@@ -257,3 +257,47 @@ export interface TeachingMaterial {
   updated_at: string;
   processed_at: string | null;
 }
+
+export interface MaterialChunk {
+  id: string;
+  material_id: string;
+  chunk_index: number;
+  content: string;
+  content_tokens: number | null;
+  embedding: number[] | null;
+  metadata: Record<string, any>;
+  created_at: string;
+}
+
+// ============================================================
+// Fase 11.D · Generated lesson questions (3 tipos)
+// ============================================================
+
+export type QuestionType = 'multiple_choice' | 'true_false' | 'fill_blank';
+
+export interface MCQuestion {
+  question: string;
+  options: [string, string, string, string];
+  correct_index: number;
+  explanation: string;
+  source_quote: string;
+}
+
+export interface TFQuestion {
+  statement: string;
+  is_true: boolean;
+  explanation: string;
+  source_quote: string;
+}
+
+export interface FillQuestion {
+  sentence_with_blank: string;
+  correct_answer: string;
+  alternatives_accepted: string[];
+  explanation: string;
+  source_quote: string;
+}
+
+export type GeneratedLessonQuestion =
+  | { question_type: 'multiple_choice'; data: MCQuestion }
+  | { question_typ
