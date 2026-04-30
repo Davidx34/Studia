@@ -248,3 +248,97 @@ Privado · Todos los derechos reservados · 2026
 ---
 
 Construido con cariño para los estudiantes de Latinoamérica 💙
+
+---
+
+## Fase 11: Clases con IA
+
+> Funcionalidad nueva. Profesor crea una clase, sube material didáctico (PDF/DOCX/XLSX), y la IA arma un mapa de aprendizaje + genera lecciones contextualizadas con RAG sobre el material real.
+
+### Flujo del profesor
+
+1. **Crear clase** en `/teacher/classrooms/new` (nombre, materia, grado).
+2. **Inscribir estudiantes** por email (los que ya tienen cuenta entran al toque; los demás quedan pendientes y se inscriben automáticamente al hacer signup, vía un trigger SQL).
+3. **Subir material** en la pestaña "Materiales" (drag-drop nativo, máx 10 MB por archivo). La Edge Function `process-material` extrae texto, lo divide en chunks de ~500 tokens y calcula embeddings (Gemini `text-embedding-004`, 768 dims) que se guardan en pgvector con índice HNSW.
+4. **Generar mapa** desde la pestaña "Módulos". La Edge Function `generate-classroom-map` llama a Gemini Map Designer con `responseSchema` JSON pidiendo 5–12 nodos con dificultad creciente, prerequisites por índice y posiciones x/y para el mapa visual.
+5. **Ver progreso** en la pestaña "Progreso" con tabla sortable, filtros (Todos / Activos / En riesgo), sparkline de actividad semanal y exportación a Excel multi-hoja.
+
+### Flujo del estudiante
+
+1. En su dashboard ve la nueva sección **"📚 Mis clases"** arriba del mapa global.
+2. Entra a una clase (`/my-classes/[id]`) y ve el mapa de la clase: lista de estaciones con estados *locked / available / in_progress / completed*.
+3. Hace una lección — la Edge Function `generate-lesson-from-material` corre two-stage:
+   - **Outliner**: outline cacheado en `lesson_generations` (TTL 7 días) con mezcla de tipos.
+   - **Writer**: por cada entrada hace embedding del query + `match_material_chunks` (RAG sobre pgvector) + prompt al modelo con `responseSchema` específico al tipo de pregunta.
+4. Soporta **3 tipos de pregunta mezclados**:
+   - **Multiple choice** (4 botones)
+   - **Verdadero/Falso** (2 botones grandes)
+   - **Completar la frase** (input con normalización: minúsculas, sin tildes, sin espacios extra)
+5. Cada feedback muestra el **`source_quote`** del material original ("Del material de tu profesor: '…'").
+6. XP, achievements y rachas se recalculan igual que con módulos legacy.
+
+### Schema agregado
+
+12 migraciones nuevas (`004_enable_extensions.sql` → `015_profiles_add_email.sql`):
+
+| Tabla nueva | Propósito |
+|---|---|
+| `teaching_materials` | metadata + estado de procesamiento de cada archivo |
+| `material_chunks` | texto + `embedding vector(768)` con HNSW |
+| `pending_enrollments` | invitaciones por email a usuarios sin cuenta |
+| `lesson_generations` | cache de outlines (TTL 7d), service_role only |
+
+Más columnas aditivas en `content_modules` (`auto_generated`, `topic_keywords`, `source_material_ids`), `classrooms` (`subject_area`, `grade_level`) y `profiles` (`email`).
+
+3 funciones SQL nuevas (todas `SECURITY DEFINER` con `search_path` explícito):
+- `match_material_chunks(query_embedding, classroom_id_filter, match_count)` — RAG retrieval por similitud cosine
+- `invalidate_lesson_cache(classroom_id)` — limpia outlines + preguntas cuando cambia el material
+- `auto_enroll_pending()` (trigger) — promueve `pending_enrollments` a `class_enrollments` al signup
+
+1 bucket de Storage privado (`teaching-materials`, 10 MB max, MIMEs PDF/DOCX/XLSX) con 4 políticas RLS.
+
+### Edge Functions nuevas (3)
+
+| Función | Qué hace |
+|---|---|
+| `process-material` | Descarga archivo, extrae texto (`unpdf` / `mammoth` / `xlsx`), chunking + embeddings, detección de temas |
+| `generate-classroom-map` | Map Designer con structured JSON output → 5-12 módulos con prereqs |
+| `generate-lesson-from-material` | Two-stage Outliner + Writer con RAG sobre `match_material_chunks` |
+
+Todas requieren `GEMINI_API_KEY` configurada en `supabase secrets`.
+
+### Setup (orden)
+
+```powershell
+# 1. Migraciones (ya aplicadas si seguiste el flujo)
+supabase db push
+
+# 2. Configurar Gemini API key (sólo si no está)
+supabase secrets set GEMINI_API_KEY=tu_key_de_aistudio_google_com
+
+# 3. Deploy de las 3 edge functions nuevas
+supabase functions deploy process-material
+supabase functions deploy generate-classroom-map
+supabase functions deploy generate-lesson-from-material
+
+# 4. Verificar
+supabase functions list
+```
+
+### Costos estimados (Gemini 1.5 Flash + text-embedding-004)
+
+| Operación | Costo |
+|---|---|
+| Procesar PDF de 20 páginas | ~$0.0003 |
+| Generar mapa de clase | ~$0.005 |
+| Generar lección de 5 preguntas con RAG | ~$0.002 |
+| Cache hit | $0 |
+| **100 estudiantes × 20 lecciones/mes** | **~$4/mes** |
+
+### Limitaciones conocidas
+
+- Edge Functions tienen timeout de 150s. Si subís un PDF de >50 páginas conviene implementar background jobs con tabla `processing_jobs` + cron de 1 min.
+- Gemini free tier tiene rate limit de 15 req/min — agrupamos embeddings en batches de 100.
+- Storage free tier: 1 GB total. El UI muestra cuota usada.
+- `pgvector` con RLS requiere `SECURITY DEFINER` (ya aplicado en `match_material_chunks`).
+- Ejecutar `VACUUM ANALYZE` periódicamente sobre `material_chunks` mejora el HNSW index.
