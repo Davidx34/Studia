@@ -1,5 +1,5 @@
 // Tipos generados manualmente desde el schema SQL
-// En producción, usar: npx supabase gen types typescript --project-id <id> > types/database.ts
+// En produccion, usar: npx supabase gen types typescript --project-id <id> > types/database.ts
 
 export type UserRole = 'student' | 'teacher' | 'admin';
 export type ModuleStatus = 'locked' | 'available' | 'in_progress' | 'completed';
@@ -26,6 +26,7 @@ export type MissionType =
 export interface Profile {
   id: string;
   username: string;
+  email: string | null;
   full_name: string | null;
   avatar_url: string;
   role: UserRole;
@@ -141,7 +142,25 @@ export interface Classroom {
   description: string | null;
   join_code: string;
   is_active: boolean;
+  subject_area: string | null;
+  grade_level: string | null;
   created_at: string;
+}
+
+export interface ClassEnrollment {
+  id: string;
+  classroom_id: string;
+  student_id: string;
+  teacher_id: string;
+  enrolled_at: string;
+}
+
+export interface PendingEnrollment {
+  id: string;
+  email: string;
+  classroom_id: string;
+  teacher_id: string;
+  invited_at: string;
 }
 
 export interface DailyMission {
@@ -178,6 +197,8 @@ export interface Database {
       user_achievements: { Row: UserAchievement; Insert: Partial<UserAchievement>; Update: Partial<UserAchievement> };
       shop_items: { Row: ShopItem; Insert: Partial<ShopItem>; Update: Partial<ShopItem> };
       classrooms: { Row: Classroom; Insert: Partial<Classroom>; Update: Partial<Classroom> };
+      class_enrollments: { Row: ClassEnrollment; Insert: Partial<ClassEnrollment>; Update: Partial<ClassEnrollment> };
+      pending_enrollments: { Row: PendingEnrollment; Insert: Partial<PendingEnrollment>; Update: Partial<PendingEnrollment> };
       daily_missions: { Row: DailyMission; Insert: Partial<DailyMission>; Update: Partial<DailyMission> };
       user_missions: { Row: UserMission; Insert: Partial<UserMission>; Update: Partial<UserMission> };
     };

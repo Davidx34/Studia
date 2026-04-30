@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { LayoutDashboard, Users, BookOpen, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, BookOpen, LogOut, GraduationCap } from 'lucide-react';
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -48,6 +48,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
   const navItems = [
     { href: '/teacher/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/teacher/classrooms', label: 'Mis clases', icon: GraduationCap },
     { href: '/teacher/students', label: 'Estudiantes', icon: Users },
     { href: '/teacher/content', label: 'Contenido', icon: BookOpen },
   ];
