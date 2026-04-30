@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6C5CE7"/>
+      <stop offset="100%" stop-color="#00D2D3"/>
+    </linearGradient>
+    <linearGradient id="ton" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#67e8f9"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="35%" cy="30%" r="50%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.5)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="115" fill="url(#bg)"/>
+
+  <!-- Subtle decorative dots -->
+  <circle cx="80" cy="80" r="4" fill="rgba(255,255,255,0.15)"/>
+  <circle cx="432" cy="120" r="6" fill="rgba(255,255,255,0.12)"/>
+  <circle cx="120" cy="430" r="5" fill="rgba(255,255,255,0.18)"/>
+  <circle cx="450" cy="400" r="4" fill="rgba(255,255,255,0.15)"/>
+
+  <!-- Shadow under Toñito -->
+  <ellipse cx="256" cy="430" rx="110" ry="20" fill="rgba(0,0,0,0.2)"/>
+
+  <!-- Tail -->
+  <ellipse cx="340" cy="320" rx="50" ry="40" fill="url(#ton)" opacity="0.85"/>
+
+  <!-- Body -->
+  <ellipse cx="256" cy="280" rx="130" ry="110" fill="url(#ton)" filter="url(#glow)"/>
+
+  <!-- Head -->
+  <ellipse cx="256" cy="180" rx="120" ry="115" fill="url(#ton)" filter="url(#glow)"/>
+
+  <!-- Shine highlight -->
+  <ellipse cx="256" cy="170" rx="110" ry="100" fill="url(#shine)"/>
+
+  <!-- Eyes (happy arc style) -->
+  <path d="M 195 185 Q 205 155 215 185" stroke="white" stroke-width="13" fill="none" stroke-linecap="round"/>
+  <path d="M 295 185 Q 305 155 315 185" stroke="white" stroke-width="13" fill="none" stroke-linecap="round"/>
+
+  <!-- Blush -->
+  <ellipse cx="170" cy="220" rx="20" ry="12" fill="rgba(255,150,150,0.5)"/>
+  <ellipse cx="340" cy="220" rx="20" ry="12" fill="rgba(255,150,150,0.5)"/>
+
+  <!-- Mouth -->
+  <path d="M 220 220 Q 256 260 290 220" stroke="white" stroke-width="11" fill="none" stroke-linecap="round"/>
+
+  <!-- Sparkles around -->
+  <text x="100" y="200" font-size="40" fill="#fde047" font-weight="bold">✦</text>
+  <text x="395" y="280" font-size="32" fill="#fde047" font-weight="bold">✦</text>
+  <text x="80" y="350" font-size="28" fill="#fff" font-weight="bold">✦</text>
+</svg>
