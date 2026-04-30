@@ -199,6 +199,8 @@ export interface Database {
       classrooms: { Row: Classroom; Insert: Partial<Classroom>; Update: Partial<Classroom> };
       class_enrollments: { Row: ClassEnrollment; Insert: Partial<ClassEnrollment>; Update: Partial<ClassEnrollment> };
       pending_enrollments: { Row: PendingEnrollment; Insert: Partial<PendingEnrollment>; Update: Partial<PendingEnrollment> };
+      teaching_materials: { Row: TeachingMaterial; Insert: Partial<TeachingMaterial>; Update: Partial<TeachingMaterial> };
+      material_chunks: { Row: MaterialChunk; Insert: Partial<MaterialChunk>; Update: Partial<MaterialChunk> };
       daily_missions: { Row: DailyMission; Insert: Partial<DailyMission>; Update: Partial<DailyMission> };
       user_missions: { Row: UserMission; Insert: Partial<UserMission>; Update: Partial<UserMission> };
     };
@@ -225,4 +227,33 @@ export interface Database {
       };
     };
   };
+}
+
+// ============================================================
+// Fase 11 · Stud.ia · Clases con IA
+// ============================================================
+
+export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export interface TeachingMaterial {
+  id: string;
+  classroom_id: string;
+  teacher_id: string;
+  filename: string;
+  display_name: string | null;
+  storage_path: string;
+  mime_type: string;
+  size_bytes: number;
+  extracted_text: string | null;
+  extracted_text_preview: string | null;
+  processing_status: ProcessingStatus;
+  processing_error: string | null;
+  content_hash: string | null;
+  chunk_count: number | null;
+  topics_detected: string[] | null;
+  estimated_difficulty: number | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  processed_at: string | null;
 }
