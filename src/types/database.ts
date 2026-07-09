@@ -300,4 +300,12 @@ export interface FillQuestion {
 
 export type GeneratedLessonQuestion =
   | { question_type: 'multiple_choice'; data: MCQuestion }
-  | { question_typ
+  | { question_type: 'true_false'; data: TFQuestion }
+  | { question_type: 'fill_blank'; data: FillQuestion };
+
+export interface GenerateLessonResponse {
+  ok: boolean;
+  module_id?: string;
+  questions?: GeneratedLessonQuestion[];
+  error?: string;
+}
