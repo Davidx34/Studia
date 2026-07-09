@@ -3,22 +3,26 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useTonitoStore } from '@/stores/useTonitoStore';
-import { BookOpen, Trophy, Target, Map, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { BookOpen, Trophy, Target, Map, Sparkles, ArrowRight, CheckCircle2, Zap, Flame } from 'lucide-react';
 
 interface Props {
   profile: any;
   inProgressModule: any;
+  nextModule: { id: string; title: string; classroomId: string; classroomName: string } | null;
   missions: any[];
   recentAchievements: any[];
   totalCompleted: number;
+  weeklyProgress: { date: string; count: number }[];
 }
 
 export function DashboardClient({
   profile,
   inProgressModule,
+  nextModule,
   missions,
   recentAchievements,
   totalCompleted,
+  weeklyProgress,
 }: Props) {
   const showMessage = useTonitoStore((s) => s.showMessage);
 
@@ -48,9 +52,15 @@ export function DashboardClient({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Hero card: Continuar / Empezar */}
+      {/* Hero card: Continuar / Siguiente modulo / Empezar */}
       <Link
-        href={inProgressModule ? `/lesson/${inProgressModule.module_id}` : '/map'}
+        href={
+          inProgressModule
+            ? `/lesson/${inProgressModule.module_id}`
+            : nextModule
+            ? `/lesson/${nextModule.id}`
+            : '/map'
+        }
         className="block group"
       >
         <div className="relative overflow-hidden rounded-3xl backdrop-blur-2xl bg-white/15 border border-white/25 p-6 sm:p-8 hover:bg-white/20 hover:scale-[1.01] transition-all shadow-2xl">
@@ -60,10 +70,16 @@ export function DashboardClient({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 text-yellow-200 text-sm font-semibold uppercase tracking-wider mb-2">
                 <Sparkles className="w-4 h-4" />
-                {inProgressModule ? 'Continúa donde lo dejaste' : 'Empieza tu día'}
+                {inProgressModule
+                  ? 'Continúa donde lo dejaste'
+                  : nextModule
+                  ? `Siguiente en ${nextModule.classroomName}`
+                  : 'Empieza tu día'}
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 truncate">
-                {inProgressModule?.content_modules?.title || 'Explora el mapa de aprendizaje'}
+                {inProgressModule?.content_modules?.title ||
+                  nextModule?.title ||
+                  'Explora el mapa de aprendizaje'}
               </h2>
               {inProgressModule && (
                 <div className="flex items-center gap-3">
@@ -85,12 +101,17 @@ export function DashboardClient({
       </Link>
 
       {/* Grid de stats rápidas */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard icon={Zap} label="XP total" value={profile?.total_xp || 0} color="from-amber-400 to-yellow-500" />
         <StatCard icon={BookOpen} label="Módulos" value={totalCompleted} color="from-cyan-400 to-blue-500" />
+        <StatCard icon={Flame} label="Racha" value={`${profile?.streak_days || 0}d`} color="from-orange-400 to-red-500" />
         <StatCard icon={Trophy} label="Logros" value={recentAchievements.length} color="from-yellow-400 to-orange-500" />
         <StatCard icon={Target} label="Misiones hoy" value={`${completedMissions}/${missions.length}`} color="from-pink-400 to-rose-500" />
         <StatCard icon={Map} label="Nivel" value={profile?.current_level || 1} color="from-violet-400 to-purple-600" />
       </div>
+
+      {/* Progreso semanal */}
+      <WeeklyProgressChart data={weeklyProgress} />
 
       {/* Misiones del día */}
       <section>
@@ -211,6 +232,38 @@ export function DashboardClient({
         .animate-fade-in { animation: fade-in 0.5s ease-out; }
       `}</style>
     </div>
+  );
+}
+
+function WeeklyProgressChart({ data }: { data: { date: string; count: number }[] }) {
+  const max = Math.max(1, ...data.map((d) => d.count));
+  const dayLabels = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+
+  return (
+    <section className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-4">
+      <h3 className="text-sm font-bold text-white/80 mb-3 flex items-center gap-2">
+        <BookOpen className="w-4 h-4 text-cyan-300" /> Módulos completados esta semana
+      </h3>
+      <div className="flex items-end justify-between gap-2 h-20">
+        {data.map((d, i) => {
+          const h = Math.max(4, (d.count / max) * 100);
+          const label = dayLabels[new Date(d.date + 'T00:00:00').getDay()];
+          return (
+            <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
+              <div className="w-full flex items-end h-16">
+                <div
+                  className={`w-full rounded-t-md transition-all ${
+                    d.count > 0 ? 'bg-gradient-to-t from-cyan-500 to-blue-400' : 'bg-white/10'
+                  }`}
+                  style={{ height: `${h}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-white/50">{label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

@@ -40,6 +40,14 @@ export default function LoginPage() {
       .eq('id', data.user.id)
       .single() as { data: { role: string } | null, error: unknown };
 
+    // Si venía de un signup con código de clase pendiente (email sin confirmar
+    // en ese momento), lo aplicamos ahora que ya hay sesión.
+    const pendingJoinCode = localStorage.getItem('studia_pending_join_code');
+    if (pendingJoinCode && profile?.role !== 'teacher') {
+      await supabase.rpc('join_classroom_by_code', { p_join_code: pendingJoinCode });
+      localStorage.removeItem('studia_pending_join_code');
+    }
+
     router.push(profile?.role === 'teacher' ? '/teacher/dashboard' : '/dashboard');
     router.refresh();
   };

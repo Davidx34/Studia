@@ -40,7 +40,17 @@ export async function POST(req: NextRequest) {
       respuesta_corta: '{"type":"short_answer","q":"pregunta abierta","keywords":["palabra_clave1","palabra_clave2"],"exp":"explicacion"}'
     };
 
-    const selectedFormats = types.length > 0 ? types.map(t => jsonFormats[t]).filter(Boolean) : [jsonFormats.opcion_multiple];
+    // Distribuir exactamente TOTAL_QUESTIONS entre los tipos activos (nunca solo opcion_multiple
+    // si hay mas tipos habilitados). Sin esto, Cohere tiende a generar todo opcion_multiple.
+    const TOTAL_QUESTIONS = 5;
+    const activeTypes = types.length > 0 ? types : ['opcion_multiple'];
+    const base = Math.floor(TOTAL_QUESTIONS / activeTypes.length);
+    let remainder = TOTAL_QUESTIONS % activeTypes.length;
+    const counts = activeTypes.map(() => base + (remainder-- > 0 ? 1 : 0));
+
+    const typeInstructions = activeTypes
+      .map((t, i) => `- ${counts[i]} pregunta(s) de tipo "${t}", con este formato JSON: ${jsonFormats[t]}`)
+      .join('\n');
 
     const prompt = `Eres un profesor experto generando preguntas de evaluacion.
 
@@ -59,12 +69,11 @@ ${badExample ? 'PREGUNTA A EVITAR: ' + badExample : ''}
 CONTENIDO DEL MATERIAL:
 ${context.substring(0, 1500)}
 
-Genera exactamente 5 preguntas variadas usando estos tipos: ${types.join(', ') || 'opcion_multiple'}
-Usa estos formatos JSON segun el tipo:
-${selectedFormats.join(' O ')}
+Genera EXACTAMENTE ${TOTAL_QUESTIONS} preguntas, distribuidas asi (respeta la cantidad exacta de cada tipo, no generes solo un tipo):
+${typeInstructions}
 
 Responde SOLO con JSON valido:
-{"questions":[...5 preguntas aqui...]}`;
+{"questions":[...${TOTAL_QUESTIONS} preguntas aqui, en el orden y cantidad indicados arriba...]}`;
 
     const res = await fetch('https://api.cohere.com/v2/chat', {
       method: 'POST',

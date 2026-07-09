@@ -51,6 +51,28 @@ export default async function DashboardPage() {
     .eq('student_id', user.id)
     .eq('status', 'completed');
 
+  // Progreso semanal: modulos completados por dia en los ultimos 7 dias
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+  const { data: recentCompletions } = await supabase
+    .from('student_progress')
+    .select('completed_at')
+    .eq('student_id', user.id)
+    .eq('status', 'completed')
+    .gte('completed_at', sevenDaysAgo.toISOString());
+
+  const weeklyProgress: { date: string; count: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    const count = (recentCompletions ?? []).filter(
+      (r: any) => r.completed_at?.startsWith(key)
+    ).length;
+    weeklyProgress.push({ date: key, count });
+  }
+
   // ============================================================
   // Fase 11.F: Mis clases (clases en las que esta inscrito)
   // ============================================================
@@ -61,6 +83,7 @@ export default async function DashboardPage() {
   const classroomIds = (enrollments ?? []).map((e: any) => e.classroom_id);
 
   const myClasses: MyClassCard[] = [];
+  let nextModule: { id: string; title: string; classroomId: string; classroomName: string } | null = null;
   if (classroomIds.length > 0) {
     const { data: classrooms } = await supabase
       .from('classrooms')
@@ -81,10 +104,11 @@ export default async function DashboardPage() {
     // Modulos auto-generados por classroom + progress
     const { data: classModules } = await supabase
       .from('content_modules')
-      .select('id, classroom_id')
+      .select('id, classroom_id, title, order_index')
       .in('classroom_id', classroomIds)
       .eq('auto_generated', true)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .order('order_index');
 
     const totalByClassroom = new Map<string, number>();
     const moduleIdToClass = new Map<string, string>();
@@ -96,6 +120,7 @@ export default async function DashboardPage() {
 
     const moduleIds = (classModules ?? []).map((m: any) => m.id);
     const completedByClassroom = new Map<string, number>();
+    const completedModuleIds = new Set<string>();
     if (moduleIds.length > 0) {
       const { data: progressRows } = await supabase
         .from('student_progress')
@@ -104,11 +129,30 @@ export default async function DashboardPage() {
         .eq('status', 'completed')
         .in('module_id', moduleIds);
       for (const r of progressRows ?? []) {
+        completedModuleIds.add((r as any).module_id);
         const cls = moduleIdToClass.get((r as any).module_id);
         if (cls) {
           completedByClassroom.set(cls, (completedByClassroom.get(cls) ?? 0) + 1);
         }
       }
+    }
+
+    // Proximo modulo disponible: primer modulo no completado y desbloqueado
+    // (order_index 0, o el anterior en su classroom ya completado).
+    for (const c of classrooms ?? []) {
+      const classroomModules = (classModules ?? []).filter(
+        (m: any) => m.classroom_id === (c as any).id
+      );
+      for (let i = 0; i < classroomModules.length; i++) {
+        const m = classroomModules[i] as any;
+        if (completedModuleIds.has(m.id)) continue;
+        const prevCompleted = i === 0 || completedModuleIds.has((classroomModules[i - 1] as any).id);
+        if (prevCompleted) {
+          nextModule = { id: m.id, title: m.title, classroomId: (c as any).id, classroomName: (c as any).name };
+        }
+        break;
+      }
+      if (nextModule) break;
     }
 
     for (const c of classrooms ?? []) {
@@ -131,9 +175,11 @@ export default async function DashboardPage() {
       <DashboardClient
         profile={profile}
         inProgressModule={inProgress}
+        nextModule={nextModule}
         missions={missions || []}
         recentAchievements={recentAchievements || []}
         totalCompleted={totalCompleted || 0}
+        weeklyProgress={weeklyProgress}
       />
     </>
   );

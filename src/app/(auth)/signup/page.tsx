@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
+const PENDING_JOIN_CODE_KEY = 'studia_pending_join_code';
+
 export default function SignupPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -12,8 +14,10 @@ export default function SignupPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [joinCode, setJoinCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkEmail, setCheckEmail] = useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +30,7 @@ export default function SignupPage() {
       return;
     }
 
-    const { error: signUpError } = await supabase.auth.signUp({
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -44,9 +48,49 @@ export default function SignupPage() {
       return;
     }
 
+    const trimmedCode = joinCode.trim();
+
+    if (!data.session) {
+      // El proyecto requiere confirmar el email: no hay sesión todavía.
+      // Guardamos el join_code (si lo hay) para aplicarlo en el primer login.
+      if (trimmedCode) localStorage.setItem(PENDING_JOIN_CODE_KEY, trimmedCode);
+      setCheckEmail(true);
+      setLoading(false);
+      return;
+    }
+
+    if (trimmedCode) {
+      await supabase.rpc('join_classroom_by_code', { p_join_code: trimmedCode });
+    }
+
     router.push('/dashboard');
     router.refresh();
   };
+
+  if (checkEmail) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-violet-600 via-purple-600 to-cyan-500">
+        <div className="w-full max-w-md text-center">
+          <h1 className="text-5xl font-bold text-white tracking-tight mb-8">
+            Stud<span className="text-yellow-300">.</span>ia
+          </h1>
+          <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
+            <h2 className="text-2xl font-semibold text-white mb-3">¡Ya casi! 📬</h2>
+            <p className="text-white/70">
+              Te enviamos un correo a <span className="text-yellow-300">{email}</span> para
+              confirmar tu cuenta. Ábrelo y luego inicia sesión.
+            </p>
+            <Link
+              href="/login"
+              className="inline-block mt-6 text-yellow-300 hover:text-yellow-200 font-medium"
+            >
+              Ir a iniciar sesión
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-violet-600 via-purple-600 to-cyan-500">
@@ -109,6 +153,19 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                Código de clase <span className="text-white/40 font-normal">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                placeholder="ej: ANA5A26"
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40 uppercase"
               />
             </div>
 

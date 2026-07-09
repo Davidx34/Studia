@@ -71,15 +71,16 @@ export default async function StudentClassPage({ params }: { params: { id: strin
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {modules.map((module: any, index: number) => {
               const progress = progressMap.get(module.id);
-              const isLocked = index > 0 && !progressMap.get((modules[index - 1] as any).id);
+              const prevProgress = index > 0 ? progressMap.get((modules[index - 1] as any).id) : null;
+              const isLocked = index > 0 && (prevProgress as any)?.status !== 'completed';
               const statusEmoji =
                 progress?.status === 'completed'
                   ? '✓'
                   : progress?.status === 'in_progress'
                   ? '▶️'
-                  : progress?.status === 'available'
-                  ? '🔓'
-                  : '🔒';
+                  : isLocked
+                  ? '🔒'
+                  : '🔓';
               return (
                 <div
                   key={module.id}
