@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get('GEMINI_API_KEY');
     if (!apiKey) throw new Error('GEMINI_API_KEY no configurada');
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
 
     const geminiResponse = await fetch(geminiUrl, {
       method: 'POST',
@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
         ],
         generationConfig: {
           temperature: 0.8,
-          maxOutputTokens: 300,
+          maxOutputTokens: 500,
           responseMimeType: 'text/plain',
         },
         safetySettings: [

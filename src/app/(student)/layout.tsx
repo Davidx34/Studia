@@ -4,12 +4,19 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { LogoutButton } from '@/components/LogoutButton';
+import { TonitoChatWidget } from '@/components/tonito/TonitoChatWidget';
+import { AchievementUnlockModal } from '@/components/notifications/AchievementUnlockModal';
+import { LevelUpModal } from '@/components/notifications/LevelUpModal';
+import { ToastContainer } from '@/components/notifications/ToastContainer';
+import { useNotificationBridge } from '@/hooks/useNotificationBridge';
+import { evaluateAchievements } from '@/lib/achievements/evaluate';
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  useNotificationBridge();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -32,6 +39,12 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
       setUser(profile);
       setLoading(false);
+
+      // Actualizar racha diaria y evaluar logros (first_login, streak_days, etc.)
+      // en background, sin bloquear el render.
+      supabase.rpc('check_and_update_streak', { p_user_id: authUser.id }).then(() => {
+        evaluateAchievements();
+      });
     };
 
     checkAuth();
@@ -68,6 +81,10 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
       <main className="max-w-7xl mx-auto p-8">
         {children}
       </main>
+      <TonitoChatWidget />
+      <ToastContainer />
+      <AchievementUnlockModal />
+      <LevelUpModal />
     </div>
   );
 }

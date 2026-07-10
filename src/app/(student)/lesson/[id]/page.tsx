@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { evaluateAchievements } from '@/lib/achievements/evaluate';
 
 export default function LessonPage() {
   const params = useParams();
@@ -147,6 +148,9 @@ export default function LessonPage() {
           .update({ total_xp: (profile?.total_xp ?? 0) + (mod.base_xp_reward ?? 0) })
           .eq('id', user.id);
       }
+
+      // Verificar y otorgar logros (el modal de desbloqueo aparece via Realtime).
+      await evaluateAchievements();
     } catch (e) {
       console.warn('Error guardando progreso:', e);
     }
