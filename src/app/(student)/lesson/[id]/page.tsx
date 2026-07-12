@@ -18,6 +18,7 @@ export default function LessonPage() {
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState(false);
   const [matchAnswers, setMatchAnswers] = useState({});
+  const [shortAnswerText, setShortAnswerText] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -99,6 +100,7 @@ export default function LessonPage() {
       setAnswered(false);
       setSelected(null);
       setMatchAnswers({});
+      setShortAnswerText('');
     } else {
       setDone(true);
       saveProgress(score);
@@ -246,10 +248,11 @@ export default function LessonPage() {
     if (q.type === 'short_answer') return (
       <div className="space-y-4">
         <textarea className="w-full bg-gray-700 text-white rounded-lg p-4 border border-gray-600 focus:border-purple-500 outline-none resize-none h-32"
-          placeholder="Escribe tu respuesta aqui..." disabled={answered} />
+          placeholder="Escribe tu respuesta aqui..." disabled={answered}
+          value={shortAnswerText} onChange={(e) => setShortAnswerText(e.target.value)} />
         {!answered ? (
-          <button onClick={() => handleAnswer('answered')}
-            className="w-full p-4 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700">
+          <button onClick={() => handleAnswer('answered')} disabled={!shortAnswerText.trim()}
+            className="w-full p-4 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-purple-600">
             Enviar respuesta
           </button>
         ) : (
