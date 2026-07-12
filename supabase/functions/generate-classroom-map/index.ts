@@ -188,6 +188,10 @@ Deno.serve(async (req: Request) => {
 // Helpers
 // ============================================================
 
+// Debe coincidir EXACTAMENTE con el CHECK constraint content_modules_category_check
+// en la DB (no incluye 'general' - insertar esa categoria rompe el INSERT con un 500).
+const VALID_CATEGORIES = ['math', 'science', 'language', 'history', 'logic'];
+
 function clampModule(m: DesignerModule): DesignerModule {
   return {
     title: m.title || 'Módulo sin título',
@@ -198,7 +202,7 @@ function clampModule(m: DesignerModule): DesignerModule {
     prerequisites_indices: Array.isArray(m.prerequisites_indices) ? m.prerequisites_indices : [],
     map_position_x: clamp(m.map_position_x ?? 500, 50, 950),
     map_position_y: clamp(m.map_position_y ?? 200, 50, 1500),
-    category: m.category || 'general',
+    category: VALID_CATEGORIES.includes(m.category) ? m.category : 'history',
   };
 }
 
@@ -248,7 +252,7 @@ REGLAS:
 - topic_keywords: 2-5 palabras clave por módulo
 - Títulos en español neutro, máximo 80 caracteres
 - Descripciones cortas (1-2 oraciones)
-- category: usa "math", "science", "language", "history", "logic" o "general"`;
+- category: usa EXACTAMENTE uno de estos valores (nunca otro): "math", "science", "language", "history", "logic"`;
 
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -270,7 +274,7 @@ REGLAS:
                 prerequisites_indices: { type: 'array', items: { type: 'integer' } },
                 map_position_x: { type: 'integer', minimum: 50, maximum: 950 },
                 map_position_y: { type: 'integer', minimum: 50, maximum: 1500 },
-                category: { type: 'string' },
+                category: { type: 'string', enum: VALID_CATEGORIES },
               },
               required: [
                 'title',
