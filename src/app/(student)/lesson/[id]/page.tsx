@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { evaluateAchievements } from '@/lib/achievements/evaluate';
+import { normalizeAnswer } from '@/lib/lesson/normalize';
+import { LessonQuestionMatch } from '@/components/LessonQuestionMatch';
 
 export default function LessonPage() {
   const params = useParams();
@@ -19,6 +21,10 @@ export default function LessonPage() {
   const [done, setDone] = useState(false);
   const [matchAnswers, setMatchAnswers] = useState({});
   const [shortAnswerText, setShortAnswerText] = useState('');
+  const [shortAnswerMatchedCount, setShortAnswerMatchedCount] = useState(0);
+  const [fillBlankText, setFillBlankText] = useState('');
+  const [fillBlankAttempts, setFillBlankAttempts] = useState(0);
+  const [fillBlankFeedback, setFillBlankFeedback] = useState(null); // 'correct' | 'retry' | 'revealed'
 
   useEffect(() => {
     const load = async () => {
@@ -90,8 +96,41 @@ export default function LessonPage() {
     const q = questions[idx];
     if (q.type === 'multiple_choice' && answer === q.ok) setScore(s => s + 1);
     if (q.type === 'true_false' && answer === q.ok) setScore(s => s + 1);
-    if (q.type === 'fill_blank') setScore(s => s + 1);
     if (q.type === 'short_answer') setScore(s => s + 1);
+  };
+
+  const handleShortAnswerSubmit = () => {
+    const q = questions[idx];
+    const norm = normalizeAnswer(shortAnswerText);
+    const matched = (q.keywords || []).filter((k) => norm.includes(normalizeAnswer(k))).length;
+    setShortAnswerMatchedCount(matched);
+    handleAnswer('answered');
+  };
+
+  const handleFillBlankSubmit = () => {
+    const q = questions[idx];
+    const norm = normalizeAnswer(fillBlankText);
+    const total = q.answers?.length || 0;
+    const matched = (q.answers || []).filter((a) => norm.includes(normalizeAnswer(a))).length;
+    const allMatched = total > 0 && matched === total;
+
+    if (allMatched) {
+      setFillBlankFeedback('correct');
+      setAnswered(true);
+      setSelected('filled');
+      setScore((s) => s + 1);
+      return;
+    }
+
+    const nextAttempts = fillBlankAttempts + 1;
+    setFillBlankAttempts(nextAttempts);
+    if (nextAttempts >= 2) {
+      setFillBlankFeedback('revealed');
+      setAnswered(true);
+      setSelected('filled');
+    } else {
+      setFillBlankFeedback('retry');
+    }
   };
 
   const nextQuestion = () => {
@@ -101,6 +140,10 @@ export default function LessonPage() {
       setSelected(null);
       setMatchAnswers({});
       setShortAnswerText('');
+      setShortAnswerMatchedCount(0);
+      setFillBlankText('');
+      setFillBlankAttempts(0);
+      setFillBlankFeedback(null);
     } else {
       setDone(true);
       saveProgress(score);
@@ -213,36 +256,42 @@ export default function LessonPage() {
       <div className="space-y-4">
         <p className="text-gray-300 text-sm">Escribe las palabras que faltan en los espacios</p>
         <div className="bg-gray-700 p-4 rounded-lg text-white text-lg">{q.q}</div>
+        <textarea className="w-full bg-gray-700 text-white rounded-lg p-4 border border-gray-600 focus:border-purple-500 outline-none resize-none h-24"
+          placeholder="Escribe aqui las palabras que faltan..." disabled={answered}
+          value={fillBlankText} onChange={(e) => setFillBlankText(e.target.value)} />
+        {fillBlankFeedback === 'retry' && (
+          <div className="bg-red-900 border border-red-500 p-3 rounded-lg text-red-200 text-sm font-medium">
+            Intenta de nuevo, te falta al menos una palabra clave.
+          </div>
+        )}
         {!answered ? (
-          <button onClick={() => handleAnswer('filled')}
-            className="w-full p-4 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700">
-            Ver respuesta correcta
+          <button onClick={handleFillBlankSubmit} disabled={!fillBlankText.trim()}
+            className="w-full p-4 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-purple-600">
+            Enviar respuesta
           </button>
-        ) : (
+        ) : fillBlankFeedback === 'correct' ? (
           <div className="bg-green-900 border border-green-500 p-4 rounded-lg">
-            <p className="text-green-300 font-medium">Respuesta: {q.answers?.join(', ')}</p>
+            <p className="text-green-300 font-medium">¡Correcto! 🎉</p>
+          </div>
+        ) : (
+          <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg">
+            <p className="text-blue-300 font-medium">Respuesta: {q.answers?.join(', ')}</p>
           </div>
         )}
       </div>
     );
 
     if (q.type === 'match') return (
-      <div className="space-y-3">
-        <p className="text-gray-300 text-sm mb-4">Conecta cada concepto con su definicion</p>
-        {q.pairs?.map((pair, i) => (
-          <div key={i} className="flex gap-3 items-center">
-            <div className="flex-1 bg-purple-800 p-3 rounded-lg text-white text-sm font-medium">{pair.term}</div>
-            <div className="text-gray-400">?</div>
-            <div className="flex-1 bg-blue-800 p-3 rounded-lg text-white text-sm">{pair.def}</div>
-          </div>
-        ))}
-        {!answered && (
-          <button onClick={() => handleAnswer('matched')}
-            className="w-full p-4 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700 mt-4">
-            Confirmar conexiones
-          </button>
-        )}
-      </div>
+      <LessonQuestionMatch
+        key={idx}
+        pairs={q.pairs || []}
+        disabled={answered}
+        onComplete={(correct) => {
+          setAnswered(true);
+          setSelected('matched');
+          if (correct) setScore((s) => s + 1);
+        }}
+      />
     );
 
     if (q.type === 'short_answer') return (
@@ -251,13 +300,18 @@ export default function LessonPage() {
           placeholder="Escribe tu respuesta aqui..." disabled={answered}
           value={shortAnswerText} onChange={(e) => setShortAnswerText(e.target.value)} />
         {!answered ? (
-          <button onClick={() => handleAnswer('answered')} disabled={!shortAnswerText.trim()}
+          <button onClick={handleShortAnswerSubmit} disabled={!shortAnswerText.trim()}
             className="w-full p-4 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-purple-600">
             Enviar respuesta
           </button>
         ) : (
-          <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg">
-            <p className="text-blue-300 font-medium">Palabras clave esperadas: {q.keywords?.join(', ')}</p>
+          <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg space-y-1">
+            <p className="text-blue-300 font-medium">
+              {shortAnswerMatchedCount > 0
+                ? `✅ Mencionaste ${shortAnswerMatchedCount} de ${q.keywords?.length || 0} palabras clave`
+                : 'Palabras clave esperadas:'}
+            </p>
+            <p className="text-blue-100 text-sm">{q.keywords?.join(', ')}</p>
           </div>
         )}
       </div>

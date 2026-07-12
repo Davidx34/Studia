@@ -75,9 +75,9 @@ export async function POST(req: NextRequest) {
     const jsonFormats = {
       opcion_multiple: '{"type":"multiple_choice","q":"pregunta","opts":["A. op1","B. op2","C. op3","D. op4"],"ok":0,"exp":"explicacion"}',
       verdadero_falso: '{"type":"true_false","q":"afirmacion","ok":true,"exp":"explicacion"}',
-      completar_frase: '{"type":"fill_blank","q":"La ___ es importante porque ___","answers":["palabra1","palabra2"],"exp":"explicacion"}',
+      completar_frase: '{"type":"fill_blank","q":"La escritura cuneiforme surgio en ___ para registrar transacciones comerciales","answers":["Mesopotamia"],"exp":"explicacion"}',
       conectar_conceptos: '{"type":"match","q":"Conecta cada concepto con su definicion","pairs":[{"term":"concepto","def":"definicion"}],"exp":"explicacion"}',
-      respuesta_corta: '{"type":"short_answer","q":"pregunta abierta","keywords":["palabra_clave1","palabra_clave2"],"exp":"explicacion"}'
+      respuesta_corta: '{"type":"short_answer","q":"¿Cual fue el aporte matematico mas importante de la India antigua?","keywords":["cero","sistema decimal","numeros"],"exp":"explicacion"}'
     };
 
     // Distribuir exactamente TOTAL_QUESTIONS entre los tipos activos (nunca solo opcion_multiple
@@ -113,6 +113,11 @@ Genera EXACTAMENTE ${TOTAL_QUESTIONS} preguntas, distribuidas asi (respeta la ca
 ${typeInstructions}
 
 No repitas preguntas ni reformules la misma idea dos veces; cada pregunta debe cubrir un aspecto distinto del tema.
+
+REGLAS ADICIONALES POR TIPO:
+- short_answer: la pregunta debe ser especifica y acotada (nunca vaga tipo "¿que es importante?"), con una respuesta esperada clara. "keywords" debe tener entre 2 y 5 palabras u expresiones concretas que se esperan en la respuesta.
+- fill_blank: "q" debe tener UN SOLO espacio en blanco marcado con "___", y "answers" debe tener exactamente 1 palabra o frase corta que lo completa (no varios blancos en la misma oracion).
+- match: "pairs" debe tener entre 3 y 4 pares concepto-definicion, cada uno claramente distinto de los demas para evitar ambiguedad.
 
 Responde SOLO con JSON valido:
 {"questions":[...${TOTAL_QUESTIONS} preguntas aqui, en el orden y cantidad indicados arriba...]}`;
