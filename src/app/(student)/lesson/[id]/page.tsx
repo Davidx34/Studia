@@ -59,7 +59,7 @@ export default function LessonPage() {
       const res = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context, moduleTitle: modData.title, aiConfig })
+        body: JSON.stringify({ moduleId, context, moduleTitle: modData.title, aiConfig })
       });
 
       if (res.ok) {
