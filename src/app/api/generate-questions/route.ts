@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { generateEmbedding } from '@/lib/embeddings/generate';
 
 const MIN_CACHE_SIZE = 5; // debajo de esto, todavia se sirve del cache si alcanza
 const SERVE_COUNT = 5; // preguntas que ve el estudiante por leccion
 const GENERATE_COUNT = 10; // preguntas generadas por llamada a Cohere (puebla el cache mas rapido)
+const RAG_MATCH_COUNT = 5; // chunks mas relevantes traidos via match_material_chunks
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -15,8 +17,9 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 // Convierte una fila de lesson_questions al shape que espera el render de la leccion.
+// Incluye id y concept_tag para que el cliente pueda registrar el intento en question_attempts.
 function rowToQuestion(row: any) {
-  const q: any = { type: row.type, q: row.q, exp: row.exp };
+  const q: any = { id: row.id, type: row.type, q: row.q, exp: row.exp, concept_tag: row.concept_tag ?? null };
   if (row.opts) q.opts = row.opts;
   if (row.ok !== null && row.ok !== undefined) q.ok = row.ok;
   if (row.answers) q.answers = row.answers;
@@ -25,13 +28,64 @@ function rowToQuestion(row: any) {
   return q;
 }
 
+// Busca el contexto mas relevante para el modulo: primero intenta RAG real
+// (embedding del titulo/descripcion + busqueda semantica entre TODOS los
+// materiales de la clase via match_material_chunks). Si no hay embeddings
+// disponibles o falla, cae al fallback anterior: primeros chunks de cualquier
+// material completado de la clase.
+async function getRagContext(supabase: any, moduleId: string): Promise<string> {
+  const { data: moduleRow } = await supabase
+    .from('content_modules')
+    .select('title, description, classroom_id')
+    .eq('id', moduleId)
+    .single();
+
+  if (!moduleRow) return '';
+
+  const queryText = `${moduleRow.title}. ${moduleRow.description || ''}`.trim();
+  const embedding = await generateEmbedding(queryText);
+
+  if (embedding) {
+    const { data: relevantChunks } = await supabase.rpc('match_material_chunks', {
+      query_embedding: embedding,
+      classroom_id_filter: moduleRow.classroom_id,
+      match_count: RAG_MATCH_COUNT,
+    });
+    if (relevantChunks && relevantChunks.length > 0) {
+      return relevantChunks.map((c: any) => c.content).join('\n\n');
+    }
+  }
+
+  // Fallback: sin embeddings todavia (material recien subido) o RAG sin resultados.
+  const { data: material } = await supabase
+    .from('teaching_materials')
+    .select('id')
+    .eq('classroom_id', moduleRow.classroom_id)
+    .eq('processing_status', 'completed')
+    .limit(1)
+    .single();
+
+  if (material?.id) {
+    const { data: chunks } = await supabase
+      .from('material_chunks')
+      .select('content')
+      .eq('material_id', material.id)
+      .limit(5);
+    if (chunks && chunks.length > 0) return chunks.map((c: any) => c.content).join(' ');
+  }
+
+  return moduleRow.description || '';
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { moduleId, context, moduleTitle, aiConfig } = await req.json();
+    const { moduleId, context: clientContext, moduleTitle, aiConfig } = await req.json();
+
+    let supabase: Awaited<ReturnType<typeof createServerSupabase>> | null = null;
+    if (moduleId) supabase = await createServerSupabase();
 
     // 1. Intentar servir del cache (rapido, sin llamar a Cohere).
-    if (moduleId) {
-      const supabase = await createServerSupabase();
+    if (moduleId && supabase) {
       const { data: cached } = await supabase
         .from('lesson_questions')
         .select('*')
@@ -46,6 +100,14 @@ export async function POST(req: NextRequest) {
     // 2. Cache insuficiente (o sin moduleId): generar con Cohere como antes.
     const COHERE_API_KEY = process.env.COHERE_API_KEY;
     if (!COHERE_API_KEY) return NextResponse.json({ error: 'No API key' }, { status: 500 });
+
+    // Contexto: RAG real cuando hay moduleId (busca en TODA la clase, no solo un material);
+    // si no hay moduleId (fallback sin modulo real) se usa el context que mando el cliente.
+    let context = clientContext || '';
+    if (moduleId && supabase) {
+      const ragContext = await getRagContext(supabase, moduleId);
+      if (ragContext) context = ragContext;
+    }
 
     const skills = [];
     if (aiConfig?.skill_memory) skills.push('recordar hechos');
@@ -73,11 +135,11 @@ export async function POST(req: NextRequest) {
     const subjectDesc = aiConfig?.subject_description || '';
 
     const jsonFormats = {
-      opcion_multiple: '{"type":"multiple_choice","q":"pregunta","opts":["A. op1","B. op2","C. op3","D. op4"],"ok":0,"exp":"explicacion"}',
-      verdadero_falso: '{"type":"true_false","q":"afirmacion","ok":true,"exp":"explicacion"}',
-      completar_frase: '{"type":"fill_blank","q":"La escritura cuneiforme surgio en ___ para registrar transacciones comerciales","answers":["Mesopotamia"],"exp":"explicacion"}',
-      conectar_conceptos: '{"type":"match","q":"Conecta cada concepto con su definicion","pairs":[{"term":"concepto","def":"definicion"}],"exp":"explicacion"}',
-      respuesta_corta: '{"type":"short_answer","q":"¿Cual fue el aporte matematico mas importante de la India antigua?","keywords":["cero","sistema decimal","numeros"],"exp":"explicacion"}'
+      opcion_multiple: '{"type":"multiple_choice","q":"pregunta","opts":["A. op1","B. op2","C. op3","D. op4"],"ok":0,"exp":"explicacion","concept_tag":"identificador_snake_case"}',
+      verdadero_falso: '{"type":"true_false","q":"afirmacion","ok":true,"exp":"explicacion","concept_tag":"identificador_snake_case"}',
+      completar_frase: '{"type":"fill_blank","q":"La escritura cuneiforme surgio en ___ para registrar transacciones comerciales","answers":["Mesopotamia"],"exp":"explicacion","concept_tag":"identificador_snake_case"}',
+      conectar_conceptos: '{"type":"match","q":"Conecta cada concepto con su definicion","pairs":[{"term":"concepto","def":"definicion"}],"exp":"explicacion","concept_tag":"identificador_snake_case"}',
+      respuesta_corta: '{"type":"short_answer","q":"¿Cual fue el aporte matematico mas importante de la India antigua?","keywords":["cero","sistema decimal","numeros"],"exp":"explicacion","concept_tag":"identificador_snake_case"}'
     };
 
     // Distribuir exactamente TOTAL_QUESTIONS entre los tipos activos (nunca solo opcion_multiple
@@ -119,6 +181,8 @@ REGLAS ADICIONALES POR TIPO:
 - fill_blank: "q" debe tener UN SOLO espacio en blanco marcado con "___", y "answers" debe tener exactamente 1 palabra o frase corta que lo completa (no varios blancos en la misma oracion).
 - match: "pairs" debe tener entre 3 y 4 pares concepto-definicion, cada uno claramente distinto de los demas para evitar ambiguedad.
 
+CONCEPT_TAG (obligatorio en cada pregunta): identifica el concepto especifico que evalua la pregunta (no el tema general del modulo), como un identificador snake_case corto en español (ej: "revolucion_industrial_causas", "fotosintesis_clorofila"). Si dos preguntas evaluan el mismo concepto especifico, deben usar EXACTAMENTE el mismo concept_tag.
+
 Responde SOLO con JSON valido:
 {"questions":[...${TOTAL_QUESTIONS} preguntas aqui, en el orden y cantidad indicados arriba...]}`;
 
@@ -136,9 +200,10 @@ Responde SOLO con JSON valido:
     const parsed = JSON.parse(jsonMatch[0]);
     const generated: any[] = parsed.questions || [];
 
-    // 3. Guardar lo generado en el cache para las proximas aperturas (best-effort).
-    if (moduleId && generated.length > 0) {
-      const supabase = await createServerSupabase();
+    // 3. Guardar lo generado en el cache para las proximas aperturas (best-effort),
+    // y recuperar los ids asignados por la base para poder trackear intentos.
+    let generatedWithIds = generated;
+    if (moduleId && supabase && generated.length > 0) {
       const rows = generated.map((q) => ({
         module_id: moduleId,
         type: q.type,
@@ -149,12 +214,16 @@ Responde SOLO con JSON valido:
         pairs: q.pairs ?? null,
         keywords: q.keywords ?? null,
         exp: q.exp ?? null,
+        concept_tag: q.concept_tag ?? null,
       }));
-      await supabase.from('lesson_questions').insert(rows);
+      const { data: inserted } = await supabase.from('lesson_questions').insert(rows).select('id');
+      if (inserted && inserted.length === generated.length) {
+        generatedWithIds = generated.map((q, i) => ({ ...q, id: inserted[i].id }));
+      }
     }
 
     // El estudiante solo ve SERVE_COUNT, aunque se hayan generado/guardado mas.
-    const toServe = moduleId ? shuffle(generated).slice(0, SERVE_COUNT) : generated;
+    const toServe = moduleId ? shuffle(generatedWithIds).slice(0, SERVE_COUNT) : generatedWithIds;
     return NextResponse.json({ questions: toServe, cached: false });
   } catch (e) {
     console.error('Error:', String(e));

@@ -42,21 +42,9 @@ export default function LessonPage() {
 
   const generateQuestions = async (modData) => {
     try {
-      const { data: material } = await supabase
-        .from('teaching_materials')
-        .select('id')
-        .eq('classroom_id', modData.classroom_id)
-        .eq('processing_status', 'completed')
-        .limit(1).single();
-
-      let context = modData.description;
-      if (material?.id) {
-        const { data: chunks } = await supabase
-          .from('material_chunks').select('content')
-          .eq('material_id', material.id).limit(5);
-        if (chunks?.length > 0) context = chunks.map(c => c.content).join(' ');
-      }
-
+      // La seleccion de contexto relevante (RAG via match_material_chunks) ahora
+      // vive en el servidor (/api/generate-questions), que ya tiene acceso al
+      // GEMINI_API_KEY necesario para generar el embedding de busqueda.
       const { data: aiConfig } = await supabase
         .from('classroom_ai_config')
         .select('*')
@@ -66,7 +54,7 @@ export default function LessonPage() {
       const res = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ moduleId, context, moduleTitle: modData.title, aiConfig })
+        body: JSON.stringify({ moduleId, moduleTitle: modData.title, aiConfig })
       });
 
       if (res.ok) {
@@ -89,13 +77,44 @@ export default function LessonPage() {
     setLoading(false);
   };
 
+  // Registra cada intento de respuesta en question_attempts (granularidad por pregunta,
+  // no solo al completar el modulo), para poder agregar aciertos/errores por concept_tag.
+  // Las preguntas de fallback (sin conexion a Cohere) no tienen id real en lesson_questions,
+  // asi que se omiten en vez de violar la FK.
+  const recordAttempt = async (question, wasCorrect, answerGiven) => {
+    if (!question?.id) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('question_attempts').insert({
+        student_id: user.id,
+        question_id: question.id,
+        module_id: moduleId,
+        classroom_id: mod.classroom_id,
+        concept_tag: question.concept_tag ?? null,
+        was_correct: wasCorrect,
+        answer_given: answerGiven ?? null,
+      });
+    } catch (e) {
+      console.warn('Error registrando intento:', e);
+    }
+  };
+
   const handleAnswer = (answer) => {
     if (answered) return;
     setSelected(answer);
     setAnswered(true);
     const q = questions[idx];
-    if (q.type === 'multiple_choice' && answer === q.ok) setScore(s => s + 1);
-    if (q.type === 'true_false' && answer === q.ok) setScore(s => s + 1);
+    if (q.type === 'multiple_choice') {
+      const correct = answer === q.ok;
+      if (correct) setScore(s => s + 1);
+      recordAttempt(q, correct, { selectedIndex: answer });
+    }
+    if (q.type === 'true_false') {
+      const correct = answer === q.ok;
+      if (correct) setScore(s => s + 1);
+      recordAttempt(q, correct, { selected: answer });
+    }
     if (q.type === 'short_answer') setScore(s => s + 1);
   };
 
@@ -104,6 +123,8 @@ export default function LessonPage() {
     const norm = normalizeAnswer(shortAnswerText);
     const matched = (q.keywords || []).filter((k) => norm.includes(normalizeAnswer(k))).length;
     setShortAnswerMatchedCount(matched);
+    const allKeywordsMatched = (q.keywords?.length || 0) > 0 && matched === q.keywords.length;
+    recordAttempt(q, allKeywordsMatched, { text: shortAnswerText });
     handleAnswer('answered');
   };
 
@@ -119,6 +140,7 @@ export default function LessonPage() {
       setAnswered(true);
       setSelected('filled');
       setScore((s) => s + 1);
+      recordAttempt(q, true, { text: fillBlankText });
       return;
     }
 
@@ -128,6 +150,7 @@ export default function LessonPage() {
       setFillBlankFeedback('revealed');
       setAnswered(true);
       setSelected('filled');
+      recordAttempt(q, false, { text: fillBlankText });
     } else {
       setFillBlankFeedback('retry');
     }
@@ -290,6 +313,7 @@ export default function LessonPage() {
           setAnswered(true);
           setSelected('matched');
           if (correct) setScore((s) => s + 1);
+          recordAttempt(q, correct, null);
         }}
       />
     );
