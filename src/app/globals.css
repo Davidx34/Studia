@@ -25,3 +25,44 @@ body {
     text-wrap: balance;
   }
 }
+
+/* Animaciones de cuerpo completo de Toñito (TonitoCharacter). */
+@keyframes tonito-bounce-kf {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10%); }
+}
+@keyframes tonito-shake-kf {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(-4%) rotate(-4deg); }
+  75% { transform: translateX(4%) rotate(4deg); }
+}
+@keyframes tonito-spin-kf {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes tonito-pulse-kf {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@keyframes tonito-jump-kf {
+  0%, 100% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-18%) scale(1.05); }
+  60% { transform: translateY(-18%) scale(1.05); }
+}
+@keyframes tonito-sleep-kf {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  50% { transform: rotate(-3deg) translateY(2%); }
+}
+@keyframes tonito-supersaiyan-kf {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.tonito-idle { animation: none; }
+.tonito-bounce { animation: tonito-bounce-kf 0.6s ease-in-out 2; }
+.tonito-shake { animation: tonito-shake-kf 0.4s ease-in-out 2; }
+.tonito-spin { animation: tonito-spin-kf 0.8s ease-in-out 1; }
+.tonito-pulse { animation: tonito-pulse-kf 0.5s ease-in-out 2; }
+.tonito-jump { animation: tonito-jump-kf 0.5s ease-in-out 2; }
+.tonito-sleep { animation: tonito-sleep-kf 3s ease-in-out infinite; }
+.tonito-supersaiyan { animation: tonito-supersaiyan-kf 0.4s ease-in-out infinite; }
