@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
 import { getClassroomProgress } from '@/lib/actions/classroom-progress';
+import { getConceptGapData } from '@/lib/actions/concept-metrics';
 import { createServerSupabase } from '@/lib/supabase/server';
 import ProgressClient from './ProgressClient';
 
@@ -21,5 +22,15 @@ export default async function ProgressPage({ params }: { params: { id: string } 
     );
   }
 
-  return <ProgressClient data={result.data} />;
+  // La brecha de conocimiento depende de question_attempts (Sesion B) y puede
+  // no tener datos aun; se pasa hasData para que la UI lo maneje sin bloquear
+  // la tabla de progreso existente si esta vista falla.
+  const conceptResult = await getConceptGapData(params.id);
+
+  return (
+    <ProgressClient
+      data={result.data}
+      conceptGap={conceptResult.ok ? conceptResult.data ?? null : null}
+    />
+  );
 }
