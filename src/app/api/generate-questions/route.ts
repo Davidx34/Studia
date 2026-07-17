@@ -25,6 +25,8 @@ function rowToQuestion(row: any) {
   if (row.answers) q.answers = row.answers;
   if (row.pairs) q.pairs = row.pairs;
   if (row.keywords) q.keywords = row.keywords;
+  if (row.game_type) q.game_type = row.game_type;
+  if (row.game_data) q.game_data = row.game_data;
   return q;
 }
 
@@ -139,7 +141,8 @@ export async function POST(req: NextRequest) {
       verdadero_falso: '{"type":"true_false","q":"afirmacion","ok":true,"exp":"explicacion","concept_tag":"identificador_snake_case"}',
       completar_frase: '{"type":"fill_blank","q":"La escritura cuneiforme surgio en ___ para registrar transacciones comerciales","answers":["Mesopotamia"],"exp":"explicacion","concept_tag":"identificador_snake_case"}',
       conectar_conceptos: '{"type":"match","q":"Conecta cada concepto con su definicion","pairs":[{"term":"concepto","def":"definicion"}],"exp":"explicacion","concept_tag":"identificador_snake_case"}',
-      respuesta_corta: '{"type":"short_answer","q":"¿Cual fue el aporte matematico mas importante de la India antigua?","keywords":["cero","sistema decimal","numeros"],"exp":"explicacion","concept_tag":"identificador_snake_case"}'
+      respuesta_corta: '{"type":"short_answer","q":"¿Cual fue el aporte matematico mas importante de la India antigua?","keywords":["cero","sistema decimal","numeros"],"exp":"explicacion","concept_tag":"identificador_snake_case"}',
+      el_descifrador: '{"type":"el_descifrador","q":"Descifra la palabra clave","word_to_guess":"ESCRIBA","initial_clue":"Funcionario que registraba documentos oficiales en civilizaciones antiguas","hints":["Era responsable de mantener registros y documentos publicos","Sin esta profesion no habria constancia de leyes ni tratados","Viene del latin scribere, que significa escribir"],"exp":"explicacion pedagogica de por que este concepto importa","concept_tag":"identificador_snake_case"}'
     };
 
     // Distribuir exactamente TOTAL_QUESTIONS entre los tipos activos (nunca solo opcion_multiple
@@ -150,9 +153,19 @@ export async function POST(req: NextRequest) {
     let remainder = TOTAL_QUESTIONS % activeTypes.length;
     const counts = activeTypes.map(() => base + (remainder-- > 0 ? 1 : 0));
 
-    const typeInstructions = activeTypes
+    let typeInstructions = activeTypes
       .map((t, i) => `- ${counts[i]} pregunta(s) de tipo "${t}", con este formato JSON: ${jsonFormats[t]}`)
       .join('\n');
+
+    // El minijuego "El Descifrador" es un bonus fuera de la distribucion normal:
+    // solo tiene sentido cuando hay un modulo real (se cachea/trackea como el resto),
+    // y solo cuando el tema tiene un termino/concepto concreto para adivinar
+    // (si no aplica, Cohere puede omitirlo y generar una pregunta mas del resto).
+    const MINIGAME_COUNT = moduleId ? 1 : 0;
+    if (MINIGAME_COUNT > 0) {
+      typeInstructions += `\n- ${MINIGAME_COUNT} pregunta adicional de tipo "el_descifrador" SOLO SI el tema tiene un termino o palabra clave clara para adivinar (ej: un concepto, un nombre propio, un invento); si no aplica, genera en su lugar una pregunta mas de los tipos de arriba. Formato JSON: ${jsonFormats.el_descifrador}`;
+    }
+    const TOTAL_WITH_MINIGAME = TOTAL_QUESTIONS + MINIGAME_COUNT;
 
     const prompt = `Eres un profesor experto generando preguntas de evaluacion.
 
@@ -171,7 +184,7 @@ ${badExample ? 'PREGUNTA A EVITAR: ' + badExample : ''}
 CONTENIDO DEL MATERIAL:
 ${(context || '').substring(0, 1500)}
 
-Genera EXACTAMENTE ${TOTAL_QUESTIONS} preguntas, distribuidas asi (respeta la cantidad exacta de cada tipo, no generes solo un tipo):
+Genera EXACTAMENTE ${TOTAL_WITH_MINIGAME} preguntas, distribuidas asi (respeta la cantidad exacta de cada tipo, no generes solo un tipo):
 ${typeInstructions}
 
 No repitas preguntas ni reformules la misma idea dos veces; cada pregunta debe cubrir un aspecto distinto del tema.
@@ -180,11 +193,12 @@ REGLAS ADICIONALES POR TIPO:
 - short_answer: la pregunta debe ser especifica y acotada (nunca vaga tipo "¿que es importante?"), con una respuesta esperada clara. "keywords" debe tener entre 2 y 5 palabras u expresiones concretas que se esperan en la respuesta.
 - fill_blank: "q" debe tener UN SOLO espacio en blanco marcado con "___", y "answers" debe tener exactamente 1 palabra o frase corta que lo completa (no varios blancos en la misma oracion).
 - match: "pairs" debe tener entre 3 y 4 pares concepto-definicion, cada uno claramente distinto de los demas para evitar ambiguedad.
+- el_descifrador: "word_to_guess" debe ser UNA sola palabra en MAYUSCULAS sin acentos ni espacios, tomada del CONTENIDO DEL MATERIAL de arriba (nunca copies "ESCRIBA" del ejemplo de formato, es solo ilustrativo); si el termino tiene varias palabras, usa la mas importante. "hints" debe tener EXACTAMENTE 3 pistas progresivas (la primera vaga, la ultima casi obvia).
 
 CONCEPT_TAG (obligatorio en cada pregunta): identifica el concepto especifico que evalua la pregunta (no el tema general del modulo), como un identificador snake_case corto en español (ej: "revolucion_industrial_causas", "fotosintesis_clorofila"). Si dos preguntas evaluan el mismo concepto especifico, deben usar EXACTAMENTE el mismo concept_tag.
 
 Responde SOLO con JSON valido:
-{"questions":[...${TOTAL_QUESTIONS} preguntas aqui, en el orden y cantidad indicados arriba...]}`;
+{"questions":[...${TOTAL_WITH_MINIGAME} preguntas aqui, en el orden y cantidad indicados arriba...]}`;
 
     const res = await fetch('https://api.cohere.com/v2/chat', {
       method: 'POST',
@@ -198,7 +212,17 @@ Responde SOLO con JSON valido:
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return NextResponse.json({ error: 'No JSON found' }, { status: 500 });
     const parsed = JSON.parse(jsonMatch[0]);
-    const generated: any[] = parsed.questions || [];
+    // Normaliza el_descifrador a la misma forma anidada (game_type/game_data) que usan
+    // las filas servidas desde cache, para que el cliente no tenga que manejar dos shapes.
+    const generated: any[] = (parsed.questions || []).map((q: any) => {
+      if (q.type !== 'el_descifrador') return q;
+      const { word_to_guess, initial_clue, hints, ...rest } = q;
+      return {
+        ...rest,
+        game_type: 'el_descifrador',
+        game_data: { word_to_guess, initial_clue, hints, pedagogical_feedback: q.exp },
+      };
+    });
 
     // 3. Guardar lo generado en el cache para las proximas aperturas (best-effort),
     // y recuperar los ids asignados por la base para poder trackear intentos.
@@ -215,6 +239,8 @@ Responde SOLO con JSON valido:
         keywords: q.keywords ?? null,
         exp: q.exp ?? null,
         concept_tag: q.concept_tag ?? null,
+        game_type: q.game_type ?? null,
+        game_data: q.game_data ?? null,
       }));
       const { data: inserted } = await supabase.from('lesson_questions').insert(rows).select('id');
       if (inserted && inserted.length === generated.length) {
