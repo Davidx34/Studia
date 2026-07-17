@@ -66,7 +66,7 @@ export function TonitoChatWidget() {
     const resetTimer = () => {
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
       if (mood === 'sleeping') setInactive(false);
-      inactivityTimer.current = setTimeout(() => setInactive(true), 5 * 60 * 1000);
+      inactivityTimer.current = setTimeout(() => setInactive(true), 2 * 60 * 1000);
     };
 
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];

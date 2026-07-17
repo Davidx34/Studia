@@ -9,12 +9,12 @@ export function TonitoWidget() {
     useTonitoStore();
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Inactivity tracking — Toñito se duerme tras 5 minutos
+  // Inactivity tracking — Toñito se duerme tras 2 minutos
   useEffect(() => {
     const resetTimer = () => {
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
       if (mood === 'sleeping') setInactive(false);
-      inactivityTimer.current = setTimeout(() => setInactive(true), 5 * 60 * 1000);
+      inactivityTimer.current = setTimeout(() => setInactive(true), 2 * 60 * 1000);
     };
 
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
