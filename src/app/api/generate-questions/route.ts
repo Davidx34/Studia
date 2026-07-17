@@ -79,12 +79,70 @@ async function getRagContext(supabase: any, moduleId: string): Promise<string> {
   return moduleRow.description || '';
 }
 
+// Genera 4 preguntas cortas (multiple_choice/true_false, sin minijuegos) enfocadas
+// SOLO en los concept_tag debiles que paso el cliente. Se usa para el repaso dirigido
+// (Sesion E.1): nunca se cachea ni se guarda en lesson_questions (es efimero, se
+// descarta despues de usarse una vez), asi que siempre llama a Cohere directo.
+async function generateRemediationQuestions(
+  supabase: any,
+  moduleId: string,
+  moduleTitle: string,
+  weakConcepts: string[]
+): Promise<any[]> {
+  const COHERE_API_KEY = process.env.COHERE_API_KEY;
+  if (!COHERE_API_KEY) return [];
+
+  const context = await getRagContext(supabase, moduleId);
+
+  const prompt = `Eres un profesor de apoyo haciendo un repaso corto y alentador con un estudiante.
+
+TEMA DEL MODULO: ${moduleTitle}
+CONTENIDO DEL MATERIAL:
+${(context || '').substring(0, 1500)}
+
+El estudiante tuvo dificultad especificamente con estos conceptos: ${weakConcepts.join(', ')}.
+
+Genera EXACTAMENTE 4 preguntas de repaso, SOLO sobre esos conceptos (nada mas del tema general).
+Usa un lenguaje de apoyo, preguntas mas simples y directas que refuercen comprension (no que confundan mas).
+Distribucion: 2 preguntas "multiple_choice" y 2 preguntas "true_false".
+
+Formato JSON por pregunta:
+- multiple_choice: {"type":"multiple_choice","q":"pregunta","opts":["A. op1","B. op2","C. op3","D. op4"],"ok":0,"exp":"explicacion de apoyo","concept_tag":"uno de los conceptos de arriba, exacto"}
+- true_false: {"type":"true_false","q":"afirmacion","ok":true,"exp":"explicacion de apoyo","concept_tag":"uno de los conceptos de arriba, exacto"}
+
+Responde SOLO con JSON valido:
+{"questions":[...4 preguntas aqui...]}`;
+
+  const res = await fetch('https://api.cohere.com/v2/chat', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + COHERE_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'c4ai-aya-expanse-32b', messages: [{ role: 'user', content: prompt }] }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  const text = data.message?.content?.[0]?.text || '';
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return [];
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    return parsed.questions || [];
+  } catch {
+    return [];
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { moduleId, context: clientContext, moduleTitle, aiConfig } = await req.json();
+    const { moduleId, context: clientContext, moduleTitle, aiConfig, remediationConcepts } = await req.json();
 
     let supabase: Awaited<ReturnType<typeof createServerSupabase>> | null = null;
     if (moduleId) supabase = await createServerSupabase();
+
+    // 0. Modo repaso dirigido (Sesion E.1): atajo completo, nunca toca el cache normal.
+    if (remediationConcepts?.length > 0 && moduleId && supabase) {
+      const questions = await generateRemediationQuestions(supabase, moduleId, moduleTitle, remediationConcepts);
+      return NextResponse.json({ questions, cached: false });
+    }
 
     // 1. Intentar servir del cache (rapido, sin llamar a Cohere).
     if (moduleId && supabase) {
