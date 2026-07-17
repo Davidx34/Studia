@@ -144,7 +144,8 @@ export async function POST(req: NextRequest) {
       respuesta_corta: '{"type":"short_answer","q":"¿Cual fue el aporte matematico mas importante de la India antigua?","keywords":["cero","sistema decimal","numeros"],"exp":"explicacion","concept_tag":"identificador_snake_case"}',
       el_descifrador: '{"type":"el_descifrador","q":"Descifra la palabra clave","word_to_guess":"ESCRIBA","initial_clue":"Funcionario que registraba documentos oficiales en civilizaciones antiguas","hints":["Era responsable de mantener registros y documentos publicos","Sin esta profesion no habria constancia de leyes ni tratados","Viene del latin scribere, que significa escribir"],"exp":"explicacion pedagogica de por que este concepto importa","concept_tag":"identificador_snake_case"}',
       linea_del_tiempo: '{"type":"linea_del_tiempo","q":"Ordena estos eventos cronologicamente","items":[{"id":1,"text":"evento mas antiguo","correct_position":1,"year":"opcional"},{"id":2,"text":"segundo evento","correct_position":2,"year":"opcional"},{"id":3,"text":"tercer evento","correct_position":3,"year":"opcional"}],"exp":"explicacion pedagogica de por que este orden importa","concept_tag":"identificador_snake_case"}',
-      categorias_rapidas: '{"type":"categorias_rapidas","q":"Clasifica estos elementos en su categoria correcta","categories":["Categoria A","Categoria B","Categoria C"],"items":[{"id":1,"text":"elemento 1","correct_category":"Categoria A"},{"id":2,"text":"elemento 2","correct_category":"Categoria B"},{"id":3,"text":"elemento 3","correct_category":"Categoria C"},{"id":4,"text":"elemento 4","correct_category":"Categoria A"}],"time_limit_seconds":60,"exp":"explicacion pedagogica de por que esta clasificacion importa","concept_tag":"identificador_snake_case"}'
+      categorias_rapidas: '{"type":"categorias_rapidas","q":"Clasifica estos elementos en su categoria correcta","categories":["Categoria A","Categoria B","Categoria C"],"items":[{"id":1,"text":"elemento 1","correct_category":"Categoria A"},{"id":2,"text":"elemento 2","correct_category":"Categoria B"},{"id":3,"text":"elemento 3","correct_category":"Categoria C"},{"id":4,"text":"elemento 4","correct_category":"Categoria A"}],"time_limit_seconds":60,"exp":"explicacion pedagogica de por que esta clasificacion importa","concept_tag":"identificador_snake_case"}',
+      flashcard_rapida: '{"type":"flashcard_rapida","q":"Encuentra los pares relacionados","flash_pairs":[{"id":1,"card1":"concepto 1","card2":"su definicion o relacion"},{"id":2,"card1":"concepto 2","card2":"su definicion o relacion"},{"id":3,"card1":"concepto 3","card2":"su definicion o relacion"},{"id":4,"card1":"concepto 4","card2":"su definicion o relacion"}],"exp":"explicacion pedagogica de por que estas asociaciones importan","concept_tag":"identificador_snake_case"}'
     };
 
     // Minijuegos disponibles como "bonus" fuera de la distribucion normal (no le
@@ -155,6 +156,7 @@ export async function POST(req: NextRequest) {
       el_descifrador: 'SOLO SI el tema tiene un termino o palabra clave clara para adivinar (ej: un concepto, un nombre propio, un invento)',
       linea_del_tiempo: 'SOLO SI el tema tiene una secuencia cronologica o de pasos clara (ej: eventos historicos, etapas de un proceso, ciclo biologico)',
       categorias_rapidas: 'SOLO SI el tema tiene una clasificacion o taxonomia clara con 3-4 categorias y varios elementos por categoria (ej: tipos de organismos, categorias historicas, clases de algo)',
+      flashcard_rapida: 'SOLO SI el tema tiene pares claros de conceptos asociados (ej: termino-definicion, causa-efecto, pais-capital, organo-funcion)',
     };
     const MAX_MINIGAMES_PER_MODULE = 2;
 
@@ -209,6 +211,7 @@ REGLAS ADICIONALES POR TIPO:
 - el_descifrador: "word_to_guess" debe ser UNA sola palabra en MAYUSCULAS sin acentos ni espacios, tomada del CONTENIDO DEL MATERIAL de arriba (nunca copies "ESCRIBA" del ejemplo de formato, es solo ilustrativo); si el termino tiene varias palabras, usa la mas importante. "hints" debe tener EXACTAMENTE 3 pistas progresivas (la primera vaga, la ultima casi obvia).
 - linea_del_tiempo: "items" debe tener entre 3 y 5 eventos/pasos reales del CONTENIDO DEL MATERIAL, cada uno con "correct_position" empezando en 1 y sin saltos ni repeticiones; "year" es opcional (solo si el material lo menciona explicitamente, si no dejalo vacio).
 - categorias_rapidas: "categories" debe tener entre 3 y 4 categorias reales del CONTENIDO DEL MATERIAL; "items" debe tener entre 6 y 8 elementos en total, con al menos 2 elementos por categoria y "correct_category" que coincida EXACTAMENTE (mismo texto) con uno de los valores de "categories".
+- flashcard_rapida: "flash_pairs" debe tener entre 6 y 8 pares reales del CONTENIDO DEL MATERIAL (concepto + su definicion/relacion/causa-efecto), cada "card1"/"card2" corto (maximo 6 palabras) para que quepan en una tarjeta.
 
 CONCEPT_TAG (obligatorio en cada pregunta): identifica el concepto especifico que evalua la pregunta (no el tema general del modulo), como un identificador snake_case corto en español (ej: "revolucion_industrial_causas", "fotosintesis_clorofila"). Si dos preguntas evaluan el mismo concepto especifico, deben usar EXACTAMENTE el mismo concept_tag.
 
@@ -252,6 +255,14 @@ Responde SOLO con JSON valido:
           ...rest,
           game_type: 'categorias_rapidas',
           game_data: { categories, items, time_limit_seconds, pedagogical_feedback: q.exp },
+        };
+      }
+      if (q.type === 'flashcard_rapida') {
+        const { flash_pairs, ...rest } = q;
+        return {
+          ...rest,
+          game_type: 'flashcard_rapida',
+          game_data: { pairs: flash_pairs, pedagogical_feedback: q.exp },
         };
       }
       return q;
