@@ -3,7 +3,8 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useTonitoStore } from '@/stores/useTonitoStore';
-import { BookOpen, Trophy, Target, Map, Sparkles, ArrowRight, CheckCircle2, Zap, Flame } from 'lucide-react';
+import { BookOpen, Trophy, Target, Map, Sparkles, ArrowRight, CheckCircle2, Zap, Flame, ClipboardList } from 'lucide-react';
+import type { RemediationPlan } from '@/lib/actions/remediation-plans';
 
 interface Props {
   profile: any;
@@ -13,6 +14,7 @@ interface Props {
   recentAchievements: any[];
   totalCompleted: number;
   weeklyProgress: { date: string; count: number }[];
+  activePlan: RemediationPlan | null;
 }
 
 export function DashboardClient({
@@ -23,6 +25,7 @@ export function DashboardClient({
   recentAchievements,
   totalCompleted,
   weeklyProgress,
+  activePlan,
 }: Props) {
   const showMessage = useTonitoStore((s) => s.showMessage);
 
@@ -52,6 +55,37 @@ export function DashboardClient({
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Plan de refuerzo activo (Sesion E.2): no obligatorio, a su ritmo */}
+      {activePlan && (
+        <Link href={`/repaso/${activePlan.id}`} className="block group">
+          <div className="rounded-2xl backdrop-blur-xl bg-violet-500/15 border border-violet-400/30 p-4 sm:p-5 hover:bg-violet-500/20 transition-all flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-400 to-fuchsia-500 flex items-center justify-center flex-shrink-0 shadow-lg">
+              <ClipboardList className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-wider text-violet-200">
+                Mi próximo
+              </div>
+              <div className="text-white font-bold truncate">{activePlan.title}</div>
+              <div className="flex items-center gap-2 mt-1.5">
+                <div className="flex-1 max-w-[180px] h-1.5 bg-white/15 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-violet-400 to-fuchsia-400"
+                    style={{
+                      width: `${Math.min(100, (activePlan.modules_completed / activePlan.modules_target) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <span className="text-xs text-white/70 font-medium">
+                  {activePlan.modules_completed}/{activePlan.modules_target} módulos completados
+                </span>
+              </div>
+            </div>
+            <ArrowRight className="w-6 h-6 text-white/60 group-hover:translate-x-1 transition-transform flex-shrink-0" />
+          </div>
+        </Link>
+      )}
+
       {/* Hero card: Continuar / Siguiente modulo / Empezar */}
       <Link
         href={
