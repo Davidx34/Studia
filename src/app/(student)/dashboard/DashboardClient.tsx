@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useTonitoStore } from '@/stores/useTonitoStore';
 import { BookOpen, Trophy, Target, Map, Sparkles, ArrowRight, CheckCircle2, Zap, Flame, ClipboardList } from 'lucide-react';
 import type { RemediationPlan } from '@/lib/actions/remediation-plans';
+import { CinematicScene } from '@/components/cinematics/CinematicScene';
 
 interface Props {
   profile: any;
@@ -28,9 +29,22 @@ export function DashboardClient({
   activePlan,
 }: Props) {
   const showMessage = useTonitoStore((s) => s.showMessage);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Cinematica de bienvenida (Sesion F.1): solo la primera vez que el
+  // estudiante ve su dashboard, nunca mas (flag en localStorage por usuario).
+  useEffect(() => {
+    if (!profile?.id) return;
+    const key = `studia_welcome_shown_${profile.id}`;
+    if (!localStorage.getItem(key)) {
+      localStorage.setItem(key, '1');
+      setShowWelcome(true);
+    }
+  }, [profile?.id]);
 
   // Toñito saluda al cargar el dashboard, contextual a la hora y al streak
   useEffect(() => {
+    if (showWelcome) return;
     const hour = new Date().getHours();
     const timeGreeting =
       hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches';
@@ -49,9 +63,14 @@ export function DashboardClient({
 
     const timer = setTimeout(() => showMessage(message, 6000), 800);
     return () => clearTimeout(timer);
-  }, [profile, inProgressModule, showMessage]);
+  }, [profile, inProgressModule, showMessage, showWelcome]);
 
   const completedMissions = missions.filter((m) => m.is_completed).length;
+
+  if (showWelcome) {
+    const name = profile?.full_name?.split(' ')[0] || profile?.username || 'estudiante';
+    return <CinematicScene type="welcome" studentName={name} onComplete={() => setShowWelcome(false)} />;
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -313,7 +332,7 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-4 hover:bg-white/15 transition">
+    <div className="studia-card-hover backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-4 hover:bg-white/15 transition">
       <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-2 shadow-lg`}>
         <Icon className="w-5 h-5 text-white" />
       </div>
