@@ -6,6 +6,7 @@ import { evaluateAchievements } from '@/lib/achievements/evaluate';
 import { normalizeAnswer } from '@/lib/lesson/normalize';
 import { LessonQuestionMatch } from '@/components/LessonQuestionMatch';
 import { ElDescifrador } from '@/components/minigames/ElDescifrador';
+import { TimelineGame } from '@/components/minigames/TimelineGame';
 import { useTonitoStore } from '@/stores/useTonitoStore';
 
 export default function LessonPage() {
@@ -341,6 +342,20 @@ export default function LessonPage() {
       />
     );
 
+    if (q.type === 'linea_del_tiempo') return (
+      <TimelineGame
+        key={idx}
+        gameData={q.game_data || {}}
+        disabled={answered}
+        onComplete={(correct) => {
+          setAnswered(true);
+          setSelected('ordenado');
+          if (correct) setScore((s) => s + 1);
+          recordAttempt(q, correct, null);
+        }}
+      />
+    );
+
     if (q.type === 'short_answer') return (
       <div className="space-y-4">
         <textarea className="w-full bg-gray-700 text-white rounded-lg p-4 border border-gray-600 focus:border-purple-500 outline-none resize-none h-32"
@@ -389,7 +404,8 @@ export default function LessonPage() {
              q.type === 'fill_blank' ? 'Completar Frase' :
              q.type === 'match' ? 'Conectar Conceptos' :
              q.type === 'short_answer' ? 'Respuesta Corta' :
-             q.type === 'el_descifrador' ? '🔤 El Descifrador' : 'Pregunta'}
+             q.type === 'el_descifrador' ? '🔤 El Descifrador' :
+             q.type === 'linea_del_tiempo' ? '📅 Línea del Tiempo' : 'Pregunta'}
           </span>
         </div>
         <p className="text-white font-bold text-lg mb-6">{q.q}</p>

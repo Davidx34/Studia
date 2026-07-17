@@ -142,7 +142,16 @@ export async function POST(req: NextRequest) {
       completar_frase: '{"type":"fill_blank","q":"La escritura cuneiforme surgio en ___ para registrar transacciones comerciales","answers":["Mesopotamia"],"exp":"explicacion","concept_tag":"identificador_snake_case"}',
       conectar_conceptos: '{"type":"match","q":"Conecta cada concepto con su definicion","pairs":[{"term":"concepto","def":"definicion"}],"exp":"explicacion","concept_tag":"identificador_snake_case"}',
       respuesta_corta: '{"type":"short_answer","q":"¿Cual fue el aporte matematico mas importante de la India antigua?","keywords":["cero","sistema decimal","numeros"],"exp":"explicacion","concept_tag":"identificador_snake_case"}',
-      el_descifrador: '{"type":"el_descifrador","q":"Descifra la palabra clave","word_to_guess":"ESCRIBA","initial_clue":"Funcionario que registraba documentos oficiales en civilizaciones antiguas","hints":["Era responsable de mantener registros y documentos publicos","Sin esta profesion no habria constancia de leyes ni tratados","Viene del latin scribere, que significa escribir"],"exp":"explicacion pedagogica de por que este concepto importa","concept_tag":"identificador_snake_case"}'
+      el_descifrador: '{"type":"el_descifrador","q":"Descifra la palabra clave","word_to_guess":"ESCRIBA","initial_clue":"Funcionario que registraba documentos oficiales en civilizaciones antiguas","hints":["Era responsable de mantener registros y documentos publicos","Sin esta profesion no habria constancia de leyes ni tratados","Viene del latin scribere, que significa escribir"],"exp":"explicacion pedagogica de por que este concepto importa","concept_tag":"identificador_snake_case"}',
+      linea_del_tiempo: '{"type":"linea_del_tiempo","q":"Ordena estos eventos cronologicamente","items":[{"id":1,"text":"evento mas antiguo","correct_position":1,"year":"opcional"},{"id":2,"text":"segundo evento","correct_position":2,"year":"opcional"},{"id":3,"text":"tercer evento","correct_position":3,"year":"opcional"}],"exp":"explicacion pedagogica de por que este orden importa","concept_tag":"identificador_snake_case"}'
+    };
+
+    // Minijuegos disponibles como "bonus" fuera de la distribucion normal (no le
+    // roban cupo a los tipos que el profesor configuro). Maximo 2 minijuegos por
+    // modulo para no perder variedad pedagogica (cada uno pide 1, y hay 2 tipos).
+    const MINIGAME_RULES: Record<string, string> = {
+      el_descifrador: 'SOLO SI el tema tiene un termino o palabra clave clara para adivinar (ej: un concepto, un nombre propio, un invento)',
+      linea_del_tiempo: 'SOLO SI el tema tiene una secuencia cronologica o de pasos clara (ej: eventos historicos, etapas de un proceso, ciclo biologico)',
     };
 
     // Distribuir exactamente TOTAL_QUESTIONS entre los tipos activos (nunca solo opcion_multiple
@@ -157,15 +166,15 @@ export async function POST(req: NextRequest) {
       .map((t, i) => `- ${counts[i]} pregunta(s) de tipo "${t}", con este formato JSON: ${jsonFormats[t]}`)
       .join('\n');
 
-    // El minijuego "El Descifrador" es un bonus fuera de la distribucion normal:
-    // solo tiene sentido cuando hay un modulo real (se cachea/trackea como el resto),
-    // y solo cuando el tema tiene un termino/concepto concreto para adivinar
-    // (si no aplica, Cohere puede omitirlo y generar una pregunta mas del resto).
-    const MINIGAME_COUNT = moduleId ? 1 : 0;
-    if (MINIGAME_COUNT > 0) {
-      typeInstructions += `\n- ${MINIGAME_COUNT} pregunta adicional de tipo "el_descifrador" SOLO SI el tema tiene un termino o palabra clave clara para adivinar (ej: un concepto, un nombre propio, un invento); si no aplica, genera en su lugar una pregunta mas de los tipos de arriba. Formato JSON: ${jsonFormats.el_descifrador}`;
+    // Los minijuegos son un bonus fuera de la distribucion normal: solo tienen
+    // sentido cuando hay un modulo real (se cachean/trackean como el resto), y
+    // solo si el tema efectivamente se presta para ese formato (si no aplica,
+    // Cohere genera en su lugar una pregunta mas de los tipos configurados).
+    const minigameTypes = moduleId ? Object.keys(MINIGAME_RULES) : [];
+    for (const mg of minigameTypes) {
+      typeInstructions += `\n- 1 pregunta adicional de tipo "${mg}" ${MINIGAME_RULES[mg]}; si no aplica, genera en su lugar una pregunta mas de los tipos de arriba. Formato JSON: ${jsonFormats[mg]}`;
     }
-    const TOTAL_WITH_MINIGAME = TOTAL_QUESTIONS + MINIGAME_COUNT;
+    const TOTAL_WITH_MINIGAME = TOTAL_QUESTIONS + minigameTypes.length;
 
     const prompt = `Eres un profesor experto generando preguntas de evaluacion.
 
@@ -194,6 +203,7 @@ REGLAS ADICIONALES POR TIPO:
 - fill_blank: "q" debe tener UN SOLO espacio en blanco marcado con "___", y "answers" debe tener exactamente 1 palabra o frase corta que lo completa (no varios blancos en la misma oracion).
 - match: "pairs" debe tener entre 3 y 4 pares concepto-definicion, cada uno claramente distinto de los demas para evitar ambiguedad.
 - el_descifrador: "word_to_guess" debe ser UNA sola palabra en MAYUSCULAS sin acentos ni espacios, tomada del CONTENIDO DEL MATERIAL de arriba (nunca copies "ESCRIBA" del ejemplo de formato, es solo ilustrativo); si el termino tiene varias palabras, usa la mas importante. "hints" debe tener EXACTAMENTE 3 pistas progresivas (la primera vaga, la ultima casi obvia).
+- linea_del_tiempo: "items" debe tener entre 3 y 5 eventos/pasos reales del CONTENIDO DEL MATERIAL, cada uno con "correct_position" empezando en 1 y sin saltos ni repeticiones; "year" es opcional (solo si el material lo menciona explicitamente, si no dejalo vacio).
 
 CONCEPT_TAG (obligatorio en cada pregunta): identifica el concepto especifico que evalua la pregunta (no el tema general del modulo), como un identificador snake_case corto en español (ej: "revolucion_industrial_causas", "fotosintesis_clorofila"). Si dos preguntas evaluan el mismo concepto especifico, deben usar EXACTAMENTE el mismo concept_tag.
 
@@ -212,16 +222,26 @@ Responde SOLO con JSON valido:
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return NextResponse.json({ error: 'No JSON found' }, { status: 500 });
     const parsed = JSON.parse(jsonMatch[0]);
-    // Normaliza el_descifrador a la misma forma anidada (game_type/game_data) que usan
-    // las filas servidas desde cache, para que el cliente no tenga que manejar dos shapes.
+    // Normaliza cada minijuego a la misma forma anidada (game_type/game_data) que usan
+    // las filas servidas desde cache, para que el cliente no tenga que manejar N shapes.
     const generated: any[] = (parsed.questions || []).map((q: any) => {
-      if (q.type !== 'el_descifrador') return q;
-      const { word_to_guess, initial_clue, hints, ...rest } = q;
-      return {
-        ...rest,
-        game_type: 'el_descifrador',
-        game_data: { word_to_guess, initial_clue, hints, pedagogical_feedback: q.exp },
-      };
+      if (q.type === 'el_descifrador') {
+        const { word_to_guess, initial_clue, hints, ...rest } = q;
+        return {
+          ...rest,
+          game_type: 'el_descifrador',
+          game_data: { word_to_guess, initial_clue, hints, pedagogical_feedback: q.exp },
+        };
+      }
+      if (q.type === 'linea_del_tiempo') {
+        const { items, ...rest } = q;
+        return {
+          ...rest,
+          game_type: 'linea_del_tiempo',
+          game_data: { items, pedagogical_feedback: q.exp },
+        };
+      }
+      return q;
     });
 
     // 3. Guardar lo generado en el cache para las proximas aperturas (best-effort),
