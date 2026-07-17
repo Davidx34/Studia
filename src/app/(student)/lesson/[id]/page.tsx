@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { evaluateAchievements } from '@/lib/achievements/evaluate';
@@ -89,11 +89,21 @@ export default function LessonPage() {
     showMessage('¡Listo! Vamos a aprender 🚀');
   };
 
+  // Racha de fallos seguidos (cualquier tipo de pregunta) para que Toñito
+  // reaccione con tono compasivo tras 3+ fallos, en vez de solo animar cada uno.
+  const wrongStreakRef = useRef(0);
+
   // Registra cada intento de respuesta en question_attempts (granularidad por pregunta,
   // no solo al completar el modulo), para poder agregar aciertos/errores por concept_tag.
   // Las preguntas de fallback (sin conexion a Cohere) no tienen id real en lesson_questions,
   // asi que se omiten en vez de violar la FK.
   const recordAttempt = async (question, wasCorrect, answerGiven) => {
+    if (wasCorrect) {
+      wrongStreakRef.current = 0;
+    } else {
+      wrongStreakRef.current += 1;
+      useTonitoStore.getState().onConsecutiveFails(wrongStreakRef.current);
+    }
     if (!question?.id) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -182,6 +192,7 @@ export default function LessonPage() {
     } else {
       setDone(true);
       saveProgress(score);
+      useTonitoStore.getState().onModuleComplete(Math.round((score / questions.length) * 100));
     }
   };
 

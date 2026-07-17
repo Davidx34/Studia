@@ -43,6 +43,8 @@ interface TonitoState {
   onWrongAnswer: () => void;
   onStreak: (days: number) => void;
   onLevelUp: () => void;
+  onModuleComplete: (scorePercent: number) => void;
+  onConsecutiveFails: (count: number) => void;
 }
 
 export const useTonitoStore = create<TonitoState>((set, get) => ({
@@ -135,5 +137,36 @@ export const useTonitoStore = create<TonitoState>((set, get) => ({
       () => set({ mood: 'happy', animation: 'idle', message: null }),
       5000
     );
+  },
+
+  // Modulo completado: celebra grande si el score fue bueno (>=70%),
+  // o queda mas reflexivo (sin regañar) si no.
+  onModuleComplete: (scorePercent) => {
+    if (scorePercent >= 70) {
+      const messages = ['¡FELICIDADES! 🎉', '¡LO HICISTE! 🏆', '¡SOS UN CAMPEÓN! 🌟'];
+      const msg = messages[Math.floor(Math.random() * messages.length)];
+      set({ mood: 'celebrating', animation: 'supersaiyan', message: msg });
+      setTimeout(() => set({ mood: 'happy', animation: 'idle', message: null }), 4000);
+    } else {
+      const messages = [
+        'Estás aprendiendo. La próxima será mejor. 💪',
+        'Cada intento te acerca más. ¡Sigamos mejorando! 📚',
+      ];
+      const msg = messages[Math.floor(Math.random() * messages.length)];
+      set({ mood: 'thinking', animation: 'idle', message: msg });
+      setTimeout(() => set({ mood: 'happy', animation: 'idle', message: null }), 4000);
+    }
+  },
+
+  // 3+ fallos seguidos: tono compasivo, no de reproche.
+  onConsecutiveFails: (count) => {
+    if (count < 3) return;
+    const messages = [
+      'Veo que esto es difícil. ¿Seguimos con calma? 🤗',
+      'Tómate tu tiempo, no hay apuro. 💙',
+    ];
+    const msg = messages[Math.floor(Math.random() * messages.length)];
+    set({ mood: 'encouraging', animation: 'shake', message: msg });
+    setTimeout(() => set({ mood: 'happy', animation: 'idle', message: null }), 3500);
   },
 }));
