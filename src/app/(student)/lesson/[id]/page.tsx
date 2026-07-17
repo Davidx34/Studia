@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { evaluateAchievements } from '@/lib/achievements/evaluate';
 import { normalizeAnswer } from '@/lib/lesson/normalize';
 import { LessonQuestionMatch } from '@/components/LessonQuestionMatch';
+import { ElDescifrador } from '@/components/minigames/ElDescifrador';
+import { useTonitoStore } from '@/stores/useTonitoStore';
 
 export default function LessonPage() {
   const params = useParams();
@@ -41,6 +43,9 @@ export default function LessonPage() {
   }, []);
 
   const generateQuestions = async (modData) => {
+    const { setMood, showMessage } = useTonitoStore.getState();
+    setMood('thinking');
+    showMessage('Espera, estoy preparando preguntas especiales...', 0);
     try {
       // La seleccion de contexto relevante (RAG via match_material_chunks) ahora
       // vive en el servidor (/api/generate-questions), que ya tiene acceso al
@@ -62,6 +67,8 @@ export default function LessonPage() {
         if (data.questions?.length > 0) {
           setQuestions(data.questions);
           setLoading(false);
+          setMood('happy');
+          showMessage('¡Listo! Vamos a aprender 🚀');
           return;
         }
       }
@@ -75,6 +82,8 @@ export default function LessonPage() {
       { type: 'multiple_choice', q: 'Pregunta 3 sobre ' + modData.title, opts: ['A. Opcion A', 'B. Opcion B', 'C. Opcion C', 'D. Opcion D'], ok: 2, exp: 'Correcto.' },
     ]);
     setLoading(false);
+    setMood('happy');
+    showMessage('¡Listo! Vamos a aprender 🚀');
   };
 
   // Registra cada intento de respuesta en question_attempts (granularidad por pregunta,
@@ -318,6 +327,20 @@ export default function LessonPage() {
       />
     );
 
+    if (q.type === 'el_descifrador') return (
+      <ElDescifrador
+        key={idx}
+        gameData={q.game_data || {}}
+        disabled={answered}
+        onComplete={(correct) => {
+          setAnswered(true);
+          setSelected('descifrado');
+          if (correct) setScore((s) => s + 1);
+          recordAttempt(q, correct, null);
+        }}
+      />
+    );
+
     if (q.type === 'short_answer') return (
       <div className="space-y-4">
         <textarea className="w-full bg-gray-700 text-white rounded-lg p-4 border border-gray-600 focus:border-purple-500 outline-none resize-none h-32"
@@ -365,7 +388,8 @@ export default function LessonPage() {
              q.type === 'true_false' ? 'Verdadero/Falso' :
              q.type === 'fill_blank' ? 'Completar Frase' :
              q.type === 'match' ? 'Conectar Conceptos' :
-             q.type === 'short_answer' ? 'Respuesta Corta' : 'Pregunta'}
+             q.type === 'short_answer' ? 'Respuesta Corta' :
+             q.type === 'el_descifrador' ? '🔤 El Descifrador' : 'Pregunta'}
           </span>
         </div>
         <p className="text-white font-bold text-lg mb-6">{q.q}</p>
