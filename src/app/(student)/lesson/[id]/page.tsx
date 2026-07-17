@@ -9,7 +9,11 @@ import { ElDescifrador } from '@/components/minigames/ElDescifrador';
 import { TimelineGame } from '@/components/minigames/TimelineGame';
 import { CategoriesGame } from '@/components/minigames/CategoriesGame';
 import { FlashcardGame } from '@/components/minigames/FlashcardGame';
+import { RemediationPrompt } from '@/components/lesson/RemediationPrompt';
 import { useTonitoStore } from '@/stores/useTonitoStore';
+
+const REMEDIATION_ACCURACY_THRESHOLD = 70;
+const REMEDIATION_TRIGGER_SCORE = 80;
 
 export default function LessonPage() {
   const params = useParams();
@@ -30,6 +34,14 @@ export default function LessonPage() {
   const [fillBlankText, setFillBlankText] = useState('');
   const [fillBlankAttempts, setFillBlankAttempts] = useState(0);
   const [fillBlankFeedback, setFillBlankFeedback] = useState(null); // 'correct' | 'retry' | 'revealed'
+
+  // Repaso dirigido automatico (Sesion E.1).
+  const [moduleFinishing, setModuleFinishing] = useState(false);
+  const [remediationPhase, setRemediationPhase] = useState('none'); // 'none' | 'offered' | 'active' | 'completed'
+  const [weakConcepts, setWeakConcepts] = useState([]);
+  const [remediationLoading, setRemediationLoading] = useState(false);
+  const [remediationRowId, setRemediationRowId] = useState(null);
+  const [remediationBonusXp, setRemediationBonusXp] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -189,11 +201,150 @@ export default function LessonPage() {
       setFillBlankText('');
       setFillBlankAttempts(0);
       setFillBlankFeedback(null);
+    } else if (remediationPhase === 'active') {
+      completeRemediation();
     } else {
-      setDone(true);
-      saveProgress(score);
-      useTonitoStore.getState().onModuleComplete(Math.round((score / questions.length) * 100));
+      finishModule();
     }
+  };
+
+  // Busca los conceptos donde el estudiante acerto <70% en ESTE modulo
+  // (no en toda la clase), para ofrecer un repaso dirigido si aplica.
+  const fetchWeakConcepts = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    const { data } = await supabase
+      .from('question_attempts')
+      .select('concept_tag, was_correct')
+      .eq('student_id', user.id)
+      .eq('module_id', moduleId);
+    if (!data || data.length === 0) return [];
+
+    const byTag = new Map();
+    for (const row of data) {
+      if (!row.concept_tag) continue;
+      const entry = byTag.get(row.concept_tag) ?? { correct: 0, total: 0 };
+      entry.total += 1;
+      if (row.was_correct) entry.correct += 1;
+      byTag.set(row.concept_tag, entry);
+    }
+
+    return [...byTag.entries()]
+      .map(([tag, { correct, total }]) => ({ tag, accuracy: Math.round((correct / total) * 100) }))
+      .filter((c) => c.accuracy < REMEDIATION_ACCURACY_THRESHOLD)
+      .sort((a, b) => a.accuracy - b.accuracy)
+      .slice(0, 3);
+  };
+
+  // Termina el modulo original: guarda progreso como siempre, y si el score
+  // general fue bajo Y hay conceptos especificos debiles, ofrece un repaso
+  // dirigido en vez de ir directo a la pantalla de "Completado!".
+  const finishModule = async () => {
+    setModuleFinishing(true);
+    const scorePercent = Math.round((score / questions.length) * 100);
+    saveProgress(score);
+    useTonitoStore.getState().onModuleComplete(scorePercent);
+
+    if (scorePercent < REMEDIATION_TRIGGER_SCORE) {
+      try {
+        const weak = await fetchWeakConcepts();
+        if (weak.length > 0) {
+          setWeakConcepts(weak);
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: row } = await supabase
+              .from('student_remediations')
+              .insert({
+                student_id: user.id,
+                module_id: moduleId,
+                classroom_id: mod.classroom_id,
+                concept_tags: weak.map((w) => w.tag),
+                was_offered: true,
+              })
+              .select('id')
+              .single();
+            setRemediationRowId(row?.id ?? null);
+          }
+          setRemediationPhase('offered');
+          setModuleFinishing(false);
+          return;
+        }
+      } catch (e) {
+        console.warn('Error evaluando repaso dirigido:', e);
+      }
+    }
+    setModuleFinishing(false);
+    setDone(true);
+  };
+
+  const handleRemediationSkip = () => {
+    setRemediationPhase('none');
+    setDone(true);
+  };
+
+  const handleRemediationAccept = async () => {
+    setRemediationLoading(true);
+    try {
+      if (remediationRowId) {
+        await supabase.from('student_remediations').update({ was_accepted: true }).eq('id', remediationRowId);
+      }
+      const res = await fetch('/api/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          moduleId,
+          moduleTitle: mod.title,
+          remediationConcepts: weakConcepts.map((w) => w.tag),
+        }),
+      });
+      const data = res.ok ? await res.json() : null;
+      if (data?.questions?.length > 0) {
+        setQuestions(data.questions);
+        setIdx(0);
+        setScore(0);
+        setAnswered(false);
+        setSelected(null);
+        setRemediationPhase('active');
+        useTonitoStore.getState().setMood('encouraging');
+        useTonitoStore.getState().showMessage('¡Vamos, reforcemos esto juntos! 💪', 3000);
+        return;
+      }
+    } catch (e) {
+      console.warn('Error generando repaso:', e);
+    } finally {
+      setRemediationLoading(false);
+    }
+    // Si no se pudo generar el repaso, no bloqueamos al estudiante.
+    setRemediationPhase('none');
+    setDone(true);
+  };
+
+  const completeRemediation = async () => {
+    const scorePercent = Math.round((score / questions.length) * 100);
+    const bonusXp = Math.round(25 + (score / questions.length) * 25); // 25-50 segun desempeño
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        if (remediationRowId) {
+          await supabase
+            .from('student_remediations')
+            .update({
+              was_completed: true,
+              score_percent: scorePercent,
+              bonus_xp_earned: bonusXp,
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', remediationRowId);
+        }
+        const { data: profile } = await supabase.from('profiles').select('total_xp').eq('id', user.id).single();
+        await supabase.from('profiles').update({ total_xp: (profile?.total_xp ?? 0) + bonusXp }).eq('id', user.id);
+      }
+    } catch (e) {
+      console.warn('Error completando repaso:', e);
+    }
+    setRemediationBonusXp(bonusXp);
+    setRemediationPhase('completed');
+    useTonitoStore.getState().onModuleComplete(100);
   };
 
   const saveProgress = async (finalScore) => {
@@ -255,6 +406,26 @@ export default function LessonPage() {
   );
 
   if (!mod) return <div className="text-white p-8">No encontrado</div>;
+
+  if (remediationPhase === 'offered') return (
+    <RemediationPrompt
+      weakConcepts={weakConcepts}
+      loading={remediationLoading}
+      onAccept={handleRemediationAccept}
+      onSkip={handleRemediationSkip}
+    />
+  );
+
+  if (remediationPhase === 'completed') return (
+    <div className="max-w-2xl mx-auto p-8">
+      <div className="bg-green-600 p-8 text-white rounded-lg text-center">
+        <h1 className="text-3xl font-bold mb-4">¡Repaso completado! 🎉</h1>
+        <p className="text-lg mb-2">Ahora estás listo para lo siguiente.</p>
+        <p className="text-lg mb-8">+{remediationBonusXp} XP bonus ganados</p>
+        <button onClick={() => router.back()} className="bg-white text-green-600 px-8 py-3 rounded-lg font-bold">Volver</button>
+      </div>
+    </div>
+  );
 
   if (done) return (
     <div className="max-w-2xl mx-auto p-8">
@@ -426,6 +597,11 @@ export default function LessonPage() {
   return (
     <div className="max-w-2xl mx-auto p-8">
       <div className="mb-6">
+        {remediationPhase === 'active' && (
+          <div className="inline-flex items-center gap-1.5 bg-purple-700 text-white text-xs font-bold px-3 py-1 rounded-full mb-2">
+            🔁 Repaso rápido
+          </div>
+        )}
         <h1 className="text-2xl font-bold text-white mb-1">{mod.title}</h1>
         <p className="text-gray-300 text-sm mb-4">{mod.description}</p>
         <div className="flex justify-between text-sm text-gray-400 mb-2">
@@ -462,9 +638,15 @@ export default function LessonPage() {
       </div>
 
       {answered && (
-        <button onClick={nextQuestion}
-          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition text-lg">
-          {idx < questions.length - 1 ? 'Siguiente Pregunta' : 'Terminar Modulo'}
+        <button onClick={nextQuestion} disabled={moduleFinishing}
+          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition text-lg disabled:opacity-60 disabled:cursor-wait">
+          {moduleFinishing
+            ? 'Guardando...'
+            : idx < questions.length - 1
+            ? 'Siguiente Pregunta'
+            : remediationPhase === 'active'
+            ? 'Terminar Repaso'
+            : 'Terminar Modulo'}
         </button>
       )}
     </div>
