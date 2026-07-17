@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { DashboardClient } from './DashboardClient';
 import MyClassesSection, { type MyClassCard } from './MyClassesSection';
+import { getMyActiveRemediationPlan } from '@/lib/actions/remediation-plans';
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabase();
@@ -169,6 +170,8 @@ export default async function DashboardPage() {
     }
   }
 
+  const activePlan = await getMyActiveRemediationPlan();
+
   return (
     <>
       <MyClassesSection classes={myClasses} />
@@ -180,6 +183,7 @@ export default async function DashboardPage() {
         recentAchievements={recentAchievements || []}
         totalCompleted={totalCompleted || 0}
         weeklyProgress={weeklyProgress}
+        activePlan={activePlan}
       />
     </>
   );

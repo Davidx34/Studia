@@ -8,7 +8,7 @@
 // concepto (concept_tag, de question_attempts / Sesion B), sobre la
 // tabla de progreso ya existente ("Resumen").
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Search,
   ArrowUp,
@@ -26,6 +26,11 @@ import {
 import type { ClassroomProgressData, StudentRow } from '@/lib/actions/classroom-progress';
 import type { ConceptGapData, ConceptMetric, StudentMetric, ConceptSeverity, StudentStatus } from '@/lib/actions/concept-metrics';
 import { downloadClassroomReportXlsx } from '@/lib/export/classroomReport';
+import {
+  createRemediationPlan,
+  getActiveRemediationPlans,
+  type RemediationPlan,
+} from '@/lib/actions/remediation-plans';
 
 type SortKey =
   | 'fullName'
@@ -253,7 +258,9 @@ export default function ProgressClient({
       )}
 
       {tab === 'brecha' && <ConceptBreach conceptGap={conceptGap} />}
-      {tab === 'estudiantes' && <StudentPerformance conceptGap={conceptGap} />}
+      {tab === 'estudiantes' && (
+        <StudentPerformance conceptGap={conceptGap} classroomId={data.classroom.id} />
+      )}
       {tab === 'matriz' && <ConceptStudentMatrix conceptGap={conceptGap} />}
     </div>
   );
@@ -353,10 +360,41 @@ const STATUS_STYLES: Record<StudentStatus, { badge: string; label: string; dot: 
   good: { badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', label: '🟢 BIEN (>75% general)', dot: 'text-emerald-400' },
 };
 
-function StudentPerformance({ conceptGap }: { conceptGap: ConceptGapData | null }) {
+function StudentPerformance({
+  conceptGap,
+  classroomId,
+}: {
+  conceptGap: ConceptGapData | null;
+  classroomId: string;
+}) {
   const [filter, setFilter] = useState<StudentFilter>('all');
   const [sort, setSort] = useState<StudentSort>('worst');
-  const [planNoted, setPlanNoted] = useState<string | null>(null);
+  const [plans, setPlans] = useState<Record<string, RemediationPlan>>({});
+  const [creatingFor, setCreatingFor] = useState<string | null>(null);
+  const [confirmedFor, setConfirmedFor] = useState<string | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getActiveRemediationPlans(classroomId).then(setPlans);
+  }, [classroomId]);
+
+  async function handleCreatePlan(s: StudentMetric) {
+    setPlanError(null);
+    setCreatingFor(s.studentId);
+    // 2-3 conceptos con peor performance, ordenados de peor a mejor.
+    const weakest = [...s.weaknesses]
+      .sort((a, b) => s.byConcept[a].accuracy - s.byConcept[b].accuracy)
+      .slice(0, 3);
+    const result = await createRemediationPlan(s.studentId, classroomId, weakest);
+    setCreatingFor(null);
+    if (result.ok) {
+      setPlans((prev) => ({ ...prev, [s.studentId]: result.plan }));
+      setConfirmedFor(s.studentId);
+      setTimeout(() => setConfirmedFor(null), 4000);
+    } else {
+      setPlanError(result.error);
+    }
+  }
 
   if (!conceptGap || !conceptGap.hasData) {
     return <EmptyConceptState />;
@@ -432,14 +470,30 @@ function StudentPerformance({ conceptGap }: { conceptGap: ConceptGapData | null 
                 )}
                 {status !== 'good' && (
                   <div className="pt-1">
-                    <button
-                      onClick={() => setPlanNoted(s.studentId)}
-                      className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 hover:bg-violet-500/20 transition"
-                    >
-                      📋 Crear plan de refuerzo
-                    </button>
-                    {planNoted === s.studentId && (
-                      <span className="ml-2 text-[11px] text-slate-500">🔜 Disponible próximamente</span>
+                    {plans[s.studentId] ? (
+                      <span className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                        {plans[s.studentId].status === 'completed' ? '✓' : '📋'} Plan activo: {plans[s.studentId].title.replace('Plan de Refuerzo: ', '')} (
+                        {Math.round(
+                          (plans[s.studentId].modules_completed / plans[s.studentId].modules_target) * 100
+                        )}
+                        % completado)
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleCreatePlan(s)}
+                        disabled={creatingFor === s.studentId}
+                        className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 hover:bg-violet-500/20 transition disabled:opacity-50"
+                      >
+                        {creatingFor === s.studentId ? 'Creando…' : '📋 Crear plan de refuerzo'}
+                      </button>
+                    )}
+                    {confirmedFor === s.studentId && (
+                      <span className="ml-2 text-[11px] text-emerald-400">
+                        ✓ Plan creado y asignado a {s.studentName.split(' ')[0]}
+                      </span>
+                    )}
+                    {planError && creatingFor === null && (
+                      <span className="ml-2 text-[11px] text-red-400">{planError}</span>
                     )}
                   </div>
                 )}
