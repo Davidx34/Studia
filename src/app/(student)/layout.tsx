@@ -10,6 +10,7 @@ import { LevelUpModal } from '@/components/notifications/LevelUpModal';
 import { ToastContainer } from '@/components/notifications/ToastContainer';
 import { useNotificationBridge } from '@/hooks/useNotificationBridge';
 import { evaluateAchievements } from '@/lib/achievements/evaluate';
+import { SoundToggle } from '@/components/SoundToggle';
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -69,6 +70,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
               ✨ Logros
             </Link>
             <div className="flex items-center gap-3 border-l border-white border-opacity-20 pl-6 ml-6">
+              <SoundToggle />
               <div>
                 <p className="text-sm text-gray-200">{user?.email}</p>
                 <p className="text-white font-medium">{user?.full_name || user?.username}</p>

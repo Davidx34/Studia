@@ -11,6 +11,9 @@ import { CategoriesGame } from '@/components/minigames/CategoriesGame';
 import { FlashcardGame } from '@/components/minigames/FlashcardGame';
 import { RemediationPrompt } from '@/components/lesson/RemediationPrompt';
 import { useTonitoStore } from '@/stores/useTonitoStore';
+import { CinematicScene } from '@/components/cinematics/CinematicScene';
+import { useSoundFx } from '@/lib/sound/useSoundFx';
+import { TonitoCharacter } from '@/components/tonito/TonitoCharacter';
 
 const REMEDIATION_ACCURACY_THRESHOLD = 70;
 const REMEDIATION_TRIGGER_SCORE = 80;
@@ -43,6 +46,12 @@ export default function LessonPage() {
   const [remediationRowId, setRemediationRowId] = useState(null);
   const [remediationBonusXp, setRemediationBonusXp] = useState(0);
 
+  // Cinematicas (Sesion F.1): cola simple, se muestran en secuencia.
+  const [cinematicQueue, setCinematicQueue] = useState([]);
+  const [showIntro, setShowIntro] = useState(true);
+  const [studentName, setStudentName] = useState('');
+  const [streakForCinematic, setStreakForCinematic] = useState(0);
+
   useEffect(() => {
     const load = async () => {
       const { data: modData } = await supabase
@@ -52,6 +61,11 @@ export default function LessonPage() {
         .single();
       if (!modData) { router.push('/dashboard'); return; }
       setMod(modData);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('full_name, username').eq('id', user.id).single();
+        setStudentName(profile?.full_name?.split(' ')[0] || profile?.username || '');
+      }
       await generateQuestions(modData);
     };
     load();
@@ -104,12 +118,14 @@ export default function LessonPage() {
   // Racha de fallos seguidos (cualquier tipo de pregunta) para que Toñito
   // reaccione con tono compasivo tras 3+ fallos, en vez de solo animar cada uno.
   const wrongStreakRef = useRef(0);
+  const { play } = useSoundFx();
 
   // Registra cada intento de respuesta en question_attempts (granularidad por pregunta,
   // no solo al completar el modulo), para poder agregar aciertos/errores por concept_tag.
   // Las preguntas de fallback (sin conexion a Cohere) no tienen id real en lesson_questions,
   // asi que se omiten en vez de violar la FK.
   const recordAttempt = async (question, wasCorrect, answerGiven) => {
+    play(wasCorrect ? 'coin' : 'error');
     if (wasCorrect) {
       wrongStreakRef.current = 0;
     } else {
@@ -242,8 +258,27 @@ export default function LessonPage() {
   const finishModule = async () => {
     setModuleFinishing(true);
     const scorePercent = Math.round((score / questions.length) * 100);
-    saveProgress(score);
+    await saveProgress(score);
     useTonitoStore.getState().onModuleComplete(scorePercent);
+
+    const queue = [scorePercent >= 70 ? 'module_complete_good' : 'module_complete_low'];
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('streak_days').eq('id', user.id).single();
+        const streakDays = profile?.streak_days ?? 0;
+        const today = new Date().toISOString().split('T')[0];
+        const shownKey = `studia_streak_cinematic_${today}`;
+        const isMilestone = streakDays === 3 || (streakDays >= 5 && streakDays % 5 === 0);
+        if (isMilestone && typeof window !== 'undefined' && !localStorage.getItem(shownKey)) {
+          localStorage.setItem(shownKey, '1');
+          setStreakForCinematic(streakDays);
+          queue.push('streak');
+        }
+      }
+    } catch (e) {
+      console.warn('Error evaluando racha para cinematica:', e);
+    }
 
     if (scorePercent < REMEDIATION_TRIGGER_SCORE) {
       try {
@@ -273,6 +308,7 @@ export default function LessonPage() {
         console.warn('Error evaluando repaso dirigido:', e);
       }
     }
+    setCinematicQueue(queue);
     setModuleFinishing(false);
     setDone(true);
   };
@@ -400,12 +436,35 @@ export default function LessonPage() {
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-64 text-white p-8">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
-      <p className="text-lg">Generando preguntas personalizadas...</p>
+      <div className="tonito-breathing">
+        <TonitoCharacter mood="thinking" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={110} />
+      </div>
+      <p className="text-lg font-semibold mt-4">Estoy preparando preguntas especiales…</p>
+      <p className="text-sm text-white/60 mt-1">Solo un momento</p>
     </div>
   );
 
   if (!mod) return <div className="text-white p-8">No encontrado</div>;
+
+  if (showIntro) return (
+    <CinematicScene
+      type="lesson_start"
+      moduleTitle={mod.title}
+      studentName={studentName}
+      onComplete={() => setShowIntro(false)}
+    />
+  );
+
+  if (cinematicQueue.length > 0) return (
+    <CinematicScene
+      type={cinematicQueue[0]}
+      studentName={studentName}
+      score={Math.round((score / questions.length) * 100)}
+      xpEarned={cinematicQueue[0] === 'module_complete_good' || cinematicQueue[0] === 'module_complete_low' ? mod.base_xp_reward : undefined}
+      streak={streakForCinematic}
+      onComplete={() => setCinematicQueue((q) => q.slice(1))}
+    />
+  );
 
   if (remediationPhase === 'offered') return (
     <RemediationPrompt
