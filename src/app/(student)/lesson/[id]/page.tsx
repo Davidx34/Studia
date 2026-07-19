@@ -9,6 +9,10 @@ import { ElDescifrador } from '@/components/minigames/ElDescifrador';
 import { TimelineGame } from '@/components/minigames/TimelineGame';
 import { CategoriesGame } from '@/components/minigames/CategoriesGame';
 import { FlashcardGame } from '@/components/minigames/FlashcardGame';
+import { ImpostorCognitivoGame } from '@/components/minigames/ImpostorCognitivoGame';
+import { AlquimiaConceptualGame } from '@/components/minigames/AlquimiaConceptualGame';
+import { CuartoCrisisGame } from '@/components/minigames/CuartoCrisisGame';
+import { JuicioConocimientoGame } from '@/components/minigames/JuicioConocimientoGame';
 import { RemediationPrompt } from '@/components/lesson/RemediationPrompt';
 import { useTonitoStore } from '@/stores/useTonitoStore';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
@@ -627,6 +631,62 @@ export default function LessonPage() {
       />
     );
 
+    if (q.type === 'impostor_cognitivo') return (
+      <ImpostorCognitivoGame
+        key={idx}
+        gameData={q.game_data || {}}
+        disabled={answered}
+        onComplete={(correct) => {
+          setAnswered(true);
+          setSelected('acusado');
+          if (correct) setScore((s) => s + 1);
+          recordAttempt(q, correct, null);
+        }}
+      />
+    );
+
+    if (q.type === 'alquimia_conceptual') return (
+      <AlquimiaConceptualGame
+        key={idx}
+        gameData={q.game_data || {}}
+        disabled={answered}
+        onComplete={(correct) => {
+          setAnswered(true);
+          setSelected('fusionado');
+          if (correct) setScore((s) => s + 1);
+          recordAttempt(q, correct, null);
+        }}
+      />
+    );
+
+    if (q.type === 'cuarto_crisis') return (
+      <CuartoCrisisGame
+        key={idx}
+        gameData={q.game_data || {}}
+        disabled={answered}
+        onComplete={(correct) => {
+          setAnswered(true);
+          setSelected('resuelto');
+          if (correct) setScore((s) => s + 1);
+          recordAttempt(q, correct, null);
+        }}
+      />
+    );
+
+    if (q.type === 'juicio_conocimiento') return (
+      <JuicioConocimientoGame
+        key={idx}
+        gameData={q.game_data || {}}
+        disabled={answered}
+        onComplete={(correct) => {
+          setAnswered(true);
+          setSelected('objetado');
+          if (correct) setScore((s) => s + 1);
+          recordAttempt(q, correct, null);
+        }}
+      />
+    );
+
     if (q.type === 'short_answer') return (
       <div className="space-y-4">
         <textarea className="w-full bg-gray-700 text-white rounded-lg p-4 border border-gray-600 focus:border-purple-500 outline-none resize-none h-32"
@@ -683,7 +743,11 @@ export default function LessonPage() {
              q.type === 'el_descifrador' ? '🔤 El Descifrador' :
              q.type === 'linea_del_tiempo' ? '📅 Línea del Tiempo' :
              q.type === 'categorias_rapidas' ? '⏱️ Categorías Rápidas' :
-             q.type === 'flashcard_rapida' ? '🃏 Flashcard Rápida' : 'Pregunta'}
+             q.type === 'flashcard_rapida' ? '🃏 Flashcard Rápida' :
+             q.type === 'impostor_cognitivo' ? '🕵️ El Impostor Cognitivo' :
+             q.type === 'alquimia_conceptual' ? '⚗️ Alquimia Conceptual' :
+             q.type === 'cuarto_crisis' ? '🚨 Cuarto de Crisis' :
+             q.type === 'juicio_conocimiento' ? '⚖️ El Juicio al Conocimiento' : 'Pregunta'}
           </span>
         </div>
         <p className="text-white font-bold text-lg mb-6">{q.q}</p>
