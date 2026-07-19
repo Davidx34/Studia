@@ -16,7 +16,14 @@ interface ChatRequest {
   history?: { role: 'user' | 'tonito'; text: string }[]; // últimos mensajes para contexto
 }
 
-function buildSystemPrompt(profile: any, module: any | null, history: any[]): string {
+function buildSystemPrompt(
+  profile: any,
+  module: any | null,
+  history: any[],
+  perf: { overallAccuracy: number | null; weakConcepts: string[]; strongConcepts: string[]; hasData: boolean },
+  moduleScore: number | null,
+  timeOfDay: 'mañana' | 'tarde' | 'noche'
+): string {
   const level = profile?.current_level || 1;
   const name = profile?.full_name?.split(' ')[0] || profile?.username || 'amigo';
   const interests = profile?.gemini_preferences?.interests || [];
@@ -30,8 +37,20 @@ function buildSystemPrompt(profile: any, module: any | null, history: any[]): st
       : 'respetuoso y profundo, asume conocimiento previo';
 
   const moduleContext = module
-    ? `\n\nEl estudiante está estudiando AHORA MISMO el módulo "${module.title}" de ${module.category} (dificultad ${module.difficulty_level}/10). Si pregunta algo del tema, ayúdalo. Si quiere desviarse, redirígelo amablemente.`
+    ? `\n\nEl estudiante está estudiando AHORA MISMO el módulo "${module.title}" de ${module.category} (dificultad ${module.difficulty_level}/10)${
+        moduleScore !== null ? `, va ${moduleScore}% en este módulo` : ''
+      }. Si pregunta algo del tema, ayúdalo. Si quiere desviarse, redirígelo amablemente.`
     : '\n\nEl estudiante está navegando libremente. Puedes conversar de cualquier tema apropiado.';
+
+  // Mejora 2: desempeño real del estudiante (agregado de question_attempts),
+  // para que Toñito hable de fortalezas/debilidades CONCRETAS, no genéricas.
+  const performanceContext = perf.hasData
+    ? `\n\nDESEMPEÑO GENERAL DE ${name.toUpperCase()}:
+- Precisión general: ${perf.overallAccuracy}%
+${perf.strongConcepts.length > 0 ? `- Domina bien: ${perf.strongConcepts.join(', ')}` : ''}
+${perf.weakConcepts.length > 0 ? `- Necesita refuerzo en: ${perf.weakConcepts.join(', ')}` : ''}
+Si pregunta cómo le va o pide ayuda con temas difíciles, usa estos datos concretos (nombra el concepto exacto, no hables en general).`
+    : '';
 
   const historyContext =
     history && history.length > 0
@@ -48,12 +67,13 @@ PERSONALIDAD:
 - Eres un compañero amigo, NUNCA un profesor rígido.
 - Te encanta ${interests[0] || 'aprender de todo'}.
 - Hablas con calidez y energía juvenil.
+- Es de ${timeOfDay} para el estudiante: si es mañana usa energía alta, si es tarde motívalo a seguir, si es noche sugiere no quemarse y descansar si ya llevan rato.
 
 CONTEXTO DEL ESTUDIANTE:
 - Nombre: ${name}
 - Nivel actual: ${level}
 - Racha: ${streak} días seguidos${streak >= 7 ? ' (¡impresionante!)' : ''}
-${moduleContext}${historyContext}
+${moduleContext}${performanceContext}${historyContext}
 
 REGLAS ESTRICTAS:
 1. Responde SIEMPRE en español neutro, claro y conciso.
@@ -109,16 +129,62 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Cargar perfil + módulo (si aplica) en paralelo
-    const [{ data: profile }, moduleResult] = await Promise.all([
+    // Cargar perfil + módulo (si aplica) + intentos de preguntas, en paralelo.
+    const [{ data: profile }, moduleResult, attemptsResult, progressResult] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       moduleId
         ? supabase.from('content_modules').select('*').eq('id', moduleId).maybeSingle()
         : Promise.resolve({ data: null }),
+      supabase
+        .from('question_attempts')
+        .select('concept_tag, was_correct')
+        .eq('student_id', user.id)
+        .not('concept_tag', 'is', null)
+        .limit(500),
+      moduleId
+        ? supabase
+            .from('student_progress')
+            .select('score')
+            .eq('student_id', user.id)
+            .eq('module_id', moduleId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
     const module = moduleResult.data;
-    const systemPrompt = buildSystemPrompt(profile, module, history);
+    const moduleScore: number | null = progressResult.data?.score ?? null;
+
+    // Mejora 2: agregar question_attempts por concept_tag para saber
+    // fortalezas/debilidades REALES del estudiante (mismo criterio que el
+    // panel de brecha de conocimiento del profesor: <70% debil, >=80% fuerte).
+    const perf = (() => {
+      const rows = attemptsResult.data || [];
+      if (rows.length === 0) return { overallAccuracy: null, weakConcepts: [], strongConcepts: [], hasData: false };
+      const byTag = new Map<string, { correct: number; total: number }>();
+      let totalCorrect = 0;
+      for (const r of rows as any[]) {
+        const e = byTag.get(r.concept_tag) ?? { correct: 0, total: 0 };
+        e.total += 1;
+        if (r.was_correct) { e.correct += 1; totalCorrect += 1; }
+        byTag.set(r.concept_tag, e);
+      }
+      const withAccuracy = [...byTag.entries()].map(([tag, e]) => ({ tag, accuracy: Math.round((e.correct / e.total) * 100) }));
+      const weakConcepts = withAccuracy.filter((c) => c.accuracy < 70).sort((a, b) => a.accuracy - b.accuracy).slice(0, 3).map((c) => c.tag);
+      const strongConcepts = withAccuracy.filter((c) => c.accuracy >= 80).sort((a, b) => b.accuracy - a.accuracy).slice(0, 3).map((c) => c.tag);
+      return {
+        overallAccuracy: Math.round((totalCorrect / rows.length) * 100),
+        weakConcepts,
+        strongConcepts,
+        hasData: true,
+      };
+    })();
+
+    // Hora local aproximada del estudiante (LatAm, offset fijo UTC-5) — solo
+    // para ajustar el tono, no necesita ser exacta.
+    const localHour = (new Date().getUTCHours() - 5 + 24) % 24;
+    const timeOfDay = localHour < 12 ? 'mañana' : localHour < 19 ? 'tarde' : 'noche';
+
+    const systemPrompt = buildSystemPrompt(profile, module, history, perf, moduleScore, timeOfDay);
 
     // Guardar mensaje del usuario en historial
     await supabase.from('tonito_conversations').insert({
