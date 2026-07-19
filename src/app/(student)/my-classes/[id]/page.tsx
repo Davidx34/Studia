@@ -53,14 +53,22 @@ export default async function StudentClassPage({ params }: { params: { id: strin
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white">{classroom.name}</h1>
-        <p className="text-slate-400 mt-2">
-          Con {teacher?.full_name || teacher?.username || 'profesor'}
-        </p>
-        {classroom.subject_area && (
-          <p className="text-slate-300 text-sm mt-2">📚 {classroom.subject_area}</p>
-        )}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-white">{classroom.name}</h1>
+          <p className="text-slate-400 mt-2">
+            Con {teacher?.full_name || teacher?.username || 'profesor'}
+          </p>
+          {classroom.subject_area && (
+            <p className="text-slate-300 text-sm mt-2">📚 {classroom.subject_area}</p>
+          )}
+        </div>
+        <Link
+          href={`/my-classes/${params.id}/library`}
+          className="text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition"
+        >
+          📚 Biblioteca de Clase
+        </Link>
       </div>
 
       {/* Mapa de módulos generados */}
