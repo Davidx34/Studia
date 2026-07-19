@@ -32,17 +32,21 @@ interface SceneConfig {
   bg: string;
   mood: TonitoMood;
   animation: CinematicAnimation;
+  intensity: 'calm' | 'normal' | 'intense';
   lines: (p: CinematicProps) => string[];
   sfx: 'whoosh' | 'fanfare' | 'levelUp' | 'bell';
   confetti: boolean;
   ctaLabel: string;
 }
 
+// Mejora 1: cada escena usa la variante full-body mas cercana a su emocion
+// (mas peso/anticipacion que las animaciones simples de Sesion F).
 const SCENES: Record<CinematicType, SceneConfig> = {
   welcome: {
     bg: 'from-violet-700 via-purple-700 to-indigo-800',
     mood: 'excited',
-    animation: 'enter',
+    animation: 'enterEpic',
+    intensity: 'intense',
     sfx: 'whoosh',
     confetti: false,
     ctaLabel: '¡Empecemos!',
@@ -55,7 +59,8 @@ const SCENES: Record<CinematicType, SceneConfig> = {
   lesson_start: {
     bg: 'from-slate-900 via-indigo-950 to-slate-900',
     mood: 'excited',
-    animation: 'victoryJump',
+    animation: 'danceFull',
+    intensity: 'intense',
     sfx: 'whoosh',
     confetti: false,
     ctaLabel: 'Vamos',
@@ -64,7 +69,8 @@ const SCENES: Record<CinematicType, SceneConfig> = {
   module_complete_good: {
     bg: 'from-amber-600 via-orange-600 to-rose-600',
     mood: 'celebrating',
-    animation: 'victoryJump',
+    animation: 'celebrationFull',
+    intensity: 'intense',
     sfx: 'fanfare',
     confetti: true,
     ctaLabel: 'Continuar',
@@ -73,7 +79,8 @@ const SCENES: Record<CinematicType, SceneConfig> = {
   module_complete_low: {
     bg: 'from-sky-800 via-cyan-800 to-slate-800',
     mood: 'encouraging',
-    animation: 'breathing',
+    animation: 'reflection',
+    intensity: 'calm',
     sfx: 'bell',
     confetti: false,
     ctaLabel: 'Continuar',
@@ -82,7 +89,8 @@ const SCENES: Record<CinematicType, SceneConfig> = {
   streak: {
     bg: 'from-red-700 via-orange-600 to-amber-500',
     mood: 'celebrating',
-    animation: 'dance',
+    animation: 'victoryJumpFull',
+    intensity: 'intense',
     sfx: 'levelUp',
     confetti: true,
     ctaLabel: '¡Seguir!',
@@ -134,9 +142,12 @@ export function CinematicScene(props: CinematicProps) {
 
       {scene.confetti && <ConfettiBurst />}
 
-      <div className={!exiting ? 'tonito-enter-bounce' : 'tonito-exit'}>
-        <TonitoFullBody mood={scene.mood} animation={scene.animation} size="fullscreen" />
-      </div>
+      <TonitoFullBody
+        mood={scene.mood}
+        animation={exiting ? 'exit' : scene.animation}
+        size="cinema"
+        intensity={exiting ? 'normal' : scene.intensity}
+      />
 
       <div className="mt-6 max-w-lg px-6 text-center space-y-2 min-h-[4.5rem]">
         {lines.slice(0, lineIdx).map((line, i) => (
