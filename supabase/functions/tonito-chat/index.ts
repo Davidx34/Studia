@@ -85,7 +85,8 @@ REGLAS ESTRICTAS:
 7. Si te piden ayuda con tarea/concepto, da una pista o explicación corta — no la respuesta completa de un examen.
 8. Llama al estudiante por su nombre (${name}) cuando sea natural.
 9. Si te preguntan cosas que no sabes, admítelo con humildad y sugiere buscarlo juntos.
-10. NO uses formato markdown (** __ ## etc). Texto plano natural.`;
+10. NO uses formato markdown (** __ ## etc). Texto plano natural.
+11. Responde SIEMPRE con oraciones completas — termina cada oración con un punto. Nunca cortes a media frase; si no te alcanza el espacio, sé más breve pero completo.`;
 }
 
 Deno.serve(async (req) => {
@@ -215,6 +216,12 @@ Deno.serve(async (req) => {
           temperature: 0.8,
           maxOutputTokens: 500,
           responseMimeType: 'text/plain',
+          // Sesion I, Fix 2: gemini-2.5-flash reserva "thinking tokens" del
+          // mismo presupuesto de maxOutputTokens por defecto (thinkingBudget
+          // dinamico). Para una respuesta corta de chat, ese razonamiento
+          // interno se comia casi todo el budget y la respuesta visible
+          // llegaba cortada a media frase. thinkingBudget:0 lo desactiva.
+          thinkingConfig: { thinkingBudget: 0 },
         },
         safetySettings: [
           { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
@@ -263,6 +270,10 @@ Deno.serve(async (req) => {
                   controller.enqueue(
                     encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`)
                   );
+                }
+                const finishReason = json?.candidates?.[0]?.finishReason;
+                if (finishReason && finishReason !== 'STOP') {
+                  console.warn('[TONITO_RESPONSE_TRUNCATED]', { finishReason, textLength: fullResponse.length });
                 }
               } catch {
                 // ignorar líneas mal formadas
