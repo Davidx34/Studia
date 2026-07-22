@@ -18,6 +18,7 @@ import { useTonitoStore } from '@/stores/useTonitoStore';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
 import { useSoundFx } from '@/lib/sound/useSoundFx';
 import { TonitoCharacter } from '@/components/tonito/TonitoCharacter';
+import { isValidQuestion } from '@/lib/lesson/validateQuestion';
 
 const REMEDIATION_ACCURACY_THRESHOLD = 70;
 const REMEDIATION_TRIGGER_SCORE = 80;
@@ -504,6 +505,33 @@ export default function LessonPage() {
 
   const q = questions[idx];
   const progress = ((idx + 1) / questions.length) * 100;
+
+  const questionCheck = isValidQuestion(q);
+  if (!questionCheck.valid) {
+    console.error('[QUESTION_VALIDATION_ERROR]', {
+      questionId: q?.id,
+      type: q?.type,
+      error: questionCheck.error,
+      gameData: q?.game_data,
+      timestamp: new Date().toISOString(),
+    });
+    return (
+      <div className="max-w-2xl mx-auto p-8">
+        <div className="bg-gray-800 rounded-xl p-8 text-center space-y-4">
+          <TonitoCharacter mood="sad" animation="shake" gradient={['#6C5CE7', '#00D2D3']} size={90} />
+          <h2 className="text-xl font-bold text-white">Ups, hubo un problema con esta pregunta</h2>
+          <p className="text-gray-400 text-sm">{questionCheck.error}</p>
+          <p className="text-gray-500 text-xs">Esto no debería pasar. Ya lo registramos.</p>
+          <button
+            onClick={nextQuestion}
+            className="px-6 py-3 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700"
+          >
+            Saltar a la siguiente →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const renderQuestion = () => {
     if (q.type === 'multiple_choice') return (

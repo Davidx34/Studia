@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { generateEmbedding } from '@/lib/embeddings/generate';
+import { isValidQuestion } from '@/lib/lesson/validateQuestion';
 
 const MIN_CACHE_SIZE = 5; // debajo de esto, todavia se sirve del cache si alcanza
 const SERVE_COUNT = 5; // preguntas que ve el estudiante por leccion
@@ -151,8 +152,12 @@ export async function POST(req: NextRequest) {
         .select('*')
         .eq('module_id', moduleId);
 
-      if (cached && cached.length >= MIN_CACHE_SIZE) {
-        const picked = shuffle(cached).slice(0, SERVE_COUNT).map(rowToQuestion);
+      // Sesion I, Fix 1: filtrar filas invalidas del cache (pueden existir de
+      // antes de este fix, o de una generacion que se colo con datos incompletos).
+      const validCached = (cached || []).map(rowToQuestion).filter((q) => isValidQuestion(q).valid);
+
+      if (validCached.length >= MIN_CACHE_SIZE) {
+        const picked = shuffle(validCached).slice(0, SERVE_COUNT);
         return NextResponse.json({ questions: picked, cached: true });
       }
     }
@@ -370,11 +375,23 @@ Responde SOLO con JSON valido:
       return q;
     });
 
+    // Sesion I, Fix 1: descartar preguntas/minijuegos con datos incompletos
+    // ANTES de guardarlos en cache o servirlos — nunca deben llegar al
+    // estudiante en blanco o rotos. isValidQuestion es la misma validacion
+    // que usa lesson/[id]/page.tsx para el fallback de "saltar pregunta".
+    const validGenerated = generated.filter((q) => {
+      const check = isValidQuestion(q);
+      if (!check.valid) {
+        console.warn('[GENERATION_VALIDATION_FAILED]', { type: q.type, error: check.error });
+      }
+      return check.valid;
+    });
+
     // 3. Guardar lo generado en el cache para las proximas aperturas (best-effort),
     // y recuperar los ids asignados por la base para poder trackear intentos.
-    let generatedWithIds = generated;
-    if (moduleId && supabase && generated.length > 0) {
-      const rows = generated.map((q) => ({
+    let generatedWithIds = validGenerated;
+    if (moduleId && supabase && validGenerated.length > 0) {
+      const rows = validGenerated.map((q) => ({
         module_id: moduleId,
         type: q.type,
         q: q.q,
@@ -389,8 +406,8 @@ Responde SOLO con JSON valido:
         game_data: q.game_data ?? null,
       }));
       const { data: inserted } = await supabase.from('lesson_questions').insert(rows).select('id');
-      if (inserted && inserted.length === generated.length) {
-        generatedWithIds = generated.map((q, i) => ({ ...q, id: inserted[i].id }));
+      if (inserted && inserted.length === validGenerated.length) {
+        generatedWithIds = validGenerated.map((q, i) => ({ ...q, id: inserted[i].id }));
       }
     }
 

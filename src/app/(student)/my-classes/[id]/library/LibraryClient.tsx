@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { BookOpen, Search, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
+import { BookOpen, Search, ChevronLeft, ChevronRight, Minus, Plus, Sparkles } from 'lucide-react';
 
 interface MaterialSummary {
   id: string;
@@ -24,6 +24,13 @@ interface Chunk {
   id: string;
   chunk_index: number;
   content: string;
+}
+
+interface ProcessedChunk {
+  chunk_id: string;
+  summary: string;
+  key_points: string[];
+  main_concepts: string[];
 }
 
 interface RelatedModule {
@@ -52,6 +59,9 @@ export function LibraryClient({
   const [notesSaved, setNotesSaved] = useState(false);
   const [notesSaving, setNotesSaving] = useState(false);
   const [relatedModules, setRelatedModules] = useState<RelatedModule[]>([]);
+  const [processedByChunk, setProcessedByChunk] = useState<Map<string, ProcessedChunk>>(new Map());
+  const [processing, setProcessing] = useState(false);
+  const [showFullText, setShowFullText] = useState(false);
 
   const filteredMaterials = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -69,6 +79,8 @@ export function LibraryClient({
     setChunks([]);
     setLoadingChunks(true);
     setNotesSaved(false);
+    setShowFullText(false);
+    setProcessedByChunk(new Map());
 
     const [{ data: chunkRows }, { data: noteRow }, { data: moduleRows }] = await Promise.all([
       supabase
@@ -89,10 +101,44 @@ export function LibraryClient({
         .limit(5),
     ]);
 
-    setChunks((chunkRows as Chunk[]) || []);
+    const chunkList = (chunkRows as Chunk[]) || [];
+    setChunks(chunkList);
     setNotes((noteRow as any)?.notes_content || '');
     setRelatedModules((moduleRows as RelatedModule[]) || []);
     setLoadingChunks(false);
+
+    await loadProcessedChunks(m.id, chunkList.length);
+  };
+
+  // Sesion I, Fix 3: carga los resumenes ya procesados; si faltan (material
+  // nuevo o recien migrado), dispara el procesamiento una vez y recarga.
+  const loadProcessedChunks = async (materialId: string, totalChunks: number) => {
+    const { data } = await supabase
+      .from('material_chunks_processed')
+      .select('chunk_id, summary, key_points, main_concepts')
+      .eq('material_id', materialId);
+
+    const map = new Map<string, ProcessedChunk>((data as ProcessedChunk[] | null || []).map((p) => [p.chunk_id, p]));
+    setProcessedByChunk(map);
+
+    if (map.size < totalChunks && totalChunks > 0) {
+      setProcessing(true);
+      try {
+        await fetch('/api/process-material-chunks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ materialId }),
+        });
+        const { data: refreshed } = await supabase
+          .from('material_chunks_processed')
+          .select('chunk_id, summary, key_points, main_concepts')
+          .eq('material_id', materialId);
+        setProcessedByChunk(new Map((refreshed as ProcessedChunk[] | null || []).map((p) => [p.chunk_id, p])));
+      } catch (e) {
+        console.warn('Error procesando material:', e);
+      }
+      setProcessing(false);
+    }
   };
 
   const saveNotes = async () => {
@@ -113,6 +159,7 @@ export function LibraryClient({
   };
 
   const activeChunk = chunks[chunkIdx];
+  const activeProcessed = activeChunk ? processedByChunk.get(activeChunk.id) : undefined;
   const highlighted = useMemo(() => {
     if (!activeChunk) return null;
     if (!search.trim()) return activeChunk.content;
@@ -205,7 +252,7 @@ export function LibraryClient({
 
               <div className="flex items-center justify-between text-xs text-slate-400">
                 <button
-                  onClick={() => setChunkIdx((i) => Math.max(0, i - 1))}
+                  onClick={() => { setChunkIdx((i) => Math.max(0, i - 1)); setShowFullText(false); }}
                   disabled={chunkIdx === 0}
                   className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 disabled:opacity-30 hover:text-white"
                 >
@@ -215,7 +262,7 @@ export function LibraryClient({
                   Sección {chunkIdx + 1} / {chunks.length}
                 </span>
                 <button
-                  onClick={() => setChunkIdx((i) => Math.min(chunks.length - 1, i + 1))}
+                  onClick={() => { setChunkIdx((i) => Math.min(chunks.length - 1, i + 1)); setShowFullText(false); }}
                   disabled={chunkIdx === chunks.length - 1}
                   className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 disabled:opacity-30 hover:text-white"
                 >
@@ -223,21 +270,81 @@ export function LibraryClient({
                 </button>
               </div>
 
-              <div
-                className="text-slate-200 leading-relaxed whitespace-pre-wrap max-h-[45vh] overflow-y-auto pr-1"
-                style={{ fontSize: `${fontSize}px` }}
-              >
-                {Array.isArray(highlighted)
-                  ? highlighted.map((part, i) =>
-                      part.toLowerCase() === search.trim().toLowerCase() ? (
-                        <mark key={i} className="bg-blue-500/60 text-white rounded px-0.5">
-                          {part}
-                        </mark>
-                      ) : (
-                        <span key={i}>{part}</span>
-                      )
-                    )
-                  : highlighted}
+              <div className="max-h-[45vh] overflow-y-auto pr-1 space-y-3">
+                {processing && !activeProcessed && (
+                  <p className="text-xs text-blue-300 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Preparando un resumen de esta sección…
+                  </p>
+                )}
+
+                {activeProcessed && !showFullText ? (
+                  <>
+                    <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl p-4 text-white">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide opacity-80 mb-1">📌 Resumen</h3>
+                      <p style={{ fontSize: `${fontSize}px` }} className="leading-relaxed">
+                        {activeProcessed.summary}
+                      </p>
+                    </div>
+
+                    {activeProcessed.key_points.length > 0 && (
+                      <div className="bg-slate-900/60 rounded-xl p-4 border-l-4 border-emerald-500">
+                        <h3 className="text-xs font-semibold uppercase text-emerald-400 mb-2">✓ Puntos Clave</h3>
+                        <ul className="space-y-1.5">
+                          {activeProcessed.key_points.map((point, i) => (
+                            <li key={i} className="text-slate-200 text-sm pl-4 relative">
+                              <span className="absolute left-0 text-emerald-400">✓</span>
+                              {point}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {activeProcessed.main_concepts.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {activeProcessed.main_concepts.map((concept, i) => (
+                          <span key={i} className="text-xs px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-200">
+                            {concept}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => setShowFullText(true)}
+                      className="text-xs text-slate-400 hover:text-white border border-slate-700 rounded-lg px-3 py-1.5 transition"
+                    >
+                      ▼ Ver texto completo
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {activeProcessed && (
+                      <button
+                        onClick={() => setShowFullText(false)}
+                        className="text-xs text-slate-400 hover:text-white border border-slate-700 rounded-lg px-3 py-1.5 transition"
+                      >
+                        ▲ Ocultar texto completo
+                      </button>
+                    )}
+                    <div
+                      className="text-slate-200 leading-relaxed whitespace-pre-wrap"
+                      style={{ fontSize: `${fontSize}px` }}
+                    >
+                      {Array.isArray(highlighted)
+                        ? highlighted.map((part, i) =>
+                            part.toLowerCase() === search.trim().toLowerCase() ? (
+                              <mark key={i} className="bg-blue-500/60 text-white rounded px-0.5">
+                                {part}
+                              </mark>
+                            ) : (
+                              <span key={i}>{part}</span>
+                            )
+                          )
+                        : highlighted}
+                    </div>
+                  </>
+                )}
               </div>
 
               {relatedModules.length > 0 && (
