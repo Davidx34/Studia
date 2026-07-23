@@ -49,3 +49,6 @@ public/swe-worker-*.js
 
 # Briefings exportados (mantener solo .md)
 FASE_*_BRIEF.docx
+
+.vercel
+.env*

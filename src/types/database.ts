@@ -235,14 +235,16 @@ export interface Database {
 
 export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
+export type MaterialSourceType = 'file' | 'link' | 'youtube';
+
 export interface TeachingMaterial {
   id: string;
   classroom_id: string;
   teacher_id: string;
   filename: string;
   display_name: string | null;
-  storage_path: string;
-  mime_type: string;
+  storage_path: string | null;
+  mime_type: string | null;
   size_bytes: number;
   extracted_text: string | null;
   extracted_text_preview: string | null;
@@ -256,6 +258,15 @@ export interface TeachingMaterial {
   created_at: string;
   updated_at: string;
   processed_at: string | null;
+  // Sesion K: materiales multimedia (links y videos de YouTube)
+  source_type: MaterialSourceType;
+  external_url: string | null;
+  external_title: string | null;
+  external_favicon: string | null;
+  youtube_video_id: string | null;
+  thumbnail_url: string | null;
+  duration_seconds: number | null;
+  transcript_source: string | null;
 }
 
 export interface MaterialChunk {

@@ -26,7 +26,9 @@ export default async function ClassroomLibraryPage({ params }: { params: { id: s
 
   const { data: materials } = await supabase
     .from('teaching_materials')
-    .select('id, display_name, chunk_count, topics_detected, created_at')
+    .select(
+      'id, display_name, chunk_count, topics_detected, created_at, source_type, external_url, external_title, external_favicon, youtube_video_id, thumbnail_url, transcript_source'
+    )
     .eq('classroom_id', params.id)
     .eq('processing_status', 'completed')
     .order('created_at', { ascending: false });

@@ -2,10 +2,12 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, Loader2, AlertCircle, CheckCircle2, Link as LinkIcon, Video, FileUp } from 'lucide-react';
 import {
   getUploadSignedUrl,
   confirmMaterialUpload,
+  addLinkMaterial,
+  addYoutubeMaterial,
 } from '@/lib/actions/materials';
 import {
   ACCEPT_ATTRIBUTE,
@@ -25,14 +27,38 @@ interface UploadProgress {
   error?: string;
 }
 
+type UploadTab = 'file' | 'link' | 'youtube';
+
 export default function MaterialUploader({ classroomId }: { classroomId: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [progress, setProgress] = useState<UploadProgress[]>([]);
+  const [tab, setTab] = useState<UploadTab>('file');
+  const [externalUrl, setExternalUrl] = useState('');
+  const [externalBusy, setExternalBusy] = useState(false);
+  const [externalError, setExternalError] = useState<string | null>(null);
 
   function openPicker() {
     inputRef.current?.click();
+  }
+
+  async function handleAddExternal(e: React.FormEvent) {
+    e.preventDefault();
+    const url = externalUrl.trim();
+    if (!url) return;
+    setExternalBusy(true);
+    setExternalError(null);
+
+    const result = tab === 'youtube' ? await addYoutubeMaterial(classroomId, url) : await addLinkMaterial(classroomId, url);
+
+    setExternalBusy(false);
+    if (!result.ok) {
+      setExternalError(result.error ?? 'No se pudo procesar el link.');
+      return;
+    }
+    setExternalUrl('');
+    router.refresh();
   }
 
   async function handleFiles(files: FileList | null) {
@@ -159,38 +185,101 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
 
   return (
     <div className="space-y-3">
-      <div
-        onDragEnter={(e) => handleDrag(e, true)}
-        onDragOver={(e) => handleDrag(e, true)}
-        onDragLeave={(e) => handleDrag(e, false)}
-        onDrop={handleDrop}
-        onClick={openPicker}
-        className={`rounded-2xl border-2 border-dashed cursor-pointer transition p-8 text-center ${
-          dragActive
-            ? 'border-violet-500 bg-violet-500/5'
-            : 'border-slate-700 bg-slate-900/30 hover:border-slate-600 hover:bg-slate-900/50'
-        }`}
-      >
-        <Upload
-          className={`w-10 h-10 mx-auto mb-3 ${
-            dragActive ? 'text-violet-300' : 'text-slate-500'
-          }`}
-        />
-        <h3 className="text-sm font-semibold text-white mb-1">
-          Arrastra archivos o haz clic para seleccionar
-        </h3>
-        <p className="text-xs text-slate-500">
-          PDF, DOCX o XLSX · Máx {formatBytes(MAX_FILE_SIZE_BYTES)} por archivo
-        </p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept={ACCEPT_ATTRIBUTE}
-          multiple
-          className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
-        />
+      <div className="flex gap-1 border-b border-slate-800">
+        {(
+          [
+            { id: 'file' as const, label: 'Archivo', icon: FileUp },
+            { id: 'link' as const, label: 'Link', icon: LinkIcon },
+            { id: 'youtube' as const, label: 'YouTube', icon: Video },
+          ]
+        ).map((t) => {
+          const TabIcon = t.icon;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition ${
+                tab === t.id
+                  ? 'border-violet-500 text-violet-300'
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <TabIcon className="w-3.5 h-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
+
+      {tab === 'file' && (
+        <div
+          onDragEnter={(e) => handleDrag(e, true)}
+          onDragOver={(e) => handleDrag(e, true)}
+          onDragLeave={(e) => handleDrag(e, false)}
+          onDrop={handleDrop}
+          onClick={openPicker}
+          className={`rounded-2xl border-2 border-dashed cursor-pointer transition p-8 text-center ${
+            dragActive
+              ? 'border-violet-500 bg-violet-500/5'
+              : 'border-slate-700 bg-slate-900/30 hover:border-slate-600 hover:bg-slate-900/50'
+          }`}
+        >
+          <Upload
+            className={`w-10 h-10 mx-auto mb-3 ${
+              dragActive ? 'text-violet-300' : 'text-slate-500'
+            }`}
+          />
+          <h3 className="text-sm font-semibold text-white mb-1">
+            Arrastra archivos o haz clic para seleccionar
+          </h3>
+          <p className="text-xs text-slate-500">
+            PDF, DOCX o XLSX · Máx {formatBytes(MAX_FILE_SIZE_BYTES)} por archivo
+          </p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ACCEPT_ATTRIBUTE}
+            multiple
+            className="hidden"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+        </div>
+      )}
+
+      {(tab === 'link' || tab === 'youtube') && (
+        <form onSubmit={handleAddExternal} className="rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900/30 p-6 space-y-3">
+          <p className="text-xs text-slate-500">
+            {tab === 'youtube'
+              ? 'Pega el link de un video de YouTube. Se intentará obtener la transcripción automática para generar preguntas.'
+              : 'Pega el link de un artículo o página web. Se extraerá el contenido igual que un documento.'}
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              required
+              value={externalUrl}
+              onChange={(e) => setExternalUrl(e.target.value)}
+              placeholder={tab === 'youtube' ? 'https://www.youtube.com/watch?v=...' : 'https://...'}
+              className="flex-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500"
+            />
+            <button
+              type="submit"
+              disabled={externalBusy || !externalUrl.trim()}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-violet-500 hover:bg-violet-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {externalBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Agregar
+            </button>
+          </div>
+          {externalError && (
+            <div className="flex items-center gap-2 text-xs text-red-300">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              {externalError}
+            </div>
+          )}
+        </form>
+      )}
 
       {/* Progreso */}
       {progress.length > 0 && (

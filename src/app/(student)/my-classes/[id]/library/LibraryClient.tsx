@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { BookOpen, Search, ChevronLeft, ChevronRight, Minus, Plus, Sparkles } from 'lucide-react';
+import { BookOpen, Search, ChevronLeft, ChevronRight, Minus, Plus, Sparkles, ExternalLink, Video } from 'lucide-react';
 
 interface MaterialSummary {
   id: string;
@@ -18,6 +18,13 @@ interface MaterialSummary {
   chunk_count: number | null;
   topics_detected: string[] | null;
   created_at: string;
+  source_type: 'file' | 'link' | 'youtube';
+  external_url: string | null;
+  external_title: string | null;
+  external_favicon: string | null;
+  youtube_video_id: string | null;
+  thumbnail_url: string | null;
+  transcript_source: string | null;
 }
 
 interface Chunk {
@@ -225,10 +232,47 @@ export function LibraryClient({
             </div>
           ) : loadingChunks ? (
             <p className="text-slate-400 text-sm">Cargando contenido…</p>
-          ) : chunks.length === 0 ? (
+          ) : chunks.length === 0 && selected.source_type === 'file' ? (
             <p className="text-slate-400 text-sm">Este material no tiene contenido procesado todavía.</p>
           ) : (
             <div className="space-y-4">
+              {selected.source_type === 'youtube' && selected.youtube_video_id && (
+                <div className="aspect-video w-full rounded-lg overflow-hidden bg-black">
+                  <iframe
+                    className="w-full h-full"
+                    src={`https://www.youtube.com/embed/${selected.youtube_video_id}`}
+                    title={selected.display_name}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              )}
+
+              {selected.source_type === 'link' && selected.external_url && (
+                <a
+                  href={selected.external_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 p-3 rounded-lg bg-slate-900 border border-slate-700 hover:border-slate-500 transition text-sm"
+                >
+                  {selected.external_favicon && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={selected.external_favicon} alt="" className="w-4 h-4 flex-shrink-0" />
+                  )}
+                  <span className="text-blue-300 truncate flex-1">{selected.external_title || selected.external_url}</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                </a>
+              )}
+
+              {selected.source_type === 'youtube' && chunks.length === 0 && (
+                <p className="text-xs text-amber-300 flex items-center gap-1.5">
+                  <Video className="w-3.5 h-3.5" /> No encontramos subtítulos automáticos para este video, así que no
+                  hay preguntas generadas a partir de él todavía.
+                </p>
+              )}
+
+              {chunks.length > 0 && (
+              <>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h2 className="text-white font-bold truncate">{selected.display_name}</h2>
                 <div className="flex items-center gap-1.5">
@@ -362,6 +406,8 @@ export function LibraryClient({
                     ))}
                   </div>
                 </div>
+              )}
+              </>
               )}
             </div>
           )}
