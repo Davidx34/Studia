@@ -17,6 +17,9 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // youtubei.js no debe bundlearse con webpack (usa deteccion de entorno en
+  // tiempo de ejecucion que rompe si Next intenta empaquetarlo).
+  serverExternalPackages: ['youtubei.js'],
   experimental: {
     // Required for service worker registration
   },
