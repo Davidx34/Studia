@@ -12,6 +12,9 @@ import {
   ChevronDown,
   ChevronUp,
   Pencil,
+  Rocket,
+  FileText,
+  Clock,
 } from 'lucide-react';
 import {
   createLearningObjective,
@@ -38,6 +41,14 @@ interface ModuleRow {
   order_in_objective: number | null;
   minigame_types: string[] | null;
   configured_question_count: number | null;
+  source_material_ids: string[] | null;
+}
+
+interface MaterialSummary {
+  id: string;
+  display_name: string | null;
+  filename: string;
+  processing_status: string;
 }
 
 const MINIGAME_LABELS: Record<string, string> = {
@@ -55,17 +66,44 @@ export default function ObjectivesClient({
   classroomId,
   objectives,
   modules,
+  materials,
 }: {
   classroomId: string;
   objectives: Objective[];
   modules: ModuleRow[];
+  materials: MaterialSummary[];
 }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(objectives[0]?.id ?? null);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; title: string } | null>(null);
 
   const unassignedModules = modules.filter((m) => !m.learning_objective_id);
+  const readyForBulk = modules.filter((m) => (m.source_material_ids?.length ?? 0) > 0);
+
+  async function handleBulkGenerate() {
+    if (
+      !confirm(
+        `¿Generar preguntas para los ${readyForBulk.length} módulos que ya tienen material vinculado? Esto reemplaza el pool de preguntas de cada uno.`
+      )
+    )
+      return;
+    setBulkRunning(true);
+    setError(null);
+    for (let i = 0; i < readyForBulk.length; i++) {
+      const m = readyForBulk[i];
+      setBulkProgress({ current: i + 1, total: readyForBulk.length, title: m.title });
+      const result = await regenerateModuleQuestionPool(m.id, classroomId);
+      if (!result.ok) {
+        setError(`Falló en "${m.title}": ${result.error ?? 'error desconocido'}`);
+      }
+    }
+    setBulkProgress(null);
+    setBulkRunning(false);
+    router.refresh();
+  }
 
   return (
     <div className="space-y-6">
@@ -81,14 +119,32 @@ export default function ObjectivesClient({
             siguen funcionando como siempre.
           </p>
         </div>
-        <button
-          onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-violet-500 hover:bg-violet-600 text-white transition"
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo objetivo
-        </button>
+        <div className="flex gap-2">
+          {readyForBulk.length > 0 && (
+            <button
+              onClick={handleBulkGenerate}
+              disabled={bulkRunning}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 disabled:opacity-50 transition"
+            >
+              {bulkRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
+              Generar todos los módulos listos ({readyForBulk.length})
+            </button>
+          )}
+          <button
+            onClick={() => setCreating(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-violet-500 hover:bg-violet-600 text-white transition"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo objetivo
+          </button>
+        </div>
       </div>
+
+      {bulkProgress && (
+        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3 text-sm text-emerald-200">
+          Generando módulo {bulkProgress.current}/{bulkProgress.total}: {bulkProgress.title}...
+        </div>
+      )}
 
       {error && (
         <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-3 flex items-start gap-2 text-sm text-red-300">
@@ -122,6 +178,7 @@ export default function ObjectivesClient({
               classroomId={classroomId}
               modules={modules.filter((m) => m.learning_objective_id === obj.id)}
               unassignedModules={unassignedModules}
+              materials={materials}
               expanded={expandedId === obj.id}
               onToggle={() => setExpandedId(expandedId === obj.id ? null : obj.id)}
               onError={setError}
@@ -241,6 +298,7 @@ function ObjectiveCard({
   classroomId,
   modules,
   unassignedModules,
+  materials,
   expanded,
   onToggle,
   onError,
@@ -249,6 +307,7 @@ function ObjectiveCard({
   classroomId: string;
   modules: ModuleRow[];
   unassignedModules: ModuleRow[];
+  materials: MaterialSummary[];
   expanded: boolean;
   onToggle: () => void;
   onError: (e: string | null) => void;
@@ -357,7 +416,9 @@ function ObjectiveCard({
           ) : (
             modules
               .sort((a, b) => (a.order_in_objective ?? 0) - (b.order_in_objective ?? 0))
-              .map((m) => <ModuleConfigRow key={m.id} module={m} classroomId={classroomId} onError={onError} />)
+              .map((m) => (
+                <ModuleConfigRow key={m.id} module={m} classroomId={classroomId} materials={materials} onError={onError} />
+              ))
           )}
 
           {unassignedModules.length > 0 && (
@@ -392,21 +453,30 @@ function ObjectiveCard({
 function ModuleConfigRow({
   module,
   classroomId,
+  materials,
   onError,
 }: {
   module: ModuleRow;
   classroomId: string;
+  materials: MaterialSummary[];
   onError: (e: string | null) => void;
 }) {
   const router = useRouter();
   const [questionCount, setQuestionCount] = useState(module.configured_question_count ?? 10);
   const [minigameTypes, setMinigameTypes] = useState<string[]>(module.minigame_types ?? []);
+  const [materialIds, setMaterialIds] = useState<string[]>(module.source_material_ids ?? []);
   const [savePending, startSave] = useTransition();
   const [regenPending, startRegen] = useTransition();
   const [regenResult, setRegenResult] = useState<string | null>(null);
 
+  const hasMaterial = materialIds.length > 0;
+
   function toggleMinigame(type: string) {
     setMinigameTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
+  }
+
+  function toggleMaterial(id: string) {
+    setMaterialIds((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
   }
 
   function handleSaveConfig() {
@@ -417,8 +487,10 @@ function ModuleConfigRow({
         orderInObjective: module.order_in_objective,
         minigameTypes,
         configuredQuestionCount: questionCount,
+        materialIds,
       });
       if (!result.ok) onError(result.error ?? 'Error al guardar configuración.');
+      else router.refresh();
     });
   }
 
@@ -457,7 +529,18 @@ function ModuleConfigRow({
   return (
     <div className="rounded-lg bg-slate-800/50 border border-slate-700 p-3 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h4 className="text-sm font-medium text-white">{module.title}</h4>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h4 className="text-sm font-medium text-white">{module.title}</h4>
+          {hasMaterial ? (
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              ✓ Con material
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <Clock className="w-2.5 h-2.5" /> Esperando material
+            </span>
+          )}
+        </div>
         <button
           onClick={handleUnassign}
           disabled={savePending}
@@ -465,6 +548,35 @@ function ModuleConfigRow({
         >
           Quitar del objetivo
         </button>
+      </div>
+
+      <div>
+        <p className="text-xs text-slate-500 mb-1.5">
+          Material vinculado (sube el archivo/link/YouTube en la pestaña "Materiales" primero)
+        </p>
+        {materials.length === 0 ? (
+          <p className="text-xs text-slate-600 italic">Aún no hay materiales subidos a esta clase.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+            {materials.map((mat) => (
+              <button
+                key={mat.id}
+                type="button"
+                onClick={() => toggleMaterial(mat.id)}
+                title={mat.processing_status !== 'completed' ? `Estado: ${mat.processing_status}` : undefined}
+                className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition ${
+                  materialIds.includes(mat.id)
+                    ? 'bg-violet-500/20 border-violet-500/50 text-violet-200'
+                    : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <FileText className="w-3 h-3" />
+                {mat.display_name ?? mat.filename}
+                {mat.processing_status !== 'completed' && ' ⚠'}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <label className="flex items-center gap-2 text-xs text-slate-400">

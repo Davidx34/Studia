@@ -22,11 +22,28 @@ export function shuffle<T>(arr: T[]): T[] {
 export async function getRagContext(supabase: any, moduleId: string): Promise<string> {
   const { data: moduleRow } = await supabase
     .from('content_modules')
-    .select('title, description, classroom_id')
+    .select('title, description, classroom_id, source_material_ids')
     .eq('id', moduleId)
     .single();
 
   if (!moduleRow) return '';
+
+  // Sesion L: si el profesor vinculo materiales especificos a este modulo
+  // (via /teacher/classrooms/[id]/objectives), el contexto se restringe a
+  // ESOS materiales en vez de buscar en toda la clase — asi las preguntas de
+  // un modulo puntual (ej: "Maximizacion de Utilidad") no se contaminan con
+  // contenido de otros temas del mismo curso.
+  if (moduleRow.source_material_ids?.length > 0) {
+    const { data: scopedChunks } = await supabase
+      .from('material_chunks')
+      .select('content')
+      .in('material_id', moduleRow.source_material_ids)
+      .order('chunk_index', { ascending: true })
+      .limit(12);
+    if (scopedChunks && scopedChunks.length > 0) {
+      return scopedChunks.map((c: any) => c.content).join('\n\n');
+    }
+  }
 
   const queryText = `${moduleRow.title}. ${moduleRow.description || ''}`.trim();
   const embedding = await generateEmbedding(queryText);

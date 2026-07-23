@@ -105,6 +105,7 @@ export async function updateModuleObjectiveConfig(
     orderInObjective?: number | null;
     minigameTypes?: string[];
     configuredQuestionCount?: number;
+    materialIds?: string[];
   }
 ): Promise<ActionResult> {
   const { supabase } = await requireUser();
@@ -112,15 +113,15 @@ export async function updateModuleObjectiveConfig(
   const cleanMinigames = (data.minigameTypes || []).filter((mg) => VALID_MINIGAME_TYPES.includes(mg));
   const questionCount = Math.min(15, Math.max(5, data.configuredQuestionCount || 10));
 
-  const { error } = await supabase
-    .from('content_modules')
-    .update({
-      learning_objective_id: data.learningObjectiveId,
-      order_in_objective: data.orderInObjective ?? null,
-      minigame_types: cleanMinigames,
-      configured_question_count: questionCount,
-    })
-    .eq('id', moduleId);
+  const update: Record<string, unknown> = {
+    learning_objective_id: data.learningObjectiveId,
+    order_in_objective: data.orderInObjective ?? null,
+    minigame_types: cleanMinigames,
+    configured_question_count: questionCount,
+  };
+  if (data.materialIds) update.source_material_ids = data.materialIds;
+
+  const { error } = await supabase.from('content_modules').update(update).eq('id', moduleId);
 
   if (error) return { ok: false, error: error.message };
 

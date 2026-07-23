@@ -18,6 +18,7 @@ import { useTonitoStore } from '@/stores/useTonitoStore';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
 import { useSoundFx } from '@/lib/sound/useSoundFx';
 import { TonitoCharacter } from '@/components/tonito/TonitoCharacter';
+import { MathText } from '@/components/MathText';
 import { isValidQuestion } from '@/lib/lesson/validateQuestion';
 
 const REMEDIATION_ACCURACY_THRESHOLD = 70;
@@ -542,7 +543,7 @@ export default function LessonPage() {
               selected === i ? (i === q.ok ? 'bg-green-600 text-white border-green-400' : 'bg-red-600 text-white border-red-400')
               : answered && i === q.ok ? 'bg-green-600 text-white border-green-400'
               : 'bg-gray-700 text-gray-200 hover:bg-gray-600 border-transparent'
-            )}>{o}</button>
+            )}><MathText content={o} /></button>
         ))}
       </div>
     );
@@ -563,7 +564,7 @@ export default function LessonPage() {
     if (q.type === 'fill_blank') return (
       <div className="space-y-4">
         <p className="text-gray-300 text-sm">Escribe las palabras que faltan en los espacios</p>
-        <div className="bg-gray-700 p-4 rounded-lg text-white text-lg">{q.q}</div>
+        <div className="bg-gray-700 p-4 rounded-lg text-white text-lg"><MathText content={q.q} /></div>
         <textarea className="w-full bg-gray-700 text-white rounded-lg p-4 border border-gray-600 focus:border-purple-500 outline-none resize-none h-24"
           placeholder="Escribe aqui las palabras que faltan..." disabled={answered}
           value={fillBlankText} onChange={(e) => setFillBlankText(e.target.value)} />
@@ -583,7 +584,7 @@ export default function LessonPage() {
           </div>
         ) : (
           <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg">
-            <p className="text-blue-300 font-medium">Respuesta: {q.answers?.join(', ')}</p>
+            <p className="text-blue-300 font-medium">Respuesta: <MathText content={q.answers?.join(', ') || ''} /></p>
           </div>
         )}
       </div>
@@ -732,7 +733,7 @@ export default function LessonPage() {
                 ? `✅ Mencionaste ${shortAnswerMatchedCount} de ${q.keywords?.length || 0} palabras clave`
                 : 'Palabras clave esperadas:'}
             </p>
-            <p className="text-blue-100 text-sm">{q.keywords?.join(', ')}</p>
+            <p className="text-blue-100 text-sm"><MathText content={q.keywords?.join(', ') || ''} /></p>
           </div>
         )}
       </div>
@@ -778,12 +779,12 @@ export default function LessonPage() {
              q.type === 'juicio_conocimiento' ? '⚖️ El Juicio al Conocimiento' : 'Pregunta'}
           </span>
         </div>
-        <p className="text-white font-bold text-lg mb-6">{q.q}</p>
+        <p className="text-white font-bold text-lg mb-6"><MathText content={q.q} /></p>
         {renderQuestion()}
         {answered && q.exp && (
           <div className="mt-6 p-4 bg-blue-900 bg-opacity-50 border-l-4 border-blue-400 rounded">
             <p className="text-blue-200 font-medium">Explicacion:</p>
-            <p className="text-blue-100 mt-1">{q.exp}</p>
+            <p className="text-blue-100 mt-1"><MathText content={q.exp} /></p>
           </div>
         )}
       </div>

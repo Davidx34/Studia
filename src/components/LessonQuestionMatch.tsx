@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useLayoutEffect, useCallback, useEffect, useMemo } from 'react';
+import { MathText } from '@/components/MathText';
 
 interface Pair {
   term: string;
@@ -182,7 +183,7 @@ export function LessonQuestionMatch({
                   : 'bg-purple-900 border-purple-700 text-purple-100 hover:border-purple-400')
               }
             >
-              {p.term}
+              <MathText content={p.term} />
             </button>
           ))}
         </div>
@@ -208,7 +209,7 @@ export function LessonQuestionMatch({
                     : 'bg-blue-900 border-blue-800 text-blue-100 hover:border-blue-400')
                 }
               >
-                {pairs[origIdx].def}
+                <MathText content={pairs[origIdx].def} />
               </button>
             );
           })}
