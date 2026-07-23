@@ -302,8 +302,13 @@ export async function reprocessMaterial(materialId: string) {
 
   if (updateErr) return { ok: false as const, error: updateErr.message };
 
-  // Borrar chunks viejos para que se regeneren
-  await supabase.from('material_chunks').delete().eq('material_id', materialId);
+  // Borrar chunks viejos para que se regeneren — excepto para youtube, donde
+  // processYoutubeMaterial se encarga de esto solo cuando el reintento SI
+  // tiene exito, para no perder contenido bueno si vuelve a fallar por un
+  // bloqueo transitorio de YouTube/Gemini (ver Sesion L, fix de reintentos).
+  if (material.source_type !== 'youtube') {
+    await supabase.from('material_chunks').delete().eq('material_id', materialId);
+  }
 
   // Invalidar cache de lecciones de la clase (puede haber preguntas basadas en
   // chunks viejos)
