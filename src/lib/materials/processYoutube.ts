@@ -1,13 +1,16 @@
 // Sesion K (alcance: videos de YouTube): embebe el video y, best-effort,
 // intenta obtener sus subtitulos automaticos (sin API key, via el mismo
 // mecanismo no oficial que usan varias librerias de "youtube-transcript").
-// Si no hay captions disponibles, el video igual se guarda y se puede ver
-// (embed + metadata), simplemente no se generan preguntas para el (se marca
-// transcript_source='none' y chunk_count=0).
+// Si no hay captions, Sesion L agrega un segundo intento: Gemini soporta
+// recibir una URL publica de YouTube directamente como parte del prompt
+// (sin descargar audio ni depender de libs fragiles tipo ytdl-core) y
+// "ve"/"escucha" el video para producir una transcripcion/resumen educativo.
+// Solo si ambos fallan se marca transcript_source='none' y chunk_count=0.
 
 import { sanitizeText, chunkEmbedAndStore } from './textProcessing';
 
 const FETCH_TIMEOUT_MS = 15000;
+const GEMINI_VIDEO_MODEL = 'gemini-2.5-flash';
 
 export function extractYoutubeId(url: string): string | null {
   try {
@@ -96,6 +99,58 @@ async function fetchAutoCaptions(videoId: string): Promise<string | null> {
   }
 }
 
+// Best-effort: le pide a Gemini que "vea" el video (via fileData.fileUri
+// apuntando a la URL publica de YouTube, soportado por los modelos 2.x) y
+// devuelva una transcripcion/resumen educativo detallado, con suficiente
+// contenido para alimentar generacion de preguntas por RAG. Solo funciona
+// con videos publicos (no privados/no listados con restricciones) y puede
+// fallar por duracion excesiva o restricciones regionales — todo envuelto
+// en try/catch, nunca bloquea el resto del flujo.
+async function fetchGeminiVideoTranscript(videoId: string): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const prompt = `Este es un video educativo de YouTube. Genera una transcripcion/resumen detallado y fiel de TODO su contenido, en espanol, pensado para servir de material de estudio universitario. Incluye las ideas, definiciones, ejemplos, formulas y datos concretos que se mencionen, en el orden en que aparecen. No agregues opiniones ni contenido que no este en el video. Devuelve solo el texto, sin encabezados ni markdown.`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VIDEO_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { fileData: { fileUri: `https://www.youtube.com/watch?v=${videoId}` } },
+                { text: prompt },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 4000,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+      }
+    );
+    if (!res.ok) {
+      console.warn('[youtube_gemini_video] fallo HTTP', res.status, await res.text());
+      return null;
+    }
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text || typeof text !== 'string') return null;
+    const cleaned = text.trim();
+    return cleaned.length > 0 ? cleaned : null;
+  } catch (err) {
+    console.warn('[youtube_gemini_video] fallo, se sirve el video sin transcripcion:', (err as Error).message);
+    return null;
+  }
+}
+
 function decodeXmlEntities(s: string): string {
   return s
     .replace(/&amp;/g, '&')
@@ -112,7 +167,13 @@ export async function processYoutubeMaterial(supabase: any, materialId: string, 
     if (!videoId) throw new Error('No se pudo reconocer el link como un video de YouTube valido.');
 
     const meta = await fetchOEmbed(videoId);
-    const transcript = await fetchAutoCaptions(videoId);
+    let transcript = await fetchAutoCaptions(videoId);
+    let transcriptSource: 'youtube_captions' | 'gemini_video' = 'youtube_captions';
+
+    if (!transcript) {
+      transcript = await fetchGeminiVideoTranscript(videoId);
+      transcriptSource = 'gemini_video';
+    }
 
     const baseUpdate = {
       display_name: meta.title,
@@ -140,7 +201,7 @@ export async function processYoutubeMaterial(supabase: any, materialId: string, 
       .from('teaching_materials')
       .update({
         ...baseUpdate,
-        transcript_source: 'youtube_captions',
+        transcript_source: transcriptSource,
         extracted_text: sanitized,
         extracted_text_preview: sanitized.slice(0, 500),
         chunk_count: chunkCount,
