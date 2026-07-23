@@ -1,12 +1,23 @@
 // Sesion K (alcance: videos de YouTube): embebe el video y, best-effort,
-// intenta obtener sus subtitulos automaticos (sin API key, via el mismo
-// mecanismo no oficial que usan varias librerias de "youtube-transcript").
-// Si no hay captions, Sesion L agrega un segundo intento: Gemini soporta
-// recibir una URL publica de YouTube directamente como parte del prompt
-// (sin descargar audio ni depender de libs fragiles tipo ytdl-core) y
-// "ve"/"escucha" el video para producir una transcripcion/resumen educativo.
-// Solo si ambos fallan se marca transcript_source='none' y chunk_count=0.
+// intenta obtener sus subtitulos automaticos. Sesion L reemplaza el scraping
+// manual de HTML (fragil: dependia de encontrar "captionTracks" en el HTML y
+// de que el endpoint de timedtext no exigiera un PO token) por youtubei.js,
+// un cliente mantenido de la API interna (Innertube) de YouTube que expone
+// el mismo endpoint get_transcript que usa el boton "Mostrar transcripcion"
+// del reproductor. Sigue siendo no oficial (no hay API publica de Google
+// para esto sin ser el dueño del canal), pero es mucho mas confiable que
+// parsear HTML a mano y no requiere resolver el desafio BotGuard/PO token
+// (ese endpoint especifico no lo exige, a diferencia del de captions.download
+// o el de timedtext directo).
+//
+// Si aun asi falla (ej. YouTube empieza a exigir PO token tambien aqui),
+// cae a un segundo intento: Gemini soporta recibir una URL publica de
+// YouTube directamente como parte del prompt (sin descargar audio ni
+// depender de libs fragiles tipo ytdl-core) y "ve"/"escucha" el video para
+// producir una transcripcion/resumen educativo. Solo si ambos fallan se
+// marca transcript_source='none' y chunk_count=0.
 
+import { Innertube } from 'youtubei.js';
 import { sanitizeText, chunkEmbedAndStore } from './textProcessing';
 
 const FETCH_TIMEOUT_MS = 15000;
@@ -47,56 +58,56 @@ async function fetchOEmbed(videoId: string): Promise<OEmbedResult> {
   };
 }
 
-// Best-effort: descarga la pagina del video, extrae los captionTracks del
-// JSON embebido (ytInitialPlayerResponse) y descarga el track en español o
-// ingles si existe. Este mecanismo es no oficial (no hay API key para esto)
-// y puede dejar de funcionar si YouTube cambia el HTML — por eso todo esta
-// envuelto en try/catch y nunca bloquea el resto del flujo.
-async function fetchAutoCaptions(videoId: string): Promise<string | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+// Usa youtubei.js (Innertube) solo para obtener la lista de caption_tracks
+// con su base_url ya firmado por YouTube (via getBasicInfo — mas confiable
+// que el endpoint get_transcript, que YouTube esta bloqueando activamente
+// para requests programaticos desde hace unos dias segun reportes de la
+// comunidad). Descargamos el track directamente en vez de usar el endpoint
+// get_transcript porque este ultimo devuelve 400 con bastante frecuencia
+// (bot detection), mientras que el base_url obtenido via Innertube si
+// funciona en la mayoria de los casos probados.
+async function fetchInnertubeTranscript(videoId: string): Promise<string | null> {
   try {
-    const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
-      signal: controller.signal,
-      cache: 'no-store',
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-      },
-    });
-    if (!pageRes.ok) return null;
-    const html = await pageRes.text();
+    const result = await Promise.race([
+      (async () => {
+        const yt = await Innertube.create({ generate_session_locally: true });
+        const info = await yt.getBasicInfo(videoId);
+        const tracks = info.captions?.caption_tracks ?? [];
+        if (!tracks.length) return '';
 
-    const match = html.match(/"captionTracks":(\[.*?\])/);
-    if (!match) return null;
+        const track =
+          tracks.find((t: any) => t.language_code === 'es' && t.kind !== 'asr') ||
+          tracks.find((t: any) => t.language_code?.startsWith('es')) ||
+          tracks.find((t: any) => t.language_code === 'en' && t.kind !== 'asr') ||
+          tracks.find((t: any) => t.language_code?.startsWith('en')) ||
+          tracks[0];
 
-    const tracks = JSON.parse(match[1]) as Array<{ baseUrl: string; languageCode: string; kind?: string }>;
-    if (!tracks.length) return null;
+        if (!track?.base_url) return '';
 
-    const track =
-      tracks.find((t) => t.languageCode === 'es') ||
-      tracks.find((t) => t.languageCode?.startsWith('es')) ||
-      tracks.find((t) => t.languageCode === 'en') ||
-      tracks.find((t) => t.languageCode?.startsWith('en')) ||
-      tracks[0];
+        const xmlRes = await fetch(track.base_url, { cache: 'no-store' });
+        if (!xmlRes.ok) return '';
+        const xml = await xmlRes.text();
 
-    // A veces YouTube devuelve 200 con body vacio para esta URL firmada (ej.
-    // si requiere un PO token que no tenemos) — se trata igual que "sin
-    // captions" en vez de reventar.
-    const xmlRes = await fetch(track.baseUrl, { cache: 'no-store' });
-    if (!xmlRes.ok) return null;
-    const xml = await xmlRes.text();
-
-    const lines = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)].map((m) => decodeXmlEntities(m[1]));
-    const transcript = lines.join(' ').replace(/\s+/g, ' ').trim();
-    return transcript.length > 0 ? transcript : null;
+        const lines = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)].map((m) => decodeXmlEntities(m[1]));
+        return lines.join(' ').replace(/\s+/g, ' ').trim();
+      })(),
+      new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), FETCH_TIMEOUT_MS)),
+    ]);
+    return result.length > 0 ? result : null;
   } catch (err) {
-    console.warn('[youtube_captions] fallo, se sirve el video sin transcripcion:', (err as Error).message);
+    console.warn('[youtube_innertube_transcript] fallo, se intentara otro metodo:', (err as Error).message);
     return null;
-  } finally {
-    clearTimeout(timeout);
   }
+}
+
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/<[^>]+>/g, '');
 }
 
 // Best-effort: le pide a Gemini que "vea" el video (via fileData.fileUri
@@ -151,23 +162,13 @@ async function fetchGeminiVideoTranscript(videoId: string): Promise<string | nul
   }
 }
 
-function decodeXmlEntities(s: string): string {
-  return s
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/<[^>]+>/g, '');
-}
-
 export async function processYoutubeMaterial(supabase: any, materialId: string, url: string): Promise<void> {
   try {
     const videoId = extractYoutubeId(url);
     if (!videoId) throw new Error('No se pudo reconocer el link como un video de YouTube valido.');
 
     const meta = await fetchOEmbed(videoId);
-    let transcript = await fetchAutoCaptions(videoId);
+    let transcript = await fetchInnertubeTranscript(videoId);
     let transcriptSource: 'youtube_captions' | 'gemini_video' = 'youtube_captions';
 
     if (!transcript) {
