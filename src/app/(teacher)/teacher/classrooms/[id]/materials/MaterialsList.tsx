@@ -15,6 +15,8 @@ import {
   X,
   Check,
   Clock,
+  Link as LinkIcon,
+  Video,
 } from 'lucide-react';
 import { MIME_INFO } from '@/lib/materials/constants';
 import { formatBytes } from '@/lib/materials/file-helpers';
@@ -67,8 +69,11 @@ function MaterialRow({
   const [name, setName] = useState(material.display_name ?? material.filename);
   const [busy, setBusy] = useState(false);
 
-  const mimeInfo = MIME_INFO[material.mime_type] ?? { ext: '?', label: material.mime_type };
-  const Icon = pickIcon(material.mime_type);
+  const isExternal = material.source_type !== 'file';
+  const mimeInfo = material.mime_type
+    ? MIME_INFO[material.mime_type] ?? { ext: '?', label: material.mime_type }
+    : { ext: material.source_type === 'youtube' ? 'youtube' : 'link', label: material.source_type === 'youtube' ? 'YouTube' : 'Link' };
+  const Icon = pickIcon(material);
 
   async function handleRename() {
     if (!name.trim() || name === (material.display_name ?? material.filename)) {
@@ -151,8 +156,18 @@ function MaterialRow({
 
         <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 flex-wrap">
           <span className="uppercase">{mimeInfo.ext}</span>
-          <span>·</span>
-          <span>{formatBytes(material.size_bytes)}</span>
+          {!isExternal && (
+            <>
+              <span>·</span>
+              <span>{formatBytes(material.size_bytes)}</span>
+            </>
+          )}
+          {material.source_type === 'youtube' && material.transcript_source === 'none' && (
+            <>
+              <span>·</span>
+              <span title="No se encontraron subtítulos automáticos para este video">sin transcripción</span>
+            </>
+          )}
           {material.chunk_count != null && material.chunk_count > 0 && (
             <>
               <span>·</span>
@@ -231,7 +246,10 @@ function MaterialRow({
   );
 }
 
-function pickIcon(mime: string) {
+function pickIcon(material: TeachingMaterial) {
+  if (material.source_type === 'youtube') return Video;
+  if (material.source_type === 'link') return LinkIcon;
+  const mime = material.mime_type ?? '';
   if (mime.includes('pdf')) return FileText;
   if (mime.includes('spreadsheet') || mime.includes('excel')) return FileSpreadsheet;
   if (mime.includes('word')) return FileText;

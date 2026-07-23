@@ -20,6 +20,8 @@ import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '@/lib/materials/constants';
 import { slugifyFilename } from '@/lib/materials/file-helpers';
+import { processLinkMaterial } from '@/lib/materials/processLink';
+import { processYoutubeMaterial, extractYoutubeId } from '@/lib/materials/processYoutube';
 
 const STORAGE_BUCKET = 'teaching-materials';
 const SIGNED_URL_TTL_SECONDS = 60 * 5; // 5 minutos
@@ -175,6 +177,102 @@ export async function confirmMaterialUpload(
 }
 
 // ============================================================
+// addLinkMaterial / addYoutubeMaterial (Sesion K)
+// ============================================================
+//
+// A diferencia de confirmMaterialUpload (que dispara la edge function y
+// vuelve enseguida), estas dos esperan el procesamiento completo antes de
+// responder: no hay archivo que subir de por medio, así que el "trabajo
+// pesado" (scraping/oEmbed + captions + embeddings) es lo único que hay que
+// esperar, y mantenerlo en el mismo request evita duplicar la lógica de
+// scraping/transcripción en una ruta API aparte (mismo patrón que se usó
+// para regenerateModulePool en Mejora Estructural 2).
+
+export interface AddMaterialResult {
+  ok: boolean;
+  materialId?: string;
+  error?: string;
+}
+
+export async function addLinkMaterial(classroomId: string, url: string): Promise<AddMaterialResult> {
+  const { supabase, user } = await requireUser();
+
+  if (!(await requireClassroomOwnership(supabase, classroomId, user.id))) {
+    return { ok: false, error: 'Clase no encontrada o sin permisos.' };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { ok: false, error: 'URL inválida.' };
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { ok: false, error: 'Solo se aceptan links http/https.' };
+  }
+
+  const { data, error } = await supabase
+    .from('teaching_materials')
+    .insert({
+      classroom_id: classroomId,
+      teacher_id: user.id,
+      filename: url,
+      display_name: url,
+      source_type: 'link',
+      external_url: url,
+      processing_status: 'processing',
+    })
+    .select('id')
+    .single();
+
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? 'No se pudo registrar el link.' };
+  }
+
+  await processLinkMaterial(supabase, data.id, url);
+
+  revalidatePath(`/teacher/classrooms/${classroomId}/materials`);
+  return { ok: true, materialId: data.id };
+}
+
+export async function addYoutubeMaterial(classroomId: string, url: string): Promise<AddMaterialResult> {
+  const { supabase, user } = await requireUser();
+
+  if (!(await requireClassroomOwnership(supabase, classroomId, user.id))) {
+    return { ok: false, error: 'Clase no encontrada o sin permisos.' };
+  }
+
+  const videoId = extractYoutubeId(url);
+  if (!videoId) {
+    return { ok: false, error: 'No reconocemos ese link como un video de YouTube.' };
+  }
+
+  const { data, error } = await supabase
+    .from('teaching_materials')
+    .insert({
+      classroom_id: classroomId,
+      teacher_id: user.id,
+      filename: url,
+      display_name: url,
+      source_type: 'youtube',
+      external_url: url,
+      youtube_video_id: videoId,
+      processing_status: 'processing',
+    })
+    .select('id')
+    .single();
+
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? 'No se pudo registrar el video.' };
+  }
+
+  await processYoutubeMaterial(supabase, data.id, url);
+
+  revalidatePath(`/teacher/classrooms/${classroomId}/materials`);
+  return { ok: true, materialId: data.id };
+}
+
+// ============================================================
 // reprocessMaterial
 // ============================================================
 
@@ -183,7 +281,7 @@ export async function reprocessMaterial(materialId: string) {
 
   const { data: material } = await supabase
     .from('teaching_materials')
-    .select('id, classroom_id')
+    .select('id, classroom_id, source_type, external_url')
     .eq('id', materialId)
     .eq('teacher_id', user.id)
     .single();
@@ -192,11 +290,11 @@ export async function reprocessMaterial(materialId: string) {
     return { ok: false as const, error: 'Material no encontrado o sin permisos.' };
   }
 
-  // Reset status a pending
+  // Reset status a processing/pending
   const { error: updateErr } = await supabase
     .from('teaching_materials')
     .update({
-      processing_status: 'pending',
+      processing_status: material.source_type === 'file' ? 'pending' : 'processing',
       processing_error: null,
       processed_at: null,
     })
@@ -204,7 +302,7 @@ export async function reprocessMaterial(materialId: string) {
 
   if (updateErr) return { ok: false as const, error: updateErr.message };
 
-  // Borrar chunks viejos para que la edge function los regenere
+  // Borrar chunks viejos para que se regeneren
   await supabase.from('material_chunks').delete().eq('material_id', materialId);
 
   // Invalidar cache de lecciones de la clase (puede haber preguntas basadas en
@@ -213,10 +311,17 @@ export async function reprocessMaterial(materialId: string) {
     p_classroom_id: material.classroom_id,
   } as any);
 
-  // Disparar edge function
-  await supabase.functions
-    .invoke('process-material', { body: { material_id: materialId } })
-    .catch(() => {});
+  // Sesion K: link/youtube se reprocesan in-process (mismo pipeline que al
+  // crearlos); los archivos siguen yendo por la edge function.
+  if (material.source_type === 'link' && material.external_url) {
+    await processLinkMaterial(supabase, materialId, material.external_url);
+  } else if (material.source_type === 'youtube' && material.external_url) {
+    await processYoutubeMaterial(supabase, materialId, material.external_url);
+  } else {
+    await supabase.functions
+      .invoke('process-material', { body: { material_id: materialId } })
+      .catch(() => {});
+  }
 
   revalidatePath(`/teacher/classrooms/${material.classroom_id}/materials`);
   return { ok: true as const };
@@ -269,11 +374,14 @@ export async function deleteMaterial(materialId: string) {
 
   if (!material) return { ok: false as const, error: 'Material no encontrado.' };
 
-  // Best-effort: borrar archivo de Storage (si falla seguimos)
-  await supabase.storage
-    .from(STORAGE_BUCKET)
-    .remove([material.storage_path])
-    .catch(() => {});
+  // Best-effort: borrar archivo de Storage (si falla seguimos). Materiales
+  // de tipo link/youtube no tienen storage_path.
+  if (material.storage_path) {
+    await supabase.storage
+      .from(STORAGE_BUCKET)
+      .remove([material.storage_path])
+      .catch(() => {});
+  }
 
   // Borrar fila DB (cascade limpia material_chunks)
   const { error } = await supabase
