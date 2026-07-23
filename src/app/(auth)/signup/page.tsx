@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 const PENDING_JOIN_CODE_KEY = 'studia_pending_join_code';
+const PENDING_REGISTRATION_EMAIL_KEY = 'studia_pending_registration_email';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -26,6 +27,18 @@ export default function SignupPage() {
 
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres.');
+      setLoading(false);
+      return;
+    }
+
+    // Registro por invitación: el email debe estar pre-registrado por un
+    // profesor o el administrador antes de poder crear la cuenta.
+    const { data: pendingRole, error: pendingError } = await supabase.rpc(
+      'check_pending_registration',
+      { p_email: email }
+    );
+    if (pendingError || !pendingRole) {
+      setError('Este email no está autorizado para registrarse. Pide que te inviten primero.');
       setLoading(false);
       return;
     }
@@ -52,18 +65,22 @@ export default function SignupPage() {
 
     if (!data.session) {
       // El proyecto requiere confirmar el email: no hay sesión todavía.
-      // Guardamos el join_code (si lo hay) para aplicarlo en el primer login.
+      // Guardamos el join_code y el email pendiente (para asignar el rol)
+      // para aplicarlos en el primer login.
       if (trimmedCode) localStorage.setItem(PENDING_JOIN_CODE_KEY, trimmedCode);
+      localStorage.setItem(PENDING_REGISTRATION_EMAIL_KEY, email);
       setCheckEmail(true);
       setLoading(false);
       return;
     }
 
-    if (trimmedCode) {
+    const { data: appliedRole } = await supabase.rpc('apply_pending_registration', { p_email: email });
+
+    if (trimmedCode && appliedRole !== 'teacher') {
       await supabase.rpc('join_classroom_by_code', { p_join_code: trimmedCode });
     }
 
-    router.push('/dashboard');
+    router.push(appliedRole === 'teacher' ? '/teacher/dashboard' : '/dashboard');
     router.refresh();
   };
 

@@ -33,6 +33,15 @@ export default function LoginPage() {
       return;
     }
 
+    // Si venía de un signup con email sin confirmar en ese momento, el rol
+    // pre-registrado (invitación) todavía no se aplicó — lo hacemos ahora
+    // que ya hay sesión.
+    const pendingRegistrationEmail = localStorage.getItem('studia_pending_registration_email');
+    if (pendingRegistrationEmail) {
+      await supabase.rpc('apply_pending_registration', { p_email: pendingRegistrationEmail });
+      localStorage.removeItem('studia_pending_registration_email');
+    }
+
     // Determinar a dónde redirigir según rol
     const { data: profile } = await supabase
       .from('profiles')

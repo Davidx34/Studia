@@ -25,8 +25,17 @@ export async function middleware(request: NextRequest) {
       }
     );
 
-    const { data: { user } } = await supabase.auth.getUser();
     const { pathname } = request.nextUrl;
+
+    // El panel de desarrollador (/dev/* y sus API routes /api/dev-auth,
+    // /api/dev/*) tiene su propia sesion (cookie firmada, ver
+    // src/lib/devAuth.ts) completamente separada del auth de Supabase — no
+    // debe pasar por este gate ni por la logica de rol de abajo.
+    if (pathname.startsWith("/dev") || pathname.startsWith("/api/dev")) {
+      return NextResponse.next();
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
     const isAuthPage = pathname === "/login" || pathname === "/signup";
     const isPublicPage = pathname === "/offline";
 
