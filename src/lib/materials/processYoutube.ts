@@ -135,8 +135,8 @@ async function fetchInnertubeTranscript(videoId: string): Promise<string | null>
         })(),
         FETCH_TIMEOUT_MS
       ),
-    1,
-    800,
+    2,
+    1000,
     'youtube_innertube_transcript'
   );
 }
@@ -202,8 +202,8 @@ async function fetchGeminiVideoTranscript(videoId: string): Promise<string | nul
       }
       return text.trim();
     },
-    1,
-    1200,
+    2,
+    1500,
     'youtube_gemini_video'
   );
 }
@@ -234,14 +234,34 @@ export async function processYoutubeMaterial(supabase: any, materialId: string, 
     };
 
     if (!transcript) {
-      await supabase
+      // No se pudo obtener transcripcion en este intento (tras los
+      // reintentos). Si ya habia contenido bueno de un procesamiento
+      // anterior — por ejemplo, un "Reintentar" que volvio a chocar con un
+      // bloqueo transitorio de YouTube/Gemini — lo dejamos intacto en vez
+      // de borrarlo: es mejor conservar datos buenos viejos que perderlos
+      // por una falla momentanea nueva.
+      const { data: existing } = await supabase
         .from('teaching_materials')
-        .update({ ...baseUpdate, transcript_source: 'none', chunk_count: 0 })
-        .eq('id', materialId);
+        .select('chunk_count')
+        .eq('id', materialId)
+        .single();
+
+      if (existing?.chunk_count > 0) {
+        await supabase.from('teaching_materials').update(baseUpdate).eq('id', materialId);
+      } else {
+        await supabase
+          .from('teaching_materials')
+          .update({ ...baseUpdate, transcript_source: 'none', chunk_count: 0 })
+          .eq('id', materialId);
+      }
       return;
     }
 
     const sanitized = sanitizeText(transcript);
+    // Solo borramos los chunks viejos justo antes de insertar los nuevos —
+    // una vez que ya sabemos que el nuevo contenido si se obtuvo — para que
+    // un reintento fallido nunca destruya datos buenos existentes.
+    await supabase.from('material_chunks').delete().eq('material_id', materialId);
     const { chunkCount, topics, difficulty } = await chunkEmbedAndStore(supabase, materialId, sanitized);
 
     await supabase
