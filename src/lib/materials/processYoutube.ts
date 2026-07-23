@@ -23,6 +23,43 @@ import { sanitizeText, chunkEmbedAndStore } from './textProcessing';
 const FETCH_TIMEOUT_MS = 15000;
 const GEMINI_VIDEO_MODEL = 'gemini-2.5-flash';
 
+// Cuando el profesor agrega varios videos seguidos (bulk), YouTube y/o
+// Gemini a veces bloquean/limitan peticiones consecutivas por un momento
+// (rate limiting transitorio) — un video real, con captions reales, puede
+// fallar sin motivo aparente solo por mala suerte de timing. NoRetryError
+// distingue eso de una ausencia real (el video simplemente no tiene
+// captions), que no tiene sentido reintentar.
+class NoRetryError extends Error {}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]);
+}
+
+// Reintenta con backoff exponencial + jitter. Para en seco (sin reintentar)
+// si el intento lanza NoRetryError, ya que eso indica una condicion
+// permanente (ej. el video no tiene subtitulos) y no una falla transitoria.
+async function withRetry<T>(fn: () => Promise<T>, retries: number, baseDelayMs: number, label: string): Promise<T | null> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (err instanceof NoRetryError) return null;
+      lastErr = err;
+      if (attempt < retries) {
+        const delay = baseDelayMs * 2 ** attempt + Math.floor(Math.random() * 250);
+        console.warn(`[${label}] intento ${attempt + 1}/${retries + 1} fallo (${(err as Error).message}), reintentando en ${delay}ms`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  console.warn(`[${label}] fallo definitivo tras ${retries + 1} intentos:`, (lastErr as Error)?.message ?? lastErr);
+  return null;
+}
+
 export function extractYoutubeId(url: string): string | null {
   try {
     const u = new URL(url);
@@ -67,37 +104,41 @@ async function fetchOEmbed(videoId: string): Promise<OEmbedResult> {
 // (bot detection), mientras que el base_url obtenido via Innertube si
 // funciona en la mayoria de los casos probados.
 async function fetchInnertubeTranscript(videoId: string): Promise<string | null> {
-  try {
-    const result = await Promise.race([
-      (async () => {
-        const yt = await Innertube.create({ generate_session_locally: true });
-        const info = await yt.getBasicInfo(videoId);
-        const tracks = info.captions?.caption_tracks ?? [];
-        if (!tracks.length) return '';
+  return withRetry(
+    () =>
+      withTimeout(
+        (async () => {
+          const yt = await Innertube.create({ generate_session_locally: true });
+          const info = await yt.getBasicInfo(videoId);
+          const tracks = info.captions?.caption_tracks ?? [];
+          if (!tracks.length) throw new NoRetryError('el video no tiene caption_tracks');
 
-        const track =
-          tracks.find((t: any) => t.language_code === 'es' && t.kind !== 'asr') ||
-          tracks.find((t: any) => t.language_code?.startsWith('es')) ||
-          tracks.find((t: any) => t.language_code === 'en' && t.kind !== 'asr') ||
-          tracks.find((t: any) => t.language_code?.startsWith('en')) ||
-          tracks[0];
+          const track =
+            tracks.find((t: any) => t.language_code === 'es' && t.kind !== 'asr') ||
+            tracks.find((t: any) => t.language_code?.startsWith('es')) ||
+            tracks.find((t: any) => t.language_code === 'en' && t.kind !== 'asr') ||
+            tracks.find((t: any) => t.language_code?.startsWith('en')) ||
+            tracks[0];
+          if (!track?.base_url) throw new NoRetryError('caption_track sin base_url');
 
-        if (!track?.base_url) return '';
+          const xmlRes = await fetch(track.base_url, { cache: 'no-store' });
+          if (!xmlRes.ok) throw new Error(`timedtext respondio HTTP ${xmlRes.status}`);
+          const xml = await xmlRes.text();
 
-        const xmlRes = await fetch(track.base_url, { cache: 'no-store' });
-        if (!xmlRes.ok) return '';
-        const xml = await xmlRes.text();
-
-        const lines = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)].map((m) => decodeXmlEntities(m[1]));
-        return lines.join(' ').replace(/\s+/g, ' ').trim();
-      })(),
-      new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), FETCH_TIMEOUT_MS)),
-    ]);
-    return result.length > 0 ? result : null;
-  } catch (err) {
-    console.warn('[youtube_innertube_transcript] fallo, se intentara otro metodo:', (err as Error).message);
-    return null;
-  }
+          const lines = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)].map((m) => decodeXmlEntities(m[1]));
+          const text = lines.join(' ').replace(/\s+/g, ' ').trim();
+          // Cuerpo vacio con HTTP 200 es la firma tipica de un bloqueo
+          // transitorio de YouTube (rate limiting) — lo tratamos como
+          // reintentable, no como "sin captions".
+          if (!text) throw new Error('timedtext devolvio contenido vacio (posible bloqueo transitorio)');
+          return text;
+        })(),
+        FETCH_TIMEOUT_MS
+      ),
+    1,
+    800,
+    'youtube_innertube_transcript'
+  );
 }
 
 function decodeXmlEntities(s: string): string {
@@ -123,43 +164,48 @@ async function fetchGeminiVideoTranscript(videoId: string): Promise<string | nul
 
   const prompt = `Este es un video educativo de YouTube. Genera una transcripcion/resumen detallado y fiel de TODO su contenido, en espanol, pensado para servir de material de estudio universitario. Incluye las ideas, definiciones, ejemplos, formulas y datos concretos que se mencionen, en el orden en que aparecen. No agregues opiniones ni contenido que no este en el video. Devuelve solo el texto, sin encabezados ni markdown.`;
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VIDEO_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { fileData: { fileUri: `https://www.youtube.com/watch?v=${videoId}` } },
-                { text: prompt },
-              ],
+  return withRetry(
+    async () => {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VIDEO_MODEL}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  { fileData: { fileUri: `https://www.youtube.com/watch?v=${videoId}` } },
+                  { text: prompt },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 4000,
+              thinkingConfig: { thinkingBudget: 0 },
             },
-          ],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 4000,
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
+          }),
+        }
+      );
+      if (!res.ok) {
+        // 429 (rate limit por ráfaga de videos) y errores 5xx son
+        // tipicamente transitorios — vale la pena reintentar.
+        const errText = await res.text();
+        throw new Error(`Gemini HTTP ${res.status}: ${errText.slice(0, 200)}`);
       }
-    );
-    if (!res.ok) {
-      console.warn('[youtube_gemini_video] fallo HTTP', res.status, await res.text());
-      return null;
-    }
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text || typeof text !== 'string') return null;
-    const cleaned = text.trim();
-    return cleaned.length > 0 ? cleaned : null;
-  } catch (err) {
-    console.warn('[youtube_gemini_video] fallo, se sirve el video sin transcripcion:', (err as Error).message);
-    return null;
-  }
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text || typeof text !== 'string' || !text.trim()) {
+        throw new Error('Gemini devolvio una respuesta vacia');
+      }
+      return text.trim();
+    },
+    1,
+    1200,
+    'youtube_gemini_video'
+  );
 }
 
 export async function processYoutubeMaterial(supabase: any, materialId: string, url: string): Promise<void> {
