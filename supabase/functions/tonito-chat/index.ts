@@ -196,55 +196,47 @@ Deno.serve(async (req) => {
       interaction_type: 'chat',
     });
 
-    // ── Llamada a Gemini con streaming ──
-    const apiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!apiKey) throw new Error('GEMINI_API_KEY no configurada');
+    // ── Llamada a Groq con streaming ──
+    // Cambio de Gemini a Groq para el chat conversacional de Toñito: no
+    // consume el mismo presupuesto de tokens que la generacion de preguntas
+    // (que sigue en Gemini/Cohere), tiene tier gratis real (sin tarjeta,
+    // sin programa de datos compartidos) y responde muy rapido gracias a
+    // su hardware de inferencia especializado (LPU). La API de Groq es
+    // compatible con el formato de OpenAI (chat completions + streaming SSE).
+    const apiKey = Deno.env.get('GROQ_API_KEY');
+    if (!apiKey) throw new Error('GROQ_API_KEY no configurada');
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
-
-    const geminiResponse = await fetch(geminiUrl, {
+    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: `${systemPrompt}\n\n---\n\nEl estudiante dice: "${message}"\n\nResponde como Toñito:` }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 500,
-          responseMimeType: 'text/plain',
-          // Sesion I, Fix 2: gemini-2.5-flash reserva "thinking tokens" del
-          // mismo presupuesto de maxOutputTokens por defecto (thinkingBudget
-          // dinamico). Para una respuesta corta de chat, ese razonamiento
-          // interno se comia casi todo el budget y la respuesta visible
-          // llegaba cortada a media frase. thinkingBudget:0 lo desactiva.
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-        safetySettings: [
-          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        model: 'llama-3.3-70b-versatile',
+        stream: true,
+        temperature: 0.8,
+        max_tokens: 500,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message },
         ],
       }),
     });
 
-    if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text();
-      throw new Error(`Gemini API error ${geminiResponse.status}: ${errText}`);
+    if (!groqResponse.ok) {
+      const errText = await groqResponse.text();
+      throw new Error(`Groq API error ${groqResponse.status}: ${errText}`);
     }
 
-    // ── Stream parser: convertir SSE de Gemini a chunks de texto plano ──
+    // ── Stream parser: SSE estilo OpenAI (choices[0].delta.content) ──
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     let fullResponse = '';
 
     const stream = new ReadableStream({
       async start(controller) {
-        const reader = geminiResponse.body!.getReader();
+        const reader = groqResponse.body!.getReader();
         let buffer = '';
 
         try {
@@ -263,7 +255,7 @@ Deno.serve(async (req) => {
 
               try {
                 const json = JSON.parse(data);
-                const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+                const text = json?.choices?.[0]?.delta?.content;
                 if (text) {
                   fullResponse += text;
                   // Enviar chunk al cliente como SSE simple
@@ -271,8 +263,8 @@ Deno.serve(async (req) => {
                     encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`)
                   );
                 }
-                const finishReason = json?.candidates?.[0]?.finishReason;
-                if (finishReason && finishReason !== 'STOP') {
+                const finishReason = json?.choices?.[0]?.finish_reason;
+                if (finishReason && finishReason !== 'stop') {
                   console.warn('[TONITO_RESPONSE_TRUNCATED]', { finishReason, textLength: fullResponse.length });
                 }
               } catch {
