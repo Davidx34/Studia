@@ -242,16 +242,26 @@ export async function processYoutubeMaterial(supabase: any, materialId: string, 
       // por una falla momentanea nueva.
       const { data: existing } = await supabase
         .from('teaching_materials')
-        .select('chunk_count')
+        .select('chunk_count, auto_retry_count')
         .eq('id', materialId)
         .single();
 
+      // auto_retry_count: cuantas veces seguidas fallo el procesamiento de
+      // este material. El cron de reintento en segundo plano
+      // (/api/cron/retry-youtube-materials) usa este contador para dejar de
+      // reintentar automaticamente pasado un limite, en vez de insistir para
+      // siempre con un video que genuinamente no tiene captions.
+      const nextRetryCount = (existing?.auto_retry_count ?? 0) + 1;
+
       if (existing?.chunk_count > 0) {
-        await supabase.from('teaching_materials').update(baseUpdate).eq('id', materialId);
+        await supabase
+          .from('teaching_materials')
+          .update({ ...baseUpdate, auto_retry_count: nextRetryCount })
+          .eq('id', materialId);
       } else {
         await supabase
           .from('teaching_materials')
-          .update({ ...baseUpdate, transcript_source: 'none', chunk_count: 0 })
+          .update({ ...baseUpdate, transcript_source: 'none', chunk_count: 0, auto_retry_count: nextRetryCount })
           .eq('id', materialId);
       }
       return;
@@ -274,6 +284,7 @@ export async function processYoutubeMaterial(supabase: any, materialId: string, 
         chunk_count: chunkCount,
         topics_detected: topics,
         estimated_difficulty: difficulty,
+        auto_retry_count: 0,
       })
       .eq('id', materialId);
   } catch (err) {
