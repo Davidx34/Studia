@@ -3,10 +3,21 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 import { processYoutubeMaterial } from '@/lib/materials/processYoutube';
 
 // Sesion L: reintento automatico en segundo plano para materiales de
-// YouTube que quedaron sin transcripcion por bloqueos transitorios de
-// YouTube/Gemini (rate limiting). Los reintentos sincronos dentro del
-// request de subir/reintentar (ver processYoutube.ts) ya absorben algunos
-// casos, pero cuando el bloqueo dura mas de unos segundos no alcanzan.
+// YouTube que quedaron sin transcripcion (o sin chunks) por bloqueos
+// transitorios de YouTube/Gemini (rate limiting). Los reintentos sincronos
+// dentro del request de subir/reintentar (ver processYoutube.ts) ya
+// absorben algunos casos, pero cuando el bloqueo dura mas de unos segundos
+// no alcanzan.
+//
+// Cubre dos situaciones distintas, ambas con auto_retry_count propio:
+// 1) processing_status='completed' + transcript_source='none': no se pudo
+//    leer el caption_track (rate limit en timedtext).
+// 2) processing_status='failed': la transcripcion SI se obtuvo pero el
+//    paso de chunking/embedding fallo despues (ver textProcessing.ts) y
+//    process YoutubeMaterial nunca llego a marcar completed. Antes esto
+//    quedaba fuera del alcance del cron (solo miraba 'completed'); ahora
+//    tambien se reintenta, porque el fallo de embedding es tan transitorio
+//    como el de timedtext.
 //
 // Este endpoint lo llama un cron job de Postgres (pg_cron + pg_net) cada
 // pocos minutos, autenticado con CRON_SECRET. Al estar espaciado en el
@@ -34,10 +45,9 @@ export async function POST(req: NextRequest) {
     .from('teaching_materials')
     .select('id, external_url')
     .eq('source_type', 'youtube')
-    .eq('transcript_source', 'none')
-    .eq('processing_status', 'completed')
+    .or('and(processing_status.eq.completed,transcript_source.eq.none),processing_status.eq.failed')
     .lt('auto_retry_count', MAX_AUTO_RETRIES)
-    .order('processed_at', { ascending: true })
+    .order('processed_at', { ascending: true, nullsFirst: true })
     .limit(BATCH_SIZE);
 
   if (error) {
