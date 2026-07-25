@@ -1,34 +1,30 @@
-// Sesion K (alcance: videos de YouTube): embebe el video y, best-effort,
-// intenta obtener sus subtitulos automaticos. Sesion L reemplaza el scraping
-// manual de HTML (fragil: dependia de encontrar "captionTracks" en el HTML y
-// de que el endpoint de timedtext no exigiera un PO token) por youtubei.js,
-// un cliente mantenido de la API interna (Innertube) de YouTube que expone
-// el mismo endpoint get_transcript que usa el boton "Mostrar transcripcion"
-// del reproductor. Sigue siendo no oficial (no hay API publica de Google
-// para esto sin ser el dueño del canal), pero es mucho mas confiable que
-// parsear HTML a mano y no requiere resolver el desafio BotGuard/PO token
-// (ese endpoint especifico no lo exige, a diferencia del de captions.download
-// o el de timedtext directo).
+// Sesion K (alcance: videos de YouTube): embebe el video y extrae sus
+// subtitulos (manuales o automaticos) via youtubei.js, un cliente mantenido
+// de la API interna (Innertube) de YouTube que expone el mismo endpoint
+// get_transcript que usa el boton "Mostrar transcripcion" del reproductor.
+// Sigue siendo no oficial (no hay API publica de Google para esto sin ser
+// el dueño del canal), pero es mucho mas confiable que parsear HTML a mano
+// y no requiere resolver el desafio BotGuard/PO token (ese endpoint
+// especifico no lo exige, a diferencia del de captions.download o el de
+// timedtext directo).
 //
-// Si aun asi falla (ej. YouTube empieza a exigir PO token tambien aqui),
-// cae a un segundo intento: Gemini soporta recibir una URL publica de
-// YouTube directamente como parte del prompt (sin descargar audio ni
-// depender de libs fragiles tipo ytdl-core) y "ve"/"escucha" el video para
-// producir una transcripcion/resumen educativo. Solo si ambos fallan se
-// marca transcript_source='none' y chunk_count=0.
+// Decision de producto: solo se procesan videos que YA tienen subtitulos
+// reales en YouTube. No hay fallback a un LLM "viendo" el video (eso tiene
+// costo/cuota variable y deja de ser 100% gratuito y predecible) — si el
+// video no tiene subtitulos, se marca honestamente transcript_source='none'
+// en vez de fabricar una transcripcion aproximada.
 
 import { Innertube } from 'youtubei.js';
 import { sanitizeText, chunkEmbedAndStore } from './textProcessing';
 
 const FETCH_TIMEOUT_MS = 15000;
-const GEMINI_VIDEO_MODEL = 'gemini-2.5-flash';
 
-// Cuando el profesor agrega varios videos seguidos (bulk), YouTube y/o
-// Gemini a veces bloquean/limitan peticiones consecutivas por un momento
-// (rate limiting transitorio) — un video real, con captions reales, puede
-// fallar sin motivo aparente solo por mala suerte de timing. NoRetryError
-// distingue eso de una ausencia real (el video simplemente no tiene
-// captions), que no tiene sentido reintentar.
+// Cuando el profesor agrega varios videos seguidos, YouTube a veces
+// bloquea/limita peticiones consecutivas por un momento (rate limiting
+// transitorio) — un video real, con captions reales, puede fallar sin
+// motivo aparente solo por mala suerte de timing. NoRetryError distingue
+// eso de una ausencia real (el video simplemente no tiene captions), que no
+// tiene sentido reintentar.
 class NoRetryError extends Error {}
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -135,7 +131,7 @@ async function fetchInnertubeTranscript(videoId: string): Promise<string | null>
         })(),
         FETCH_TIMEOUT_MS
       ),
-    2,
+    4,
     1000,
     'youtube_innertube_transcript'
   );
@@ -151,76 +147,14 @@ function decodeXmlEntities(s: string): string {
     .replace(/<[^>]+>/g, '');
 }
 
-// Best-effort: le pide a Gemini que "vea" el video (via fileData.fileUri
-// apuntando a la URL publica de YouTube, soportado por los modelos 2.x) y
-// devuelva una transcripcion/resumen educativo detallado, con suficiente
-// contenido para alimentar generacion de preguntas por RAG. Solo funciona
-// con videos publicos (no privados/no listados con restricciones) y puede
-// fallar por duracion excesiva o restricciones regionales — todo envuelto
-// en try/catch, nunca bloquea el resto del flujo.
-async function fetchGeminiVideoTranscript(videoId: string): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-
-  const prompt = `Este es un video educativo de YouTube. Genera una transcripcion/resumen detallado y fiel de TODO su contenido, en espanol, pensado para servir de material de estudio universitario. Incluye las ideas, definiciones, ejemplos, formulas y datos concretos que se mencionen, en el orden en que aparecen. No agregues opiniones ni contenido que no este en el video. Devuelve solo el texto, sin encabezados ni markdown.`;
-
-  return withRetry(
-    async () => {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VIDEO_MODEL}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: 'user',
-                parts: [
-                  { fileData: { fileUri: `https://www.youtube.com/watch?v=${videoId}` } },
-                  { text: prompt },
-                ],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 4000,
-              thinkingConfig: { thinkingBudget: 0 },
-            },
-          }),
-        }
-      );
-      if (!res.ok) {
-        // 429 (rate limit por ráfaga de videos) y errores 5xx son
-        // tipicamente transitorios — vale la pena reintentar.
-        const errText = await res.text();
-        throw new Error(`Gemini HTTP ${res.status}: ${errText.slice(0, 200)}`);
-      }
-      const data = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text || typeof text !== 'string' || !text.trim()) {
-        throw new Error('Gemini devolvio una respuesta vacia');
-      }
-      return text.trim();
-    },
-    2,
-    1500,
-    'youtube_gemini_video'
-  );
-}
-
 export async function processYoutubeMaterial(supabase: any, materialId: string, url: string): Promise<void> {
   try {
     const videoId = extractYoutubeId(url);
     if (!videoId) throw new Error('No se pudo reconocer el link como un video de YouTube valido.');
 
     const meta = await fetchOEmbed(videoId);
-    let transcript = await fetchInnertubeTranscript(videoId);
-    let transcriptSource: 'youtube_captions' | 'gemini_video' = 'youtube_captions';
-
-    if (!transcript) {
-      transcript = await fetchGeminiVideoTranscript(videoId);
-      transcriptSource = 'gemini_video';
-    }
+    const transcript = await fetchInnertubeTranscript(videoId);
+    const transcriptSource: 'youtube_captions' = 'youtube_captions';
 
     const baseUpdate = {
       display_name: meta.title,
@@ -237,9 +171,9 @@ export async function processYoutubeMaterial(supabase: any, materialId: string, 
       // No se pudo obtener transcripcion en este intento (tras los
       // reintentos). Si ya habia contenido bueno de un procesamiento
       // anterior — por ejemplo, un "Reintentar" que volvio a chocar con un
-      // bloqueo transitorio de YouTube/Gemini — lo dejamos intacto en vez
-      // de borrarlo: es mejor conservar datos buenos viejos que perderlos
-      // por una falla momentanea nueva.
+      // bloqueo transitorio de YouTube — lo dejamos intacto en vez de
+      // borrarlo: es mejor conservar datos buenos viejos que perderlos por
+      // una falla momentanea nueva.
       const { data: existing } = await supabase
         .from('teaching_materials')
         .select('chunk_count, auto_retry_count')
@@ -268,10 +202,9 @@ export async function processYoutubeMaterial(supabase: any, materialId: string, 
     }
 
     const sanitized = sanitizeText(transcript);
-    // Solo borramos los chunks viejos justo antes de insertar los nuevos —
-    // una vez que ya sabemos que el nuevo contenido si se obtuvo — para que
-    // un reintento fallido nunca destruya datos buenos existentes.
-    await supabase.from('material_chunks').delete().eq('material_id', materialId);
+    // chunkEmbedAndStore borra los chunks viejos solo despues de calcular
+    // los embeddings nuevos con exito, para que un fallo transitorio en el
+    // paso de embedding nunca destruya datos buenos existentes.
     const { chunkCount, topics, difficulty } = await chunkEmbedAndStore(supabase, materialId, sanitized);
 
     await supabase
@@ -289,9 +222,24 @@ export async function processYoutubeMaterial(supabase: any, materialId: string, 
       .eq('id', materialId);
   } catch (err) {
     const message = (err as Error).message ?? 'Error desconocido procesando el video';
+    // Incrementamos auto_retry_count tambien aqui (no solo en la rama de
+    // "sin transcripcion") para que el cron de reintento en segundo plano
+    // (que ahora tambien recoge processing_status='failed', ver
+    // /api/cron/retry-youtube-materials) respete el mismo tope de
+    // MAX_AUTO_RETRIES y no reintente para siempre un fallo permanente
+    // (ej. GEMINI_API_KEY invalida).
+    const { data: existing } = await supabase
+      .from('teaching_materials')
+      .select('auto_retry_count')
+      .eq('id', materialId)
+      .single();
     await supabase
       .from('teaching_materials')
-      .update({ processing_status: 'failed', processing_error: message })
+      .update({
+        processing_status: 'failed',
+        processing_error: message,
+        auto_retry_count: (existing?.auto_retry_count ?? 0) + 1,
+      })
       .eq('id', materialId);
   }
 }
