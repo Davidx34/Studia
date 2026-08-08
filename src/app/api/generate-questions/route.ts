@@ -12,6 +12,7 @@ import {
   RAG_CONTEXT_CHAR_LIMIT,
 } from '@/lib/questions/cohereGeneration';
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
+import { acquireGenerationLock, releaseGenerationLock } from '@/lib/questions/generationLock';
 
 const MIN_CACHE_SIZE = 5; // debajo de esto, todavia se sirve del cache si alcanza
 const SERVE_COUNT = 5; // preguntas que ve el estudiante por leccion
@@ -121,9 +122,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Cache insuficiente (o sin moduleId): generar con Cohere como antes.
+    // 2. Lock anti-stampede: solo una generación por módulo simultáneamente
+    // (Protocolo 7.7.3). Si otro request ya está generando, devolver 202 Accepted
+    // para que el cliente reutilice caché o reintente después.
+    if (moduleId && supabase) {
+      const lockAcquired = await acquireGenerationLock(supabase, moduleId);
+      if (!lockAcquired) {
+        console.log(`[generate-questions] Lock not acquired for module ${moduleId}, returning 202`);
+        return NextResponse.json(
+          { cached: false, message: 'Generación en curso, reintenta en algunos segundos' },
+          { status: 202 }
+        );
+      }
+    }
+
+    // 3. Cache insuficiente (o sin moduleId): generar con Cohere como antes.
     const COHERE_API_KEY = process.env.COHERE_API_KEY;
-    if (!COHERE_API_KEY) return NextResponse.json({ error: 'No API key' }, { status: 500 });
+    if (!COHERE_API_KEY) {
+      if (moduleId && supabase) await releaseGenerationLock(supabase, moduleId);
+      return NextResponse.json({ error: 'No API key' }, { status: 500 });
+    }
 
     // Contexto: RAG real cuando hay moduleId (busca en TODA la clase, no solo un material);
     // si no hay moduleId (fallback sin modulo real) se usa el context que mando el cliente.
@@ -277,5 +295,10 @@ Responde SOLO con JSON valido:
   } catch (e) {
     console.error('Error:', String(e));
     return NextResponse.json({ error: String(e) }, { status: 500 });
+  } finally {
+    // Liberar el lock si fue adquirido
+    if (moduleId && supabase) {
+      await releaseGenerationLock(supabase, moduleId);
+    }
   }
 }
