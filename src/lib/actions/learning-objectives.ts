@@ -10,6 +10,8 @@ import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { regenerateModulePool, type RegeneratePoolResult } from '@/lib/questions/regeneratePool';
 import { MINIGAME_RULES } from '@/lib/questions/cohereGeneration';
+import { getRagContext } from '@/lib/questions/cohereGeneration';
+import { judgeQuestionsBatch } from '@/lib/questions/judge';
 
 async function requireUser() {
   const supabase = await createServerSupabase();
@@ -144,4 +146,105 @@ export async function regenerateModuleQuestionPool(
     revalidatePath(`/teacher/classrooms/${classroomId}/objectives`);
   }
   return result;
+}
+
+
+// ============================================================
+// Fase 1.3 (post-auditoria): juez LLM asincrono sobre el pool ya generado
+// ============================================================
+
+export interface JudgeModuleResult extends ActionResult {
+  total: number;
+  approved: number;
+  rejected: number;
+  humanReview: number;
+  judgeUnavailable: number; // GEMINI_API_KEY ausente o Gemini fallo -- se dejan en human_review para que el profesor las vea, nunca se pierden silenciosamente
+}
+
+// Corre el juez sobre TODAS las preguntas 'pending' de un modulo (activas +
+// backup -- Protocolo 7.5: el pool completo, no solo lo que se sirve hoy).
+// Se llama UNA VEZ POR MODULO desde el cliente (mismo patron que ya usa
+// handleBulkGenerate para regenerateModuleQuestionPool) para no arriesgar
+// el timeout de una funcion serverless corriendo el juez sobre los 18
+// modulos de Microeconomia en una sola invocacion.
+export async function judgeModuleQuestionPool(
+  moduleId: string,
+  classroomId: string
+): Promise<JudgeModuleResult> {
+  const { supabase } = await requireUser();
+
+  const { data: pending, error: fetchError } = await supabase
+    .from('lesson_questions')
+    .select('*')
+    .eq('module_id', moduleId)
+    .eq('review_status', 'pending');
+
+  if (fetchError) return { ok: false, error: fetchError.message, total: 0, approved: 0, rejected: 0, humanReview: 0, judgeUnavailable: 0 };
+  if (!pending || pending.length === 0) return { ok: true, total: 0, approved: 0, rejected: 0, humanReview: 0, judgeUnavailable: 0 };
+
+  const context = await getRagContext(supabase, moduleId);
+  const verdicts = await judgeQuestionsBatch(pending, context);
+
+  let approved = 0, rejected = 0, humanReview = 0, judgeUnavailable = 0;
+
+  for (const q of pending) {
+    const result = verdicts.get(q.id);
+    if (!result) {
+      // Gemini caido / sin API key / respuesta no parseable: NUNCA se
+      // aprueba por omision -- se manda a revision humana, igual que un
+      // veredicto "review" explicito, para que el profesor decida.
+      judgeUnavailable++;
+      await supabase
+        .from('lesson_questions')
+        .update({ review_status: 'human_review' })
+        .eq('id', q.id);
+      humanReview++;
+      continue;
+    }
+    if (result.verdict === 'pass') {
+      approved++;
+      await supabase.from('lesson_questions').update({ review_status: 'approved' }).eq('id', q.id);
+    } else if (result.verdict === 'fail') {
+      rejected++;
+      // is_backup=true saca la pregunta de circulacion activa de inmediato
+      // -- una pregunta rechazada nunca debe poder servirse mientras nadie
+      // la haya reemplazado. No se auto-reemplaza aqui (backfill desde el
+      // pool de backup): eso queda para cuando haya senal real de cuantas
+      // preguntas activas se pierden por rechazo en el piloto.
+      await supabase.from('lesson_questions').update({ review_status: 'rejected', is_backup: true }).eq('id', q.id);
+    } else {
+      humanReview++;
+      await supabase.from('lesson_questions').update({ review_status: 'human_review' }).eq('id', q.id);
+    }
+  }
+
+  revalidatePath(`/teacher/classrooms/${classroomId}/objectives`);
+  revalidatePath(`/teacher/classrooms/${classroomId}/review`);
+
+  return { ok: true, total: pending.length, approved, rejected, humanReview, judgeUnavailable };
+}
+
+// Usadas desde la pagina de revision (/teacher/classrooms/[id]/review) para
+// que el profesor resuelva a mano las preguntas en human_review antes del
+// piloto.
+export async function approveReviewQuestion(questionId: string, classroomId: string): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  const { error } = await supabase
+    .from('lesson_questions')
+    .update({ review_status: 'approved' })
+    .eq('id', questionId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/teacher/classrooms/${classroomId}/review`);
+  return { ok: true };
+}
+
+export async function rejectReviewQuestion(questionId: string, classroomId: string): Promise<ActionResult> {
+  const { supabase } = await requireUser();
+  const { error } = await supabase
+    .from('lesson_questions')
+    .update({ review_status: 'rejected', is_backup: true })
+    .eq('id', questionId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/teacher/classrooms/${classroomId}/review`);
+  return { ok: true };
 }
