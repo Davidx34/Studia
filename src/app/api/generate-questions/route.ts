@@ -11,6 +11,7 @@ import {
   callCohere,
   RAG_CONTEXT_CHAR_LIMIT,
 } from '@/lib/questions/cohereGeneration';
+import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
 
 const MIN_CACHE_SIZE = 5; // debajo de esto, todavia se sirve del cache si alcanza
 const SERVE_COUNT = 5; // preguntas que ve el estudiante por leccion
@@ -132,6 +133,14 @@ export async function POST(req: NextRequest) {
       if (ragContext) context = ragContext;
     }
 
+    // Fase 1.2: taxonomia cerrada de conceptos (Protocolo 7.6). Se genera
+    // una sola vez por modulo (primera llamada la crea, el resto la
+    // reutiliza) y se inyecta en el prompt para que todas las preguntas del
+    // modulo converjan a los mismos concept_tag.
+    const closedConcepts = moduleId && supabase
+      ? await getOrCreateModuleConcepts(supabase, moduleId, moduleTitle)
+      : [];
+
     const skills = [];
     if (aiConfig?.skill_memory) skills.push('recordar hechos');
     if (aiConfig?.skill_comprehension) skills.push('comprender conceptos');
@@ -215,7 +224,7 @@ ${MINIGAME_TYPE_RULES_TEXT}
 
 NOTACION MATEMATICA: si el contenido requiere formulas, ecuaciones o simbolos matematicos (ej: funciones, derivadas, condiciones de optimizacion), escribelos en LaTeX: usa $...$ para notacion inline (ej: $U(x,y) = x^{0.5}y^{0.5}$) y $$...$$ para ecuaciones en bloque. No uses LaTeX si el tema no lo requiere.
 
-CONCEPT_TAG (obligatorio en cada pregunta): identifica el concepto especifico que evalua la pregunta (no el tema general del modulo), como un identificador snake_case corto en español (ej: "revolucion_industrial_causas", "fotosintesis_clorofila"). Si dos preguntas evaluan el mismo concepto especifico, deben usar EXACTAMENTE el mismo concept_tag.
+${conceptTaxonomyPromptBlock(closedConcepts) || 'CONCEPT_TAG (obligatorio en cada pregunta): identifica el concepto especifico que evalua la pregunta (no el tema general del modulo), como un identificador snake_case corto en español (ej: "revolucion_industrial_causas", "fotosintesis_clorofila"). Si dos preguntas evaluan el mismo concepto especifico, deben usar EXACTAMENTE el mismo concept_tag.'}
 
 Responde SOLO con JSON valido:
 {"questions":[...${TOTAL_WITH_MINIGAME} preguntas aqui, en el orden y cantidad indicados arriba...]}`;
