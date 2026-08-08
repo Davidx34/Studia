@@ -16,12 +16,14 @@ import {
   FileText,
   Clock,
 } from 'lucide-react';
+import Link from 'next/link';
 import {
   createLearningObjective,
   updateLearningObjective,
   deleteLearningObjective,
   updateModuleObjectiveConfig,
   regenerateModuleQuestionPool,
+  judgeModuleQuestionPool,
 } from '@/lib/actions/learning-objectives';
 
 interface Objective {
@@ -79,6 +81,11 @@ export default function ObjectivesClient({
   const [expandedId, setExpandedId] = useState<string | null>(objectives[0]?.id ?? null);
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; title: string } | null>(null);
+  const [judging, setJudging] = useState(false);
+  const [judgeProgress, setJudgeProgress] = useState<{ current: number; total: number; title: string } | null>(null);
+  const [judgeSummary, setJudgeSummary] = useState<
+    { approved: number; rejected: number; humanReview: number; judgeUnavailable: number; byModule: { title: string; total: number; rejected: number }[] } | null
+  >(null);
 
   const unassignedModules = modules.filter((m) => !m.learning_objective_id);
   const readyForBulk = modules.filter((m) => (m.source_material_ids?.length ?? 0) > 0);
@@ -105,6 +112,36 @@ export default function ObjectivesClient({
     router.refresh();
   }
 
+  // Fase 1.3: paso posterior a la generacion bulk -- corre el juez LLM
+  // (Gemini Flash) sobre TODAS las preguntas 'pending' de cada modulo con
+  // material. Una invocacion de server action por modulo (no una sola para
+  // los 18), mismo patron que handleBulkGenerate, para no arriesgar el
+  // timeout de una funcion serverless.
+  async function handleRunJudge() {
+    setJudging(true);
+    setError(null);
+    const byModule: { title: string; total: number; rejected: number }[] = [];
+    let approved = 0, rejected = 0, humanReview = 0, judgeUnavailable = 0;
+    for (let i = 0; i < readyForBulk.length; i++) {
+      const m = readyForBulk[i];
+      setJudgeProgress({ current: i + 1, total: readyForBulk.length, title: m.title });
+      const result = await judgeModuleQuestionPool(m.id, classroomId);
+      if (!result.ok) {
+        setError(`Juez falló en "${m.title}": ${result.error ?? 'error desconocido'}`);
+        continue;
+      }
+      approved += result.approved;
+      rejected += result.rejected;
+      humanReview += result.humanReview;
+      judgeUnavailable += result.judgeUnavailable;
+      if (result.total > 0) byModule.push({ title: m.title, total: result.total, rejected: result.rejected });
+    }
+    setJudgeProgress(null);
+    setJudging(false);
+    setJudgeSummary({ approved, rejected, humanReview, judgeUnavailable, byModule });
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 flex items-start gap-4 flex-wrap">
@@ -119,17 +156,35 @@ export default function ObjectivesClient({
             siguen funcionando como siempre.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {readyForBulk.length > 0 && (
             <button
               onClick={handleBulkGenerate}
-              disabled={bulkRunning}
+              disabled={bulkRunning || judging}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 disabled:opacity-50 transition"
             >
               {bulkRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
               Generar todos los módulos listos ({readyForBulk.length})
             </button>
           )}
+          {readyForBulk.length > 0 && (
+            <button
+              onClick={handleRunJudge}
+              disabled={bulkRunning || judging}
+              title="Revisa con IA (Gemini Flash) las preguntas generadas antes de que las vea el estudiante"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-sky-500/15 text-sky-300 border border-sky-500/30 hover:bg-sky-500/25 disabled:opacity-50 transition"
+            >
+              {judging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              Revisar con juez IA
+            </button>
+          )}
+          <Link
+            href={`/teacher/classrooms/${classroomId}/review`}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition"
+          >
+            <FileText className="w-4 h-4" />
+            Revisión pendiente
+          </Link>
           <button
             onClick={() => setCreating(true)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-violet-500 hover:bg-violet-600 text-white transition"
@@ -143,6 +198,30 @@ export default function ObjectivesClient({
       {bulkProgress && (
         <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3 text-sm text-emerald-200">
           Generando módulo {bulkProgress.current}/{bulkProgress.total}: {bulkProgress.title}...
+        </div>
+      )}
+
+      {judgeProgress && (
+        <div className="rounded-xl bg-sky-500/10 border border-sky-500/30 p-3 text-sm text-sky-200">
+          Juez revisando módulo {judgeProgress.current}/{judgeProgress.total}: {judgeProgress.title}...
+        </div>
+      )}
+
+      {judgeSummary && (
+        <div className="rounded-xl bg-slate-900 border border-slate-800 p-4 text-sm text-slate-300 space-y-2">
+          <p className="font-medium text-white">
+            Juez: {judgeSummary.approved} aprobadas · {judgeSummary.rejected} rechazadas · {judgeSummary.humanReview} a revisión
+            {judgeSummary.judgeUnavailable > 0 && ` (${judgeSummary.judgeUnavailable} sin poder evaluar, mandadas a revisión)`}
+          </p>
+          {judgeSummary.byModule.length > 0 && (
+            <ul className="text-xs text-slate-400 space-y-0.5">
+              {judgeSummary.byModule.map((m) => (
+                <li key={m.title}>
+                  {m.title}: {m.rejected}/{m.total} rechazadas ({m.total > 0 ? Math.round((m.rejected / m.total) * 100) : 0}%)
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
