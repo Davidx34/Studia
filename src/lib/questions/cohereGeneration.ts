@@ -8,6 +8,17 @@ import { generateEmbedding } from '@/lib/embeddings/generate';
 
 export const RAG_MATCH_COUNT = 5;
 
+// Fase 1.1 (post-auditoria): limite de caracteres del contexto que se
+// inyecta en el prompt de generacion. Antes eran 1500 caracteres
+// hardcodeados en 3 sitios distintos (generate-questions x2,
+// regeneratePool x1) y desincronizados entre si -- quedaba truncado a
+// menudo el primer parrafo del material, cortando derivaciones largas
+// (ej. maximizacion de utilidad con Lagrange). Aya 32B (el modelo detras
+// de Cohere en este proyecto) soporta contexto de sobra para 5500
+// caracteres. Un solo punto de verdad: quien necesite truncar el
+// contexto RAG debe importar esta constante, nunca hardcodear el numero.
+export const RAG_CONTEXT_CHAR_LIMIT = 5500;
+
 export function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
