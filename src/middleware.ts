@@ -70,6 +70,24 @@ export async function middleware(request: NextRequest) {
 
     return NextResponse.next();
   } catch (error) {
+    const { pathname } = request.nextUrl;
+    // Fail-closed selectivo: rutas protegidas redirigen a /login si hay error,
+    // rutas públicas se dejan pasar. Esto evita que un error de Supabase
+    // deje acceder a rutas que requerían autenticación (mitigación de 6.2.4
+    // de la auditoría, segundo riesgo de escalabilidad identificado).
+    const isProtectedTeacherRoute = TEACHER_ROUTES.some((r) => pathname.startsWith(r));
+    const isProtectedStudentRoute = STUDENT_ROUTES.some((r) => pathname.startsWith(r));
+    const isPublicPath =
+      pathname === "/login" ||
+      pathname === "/signup" ||
+      pathname === "/offline" ||
+      pathname.startsWith("/dev") ||
+      pathname.startsWith("/api/dev");
+
+    if ((isProtectedTeacherRoute || isProtectedStudentRoute) && !isPublicPath) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
     return NextResponse.next();
   }
 }
