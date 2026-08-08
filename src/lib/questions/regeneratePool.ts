@@ -12,6 +12,7 @@ import {
   MINIGAME_TYPE_RULES_TEXT,
   normalizeGeneratedQuestion,
   callCohere,
+  RAG_CONTEXT_CHAR_LIMIT,
 } from '@/lib/questions/cohereGeneration';
 
 const DEFAULT_QUESTION_COUNT = 10;
@@ -113,7 +114,7 @@ ${goodExample ? 'EJEMPLO DE PREGUNTA IDEAL: ' + goodExample : ''}
 ${badExample ? 'PREGUNTA A EVITAR: ' + badExample : ''}
 
 CONTENIDO DEL MATERIAL:
-${(context || '').substring(0, 1500)}
+${(context || '').substring(0, RAG_CONTEXT_CHAR_LIMIT)}
 
 Genera EXACTAMENTE ${totalWithMinigames} preguntas, distribuidas asi (respeta la cantidad exacta de cada tipo, no generes solo un tipo):
 ${typeInstructions}

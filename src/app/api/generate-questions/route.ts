@@ -9,6 +9,7 @@ import {
   MINIGAME_TYPE_RULES_TEXT,
   normalizeGeneratedQuestion,
   callCohere,
+  RAG_CONTEXT_CHAR_LIMIT,
 } from '@/lib/questions/cohereGeneration';
 
 const MIN_CACHE_SIZE = 5; // debajo de esto, todavia se sirve del cache si alcanza
@@ -48,7 +49,7 @@ async function generateRemediationQuestions(
 
 TEMA DEL MODULO: ${moduleTitle}
 CONTENIDO DEL MATERIAL:
-${(context || '').substring(0, 1500)}
+${(context || '').substring(0, RAG_CONTEXT_CHAR_LIMIT)}
 
 El estudiante tuvo dificultad especificamente con estos conceptos: ${weakConcepts.join(', ')}.
 
@@ -199,7 +200,7 @@ ${goodExample ? 'EJEMPLO DE PREGUNTA IDEAL: ' + goodExample : ''}
 ${badExample ? 'PREGUNTA A EVITAR: ' + badExample : ''}
 
 CONTENIDO DEL MATERIAL:
-${(context || '').substring(0, 1500)}
+${(context || '').substring(0, RAG_CONTEXT_CHAR_LIMIT)}
 
 Genera EXACTAMENTE ${TOTAL_WITH_MINIGAME} preguntas, distribuidas asi (respeta la cantidad exacta de cada tipo, no generes solo un tipo):
 ${typeInstructions}
