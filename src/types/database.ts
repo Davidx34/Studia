@@ -1,11 +1,38 @@
-// Tipos generados manualmente desde el schema SQL
-// En produccion, usar: npx supabase gen types typescript --project-id <id> > types/database.ts
+// Protocolo 7.1.1 (post-auditoria): antes este archivo era un shim escrito
+// a mano con una interfaz `Database` incompleta (12 tablas, faltaban
+// lesson_questions, question_attempts, classroom_learning_objectives,
+// material_chunks_processed, etc.) — por eso `.from('lesson_questions')...`
+// resolvia a `never` en todo el codigo pese a que los 4 factories de
+// cliente (`src/lib/supabase/{server,client,admin,anon}.ts`) ya llamaban
+// `createClient<Database>` correctamente: el tipo que le pasaban estaba mal.
+//
+// database.generated.ts SI es el reflejo real del schema (via MCP
+// generate_typescript_types / `supabase gen types`). Este archivo re-exporta
+// ese `Database` real y deriva los tipos de conveniencia con nombre legible
+// (Profile, TeachingMaterial, etc.) desde el, en vez de mantenerlos a mano
+// — asi quedan sincronizados automaticamente la proxima vez que se
+// regenere database.generated.ts, y ningun import existente en la app se
+// rompe (los nombres exportados no cambiaron).
 
-export type UserRole = 'student' | 'teacher' | 'admin';
-export type ModuleStatus = 'locked' | 'available' | 'in_progress' | 'completed';
-export type ContentType = 'reading' | 'video' | 'interactive' | 'quiz' | 'dialogue';
-export type ItemType = 'avatar_skin' | 'tonito_customization' | 'power_up' | 'streak_freeze';
-export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary';
+import type { Database as GeneratedDatabase, TablesGenerated as GeneratedTables } from './database.generated';
+
+export type { Json } from './database.generated';
+export type Database = GeneratedDatabase;
+
+type TableRow<T extends keyof GeneratedDatabase['public']['Tables']> = GeneratedTables<T>;
+
+// ============================================================
+// Uniones literales para columnas que en Postgres tienen CHECK
+// constraint pero que el generador de tipos de Supabase no puede inferir
+// como literal (las expone como `string` a secas) — se mantienen a mano
+// aqui, documentando el constraint real que las respalda.
+// ============================================================
+
+export type UserRole = 'student' | 'teacher' | 'admin'; // profiles.role: sin CHECK explicito en DB, default 'student' por app
+export type ModuleStatus = 'locked' | 'available' | 'in_progress' | 'completed'; // student_progress.status
+export type ContentType = 'reading' | 'video' | 'interactive' | 'quiz' | 'dialogue'; // content_modules.content_type
+export type ItemType = 'avatar_skin' | 'tonito_customization' | 'power_up' | 'streak_freeze'; // shop_items.type
+export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary'; // achievements.rarity
 export type CriteriaType =
   | 'xp_total'
   | 'streak_days'
@@ -14,274 +41,82 @@ export type CriteriaType =
   | 'specific_category'
   | 'first_login'
   | 'coins_earned'
-  | 'time_spent';
+  | 'time_spent'; // achievements.criteria_type
 export type MissionType =
   | 'complete_modules'
   | 'earn_xp'
   | 'maintain_streak'
   | 'perfect_score'
   | 'time_spent'
-  | 'answer_questions';
+  | 'answer_questions'; // daily_missions.mission_type
 
-export interface Profile {
-  id: string;
-  username: string;
-  email: string | null;
-  full_name: string | null;
-  avatar_url: string;
-  role: UserRole;
-  current_level: number;
-  total_xp: number;
-  coins: number;
-  current_hearts: number;
-  max_hearts: number;
-  last_heart_lost_at: string | null;
-  streak_days: number;
-  last_activity_date: string | null;
-  last_login_at: string | null;
-  gemini_preferences: {
-    tone: string;
-    difficulty: string;
-    interests: string[];
-  };
-  tonito_state: {
-    mood: string;
-    skin: string;
-    last_interaction: string | null;
-  };
-  timezone: string;
-  created_at: string;
-  updated_at: string;
-}
+export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed'; // teaching_materials.processing_status, CHECK real (migracion 005)
+export type MaterialSourceType = 'file' | 'link' | 'youtube' | 'notebooklm'; // teaching_materials.source_type, CHECK real (migraciones 005, 035, 042)
+export type QuestionReviewStatus = 'pending' | 'approved' | 'rejected' | 'human_review'; // lesson_questions.review_status (Fase 1.3)
 
-export interface ContentModule {
-  id: string;
-  teacher_id: string | null;
-  classroom_id: string | null;
-  title: string;
-  description: string | null;
-  category: string;
-  difficulty_level: number;
-  content_type: ContentType;
-  resource_url: string | null;
-  resource_metadata: Record<string, any>;
-  gemini_prompt_template: string | null;
-  base_xp_reward: number;
-  estimated_time_minutes: number;
-  prerequisites: string[];
-  order_index: number;
-  map_position_x: number;
-  map_position_y: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+// ============================================================
+// Tipos de tabla derivados del schema real, con las columnas enum
+// sobrescritas a union literal donde aplica. El resto de columnas
+// (nombre, nullability) vienen tal cual del generador — reflejan la
+// verdad de la base, no una copia mantenida a mano que puede desviarse.
+// ============================================================
 
-export interface StudentProgress {
-  id: string;
-  student_id: string;
-  module_id: string;
-  status: ModuleStatus;
-  completion_percentage: number;
-  score: number | null;
-  best_score: number;
-  attempts: number;
-  time_spent_seconds: number;
-  gemini_feedback_history: any[];
-  earned_xp: number;
-  earned_coins: number;
-  started_at: string | null;
-  completed_at: string | null;
-  last_attempt_at: string | null;
-}
+export type Profile = Omit<TableRow<'profiles'>, 'role'> & { role: UserRole | null };
 
-export interface Achievement {
-  id: string;
-  name: string;
-  description: string | null;
-  icon_name: string;
-  color: string;
+export type ContentModule = Omit<TableRow<'content_modules'>, 'content_type'> & {
+  content_type: ContentType | null;
+};
+
+export type StudentProgress = Omit<TableRow<'student_progress'>, 'status'> & {
+  status: ModuleStatus | null;
+};
+
+export type Achievement = Omit<TableRow<'achievements'>, 'criteria_type' | 'rarity'> & {
   criteria_type: CriteriaType;
-  criteria_value: number;
-  criteria_category: string | null;
-  reward_coins: number;
-  reward_xp: number;
-  rarity: AchievementRarity;
-  sort_order: number;
-  is_active: boolean;
-}
+  rarity: AchievementRarity | null;
+};
 
-export interface UserAchievement {
-  id: string;
-  user_id: string;
-  achievement_id: string;
-  earned_at: string;
-  seen_by_user: boolean;
-  achievement?: Achievement;
-}
+export type UserAchievement = TableRow<'user_achievements'> & { achievement?: Achievement };
 
-export interface ShopItem {
-  id: string;
-  name: string;
-  description: string | null;
-  type: ItemType;
-  cost_coins: number;
-  effect_data: Record<string, any>;
-  image_url: string | null;
-  preview_color: string | null;
-  duration_minutes: number | null;
-  is_consumable: boolean;
-  is_active: boolean;
-  sort_order: number;
-}
+export type ShopItem = Omit<TableRow<'shop_items'>, 'type'> & { type: ItemType };
 
-export interface Classroom {
-  id: string;
-  teacher_id: string;
-  name: string;
-  description: string | null;
-  join_code: string;
-  is_active: boolean;
-  subject_area: string | null;
-  grade_level: string | null;
-  created_at: string;
-}
+export type Classroom = TableRow<'classrooms'>;
+export type ClassEnrollment = TableRow<'class_enrollments'>;
+export type PendingEnrollment = TableRow<'pending_enrollments'>;
 
-export interface ClassEnrollment {
-  id: string;
-  classroom_id: string;
-  student_id: string;
-  teacher_id: string;
-  enrolled_at: string;
-}
-
-export interface PendingEnrollment {
-  id: string;
-  email: string;
-  classroom_id: string;
-  teacher_id: string;
-  invited_at: string;
-}
-
-export interface DailyMission {
-  id: string;
-  title: string;
-  description: string | null;
-  icon_name: string;
+export type DailyMission = Omit<TableRow<'daily_missions'>, 'mission_type'> & {
   mission_type: MissionType;
-  target_value: number;
-  reward_coins: number;
-  reward_xp: number;
-}
+};
 
-export interface UserMission {
-  id: string;
-  user_id: string;
-  mission_id: string;
-  assigned_date: string;
-  current_progress: number;
-  is_completed: boolean;
-  completed_at: string | null;
-  rewards_claimed: boolean;
-  mission?: DailyMission;
-}
+export type UserMission = TableRow<'user_missions'> & { mission?: DailyMission };
 
-// Para el type helper de Supabase
-export interface Database {
-  public: {
-    Tables: {
-      profiles: { Row: Profile; Insert: Partial<Profile>; Update: Partial<Profile> };
-      content_modules: { Row: ContentModule; Insert: Partial<ContentModule>; Update: Partial<ContentModule> };
-      student_progress: { Row: StudentProgress; Insert: Partial<StudentProgress>; Update: Partial<StudentProgress> };
-      achievements: { Row: Achievement; Insert: Partial<Achievement>; Update: Partial<Achievement> };
-      user_achievements: { Row: UserAchievement; Insert: Partial<UserAchievement>; Update: Partial<UserAchievement> };
-      shop_items: { Row: ShopItem; Insert: Partial<ShopItem>; Update: Partial<ShopItem> };
-      classrooms: { Row: Classroom; Insert: Partial<Classroom>; Update: Partial<Classroom> };
-      class_enrollments: { Row: ClassEnrollment; Insert: Partial<ClassEnrollment>; Update: Partial<ClassEnrollment> };
-      pending_enrollments: { Row: PendingEnrollment; Insert: Partial<PendingEnrollment>; Update: Partial<PendingEnrollment> };
-      teaching_materials: { Row: TeachingMaterial; Insert: Partial<TeachingMaterial>; Update: Partial<TeachingMaterial> };
-      material_chunks: { Row: MaterialChunk; Insert: Partial<MaterialChunk>; Update: Partial<MaterialChunk> };
-      daily_missions: { Row: DailyMission; Insert: Partial<DailyMission>; Update: Partial<DailyMission> };
-      user_missions: { Row: UserMission; Insert: Partial<UserMission>; Update: Partial<UserMission> };
-    };
-    Functions: {
-      calculate_xp: {
-        Args: {
-          p_base_xp: number;
-          p_streak_days: number;
-          p_difficulty: number;
-          p_score: number;
-          p_attempts: number;
-          p_time_seconds: number;
-          p_estimated_minutes: number;
-        };
-        Returns: number;
-      };
-      check_and_update_streak: {
-        Args: { p_user_id: string };
-        Returns: Record<string, any>;
-      };
-      recover_hearts: {
-        Args: { p_user_id: string };
-        Returns: number;
-      };
-    };
-  };
-}
-
-// ============================================================
-// Fase 11 · Stud.ia · Clases con IA
-// ============================================================
-
-export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
-
-export type MaterialSourceType = 'file' | 'link' | 'youtube' | 'notebooklm';
-
-export interface TeachingMaterial {
-  id: string;
-  classroom_id: string;
-  teacher_id: string;
-  filename: string;
-  display_name: string | null;
-  storage_path: string | null;
-  mime_type: string | null;
-  size_bytes: number;
-  extracted_text: string | null;
-  extracted_text_preview: string | null;
+export type TeachingMaterial = Omit<TableRow<'teaching_materials'>, 'processing_status' | 'source_type'> & {
   processing_status: ProcessingStatus;
-  processing_error: string | null;
-  content_hash: string | null;
-  chunk_count: number | null;
-  topics_detected: string[] | null;
-  estimated_difficulty: number | null;
-  version: number;
-  created_at: string;
-  updated_at: string;
-  processed_at: string | null;
-  // Sesion K: materiales multimedia (links y videos de YouTube)
   source_type: MaterialSourceType;
-  external_url: string | null;
-  external_title: string | null;
-  external_favicon: string | null;
-  youtube_video_id: string | null;
-  thumbnail_url: string | null;
-  duration_seconds: number | null;
-  transcript_source: string | null;
-}
+};
 
-export interface MaterialChunk {
-  id: string;
-  material_id: string;
-  chunk_index: number;
-  content: string;
-  content_tokens: number | null;
+// El generador expone `embedding` como `string | null` (pgvector serializado
+// en la respuesta REST cruda) — el codigo de la app siempre trabaja con
+// number[] ya parseado (ver src/lib/embeddings/generate.ts). Se sobrescribe
+// aqui para reflejar el shape con el que realmente se opera en TS, no el
+// wire format crudo.
+export type MaterialChunk = Omit<TableRow<'material_chunks'>, 'embedding'> & {
   embedding: number[] | null;
-  metadata: Record<string, any>;
-  created_at: string;
-}
+};
+
+export type LessonQuestion = Omit<TableRow<'lesson_questions'>, 'review_status'> & {
+  review_status: QuestionReviewStatus;
+};
+
+export type QuestionAttempt = TableRow<'question_attempts'>;
+export type ClassroomLearningObjective = TableRow<'classroom_learning_objectives'>;
+export type ClassroomConcept = TableRow<'classroom_concepts'>;
+export type ClassroomAiConfig = TableRow<'classroom_ai_config'>;
 
 // ============================================================
-// Fase 11.D · Generated lesson questions (3 tipos)
+// Shapes que NO corresponden a ninguna tabla (payloads de API /
+// respuestas de edge functions, no filas persistidas) — se mantienen a
+// mano, no hay schema real del que derivarlos.
 // ============================================================
 
 export type QuestionType = 'multiple_choice' | 'true_false' | 'fill_blank';

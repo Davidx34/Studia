@@ -16,6 +16,7 @@
 
 import { Innertube } from 'youtubei.js';
 import { sanitizeText, chunkEmbedAndStore } from './textProcessing';
+import type { TypedSupabaseClient } from '@/lib/supabase/types';
 
 const FETCH_TIMEOUT_MS = 15000;
 
@@ -147,7 +148,7 @@ function decodeXmlEntities(s: string): string {
     .replace(/<[^>]+>/g, '');
 }
 
-export async function processYoutubeMaterial(supabase: any, materialId: string, url: string): Promise<void> {
+export async function processYoutubeMaterial(supabase: TypedSupabaseClient, materialId: string, url: string): Promise<void> {
   try {
     const videoId = extractYoutubeId(url);
     if (!videoId) throw new Error('No se pudo reconocer el link como un video de YouTube valido.');
@@ -187,7 +188,7 @@ export async function processYoutubeMaterial(supabase: any, materialId: string, 
       // siempre con un video que genuinamente no tiene captions.
       const nextRetryCount = (existing?.auto_retry_count ?? 0) + 1;
 
-      if (existing?.chunk_count > 0) {
+      if ((existing?.chunk_count ?? 0) > 0) {
         await supabase
           .from('teaching_materials')
           .update({ ...baseUpdate, auto_retry_count: nextRetryCount })

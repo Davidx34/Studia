@@ -362,7 +362,7 @@ export async function reprocessMaterial(materialId: string) {
   // chunks viejos)
   await supabase.rpc('invalidate_lesson_cache', {
     p_classroom_id: material.classroom_id,
-  } as any);
+  });
 
   // Sesion K: link/youtube se reprocesan in-process (mismo pipeline que al
   // crearlos); los archivos siguen yendo por la edge function.
@@ -459,7 +459,7 @@ export async function deleteMaterial(materialId: string) {
   // Invalidar cache de lecciones (las que se generaron con este material ya no son válidas)
   await supabase.rpc('invalidate_lesson_cache', {
     p_classroom_id: material.classroom_id,
-  } as any);
+  });
 
   revalidatePath(`/teacher/classrooms/${material.classroom_id}/materials`);
   return { ok: true as const };
