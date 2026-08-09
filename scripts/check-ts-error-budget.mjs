@@ -21,11 +21,11 @@ import { execSync } from 'child_process';
 // distintos ("error TSxxxx" unicos en el output), NO como lineas de
 // output (ver historial de PRs para la diferencia entre ambas metricas).
 //
-// Actualizado tras el merge de 3.1 (#41): bajo de 495 a 169 una vez esa
-// limpieza de tipos entro a master. Bajar este numero en cada PR que
-// reduzca errores de tipos; nunca subirlo salvo que sea estrictamente
-// necesario y se documente por que.
-const TS_ERROR_BUDGET = 169;
+// Actualizado tras el merge de 3.1 (#41): bajo de 495 a 169. Actualizado de
+// nuevo tras el merge de #46 (tipado de lesson/[id] y repaso/[planId]): bajo
+// de 169 a 32. Bajar este numero en cada PR que reduzca errores de tipos;
+// nunca subirlo salvo que sea estrictamente necesario y se documente por que.
+const TS_ERROR_BUDGET = 32;
 
 console.log(`Corriendo tsc --noEmit (presupuesto actual: ${TS_ERROR_BUDGET} errores)...`);
 

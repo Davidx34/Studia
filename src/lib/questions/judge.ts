@@ -30,7 +30,11 @@ export interface JudgeResult {
 // estricto. Los criterios 1/2 (ancorage y respuesta unica) son los que
 // determinan fail -- son objetivamente verificables contra el material
 // fuente. 3/4/5 determinan review -- son mas de juicio, un humano decide.
-const RUBRIC = `Evalua cada pregunta de evaluacion educativa contra estos criterios:
+// Exportada junto con questionToText para que scripts/judge-local.ts (juez
+// offline sobre Ollama, para no depender de la cuota gratuita de Gemini)
+// pueda reusar exactamente la misma rubrica y formato de pregunta sin
+// duplicarlos -- un cambio a la rubrica aplica a ambos jueces automaticamente.
+export const RUBRIC = `Evalua cada pregunta de evaluacion educativa contra estos criterios:
 
 1. ANCLAJE: la pregunta y su respuesta correcta se pueden verificar contra el MATERIAL FUENTE dado (no inventa datos que no estan ahi).
 2. RESPUESTA UNICA: para multiple_choice/true_false, exactamente una opcion es correcta sin ambiguedad; para fill_blank/short_answer, la respuesta esperada es especifica y verificable.
@@ -43,7 +47,7 @@ Da un veredicto por pregunta:
 - "fail": viola el criterio 1 o 2 (dato inventado, o respuesta ambigua/incorrecta) -- estos son los mas graves, nunca deben llegar al estudiante.
 - "review": viola 3, 4 o 5 pero no 1/2 -- probablemente utilizable pero conviene que un humano lo confirme.`;
 
-function questionToText(q: any): string {
+export function questionToText(q: any): string {
   const parts = [`Tipo: ${q.type}`, `Pregunta: ${q.q}`];
   if (q.opts) parts.push(`Opciones: ${JSON.stringify(q.opts)}`);
   if (q.ok !== null && q.ok !== undefined) parts.push(`Respuesta correcta (indice/bool): ${JSON.stringify(q.ok)}`);
