@@ -17,21 +17,15 @@
 
 import { execSync } from 'child_process';
 
-// Baseline real de `master` al momento de escribir 3.4 (antes de que 3.1
-// -- PR #41 -- se mergee), medido como cantidad de diagnosticos distintos
-// ("error TSxxxx" unicos en el output), NO como lineas de output.
+// Baseline real de `master` medido como cantidad de diagnosticos
+// distintos ("error TSxxxx" unicos en el output), NO como lineas de
+// output (ver historial de PRs para la diferencia entre ambas metricas).
 //
-// Nota: las descripciones de PR anteriores en esta sesion (3.1, 3.2, 3.3)
-// citaron "577" como baseline usando `tsc --noEmit | wc -l` -- esa cifra
-// cuenta LINEAS de output (los errores multi-linea, como los overloads de
-// insert/rpc, inflan el conteo con varias lineas por diagnostico). El
-// conteo real de diagnosticos distintos en ese mismo estado es 495. Las
-// comparaciones antes/despues de esos PRs siguen siendo validas (usaron
-// la misma metrica de ambos lados), pero este script usa la metrica mas
-// precisa (conteo de diagnosticos) para el presupuesto de CI en adelante.
-// Bajar este numero en cada PR que reduzca errores de tipos; nunca
-// subirlo salvo que sea estrictamente necesario y se documente por que.
-const TS_ERROR_BUDGET = 495;
+// Actualizado tras el merge de 3.1 (#41): bajo de 495 a 169 una vez esa
+// limpieza de tipos entro a master. Bajar este numero en cada PR que
+// reduzca errores de tipos; nunca subirlo salvo que sea estrictamente
+// necesario y se documente por que.
+const TS_ERROR_BUDGET = 169;
 
 console.log(`Corriendo tsc --noEmit (presupuesto actual: ${TS_ERROR_BUDGET} errores)...`);
 
