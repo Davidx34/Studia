@@ -22,6 +22,7 @@ import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '@/lib/materials/constan
 import { slugifyFilename } from '@/lib/materials/file-helpers';
 import { processLinkMaterial } from '@/lib/materials/processLink';
 import { processYoutubeMaterial, extractYoutubeId } from '@/lib/materials/processYoutube';
+import { processNotebookLMMaterial } from '@/lib/materials/processNotebookLM';
 
 const STORAGE_BUCKET = 'teaching-materials';
 const SIGNED_URL_TTL_SECONDS = 60 * 5; // 5 minutos
@@ -272,6 +273,52 @@ export async function addYoutubeMaterial(classroomId: string, url: string): Prom
   return { ok: true, materialId: data.id };
 }
 
+// El profesor procesa el video/fuente externamente con NotebookLM y pega
+// aqui el markdown resultante (notas/resumen estructurado). No hay fetch
+// externo: es sincrono y no puede fallar por bloqueos de YouTube/terceros.
+export async function addNotebookLMMaterial(
+  classroomId: string,
+  title: string,
+  markdown: string
+): Promise<AddMaterialResult> {
+  const { supabase, user } = await requireUser();
+
+  if (!(await requireClassroomOwnership(supabase, classroomId, user.id))) {
+    return { ok: false, error: 'Clase no encontrada o sin permisos.' };
+  }
+
+  const trimmedTitle = title.trim();
+  const trimmedMarkdown = markdown.trim();
+  if (!trimmedTitle) {
+    return { ok: false, error: 'El título no puede estar vacío.' };
+  }
+  if (!trimmedMarkdown) {
+    return { ok: false, error: 'El contenido pegado no puede estar vacío.' };
+  }
+
+  const { data, error } = await supabase
+    .from('teaching_materials')
+    .insert({
+      classroom_id: classroomId,
+      teacher_id: user.id,
+      filename: trimmedTitle,
+      display_name: trimmedTitle,
+      source_type: 'notebooklm',
+      processing_status: 'processing',
+    })
+    .select('id')
+    .single();
+
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? 'No se pudo registrar el material.' };
+  }
+
+  await processNotebookLMMaterial(supabase, data.id, trimmedMarkdown);
+
+  revalidatePath(`/teacher/classrooms/${classroomId}/materials`);
+  return { ok: true, materialId: data.id };
+}
+
 // ============================================================
 // reprocessMaterial
 // ============================================================
@@ -281,7 +328,7 @@ export async function reprocessMaterial(materialId: string) {
 
   const { data: material } = await supabase
     .from('teaching_materials')
-    .select('id, classroom_id, source_type, external_url')
+    .select('id, classroom_id, source_type, external_url, extracted_text')
     .eq('id', materialId)
     .eq('teacher_id', user.id)
     .single();
@@ -302,11 +349,12 @@ export async function reprocessMaterial(materialId: string) {
 
   if (updateErr) return { ok: false as const, error: updateErr.message };
 
-  // Borrar chunks viejos para que se regeneren — excepto para youtube, donde
-  // processYoutubeMaterial se encarga de esto solo cuando el reintento SI
-  // tiene exito, para no perder contenido bueno si vuelve a fallar por un
-  // bloqueo transitorio de YouTube/Gemini (ver Sesion L, fix de reintentos).
-  if (material.source_type !== 'youtube') {
+  // Borrar chunks viejos para que se regeneren — excepto para youtube y
+  // notebooklm, donde chunkEmbedAndStore ya borra los viejos internamente
+  // solo despues de calcular los embeddings nuevos con exito (ver
+  // textProcessing.ts), para no perder contenido bueno si el reintento
+  // vuelve a fallar.
+  if (material.source_type !== 'youtube' && material.source_type !== 'notebooklm') {
     await supabase.from('material_chunks').delete().eq('material_id', materialId);
   }
 
@@ -322,6 +370,18 @@ export async function reprocessMaterial(materialId: string) {
     await processLinkMaterial(supabase, materialId, material.external_url);
   } else if (material.source_type === 'youtube' && material.external_url) {
     await processYoutubeMaterial(supabase, materialId, material.external_url);
+  } else if (material.source_type === 'notebooklm') {
+    // No hay URL externa que re-descargar: reprocesar re-chunkea/re-embebe
+    // el mismo texto pegado que ya se guardo en extracted_text la primera
+    // vez (util si solo fallo el paso de embedding, ver textProcessing.ts).
+    if (material.extracted_text) {
+      await processNotebookLMMaterial(supabase, materialId, material.extracted_text);
+    } else {
+      await supabase
+        .from('teaching_materials')
+        .update({ processing_status: 'failed', processing_error: 'No hay texto guardado para reprocesar. Vuelve a crear el material pegando el markdown.' })
+        .eq('id', materialId);
+    }
   } else {
     await supabase.functions
       .invoke('process-material', { body: { material_id: materialId } })
