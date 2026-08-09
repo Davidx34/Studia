@@ -117,6 +117,26 @@ async function callGemini(prompt: string, retries: number): Promise<string | nul
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
+// Groq responde el 429 de rate-limit con el tiempo exacto de espera, tanto
+// en el header estandar Retry-After como en el propio mensaje de error
+// ("Please try again in 3.78s"). Verificado en vivo (Sesion N): con
+// BATCH_CONCURRENCY=3 y lotes de 8 preguntas (~3.3K tokens c/u), el limite
+// de 12K TPM se pisa con solo 2 lotes concurrentes de la misma llamada a
+// judgeQuestionsBatch -- un backoff fijo adivinado (lo que habia antes)
+// unas veces esperaba de mas y otras de menos que lo que Groq realmente
+// necesitaba; usar el tiempo exacto que Groq devuelve es estrictamente
+// mejor y evita que un lote entero se de por vencido innecesariamente.
+function parseGroqRetryDelayMs(res: Response, body: string): number {
+  const header = res.headers.get('retry-after');
+  if (header) {
+    const seconds = parseFloat(header);
+    if (!isNaN(seconds)) return seconds * 1000;
+  }
+  const match = body.match(/try again in ([\d.]+)s/i);
+  if (match) return parseFloat(match[1]) * 1000;
+  return 3000; // fallback conservador si Groq no informa el tiempo exacto
+}
+
 async function callGroq(prompt: string, retries: number): Promise<string | null> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
@@ -135,7 +155,9 @@ async function callGroq(prompt: string, retries: number): Promise<string | null>
       });
       if (!res.ok) {
         if (res.status === 429 && attempt < retries) {
-          await new Promise((r) => setTimeout(r, 2500 * (attempt + 1) + Math.floor(Math.random() * 500)));
+          const body = await res.text().catch(() => '');
+          const delayMs = parseGroqRetryDelayMs(res, body) + 300; // pequeño colchon sobre el tiempo exacto que pide Groq
+          await new Promise((r) => setTimeout(r, delayMs));
           continue;
         }
         return null;
