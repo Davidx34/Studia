@@ -58,6 +58,17 @@ export function questionToText(q: any): string {
   return parts.join('\n');
 }
 
+// gemini-2.5-flash tiene cuota gratuita de solo 20 requests/dia (verificado
+// en vivo, ver comentario mas abajo en BATCH_SIZE). Un 429 por CUOTA DIARIA
+// agotada (RESOURCE_EXHAUSTED con quotaId de tipo "PerDay") no se arregla
+// reintentando -- va a devolver el mismo 429 las veces que sea, solo suma
+// latencia inutil antes de caer a Groq. Se distingue de un 429 transitorio
+// (rate limit por rafaga corta, ese si vale la pena reintentar con backoff)
+// leyendo el motivo en el cuerpo del error.
+function isQuotaExhausted(status: number, body: string): boolean {
+  return status === 429 && /RESOURCE_EXHAUSTED|quotaId.*PerDay|GenerateRequestsPerDayPerProjectPerModel/i.test(body);
+}
+
 async function callGemini(prompt: string, retries: number): Promise<string | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
@@ -73,6 +84,10 @@ async function callGemini(prompt: string, retries: number): Promise<string | nul
         }),
       });
       if (!res.ok) {
+        const errBody = await res.text().catch(() => '');
+        if (res.status === 429 && isQuotaExhausted(res.status, errBody)) {
+          return null; // cuota del dia agotada, cae directo a Groq sin reintentar
+        }
         if (res.status === 429 && attempt < retries) {
           await new Promise((r) => setTimeout(r, 2500 * (attempt + 1) + Math.floor(Math.random() * 500)));
           continue;
@@ -92,11 +107,68 @@ async function callGemini(prompt: string, retries: number): Promise<string | nul
   return null;
 }
 
-// Juzga UNA pregunta con UNA llamada a Gemini. Se mantiene exportada para
-// reuso puntual, pero el camino principal (judgeQuestionsBatch) ya NO la
-// usa por pregunta -- la usa solo como fallback cuando un lote completo
-// falla al parsear (ver mas abajo), para no perder ese lote entero por un
-// problema de formato en la respuesta.
+// Respaldo en la nube cuando Gemini se agota: llama-3.3-70b-versatile en
+// Groq. Verificado en vivo (Sesion M): free tier de 1,000 requests/dia,
+// 30 RPM, 12K TPM -- con BATCH_SIZE=8 eso son hasta ~8,000 preguntas/dia,
+// muy por encima del pool completo del piloto (~136 preguntas). A
+// diferencia del juez local sobre Ollama (scripts/judge-local.ts), este SI
+// corre en el mismo proceso serverless de Vercel que ya ejecuta el resto
+// del juez -- no requiere que nadie corra nada manualmente.
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+async function callGroq(prompt: string, retries: number): Promise<string | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0,
+          response_format: { type: 'json_object' },
+        }),
+      });
+      if (!res.ok) {
+        if (res.status === 429 && attempt < retries) {
+          await new Promise((r) => setTimeout(r, 2500 * (attempt + 1) + Math.floor(Math.random() * 500)));
+          continue;
+        }
+        return null;
+      }
+      const data = await res.json();
+      return data?.choices?.[0]?.message?.content || '';
+    } catch {
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+      return null;
+    }
+  }
+  return null;
+}
+
+// Punto unico de entrada para cualquier llamada al juez: intenta Gemini
+// primero (mismo proveedor que ya usaba el proyecto, matiz ligeramente
+// mejor en la practica) y cae a Groq solo si Gemini no respondio -- cuota
+// agotada, API key ausente, o error de red. Nunca se queda sin intentar un
+// segundo proveedor antes de rendirse y mandar la pregunta a human_review.
+async function callJudgeProvider(prompt: string, retries: number): Promise<string | null> {
+  const geminiText = await callGemini(prompt, retries);
+  if (geminiText) return geminiText;
+  return callGroq(prompt, retries);
+}
+
+// Juzga UNA pregunta con UNA llamada (Gemini, con fallback a Groq via
+// callJudgeProvider). Se mantiene exportada para reuso puntual, pero el
+// camino principal (judgeQuestionsBatch) ya NO la usa por pregunta -- la
+// usa solo como fallback cuando un lote completo falla al parsear (ver mas
+// abajo), para no perder ese lote entero por un problema de formato.
 export async function judgeQuestion(question: any, sourceMaterial: string, retries = 2): Promise<JudgeResult | null> {
   const prompt = `${RUBRIC}
 
@@ -108,7 +180,7 @@ ${(sourceMaterial || '').substring(0, 4000)}
 PREGUNTA A EVALUAR:
 ${questionToText(question)}`;
 
-  const text = await callGemini(prompt, retries);
+  const text = await callJudgeProvider(prompt, retries);
   if (!text) return null;
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
@@ -130,6 +202,12 @@ ${questionToText(question)}`;
 // sino por rate limit. BATCH_SIZE agrupa varias preguntas en una sola
 // llamada: con 8 preguntas por lote, ese mismo pool de 130-270 preguntas
 // necesita ~17-34 requests -- factible en 1-2 dias en vez de nunca.
+//
+// Con el fallback a Groq (callJudgeProvider, ver mas arriba) esto ya casi
+// no importa en la practica: apenas Gemini agota sus 20 requests/dia, el
+// resto del pool cae automaticamente a Groq (1,000 requests/dia gratis),
+// que solo con batching alcanza para ~8,000 preguntas/dia -- el pool
+// completo del piloto se puede juzgar en una sola corrida.
 const BATCH_SIZE = 8;
 const BATCH_CONCURRENCY = 3;
 
@@ -175,14 +253,15 @@ export function parseBatchResponse(text: string, expectedCount: number): (JudgeR
   }
 }
 
-// Juzga un lote (BATCH_SIZE preguntas) con UNA sola llamada a Gemini. Si la
-// respuesta no se puede parsear (formato invalido, conteo no coincide) tras
-// los reintentos, cae a judgeQuestion() individual SOLO para ese lote --
-// bounded worst-case: nunca peor que el comportamiento anterior, pero solo
-// se paga ese costo en el caso raro de fallo de formato.
+// Juzga un lote (BATCH_SIZE preguntas) con UNA sola llamada (Gemini con
+// fallback automatico a Groq via callJudgeProvider). Si la respuesta no se
+// puede parsear (formato invalido, conteo no coincide) tras los reintentos
+// en AMBOS proveedores, cae a judgeQuestion() individual SOLO para ese
+// lote -- bounded worst-case: nunca peor que el comportamiento anterior,
+// pero solo se paga ese costo en el caso raro de fallo de formato.
 async function judgeBatch(batch: any[], sourceMaterial: string): Promise<(JudgeResult | null)[]> {
   const prompt = buildBatchPrompt(batch, sourceMaterial);
-  const text = await callGemini(prompt, 2);
+  const text = await callJudgeProvider(prompt, 2);
   if (text) {
     const parsed = parseBatchResponse(text, batch.length);
     if (parsed) return parsed;
