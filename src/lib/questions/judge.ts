@@ -7,7 +7,14 @@
 // generador (Cohere/Aya) -- para no heredar el mismo sesgo de "esto se ve
 // bien" que tendria el mismo modelo evaluando su propio trabajo.
 
-const GEMINI_FLASH_MODEL = 'gemini-2.0-flash';
+// gemini-2.0-flash devolvia 429 RESOURCE_EXHAUSTED con limit:0 en la
+// verificacion en vivo (Sesion L, corrida real sobre Microeconomia I) --
+// no es cuota agotada por uso, esa key nunca tuvo acceso free tier a ese
+// modelo especifico. gemini-2.5-flash SI respondio correctamente con la
+// misma key (verificado con una llamada directa). Mismo modelo que ya usa
+// textProcessing.ts para deteccion de temas, asi que el proyecto ya
+// depende de que este disponible.
+const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
 export type JudgeVerdict = 'pass' | 'fail' | 'review';
@@ -49,7 +56,13 @@ function questionToText(q: any): string {
   return parts.join('\n');
 }
 
-export async function judgeQuestion(question: any, sourceMaterial: string): Promise<JudgeResult | null> {
+// Reintenta ante 429 (rate limit transitorio del free tier de Gemini,
+// esperable con concurrencia real sobre 10-20+ preguntas por modulo) antes
+// de rendirse. Antes un solo 429 mandaba la pregunta a human_review sin
+// reintentar — en la verificacion en vivo (Sesion L) esto causo que 2 de 6
+// modulos quedaran con 0 preguntas juzgadas por rate limiting, no por
+// veredicto real.
+export async function judgeQuestion(question: any, sourceMaterial: string, retries = 2): Promise<JudgeResult | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
@@ -61,34 +74,50 @@ ${(sourceMaterial || '').substring(0, 4000)}
 PREGUNTA A EVALUAR:
 ${questionToText(question)}`;
 
-  try {
-    const res = await fetch(`${GEMINI_BASE_URL}/models/${GEMINI_FLASH_MODEL}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json' },
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]);
-    if (!['pass', 'fail', 'review'].includes(parsed.verdict)) return null;
-    return { verdict: parsed.verdict, reason: String(parsed.reason || '').slice(0, 500) };
-  } catch {
-    return null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${GEMINI_BASE_URL}/models/${GEMINI_FLASH_MODEL}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+        }),
+      });
+      if (!res.ok) {
+        if (res.status === 429 && attempt < retries) {
+          await new Promise((r) => setTimeout(r, 2500 * (attempt + 1) + Math.floor(Math.random() * 500)));
+          continue;
+        }
+        return null;
+      }
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (!['pass', 'fail', 'review'].includes(parsed.verdict)) return null;
+      return { verdict: parsed.verdict, reason: String(parsed.reason || '').slice(0, 500) };
+    } catch {
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+      return null;
+    }
   }
+  return null;
 }
 
 // Corre el juez sobre una lista de preguntas con concurrencia limitada (no
 // Promise.all sin limite -- 20-40 preguntas en paralelo contra Gemini
 // dispara rate limiting; no secuencial puro -- por modulo puede haber
 // suficientes preguntas como para acercarse al timeout de una funcion
-// serverless). CONCURRENCY=5 es conservador a proposito para el piloto.
-const CONCURRENCY = 5;
+// serverless). Bajado de 5 a 3 tras la verificacion en vivo (Sesion L):
+// con CONCURRENCY=5 y sin retry, 2 de 6 modulos de Microeconomia
+// terminaron con 0 preguntas juzgadas por 429 en cascada. Combinado con
+// el retry agregado en judgeQuestion, 3 deja margen real.
+const CONCURRENCY = 3;
 
 export async function judgeQuestionsBatch(
   questions: any[],
