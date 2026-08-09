@@ -15,45 +15,71 @@ import { CuartoCrisisGame } from '@/components/minigames/CuartoCrisisGame';
 import { JuicioConocimientoGame } from '@/components/minigames/JuicioConocimientoGame';
 import { RemediationPrompt } from '@/components/lesson/RemediationPrompt';
 import { useTonitoStore } from '@/stores/useTonitoStore';
-import { CinematicScene } from '@/components/cinematics/CinematicScene';
+import { CinematicScene, type CinematicType } from '@/components/cinematics/CinematicScene';
 import { useSoundFx } from '@/lib/sound/useSoundFx';
 import { TonitoCharacter } from '@/components/tonito/TonitoCharacter';
 import { MathText } from '@/components/MathText';
 import { isValidQuestion } from '@/lib/lesson/validateQuestion';
+import type { ContentModule } from '@/types/database';
 
 const REMEDIATION_ACCURACY_THRESHOLD = 70;
 const REMEDIATION_TRIGGER_SCORE = 80;
 
+// Shape "hidratada" de una pregunta tal como la usa esta pagina (mezcla de
+// filas cacheadas de lesson_questions y preguntas recien generadas que aun
+// no tienen id) -- mismo shape que produce rowToQuestion() en
+// /api/generate-questions/route.ts, no el tipo LessonQuestion de la DB
+// (esa tiene opts/ok/pairs/etc como Json generico, no los arrays/tipos
+// concretos que el render necesita).
+type LessonPageQuestion = {
+  id?: string;
+  type: string;
+  q: string;
+  exp?: string | null;
+  concept_tag?: string | null;
+  opts?: string[];
+  ok?: number | boolean;
+  answers?: string[];
+  pairs?: { term: string; def: string }[];
+  keywords?: string[];
+  game_type?: string;
+  game_data?: any;
+};
+
+type ModuleWithClassroom = ContentModule & { classrooms: { id: string; name: string } | null };
+type WeakConcept = { tag: string; accuracy: number };
+type RemediationPhase = 'none' | 'offered' | 'active' | 'completed';
+type FillBlankFeedback = 'correct' | 'retry' | 'revealed' | null;
+
 export default function LessonPage() {
   const params = useParams();
   const router = useRouter();
-  const moduleId = params.id;
+  const moduleId = params.id as string;
   const supabase = createClient();
-  const [mod, setMod] = useState(null);
-  const [questions, setQuestions] = useState([]);
+  const [mod, setMod] = useState<ModuleWithClassroom | null>(null);
+  const [questions, setQuestions] = useState<LessonPageQuestion[]>([]);
   const [idx, setIdx] = useState(0);
   const [answered, setAnswered] = useState(false);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState<number | boolean | string | null>(null);
   const [score, setScore] = useState(0);
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState(false);
-  const [matchAnswers, setMatchAnswers] = useState({});
   const [shortAnswerText, setShortAnswerText] = useState('');
   const [shortAnswerMatchedCount, setShortAnswerMatchedCount] = useState(0);
   const [fillBlankText, setFillBlankText] = useState('');
   const [fillBlankAttempts, setFillBlankAttempts] = useState(0);
-  const [fillBlankFeedback, setFillBlankFeedback] = useState(null); // 'correct' | 'retry' | 'revealed'
+  const [fillBlankFeedback, setFillBlankFeedback] = useState<FillBlankFeedback>(null);
 
   // Repaso dirigido automatico (Sesion E.1).
   const [moduleFinishing, setModuleFinishing] = useState(false);
-  const [remediationPhase, setRemediationPhase] = useState('none'); // 'none' | 'offered' | 'active' | 'completed'
-  const [weakConcepts, setWeakConcepts] = useState([]);
+  const [remediationPhase, setRemediationPhase] = useState<RemediationPhase>('none');
+  const [weakConcepts, setWeakConcepts] = useState<WeakConcept[]>([]);
   const [remediationLoading, setRemediationLoading] = useState(false);
-  const [remediationRowId, setRemediationRowId] = useState(null);
+  const [remediationRowId, setRemediationRowId] = useState<string | null>(null);
   const [remediationBonusXp, setRemediationBonusXp] = useState(0);
 
   // Cinematicas (Sesion F.1): cola simple, se muestran en secuencia.
-  const [cinematicQueue, setCinematicQueue] = useState([]);
+  const [cinematicQueue, setCinematicQueue] = useState<CinematicType[]>([]);
   const [showIntro, setShowIntro] = useState(true);
   const [studentName, setStudentName] = useState('');
   const [streakForCinematic, setStreakForCinematic] = useState(0);
@@ -66,18 +92,18 @@ export default function LessonPage() {
         .eq('id', moduleId)
         .single();
       if (!modData) { router.push('/dashboard'); return; }
-      setMod(modData);
+      setMod(modData as ModuleWithClassroom);
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase.from('profiles').select('full_name, username').eq('id', user.id).single();
         setStudentName(profile?.full_name?.split(' ')[0] || profile?.username || '');
       }
-      await generateQuestions(modData);
+      await generateQuestions(modData as ModuleWithClassroom);
     };
     load();
   }, []);
 
-  const generateQuestions = async (modData) => {
+  const generateQuestions = async (modData: ModuleWithClassroom) => {
     const { setMood, showMessage } = useTonitoStore.getState();
     setMood('thinking');
     showMessage('Espera, estoy preparando preguntas especiales...', 0);
@@ -88,7 +114,7 @@ export default function LessonPage() {
       const { data: aiConfig } = await supabase
         .from('classroom_ai_config')
         .select('*')
-        .eq('classroom_id', modData.classroom_id)
+        .eq('classroom_id', modData.classroom_id!) // un modulo real siempre pertenece a una clase
         .single();
 
       const res = await fetch('/api/generate-questions', {
@@ -130,7 +156,7 @@ export default function LessonPage() {
   // no solo al completar el modulo), para poder agregar aciertos/errores por concept_tag.
   // Las preguntas de fallback (sin conexion a Cohere) no tienen id real en lesson_questions,
   // asi que se omiten en vez de violar la FK.
-  const recordAttempt = async (question, wasCorrect, answerGiven) => {
+  const recordAttempt = async (question: LessonPageQuestion, wasCorrect: boolean, answerGiven: any) => {
     play(wasCorrect ? 'coin' : 'error');
     if (wasCorrect) {
       wrongStreakRef.current = 0;
@@ -146,7 +172,10 @@ export default function LessonPage() {
         student_id: user.id,
         question_id: question.id,
         module_id: moduleId,
-        classroom_id: mod.classroom_id,
+        // classroom_id es NOT NULL en la DB -- mod! es seguro aqui porque el
+        // gate de "loading" ya garantiza que mod esta cargado antes de que
+        // cualquier handler que llegue a recordAttempt pueda ejecutarse.
+        classroom_id: mod!.classroom_id!,
         concept_tag: question.concept_tag ?? null,
         was_correct: wasCorrect,
         answer_given: answerGiven ?? null,
@@ -156,7 +185,7 @@ export default function LessonPage() {
     }
   };
 
-  const handleAnswer = (answer) => {
+  const handleAnswer = (answer: number | boolean | string) => {
     if (answered) return;
     setSelected(answer);
     setAnswered(true);
@@ -179,7 +208,7 @@ export default function LessonPage() {
     const norm = normalizeAnswer(shortAnswerText);
     const matched = (q.keywords || []).filter((k) => norm.includes(normalizeAnswer(k))).length;
     setShortAnswerMatchedCount(matched);
-    const allKeywordsMatched = (q.keywords?.length || 0) > 0 && matched === q.keywords.length;
+    const allKeywordsMatched = (q.keywords?.length || 0) > 0 && matched === (q.keywords?.length ?? 0);
     recordAttempt(q, allKeywordsMatched, { text: shortAnswerText });
     handleAnswer('answered');
   };
@@ -217,7 +246,6 @@ export default function LessonPage() {
       setIdx(idx + 1);
       setAnswered(false);
       setSelected(null);
-      setMatchAnswers({});
       setShortAnswerText('');
       setShortAnswerMatchedCount(0);
       setFillBlankText('');
@@ -242,7 +270,7 @@ export default function LessonPage() {
       .eq('module_id', moduleId);
     if (!data || data.length === 0) return [];
 
-    const byTag = new Map();
+    const byTag = new Map<string, { correct: number; total: number }>();
     for (const row of data) {
       if (!row.concept_tag) continue;
       const entry = byTag.get(row.concept_tag) ?? { correct: 0, total: 0 };
@@ -251,7 +279,7 @@ export default function LessonPage() {
       byTag.set(row.concept_tag, entry);
     }
 
-    return [...byTag.entries()]
+    return Array.from(byTag.entries())
       .map(([tag, { correct, total }]) => ({ tag, accuracy: Math.round((correct / total) * 100) }))
       .filter((c) => c.accuracy < REMEDIATION_ACCURACY_THRESHOLD)
       .sort((a, b) => a.accuracy - b.accuracy)
@@ -267,7 +295,7 @@ export default function LessonPage() {
     await saveProgress(score);
     useTonitoStore.getState().onModuleComplete(scorePercent);
 
-    const queue = [scorePercent >= 70 ? 'module_complete_good' : 'module_complete_low'];
+    const queue: CinematicType[] = [scorePercent >= 70 ? 'module_complete_good' : 'module_complete_low'];
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -298,7 +326,7 @@ export default function LessonPage() {
               .insert({
                 student_id: user.id,
                 module_id: moduleId,
-                classroom_id: mod.classroom_id,
+                classroom_id: mod!.classroom_id!, // ver nota de invariante en recordAttempt
                 concept_tags: weak.map((w) => w.tag),
                 was_offered: true,
               })
@@ -335,7 +363,7 @@ export default function LessonPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           moduleId,
-          moduleTitle: mod.title,
+          moduleTitle: mod!.title, // ver nota de invariante en recordAttempt
           remediationConcepts: weakConcepts.map((w) => w.tag),
         }),
       });
@@ -389,7 +417,7 @@ export default function LessonPage() {
     useTonitoStore.getState().onModuleComplete(100);
   };
 
-  const saveProgress = async (finalScore) => {
+  const saveProgress = async (finalScore: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -414,7 +442,7 @@ export default function LessonPage() {
         score: scorePercent,
         best_score: Math.max(existing?.best_score ?? 0, scorePercent),
         attempts: (existing?.attempts ?? 0) + 1,
-        earned_xp: mod.base_xp_reward,
+        earned_xp: mod!.base_xp_reward, // ver nota de invariante en recordAttempt
         started_at: existing?.started_at ?? now,
         completed_at: now,
         last_attempt_at: now,
@@ -429,7 +457,7 @@ export default function LessonPage() {
           .single();
         await supabase
           .from('profiles')
-          .update({ total_xp: (profile?.total_xp ?? 0) + (mod.base_xp_reward ?? 0) })
+          .update({ total_xp: (profile?.total_xp ?? 0) + (mod!.base_xp_reward ?? 0) })
           .eq('id', user.id);
       }
 
@@ -466,7 +494,7 @@ export default function LessonPage() {
       type={cinematicQueue[0]}
       studentName={studentName}
       score={Math.round((score / questions.length) * 100)}
-      xpEarned={cinematicQueue[0] === 'module_complete_good' || cinematicQueue[0] === 'module_complete_low' ? mod.base_xp_reward : undefined}
+      xpEarned={cinematicQueue[0] === 'module_complete_good' || cinematicQueue[0] === 'module_complete_low' ? (mod.base_xp_reward ?? undefined) : undefined}
       streak={streakForCinematic}
       onComplete={() => setCinematicQueue((q) => q.slice(1))}
     />
@@ -507,6 +535,10 @@ export default function LessonPage() {
   const q = questions[idx];
   const progress = ((idx + 1) / questions.length) * 100;
 
+  // Da a TS un punto real de narrowing para "q" (isValidQuestion ya trata
+  // undefined como invalido en runtime, pero no es un type predicate).
+  if (!q) return <div className="text-white p-8">No hay pregunta para mostrar.</div>;
+
   const questionCheck = isValidQuestion(q);
   if (!questionCheck.valid) {
     console.error('[QUESTION_VALIDATION_ERROR]', {
@@ -537,7 +569,7 @@ export default function LessonPage() {
   const renderQuestion = () => {
     if (q.type === 'multiple_choice') return (
       <div className="space-y-3">
-        {q.opts.map((o, i) => (
+        {(q.opts || []).map((o, i) => (
           <button key={i} onClick={() => handleAnswer(i)} disabled={answered}
             className={"w-full p-4 rounded-lg text-left font-medium border-2 transition-all " + (
               selected === i ? (i === q.ok ? 'bg-green-600 text-white border-green-400' : 'bg-red-600 text-white border-red-400')
