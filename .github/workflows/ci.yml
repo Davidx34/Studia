@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  test-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests (Vitest)
+        run: npm test
+
+      # Protocolo 7.1.4: gate por presupuesto, no bloqueo duro -- ver
+      # scripts/check-ts-error-budget.mjs para el razonamiento completo.
+      # Falla el PR si SUBE el conteo de errores de tipos (incluye un
+      # error de tipos deliberado o accidental nuevo); no exige 0 errores
+      # de entrada, que romperia CI desde el primer commit dado el estado
+      # actual del proyecto.
+      - name: TypeScript error budget
+        run: node scripts/check-ts-error-budget.mjs
+
+      # NOTA: tests/rls-integration.test.ts (Protocolo 7.1.3) NO corre
+      # aqui a proposito -- necesita credenciales de service_role contra
+      # un proyecto Supabase real, incompatible con correr en cada PR de
+      # cualquier colaborador. Se corre manualmente, ver la cabecera de
+      # ese archivo.
