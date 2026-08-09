@@ -235,7 +235,7 @@ export interface Database {
 
 export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
-export type MaterialSourceType = 'file' | 'link' | 'youtube';
+export type MaterialSourceType = 'file' | 'link' | 'youtube' | 'notebooklm';
 
 export interface TeachingMaterial {
   id: string;

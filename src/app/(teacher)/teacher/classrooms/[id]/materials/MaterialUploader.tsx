@@ -2,12 +2,13 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, Loader2, AlertCircle, CheckCircle2, Link as LinkIcon, Video, FileUp } from 'lucide-react';
+import { Upload, Loader2, AlertCircle, CheckCircle2, Link as LinkIcon, Video, FileUp, Sparkles } from 'lucide-react';
 import {
   getUploadSignedUrl,
   confirmMaterialUpload,
   addLinkMaterial,
   addYoutubeMaterial,
+  addNotebookLMMaterial,
 } from '@/lib/actions/materials';
 import {
   ACCEPT_ATTRIBUTE,
@@ -27,7 +28,7 @@ interface UploadProgress {
   error?: string;
 }
 
-type UploadTab = 'file' | 'link' | 'youtube';
+type UploadTab = 'file' | 'link' | 'youtube' | 'notebooklm';
 
 export default function MaterialUploader({ classroomId }: { classroomId: string }) {
   const router = useRouter();
@@ -38,6 +39,10 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
   const [externalUrl, setExternalUrl] = useState('');
   const [externalBusy, setExternalBusy] = useState(false);
   const [externalError, setExternalError] = useState<string | null>(null);
+  const [notebookTitle, setNotebookTitle] = useState('');
+  const [notebookMarkdown, setNotebookMarkdown] = useState('');
+  const [notebookBusy, setNotebookBusy] = useState(false);
+  const [notebookError, setNotebookError] = useState<string | null>(null);
 
   function openPicker() {
     inputRef.current?.click();
@@ -58,6 +63,24 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
       return;
     }
     setExternalUrl('');
+    router.refresh();
+  }
+
+  async function handleAddNotebookLM(e: React.FormEvent) {
+    e.preventDefault();
+    if (!notebookTitle.trim() || !notebookMarkdown.trim()) return;
+    setNotebookBusy(true);
+    setNotebookError(null);
+
+    const result = await addNotebookLMMaterial(classroomId, notebookTitle, notebookMarkdown);
+
+    setNotebookBusy(false);
+    if (!result.ok) {
+      setNotebookError(result.error ?? 'No se pudo procesar el contenido.');
+      return;
+    }
+    setNotebookTitle('');
+    setNotebookMarkdown('');
     router.refresh();
   }
 
@@ -191,6 +214,7 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
             { id: 'file' as const, label: 'Archivo', icon: FileUp },
             { id: 'link' as const, label: 'Link', icon: LinkIcon },
             { id: 'youtube' as const, label: 'YouTube', icon: Video },
+            { id: 'notebooklm' as const, label: 'NotebookLM', icon: Sparkles },
           ]
         ).map((t) => {
           const TabIcon = t.icon;
@@ -276,6 +300,54 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
             <div className="flex items-center gap-2 text-xs text-red-300">
               <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
               {externalError}
+            </div>
+          )}
+        </form>
+      )}
+
+      {tab === 'notebooklm' && (
+        <form onSubmit={handleAddNotebookLM} className="rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900/30 p-6 space-y-3">
+          <p className="text-xs text-slate-500">
+            Procesa el video (u otra fuente) por tu cuenta en{' '}
+            <a
+              href="https://notebooklm.google.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-violet-300 underline hover:text-violet-200"
+            >
+              NotebookLM
+            </a>{' '}
+            y pega aquí las notas/resumen que genera (markdown). Es la vía más confiable para
+            videos sin subtítulos o con contenido denso.
+          </p>
+          <input
+            type="text"
+            required
+            value={notebookTitle}
+            onChange={(e) => setNotebookTitle(e.target.value)}
+            placeholder="Título del material (ej: Clase 4 - Elasticidad)"
+            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500"
+          />
+          <textarea
+            required
+            value={notebookMarkdown}
+            onChange={(e) => setNotebookMarkdown(e.target.value)}
+            placeholder="Pega aquí el markdown generado por NotebookLM…"
+            rows={8}
+            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 font-mono resize-y"
+          />
+          <button
+            type="submit"
+            disabled={notebookBusy || !notebookTitle.trim() || !notebookMarkdown.trim()}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-violet-500 hover:bg-violet-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            {notebookBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Agregar
+          </button>
+          {notebookError && (
+            <div className="flex items-center gap-2 text-xs text-red-300">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              {notebookError}
             </div>
           )}
         </form>

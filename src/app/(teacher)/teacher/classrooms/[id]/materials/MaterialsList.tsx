@@ -17,6 +17,7 @@ import {
   Clock,
   Link as LinkIcon,
   Video,
+  Sparkles,
 } from 'lucide-react';
 import { MIME_INFO } from '@/lib/materials/constants';
 import { formatBytes } from '@/lib/materials/file-helpers';
@@ -72,7 +73,11 @@ function MaterialRow({
   const isExternal = material.source_type !== 'file';
   const mimeInfo = material.mime_type
     ? MIME_INFO[material.mime_type] ?? { ext: '?', label: material.mime_type }
-    : { ext: material.source_type === 'youtube' ? 'youtube' : 'link', label: material.source_type === 'youtube' ? 'YouTube' : 'Link' };
+    : material.source_type === 'youtube'
+    ? { ext: 'youtube', label: 'YouTube' }
+    : material.source_type === 'notebooklm'
+    ? { ext: 'notebooklm', label: 'NotebookLM' }
+    : { ext: 'link', label: 'Link' };
   const Icon = pickIcon(material);
 
   async function handleRename() {
@@ -248,6 +253,7 @@ function MaterialRow({
 
 function pickIcon(material: TeachingMaterial) {
   if (material.source_type === 'youtube') return Video;
+  if (material.source_type === 'notebooklm') return Sparkles;
   if (material.source_type === 'link') return LinkIcon;
   const mime = material.mime_type ?? '';
   if (mime.includes('pdf')) return FileText;
