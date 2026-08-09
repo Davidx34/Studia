@@ -8,27 +8,40 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { advanceRemediationPlan } from '@/lib/actions/remediation-plans';
+import { advanceRemediationPlan, type RemediationPlan } from '@/lib/actions/remediation-plans';
 import { TonitoCharacter } from '@/components/tonito/TonitoCharacter';
 import { useTonitoStore } from '@/stores/useTonitoStore';
+
+// Mismo shape simplificado (solo multiple_choice/true_false, sin
+// minijuegos) que produce generateRemediationQuestions() en
+// /api/generate-questions/route.ts para el modo "remediation".
+type RemediationQuestion = {
+  type: string;
+  q: string;
+  ok?: number | boolean;
+  opts?: string[];
+  exp?: string | null;
+};
+
+type RoundResult = { completed: boolean; bonusXp: number };
 
 export default function RepasoPlanPage() {
   const params = useParams();
   const router = useRouter();
-  const planId = params.planId;
+  const planId = params.planId as string;
   const supabase = createClient();
 
-  const [plan, setPlan] = useState(null);
+  const [plan, setPlan] = useState<RemediationPlan | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [questions, setQuestions] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<RemediationQuestion[]>([]);
   const [idx, setIdx] = useState(0);
   const [answered, setAnswered] = useState(false);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState<number | boolean | null>(null);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [result, setResult] = useState(null); // { completed, bonusXp }
+  const [result, setResult] = useState<RoundResult | null>(null);
 
   useEffect(() => {
     load();
@@ -47,7 +60,7 @@ export default function RepasoPlanPage() {
       setLoading(false);
       return;
     }
-    setPlan(planData);
+    setPlan(planData as RemediationPlan);
 
     const { data: anchorModule } = await supabase
       .from('content_modules')
@@ -81,9 +94,10 @@ export default function RepasoPlanPage() {
     setLoading(false);
   };
 
-  const handleAnswer = (answer) => {
+  const handleAnswer = (answer: number | boolean) => {
     if (answered) return;
     const q = questions[idx];
+    if (!q) return;
     setSelected(answer);
     setAnswered(true);
     const correct = answer === q.ok;
@@ -134,6 +148,10 @@ export default function RepasoPlanPage() {
       </div>
     );
   }
+
+  // Narrowing explicito para TS: si no hay error y ya no esta cargando,
+  // load() siempre dejo `plan` seteado (o retorno antes con un error).
+  if (!plan) return null;
 
   if (done && result) {
     return (
@@ -186,7 +204,7 @@ export default function RepasoPlanPage() {
 
         {q.type === 'multiple_choice' && (
           <div className="space-y-3">
-            {q.opts.map((o, i) => (
+            {(q.opts || []).map((o, i) => (
               <button
                 key={i}
                 onClick={() => handleAnswer(i)}
