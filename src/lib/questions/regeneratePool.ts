@@ -13,6 +13,8 @@ import {
   normalizeGeneratedQuestion,
   callCohere,
   RAG_CONTEXT_CHAR_LIMIT,
+  ANTI_HALLUCINATION_BLOCK,
+  typeInstructionLine,
 } from '@/lib/questions/cohereGeneration';
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
 
@@ -54,7 +56,6 @@ export async function regenerateModulePool(supabase: any, moduleId: string): Pro
     Math.max(MIN_QUESTION_COUNT, moduleRow.configured_question_count || DEFAULT_QUESTION_COUNT)
   );
   const backupCount = questionCount; // reserva = 100% extra, per Mejora Estructural 2
-  const totalToGenerate = questionCount + backupCount;
 
   const context = await getRagContext(supabase, moduleId);
 
@@ -65,7 +66,7 @@ export async function regenerateModulePool(supabase: any, moduleId: string): Pro
   // taxonomia ya creada; si el profesor regenera antes de que exista, la crea.
   const closedConcepts = await getOrCreateModuleConcepts(supabase, moduleId, moduleRow.title);
 
-  const skills = [];
+  const skills: string[] = [];
   if (aiConfig?.skill_memory) skills.push('recordar hechos');
   if (aiConfig?.skill_comprehension) skills.push('comprender conceptos');
   if (aiConfig?.skill_application) skills.push('aplicar conocimiento');
@@ -73,12 +74,13 @@ export async function regenerateModulePool(supabase: any, moduleId: string): Pro
   if (aiConfig?.skill_synthesis) skills.push('sintetizar ideas');
   if (aiConfig?.skill_evaluation) skills.push('evaluar criticamente');
 
-  const types = [];
+  const types: string[] = [];
   if (aiConfig?.type_multiple_choice) types.push('opcion_multiple');
   if (aiConfig?.type_true_false) types.push('verdadero_falso');
   if (aiConfig?.type_fill_blank) types.push('completar_frase');
   if (aiConfig?.type_match) types.push('conectar_conceptos');
   if (aiConfig?.type_short_answer) types.push('respuesta_corta');
+  const activeTypes = types.length > 0 ? types : ['opcion_multiple'];
 
   const depth = aiConfig?.question_depth || 3;
   const langLevel = aiConfig?.language_level || 'intermediate';
@@ -90,24 +92,37 @@ export async function regenerateModulePool(supabase: any, moduleId: string): Pro
   const gradeDetail = aiConfig?.grade_level_detail || '';
   const subjectDesc = aiConfig?.subject_description || '';
 
-  const activeTypes = types.length > 0 ? types : ['opcion_multiple'];
-  const base = Math.floor(totalToGenerate / activeTypes.length);
-  let remainder = totalToGenerate % activeTypes.length;
-  const counts = activeTypes.map(() => base + (remainder-- > 0 ? 1 : 0));
-
-  let typeInstructions = activeTypes
-    .map((t, i) => `- ${counts[i]} pregunta(s) de tipo "${t}", con este formato JSON: ${jsonFormats[t]}`)
-    .join('\n');
-
   // A diferencia de generate-questions (que sortea minijuegos al azar), aqui se
   // usan EXACTAMENTE los tipos que el profesor eligio para este modulo.
   const configuredMinigames = (moduleRow.minigame_types || []).filter((mg: string) => mg in MINIGAME_RULES);
-  for (const mg of configuredMinigames) {
-    typeInstructions += `\n- 1 pregunta adicional de tipo "${mg}" ${MINIGAME_RULES[mg]}; si no aplica, genera en su lugar una pregunta mas de los tipos de arriba. Formato JSON: ${jsonFormats[mg]}`;
-  }
-  const totalWithMinigames = totalToGenerate + configuredMinigames.length;
 
-  const prompt = `Eres un profesor experto generando preguntas de evaluacion.
+  // Genera un lote de N preguntas en una sola llamada a Cohere. Separado en
+  // funcion porque el pool completo (activo+backup, hasta 30) excedia el
+  // limite DURO de salida del modelo (4096 tokens -- c4ai-aya-expanse-32b
+  // rechaza con HTTP 400 pedir mas, verificado en vivo) y, sin ese limite
+  // explicito, la respuesta se truncaba a mitad de un JSON en vez de fallar
+  // con un error claro. Pedir el pool en 2 llamadas mas chicas (activas,
+  // backup) en vez de 1 sola mantiene cada peticion comodamente por debajo
+  // del techo. Los minijuegos (mas pesados en tokens) solo van en el batch
+  // activo -- el backup es reserva simple, no necesita la misma variedad.
+  async function generateBatch(count: number, includeMinigames: boolean): Promise<any[] | null> {
+    if (count <= 0) return [];
+    const batchTypes = activeTypes.length > 0 ? activeTypes : ['opcion_multiple'];
+    const base = Math.floor(count / batchTypes.length);
+    let remainder = count % batchTypes.length;
+    const counts = batchTypes.map(() => base + (remainder-- > 0 ? 1 : 0));
+
+    let typeInstructions = batchTypes
+      .map((t: string, i: number) => typeInstructionLine(t, counts[i]))
+      .join('\n');
+
+    const minigamesForBatch = includeMinigames ? configuredMinigames : [];
+    for (const mg of minigamesForBatch) {
+      typeInstructions += `\n- 1 pregunta adicional de tipo "${mg}" ${MINIGAME_RULES[mg]}; si no aplica, genera en su lugar una pregunta mas de los tipos de arriba. Formato JSON: ${jsonFormats[mg]}`;
+    }
+    const totalForBatch = count + minigamesForBatch.length;
+
+    const prompt = `Eres un profesor experto generando preguntas de evaluacion.
 
 MATERIA: ${subjectDesc || moduleRow.title}
 GRADO: ${gradeDetail}
@@ -124,7 +139,7 @@ ${badExample ? 'PREGUNTA A EVITAR: ' + badExample : ''}
 CONTENIDO DEL MATERIAL:
 ${(context || '').substring(0, RAG_CONTEXT_CHAR_LIMIT)}
 
-Genera EXACTAMENTE ${totalWithMinigames} preguntas, distribuidas asi (respeta la cantidad exacta de cada tipo, no generes solo un tipo):
+Genera EXACTAMENTE ${totalForBatch} preguntas, distribuidas asi (respeta la cantidad exacta de cada tipo, no generes solo un tipo):
 ${typeInstructions}
 
 No repitas preguntas ni reformules la misma idea dos veces; cada pregunta debe cubrir un aspecto distinto del tema.
@@ -133,26 +148,41 @@ REGLAS ADICIONALES POR TIPO:
 - short_answer: la pregunta debe ser especifica y acotada (nunca vaga tipo "¿que es importante?"), con una respuesta esperada clara. "keywords" debe tener entre 2 y 5 palabras u expresiones concretas que se esperan en la respuesta.
 - fill_blank: "q" debe tener UN SOLO espacio en blanco marcado con "___", y "answers" debe tener exactamente 1 palabra o frase corta que lo completa (no varios blancos en la misma oracion).
 - match: "pairs" debe tener entre 3 y 4 pares concepto-definicion, cada uno claramente distinto de los demas para evitar ambiguedad.
-${MINIGAME_TYPE_RULES_TEXT}
+${includeMinigames ? MINIGAME_TYPE_RULES_TEXT : ''}
 
 NOTACION MATEMATICA: si el contenido requiere formulas, ecuaciones o simbolos matematicos (ej: funciones, derivadas, condiciones de optimizacion), escribelos en LaTeX: usa $...$ para notacion inline (ej: $U(x,y) = x^{0.5}y^{0.5}$) y $$...$$ para ecuaciones en bloque. No uses LaTeX si el tema no lo requiere.
 
 ${conceptTaxonomyPromptBlock(closedConcepts) || 'CONCEPT_TAG (obligatorio en cada pregunta): identifica el concepto especifico que evalua la pregunta (no el tema general del modulo), como un identificador snake_case corto en español (ej: "revolucion_industrial_causas", "fotosintesis_clorofila"). Si dos preguntas evaluan el mismo concepto especifico, deben usar EXACTAMENTE el mismo concept_tag.'}
 
+${ANTI_HALLUCINATION_BLOCK}
+
 Responde SOLO con JSON valido:
-{"questions":[...${totalWithMinigames} preguntas aqui, en el orden y cantidad indicados arriba...]}`;
+{"questions":[...${totalForBatch} preguntas aqui, en el orden y cantidad indicados arriba...]}`;
 
-  const questions = await callCohere(prompt);
-  if (!questions) return { ok: false, error: 'Cohere generation failed' };
+    return callCohere(prompt, totalForBatch);
+  }
 
-  const generated = questions.map(normalizeGeneratedQuestion);
-  const validGenerated = generated.filter((q: any) => {
-    const check = isValidQuestion(q);
-    if (!check.valid) {
-      console.warn('[REGENERATE_VALIDATION_FAILED]', { type: q.type, error: check.error });
-    }
-    return check.valid;
-  });
+  const [activeRaw, backupRaw] = await Promise.all([
+    generateBatch(questionCount, true),
+    generateBatch(backupCount, false),
+  ]);
+
+  if (!activeRaw && !backupRaw) {
+    return { ok: false, error: 'Cohere generation failed tras reintentos' };
+  }
+
+  const normalizeValidate = (raw: any[] | null) =>
+    (raw ?? []).map(normalizeGeneratedQuestion).filter((q: any) => {
+      const check = isValidQuestion(q);
+      if (!check.valid) {
+        console.warn('[REGENERATE_VALIDATION_FAILED]', { type: q.type, error: check.error });
+      }
+      return check.valid;
+    });
+
+  const activeQuestions = normalizeValidate(activeRaw);
+  const backupQuestions = normalizeValidate(backupRaw);
+  const validGenerated = [...activeQuestions, ...backupQuestions];
 
   if (validGenerated.length === 0) {
     return { ok: false, error: 'No se genero ninguna pregunta valida' };
@@ -160,9 +190,6 @@ Responde SOLO con JSON valido:
 
   // Reemplaza el pool existente del modulo por el nuevo (activo + backup).
   await supabase.from('lesson_questions').delete().eq('module_id', moduleId);
-
-  const activeQuestions = validGenerated.slice(0, questionCount);
-  const backupQuestions = validGenerated.slice(questionCount);
 
   const rows = [...activeQuestions, ...backupQuestions].map((q, i) => ({
     module_id: moduleId,

@@ -10,6 +10,8 @@ import {
   normalizeGeneratedQuestion,
   callCohere,
   RAG_CONTEXT_CHAR_LIMIT,
+  ANTI_HALLUCINATION_BLOCK,
+  typeInstructionLine,
 } from '@/lib/questions/cohereGeneration';
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
 import { acquireGenerationLock, releaseGenerationLock } from '@/lib/questions/generationLock';
@@ -42,8 +44,7 @@ async function generateRemediationQuestions(
   moduleTitle: string,
   weakConcepts: string[]
 ): Promise<any[]> {
-  const COHERE_API_KEY = process.env.COHERE_API_KEY;
-  if (!COHERE_API_KEY) return [];
+  if (!process.env.COHERE_API_KEY) return [];
 
   const context = await getRagContext(supabase, moduleId);
 
@@ -63,32 +64,25 @@ Formato JSON por pregunta:
 - multiple_choice: {"type":"multiple_choice","q":"pregunta","opts":["A. op1","B. op2","C. op3","D. op4"],"ok":0,"exp":"explicacion de apoyo","concept_tag":"uno de los conceptos de arriba, exacto"}
 - true_false: {"type":"true_false","q":"afirmacion","ok":true,"exp":"explicacion de apoyo","concept_tag":"uno de los conceptos de arriba, exacto"}
 
+${ANTI_HALLUCINATION_BLOCK}
+
 Responde SOLO con JSON valido:
 {"questions":[...4 preguntas aqui...]}`;
 
-  const res = await fetch('https://api.cohere.com/v2/chat', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + COHERE_API_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'c4ai-aya-expanse-32b', messages: [{ role: 'user', content: prompt }] }),
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  const text = data.message?.content?.[0]?.text || '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return [];
-  try {
-    const parsed = JSON.parse(jsonMatch[0]);
-    return parsed.questions || [];
-  } catch {
-    return [];
-  }
+  const questions = await callCohere(prompt, 4);
+  return questions ?? [];
 }
 
 export async function POST(req: NextRequest) {
+  // Declarados fuera del try para que el finally (liberar el lock
+  // anti-stampede) los pueda ver sin importar donde falle el try.
+  let moduleId: string | undefined;
+  let supabase: Awaited<ReturnType<typeof createServerSupabase>> | null = null;
   try {
-    const { moduleId, context: clientContext, moduleTitle, aiConfig, remediationConcepts } = await req.json();
+    const body = await req.json();
+    moduleId = body.moduleId;
+    const { context: clientContext, moduleTitle, aiConfig, remediationConcepts } = body;
 
-    let supabase: Awaited<ReturnType<typeof createServerSupabase>> | null = null;
     if (moduleId) supabase = await createServerSupabase();
 
     // 0. Modo repaso dirigido (Sesion E.1): atajo completo, nunca toca el cache normal.
@@ -199,7 +193,7 @@ export async function POST(req: NextRequest) {
     const counts = activeTypes.map(() => base + (remainder-- > 0 ? 1 : 0));
 
     let typeInstructions = activeTypes
-      .map((t, i) => `- ${counts[i]} pregunta(s) de tipo "${t}", con este formato JSON: ${jsonFormats[t]}`)
+      .map((t, i) => typeInstructionLine(t, counts[i]))
       .join('\n');
 
     // Los minijuegos son un bonus fuera de la distribucion normal: solo tienen
@@ -244,10 +238,12 @@ NOTACION MATEMATICA: si el contenido requiere formulas, ecuaciones o simbolos ma
 
 ${conceptTaxonomyPromptBlock(closedConcepts) || 'CONCEPT_TAG (obligatorio en cada pregunta): identifica el concepto especifico que evalua la pregunta (no el tema general del modulo), como un identificador snake_case corto en español (ej: "revolucion_industrial_causas", "fotosintesis_clorofila"). Si dos preguntas evaluan el mismo concepto especifico, deben usar EXACTAMENTE el mismo concept_tag.'}
 
+${ANTI_HALLUCINATION_BLOCK}
+
 Responde SOLO con JSON valido:
 {"questions":[...${TOTAL_WITH_MINIGAME} preguntas aqui, en el orden y cantidad indicados arriba...]}`;
 
-    const questions = await callCohere(prompt);
+    const questions = await callCohere(prompt, TOTAL_WITH_MINIGAME);
     if (!questions) return NextResponse.json({ error: 'Cohere generation failed' }, { status: 500 });
     // Normaliza cada minijuego a la misma forma anidada (game_type/game_data) que usan
     // las filas servidas desde cache, para que el cliente no tenga que manejar N shapes.
