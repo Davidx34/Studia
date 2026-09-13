@@ -19,6 +19,37 @@ export const RAG_MATCH_COUNT = 5;
 // contexto RAG debe importar esta constante, nunca hardcodear el numero.
 export const RAG_CONTEXT_CHAR_LIMIT = 5500;
 
+// Une chunks de material respetando RAG_CONTEXT_CHAR_LIMIT a nivel de CHUNK
+// COMPLETO -- nunca corta un chunk a la mitad. Antes cada llamador (aqui
+// mismo, x3 sitios) truncaba el contexto YA concatenado con un substring()
+// crudo en generate-questions/route.ts y regeneratePool.ts, lo que si podia
+// partir cualquier chunk individual a la mitad cuando el contexto total
+// superaba el limite -- con RAG_MATCH_COUNT=5 chunks de ~2000 chars cada
+// uno (500 tokens / 0.25 tokens-por-char), 5 chunks suman ~10000 chars,
+// bien por encima del limite de 5500: esto pasaba en la practica, no era
+// un caso de borde. Cortar a la mitad es especialmente grave ahora que
+// markdownChunking.ts protege tablas/bloques de codigo dentro de CADA
+// chunk -- un truncamiento ciego aguas abajo podia volver a partirlos, o
+// cortar el prefijo "[Sección: ...]" a mitad de camino. Es preferible un
+// contexto un poco mas corto (menos chunks) a uno mas largo con el ultimo
+// chunk cortado a medias.
+export function joinChunksWithinLimit(chunks: string[], limit: number): string {
+  let result = '';
+  for (const c of chunks) {
+    if (result.length === 0) {
+      // Primer chunk: si el solo ya excede el limite, se trunca (mismo
+      // comportamiento defensivo que el substring() anterior -- mejor
+      // contexto truncado que ninguno); si no, se incluye completo.
+      result = c.length > limit ? c.slice(0, limit) : c;
+      continue;
+    }
+    const candidate = `${result}\n\n${c}`;
+    if (candidate.length > limit) break;
+    result = candidate;
+  }
+  return result;
+}
+
 export function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -52,7 +83,7 @@ export async function getRagContext(supabase: any, moduleId: string): Promise<st
       .order('chunk_index', { ascending: true })
       .limit(12);
     if (scopedChunks && scopedChunks.length > 0) {
-      return scopedChunks.map((c: any) => c.content).join('\n\n');
+      return joinChunksWithinLimit(scopedChunks.map((c: any) => c.content), RAG_CONTEXT_CHAR_LIMIT);
     }
   }
 
@@ -66,7 +97,7 @@ export async function getRagContext(supabase: any, moduleId: string): Promise<st
       match_count: RAG_MATCH_COUNT,
     });
     if (relevantChunks && relevantChunks.length > 0) {
-      return relevantChunks.map((c: any) => c.content).join('\n\n');
+      return joinChunksWithinLimit(relevantChunks.map((c: any) => c.content), RAG_CONTEXT_CHAR_LIMIT);
     }
   }
 
@@ -84,7 +115,9 @@ export async function getRagContext(supabase: any, moduleId: string): Promise<st
       .select('content')
       .eq('material_id', material.id)
       .limit(5);
-    if (chunks && chunks.length > 0) return chunks.map((c: any) => c.content).join(' ');
+    if (chunks && chunks.length > 0) {
+      return joinChunksWithinLimit(chunks.map((c: any) => c.content), RAG_CONTEXT_CHAR_LIMIT);
+    }
   }
 
   return moduleRow.description || '';
