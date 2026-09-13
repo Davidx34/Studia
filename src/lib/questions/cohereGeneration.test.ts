@@ -6,7 +6,7 @@
 // passthrough de tipos de pregunta normales (que no deben tocarse).
 
 import { describe, it, expect } from 'vitest';
-import { normalizeGeneratedQuestion } from './cohereGeneration';
+import { normalizeGeneratedQuestion, joinChunksWithinLimit } from './cohereGeneration';
 
 describe('normalizeGeneratedQuestion', () => {
   it('deja intactos los tipos de pregunta normales (no minijuego)', () => {
@@ -187,5 +187,46 @@ describe('normalizeGeneratedQuestion', () => {
       const check = isValidQuestion(normalized);
       expect(check.valid, `${raw.type} deberia ser valido tras normalizar: ${check.error}`).toBe(true);
     }
+  });
+});
+
+// Etapa 3 (RAG) del pipeline -- ver skill
+// .claude/skills/ai-content-pipeline-architect. joinChunksWithinLimit
+// reemplaza un substring() crudo sobre el contexto ya concatenado (que
+// podia cortar cualquier chunk a la mitad -- tabla, bloque de codigo, o el
+// prefijo de sección que le antepone markdownChunking.ts) por un limite
+// aplicado a nivel de chunk completo. Logica pura, sin red.
+describe('joinChunksWithinLimit', () => {
+  it('incluye todos los chunks si la suma no excede el limite', () => {
+    const chunks = ['chunk uno', 'chunk dos', 'chunk tres'];
+    const result = joinChunksWithinLimit(chunks, 1000);
+    expect(result).toBe('chunk uno\n\nchunk dos\n\nchunk tres');
+  });
+
+  it('nunca corta un chunk a la mitad: para en el ultimo chunk que cabe completo', () => {
+    const chunks = ['A'.repeat(40), 'B'.repeat(40), 'C'.repeat(40)];
+    // Limite que permite exactamente 2 chunks completos (40+2+40=82) pero
+    // no los 3 (82+2+40=124).
+    const result = joinChunksWithinLimit(chunks, 100);
+    expect(result).toBe(`${'A'.repeat(40)}\n\n${'B'.repeat(40)}`);
+    expect(result).not.toContain('C');
+  });
+
+  it('si un solo chunk ya excede el limite, lo trunca como ultimo recurso (nunca devuelve vacio)', () => {
+    const chunks = ['X'.repeat(200)];
+    const result = joinChunksWithinLimit(chunks, 50);
+    expect(result).toHaveLength(50);
+  });
+
+  it('devuelve string vacio para un array vacio', () => {
+    expect(joinChunksWithinLimit([], 1000)).toBe('');
+  });
+
+  it('preserva un chunk con prefijo de sección intacto (nunca lo corta a mitad de camino)', () => {
+    const conSeccion = '[Sección: Unidad 2 > Teoría del Consumidor]\n\nContenido real del chunk.';
+    const chunks = [conSeccion, 'Y'.repeat(500)];
+    const result = joinChunksWithinLimit(chunks, conSeccion.length + 10); // no alcanza para el segundo
+    expect(result).toBe(conSeccion);
+    expect(result).toContain('[Sección: Unidad 2 > Teoría del Consumidor]');
   });
 });
