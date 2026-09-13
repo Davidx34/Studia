@@ -25,7 +25,7 @@ export default function MaterialsClient({
   return (
     <div className="space-y-6">
       {/* Header con uso */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 flex items-center gap-4">
+      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-4 flex items-center gap-4">
         <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center">
           <HardDrive className="w-5 h-5 text-violet-300" />
         </div>

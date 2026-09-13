@@ -155,12 +155,12 @@ export function DashboardClient({
 
       {/* Grid de stats rápidas */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard icon={Zap} label="XP total" value={profile?.total_xp || 0} color="from-amber-400 to-yellow-500" />
-        <StatCard icon={BookOpen} label="Módulos" value={totalCompleted} color="from-cyan-400 to-blue-500" />
-        <StatCard icon={Flame} label="Racha" value={`${profile?.streak_days || 0}d`} color="from-orange-400 to-red-500" />
-        <StatCard icon={Trophy} label="Logros" value={recentAchievements.length} color="from-yellow-400 to-orange-500" />
-        <StatCard icon={Target} label="Misiones hoy" value={`${completedMissions}/${missions.length}`} color="from-pink-400 to-rose-500" />
-        <StatCard icon={Map} label="Nivel" value={profile?.current_level || 1} color="from-violet-400 to-purple-600" />
+        <StatCard icon={Zap} label="XP total" value={profile?.total_xp || 0} color="from-amber-300/80 to-amber-500/80" />
+        <StatCard icon={BookOpen} label="Módulos" value={totalCompleted} color="from-sky-300/80 to-blue-500/80" />
+        <StatCard icon={Flame} label="Racha" value={`${profile?.streak_days || 0}d`} color="from-orange-300/80 to-rose-400/80" />
+        <StatCard icon={Trophy} label="Logros" value={recentAchievements.length} color="from-amber-300/80 to-orange-400/80" />
+        <StatCard icon={Target} label="Misiones hoy" value={`${completedMissions}/${missions.length}`} color="from-fuchsia-300/80 to-rose-400/80" />
+        <StatCard icon={Map} label="Nivel" value={profile?.current_level || 1} color="from-violet-300/80 to-purple-500/80" />
       </div>
 
       {/* Progreso semanal */}
@@ -242,7 +242,10 @@ export function DashboardClient({
                   className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-4 text-center hover:bg-white/15 transition relative overflow-hidden"
                 >
                   {!ua.seen_by_user && (
-                    <span className="absolute top-2 right-2 px-2 py-0.5 bg-yellow-400 text-yellow-900 text-[10px] font-bold rounded-full">
+                    <span
+                      className="absolute top-2 right-2 px-2 py-0.5 text-slate-900 text-[10px] font-bold rounded-full"
+                      style={{ background: 'var(--premium-gold)' }}
+                    >
                       ¡NUEVO!
                     </span>
                   )}
@@ -332,12 +335,12 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="studia-card-hover backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-4 hover:bg-white/15 transition">
+    <div className="premium-card backdrop-blur-xl bg-white/[0.04] rounded-2xl p-4">
       <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-2 shadow-lg`}>
         <Icon className="w-5 h-5 text-white" />
       </div>
-      <div className="text-2xl font-bold text-white">{value}</div>
-      <div className="text-xs text-white/60 font-medium">{label}</div>
+      <div className="text-2xl font-bold text-white font-mono tabular-nums">{value}</div>
+      <div className="text-xs text-white/50 font-medium">{label}</div>
     </div>
   );
 }

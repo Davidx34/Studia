@@ -61,7 +61,7 @@ export default function ReviewClient({ classroomId, questions }: { classroomId: 
         </Link>
       </div>
 
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 flex items-start gap-4">
+      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 flex items-start gap-4">
         <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
           <AlertTriangle className="w-5 h-5 text-amber-300" />
         </div>
@@ -89,7 +89,7 @@ export default function ReviewClient({ classroomId, questions }: { classroomId: 
             <h3 className="text-sm font-semibold text-slate-300">{moduleTitle} ({qs.length})</h3>
             <div className="space-y-2">
               {qs.map((q) => (
-                <div key={q.id} className="rounded-xl bg-slate-900 border border-slate-800 p-4 space-y-2">
+                <div key={q.id} className="rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-4 space-y-2">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-slate-500 uppercase tracking-wide">

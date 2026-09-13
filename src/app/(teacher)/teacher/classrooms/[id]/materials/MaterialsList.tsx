@@ -46,7 +46,7 @@ export default function MaterialsList({
   }
 
   return (
-    <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
+    <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl overflow-hidden">
       {materials.map((m, idx) => (
         <MaterialRow
           key={m.id}

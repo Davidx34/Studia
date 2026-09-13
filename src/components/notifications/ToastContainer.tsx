@@ -15,9 +15,9 @@ const VARIANT_CONFIG: Record<
   },
   coins: {
     icon: Coins,
-    gradient: 'from-yellow-500/30 to-amber-600/30',
-    iconBg: 'from-yellow-400 to-amber-500',
-    ring: 'ring-yellow-300/40',
+    gradient: 'from-amber-500/30 to-amber-700/30',
+    iconBg: 'from-amber-300 to-amber-500',
+    ring: 'ring-amber-300/40',
   },
   streak: {
     icon: Flame,

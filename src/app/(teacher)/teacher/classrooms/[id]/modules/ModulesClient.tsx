@@ -74,7 +74,7 @@ export default function ModulesClient({
   return (
     <div className="space-y-6">
       {/* Header con CTA */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 flex items-start gap-4 flex-wrap">
+      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 flex items-start gap-4 flex-wrap">
         <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
           <Map className="w-5 h-5 text-violet-300" />
         </div>
@@ -192,7 +192,7 @@ function ModuleRow({
   }
 
   return (
-    <div className="rounded-xl bg-slate-900 border border-slate-800 p-4 flex items-start gap-3 group">
+    <div className="rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-4 flex items-start gap-3 group">
       <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-mono text-slate-400 flex-shrink-0">
         {module.order_index + 1}
       </div>

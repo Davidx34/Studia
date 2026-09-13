@@ -158,7 +158,7 @@ export default function ProgressClient({
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-xl bg-slate-900 border border-slate-800 p-1 flex-wrap">
+      <div className="flex gap-1 rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-1 flex-wrap">
         {(Object.keys(TAB_LABELS) as ProgressTab[]).map((k) => (
           <button
             key={k}
@@ -187,7 +187,7 @@ export default function ProgressClient({
                 className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500"
               />
             </div>
-            <div className="flex gap-1 rounded-xl bg-slate-900 border border-slate-800 p-1">
+            <div className="flex gap-1 rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-1">
               {(Object.keys(FILTER_LABELS) as FilterKey[]).map((k) => (
                 <button
                   key={k}
@@ -221,7 +221,7 @@ export default function ProgressClient({
 
           {/* Tabla */}
           {filtered.length === 0 ? (
-            <div className="text-center py-12 rounded-2xl bg-slate-900 border border-slate-800 border-dashed">
+            <div className="text-center py-12 rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl border-dashed">
               <p className="text-sm text-slate-500">
                 {data.students.length === 0
                   ? 'Aún no hay estudiantes inscritos en esta clase.'
@@ -229,7 +229,7 @@ export default function ProgressClient({
               </p>
             </div>
           ) : (
-            <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
+            <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl overflow-hidden">
               {/* Header de columnas */}
               <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-slate-800 bg-slate-900/50 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                 <Th label="Estudiante" k="fullName" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="col-span-3" />
@@ -298,7 +298,7 @@ function ConceptBreach({ conceptGap }: { conceptGap: ConceptGapData | null }) {
   const topCritical = groups.critical[0] ?? groups.important[0] ?? null;
 
   return (
-    <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-5">
+    <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 space-y-5">
       <h3 className="text-white font-semibold">Brecha de Conocimiento de la Clase</h3>
 
       {(['critical', 'important', 'good'] as ConceptSeverity[]).map((sev) =>
@@ -414,7 +414,7 @@ function StudentPerformance({
   };
 
   return (
-    <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4">
+    <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-white font-semibold">Desempeño Individual</h3>
         <div className="flex gap-2 flex-wrap">
@@ -557,7 +557,7 @@ function ConceptStudentMatrix({ conceptGap }: { conceptGap: ConceptGapData | nul
   }
 
   return (
-    <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4">
+    <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-white font-semibold">Matriz Concepto-Estudiante</h3>
         <div className="flex items-center gap-2">
@@ -630,7 +630,7 @@ function ConceptStudentMatrix({ conceptGap }: { conceptGap: ConceptGapData | nul
 
 function EmptyConceptState() {
   return (
-    <div className="text-center py-12 rounded-2xl bg-slate-900 border border-slate-800 border-dashed">
+    <div className="text-center py-12 rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl border-dashed">
       <AlertTriangle className="w-6 h-6 text-slate-600 mx-auto mb-2" />
       <p className="text-sm text-slate-500">
         Todavía no hay suficientes intentos de preguntas registrados para esta clase.
@@ -656,7 +656,7 @@ function StatCard({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl bg-slate-900 border border-slate-800 p-3">
+    <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-3">
       <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-slate-500">
         {icon}
         {label}

@@ -26,28 +26,30 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   if (loading) return <div className="text-white text-center p-8">Cargando...</div>;
 
   return (
-    <div className="flex min-h-screen bg-slate-900">
-      <aside className="w-64 bg-slate-800 border-r border-slate-700 p-6 flex flex-col">
+    <div className="flex min-h-screen bg-slate-950">
+      <aside className="w-64 bg-slate-900/60 backdrop-blur-xl border-r border-white/[0.06] p-6 flex flex-col">
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-white mb-8">📚 Stud.ia</h1>
-          <nav className="space-y-3">
+          <h1 className="text-2xl font-bold text-white mb-8">
+            📚 Stud<span style={{ color: 'var(--premium-accent)' }}>.</span>ia
+          </h1>
+          <nav className="space-y-1.5">
             <Link
               href="/teacher/classrooms"
-              className="block px-4 py-2 rounded text-slate-200 hover:bg-slate-700 transition-colors"
+              className="premium-focus flex items-center gap-2 px-4 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/[0.06] transition-all duration-300 ease-out"
             >
               📖 Mis Clases
             </Link>
             <Link
               href="/dashboard"
-              className="block px-4 py-2 rounded text-slate-200 hover:bg-slate-700 transition-colors"
+              className="premium-focus flex items-center gap-2 px-4 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/[0.06] transition-all duration-300 ease-out"
             >
               🎯 Dashboard
             </Link>
           </nav>
         </div>
-        <div className="border-t border-slate-700 pt-6 space-y-3">
-          <p className="text-xs text-slate-400 break-words">{user?.email}</p>
-          <p className="text-sm text-slate-300 font-medium">{user?.full_name || user?.username}</p>
+        <div className="border-t border-white/[0.06] pt-6 space-y-3">
+          <p className="text-xs text-slate-500 break-words">{user?.email}</p>
+          <p className="text-sm text-slate-200 font-medium">{user?.full_name || user?.username}</p>
           <LogoutButton />
         </div>
       </aside>

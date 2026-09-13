@@ -93,7 +93,7 @@ export default async function StudentDetailPage({ params }: PageProps) {
       </Link>
 
       {/* Perfil grande */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6">
+      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-6">
         <div className="flex items-start gap-4">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center text-white text-2xl font-bold flex-shrink-0">
             {student.full_name?.charAt(0) || student.username.charAt(0)}
@@ -133,7 +133,7 @@ export default async function StudentDetailPage({ params }: PageProps) {
       {/* Layout dos columnas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Heatmap */}
-        <section className="lg:col-span-2 rounded-2xl bg-slate-900 border border-slate-800 p-5">
+        <section className="lg:col-span-2 rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-white">Actividad de los últimos 28 días</h3>
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -175,7 +175,7 @@ export default async function StudentDetailPage({ params }: PageProps) {
         </section>
 
         {/* Por categoría */}
-        <section className="rounded-2xl bg-slate-900 border border-slate-800 p-5">
+        <section className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5">
           <h3 className="font-semibold text-white mb-4">Rendimiento por categoría</h3>
           <div className="space-y-3">
             {categoryStats.map((cat) => {
@@ -223,7 +223,7 @@ export default async function StudentDetailPage({ params }: PageProps) {
       {/* Actividad reciente */}
       <section>
         <h3 className="font-semibold text-white mb-3">Actividad reciente</h3>
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 divide-y divide-slate-800">
+        <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl divide-y divide-slate-800">
           {[...inProgress, ...completed].slice(0, 8).map((p) => {
             const m = p.content_modules;
             return (

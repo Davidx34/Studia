@@ -53,7 +53,7 @@ export default async function TeacherContentPage() {
 
       {/* Empty state */}
       {(!modules || modules.length === 0) && (
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-12 text-center">
+        <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-12 text-center">
           <BookOpen className="w-12 h-12 text-slate-600 mx-auto mb-3" />
           <h3 className="font-semibold text-white mb-1">Aún no has creado contenido</h3>
           <p className="text-sm text-slate-500 mb-4">
@@ -85,7 +85,7 @@ export default async function TeacherContentPage() {
                 {mods.map((m) => (
                   <div
                     key={m.id}
-                    className="rounded-xl bg-slate-900 border border-slate-800 p-4 hover:border-violet-500/40 transition group"
+                    className="rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-4 hover:border-violet-500/40 transition group"
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h3 className="font-semibold text-white text-sm leading-snug">{m.title}</h3>
@@ -93,7 +93,8 @@ export default async function TeacherContentPage() {
                         {Array.from({ length: 3 }).map((_, i) => (
                           <span
                             key={i}
-                            className={i < m.difficulty_level ? 'text-yellow-400' : 'text-slate-700'}
+                            className={i >= m.difficulty_level ? 'text-slate-700' : ''}
+                            style={i < m.difficulty_level ? { color: 'var(--premium-gold)' } : undefined}
                           >
                             ★
                           </span>

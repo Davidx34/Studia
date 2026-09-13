@@ -86,20 +86,22 @@ export default function SignupPage() {
 
   if (checkEmail) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-violet-600 via-purple-600 to-cyan-500">
-        <div className="w-full max-w-md text-center">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-slate-950 bg-gradient-to-br from-slate-950 via-violet-950 to-slate-950">
+        <div className="w-full max-w-md text-center premium-fade-in-up">
           <h1 className="text-5xl font-bold text-white tracking-tight mb-8">
-            Stud<span className="text-yellow-300">.</span>ia
+            Stud<span style={{ color: 'var(--premium-gold)' }}>.</span>ia
           </h1>
-          <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
+          <div className="premium-card backdrop-blur-2xl bg-white/[0.04] rounded-3xl p-8 shadow-2xl">
             <h2 className="text-2xl font-semibold text-white mb-3">¡Ya casi! 📬</h2>
-            <p className="text-white/70">
-              Te enviamos un correo a <span className="text-yellow-300">{email}</span> para
-              confirmar tu cuenta. Ábrelo y luego inicia sesión.
+            <p className="text-white/60">
+              Te enviamos un correo a{' '}
+              <span style={{ color: 'var(--premium-gold)' }}>{email}</span> para confirmar tu
+              cuenta. Ábrelo y luego inicia sesión.
             </p>
             <Link
               href="/login"
-              className="inline-block mt-6 text-yellow-300 hover:text-yellow-200 font-medium"
+              className="premium-focus inline-block mt-6 font-medium rounded transition-colors duration-200"
+              style={{ color: 'var(--premium-gold)' }}
             >
               Ir a iniciar sesión
             </Link>
@@ -110,16 +112,16 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-violet-600 via-purple-600 to-cyan-500">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-slate-950 bg-gradient-to-br from-slate-950 via-violet-950 to-slate-950">
+      <div className="w-full max-w-md premium-fade-in-up">
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold text-white tracking-tight">
-            Stud<span className="text-yellow-300">.</span>ia
+            Stud<span style={{ color: 'var(--premium-gold)' }}>.</span>ia
           </h1>
-          <p className="text-white/70 mt-2">¡Empieza tu aventura de aprendizaje!</p>
+          <p className="text-white/60 mt-2">¡Empieza tu aventura de aprendizaje!</p>
         </div>
 
-        <div className="backdrop-blur-2xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
+        <div className="premium-card backdrop-blur-2xl bg-white/[0.04] rounded-3xl p-8 shadow-2xl">
           <h2 className="text-2xl font-semibold text-white mb-6">Crear cuenta</h2>
 
           <form onSubmit={handleSignup} className="space-y-4">
@@ -131,12 +133,12 @@ export default function SignupPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="¿Cómo te llamas?"
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40"
+                className="premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">Nombre de usuario</label>
+              <label className="block text-sm font-medium text-white/70 mb-2">Nombre de usuario</label>
               <input
                 type="text"
                 required
@@ -144,24 +146,24 @@ export default function SignupPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value.toLowerCase())}
                 placeholder="ej: super_estudiante"
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40"
+                className="premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">Email</label>
+              <label className="block text-sm font-medium text-white/70 mb-2">Email</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu@email.com"
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40"
+                className="premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">Contraseña</label>
+              <label className="block text-sm font-medium text-white/70 mb-2">Contraseña</label>
               <input
                 type="password"
                 required
@@ -169,12 +171,12 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40"
+                className="premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
+              <label className="block text-sm font-medium text-white/70 mb-2">
                 Código de clase <span className="text-white/40 font-normal">(opcional)</span>
               </label>
               <input
@@ -182,12 +184,15 @@ export default function SignupPage() {
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 placeholder="ej: ANA5A26"
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40 uppercase"
+                className="premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 uppercase transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20"
               />
             </div>
 
             {error && (
-              <div className="bg-red-500/20 border border-red-400/40 rounded-xl p-3 text-sm text-white">
+              <div
+                className="rounded-xl p-3 text-sm text-white border premium-fade-in-up"
+                style={{ background: 'rgba(243, 139, 160, 0.12)', borderColor: 'rgba(243, 139, 160, 0.3)' }}
+              >
                 {error}
               </div>
             )}
@@ -195,15 +200,20 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition disabled:opacity-50"
+              className="premium-btn premium-focus w-full py-3 text-slate-900 font-semibold rounded-xl disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg, var(--premium-gold) 0%, #e8a87c 100%)' }}
             >
               {loading ? 'Creando tu cuenta...' : '¡Empezar mi aventura!'}
             </button>
           </form>
 
-          <p className="text-center text-white/60 text-sm mt-6">
+          <p className="text-center text-white/50 text-sm mt-6">
             ¿Ya tienes cuenta?{' '}
-            <Link href="/login" className="text-yellow-300 hover:text-yellow-200 font-medium">
+            <Link
+              href="/login"
+              className="premium-focus font-medium transition-colors duration-200 rounded"
+              style={{ color: 'var(--premium-gold)' }}
+            >
               Inicia sesión
             </Link>
           </p>

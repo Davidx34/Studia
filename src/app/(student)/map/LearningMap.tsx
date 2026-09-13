@@ -93,7 +93,7 @@ export function LearningMap({ nodes, categoryMeta, stats }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-yellow-300" /> Mapa de Aprendizaje
+            <Sparkles className="w-6 h-6" style={{ color: 'var(--premium-gold)' }} /> Mapa de Aprendizaje
           </h2>
           <p className="text-sm text-white/60 mt-1">
             {stats.completed} de {stats.total} módulos completados
@@ -104,7 +104,7 @@ export function LearningMap({ nodes, categoryMeta, stats }: Props) {
             <span className="w-3 h-3 rounded-full bg-emerald-400" /> Completado
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-yellow-300 animate-pulse" /> Actual
+            <span className="w-3 h-3 rounded-full animate-pulse" style={{ background: 'var(--premium-gold)' }} /> Actual
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-white/40" /> Disponible
@@ -175,7 +175,7 @@ export function LearningMap({ nodes, categoryMeta, stats }: Props) {
               key={p.id}
               d={p.d}
               fill="none"
-              stroke={p.unlocked ? 'rgba(253,224,71,0.7)' : 'rgba(255,255,255,0.15)'}
+              stroke={p.unlocked ? 'rgba(240,198,116,0.7)' : 'rgba(255,255,255,0.15)'}
               strokeWidth="6"
               strokeLinecap="round"
               strokeDasharray={p.unlocked ? '0' : '12 8'}
@@ -281,7 +281,7 @@ function MapNodeButton({
       {isInProgress && (
         <div
           className="absolute inset-0 rounded-full animate-ping"
-          style={{ background: 'rgba(253,224,71,0.4)', transform: 'scale(1.4)' }}
+          style={{ background: 'rgba(240,198,116,0.4)', transform: 'scale(1.4)' }}
         />
       )}
 
@@ -296,19 +296,19 @@ function MapNodeButton({
             : isCompleted
             ? `linear-gradient(135deg, ${meta.gradient[0]}, ${meta.gradient[1]})`
             : isInProgress
-            ? 'linear-gradient(135deg, #fde047, #fb923c)'
+            ? 'linear-gradient(135deg, #f0c674, #e8a87c)'
             : `linear-gradient(135deg, ${meta.gradient[0]}aa, ${meta.gradient[1]}aa)`,
           borderColor: isCompleted
             ? '#10b981'
             : isInProgress
-            ? '#fbbf24'
+            ? '#f0c674'
             : isLocked
             ? 'rgba(255,255,255,0.15)'
             : 'rgba(255,255,255,0.4)',
           boxShadow: isCompleted
             ? '0 0 30px rgba(16,185,129,0.5)'
             : isInProgress
-            ? '0 0 40px rgba(253,224,71,0.7)'
+            ? '0 0 40px rgba(240,198,116,0.7)'
             : isAvailable
             ? `0 0 25px ${meta.color}66`
             : 'none',
@@ -318,9 +318,12 @@ function MapNodeButton({
           <Lock className="w-7 h-7 text-white/60" />
         ) : isCompleted ? (
           <div className="relative">
-            <Star className="w-9 h-9 text-yellow-300 fill-yellow-300" />
+            <Star className="w-9 h-9" style={{ color: 'var(--premium-gold)', fill: 'var(--premium-gold)' }} />
             {node.score === 100 && (
-              <span className="absolute -top-1 -right-2 text-[10px] font-bold text-emerald-900 bg-yellow-300 rounded-full px-1">
+              <span
+                className="absolute -top-1 -right-2 text-[10px] font-bold text-emerald-900 rounded-full px-1"
+                style={{ background: 'var(--premium-gold)' }}
+              >
                 100
               </span>
             )}
@@ -397,7 +400,8 @@ function NodeDetailModal({
                 {Array.from({ length: 3 }).map((_, i) => (
                   <span
                     key={i}
-                    className={i < node.difficulty ? 'text-yellow-300' : 'text-white/20'}
+                    className={i >= node.difficulty ? 'text-white/20' : ''}
+                    style={i < node.difficulty ? { color: 'var(--premium-gold)' } : undefined}
                   >
                     ★
                   </span>
