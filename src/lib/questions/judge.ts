@@ -14,6 +14,11 @@
 // misma key (verificado con una llamada directa). Mismo modelo que ya usa
 // textProcessing.ts para deteccion de temas, asi que el proyecto ya
 // depende de que este disponible.
+// Las mismas reglas de formato que se le dan a Cohere para GENERAR minijuegos
+// se le dan a Gemini para JUZGARLOS: un solo punto de verdad, asi que ajustar
+// una regla cambia generacion y verificacion a la vez y no pueden divergir.
+import { MINIGAME_TYPE_RULES_TEXT } from '@/lib/questions/cohereGeneration';
+
 const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -41,11 +46,14 @@ export const RUBRIC = `Evalua cada pregunta de evaluacion educativa contra estos
 3. SIN PISTAS ACCIDENTALES: los distractores (opciones incorrectas) son plausibles, no obviamente falsos por redaccion (ej: mucho mas largos/cortos que la correcta, o con errores gramaticales que los delatan).
 4. CLARIDAD: el enunciado es comprensible sin ambiguedad de interpretacion.
 5. NIVEL: la dificultad es razonable para el nivel declarado (no trivial, no imposible sin el material).
+6. ESTRUCTURA DEL MINIJUEGO (solo si la pregunta trae "Datos del minijuego"): esos datos cumplen las reglas de formato de su tipo, listadas abajo. Para un minijuego, los criterios 1 y 2 se evaluan sobre los datos del minijuego (escenarios, afirmaciones, items, pares), NO sobre el campo "Pregunta", que suele ser solo un titulo generico como "Encuentra el puente logico".
+
+REGLAS DE FORMATO POR TIPO DE MINIJUEGO (para el criterio 6):${MINIGAME_TYPE_RULES_TEXT}
 
 Da un veredicto por pregunta:
-- "pass": cumple los 5 criterios.
-- "fail": viola el criterio 1 o 2 (dato inventado, o respuesta ambigua/incorrecta) -- estos son los mas graves, nunca deben llegar al estudiante.
-- "review": viola 3, 4 o 5 pero no 1/2 -- probablemente utilizable pero conviene que un humano lo confirme.`;
+- "pass": cumple todos los criterios que le apliquen.
+- "fail": viola el criterio 1, 2 o 6 (dato inventado, respuesta ambigua/incorrecta, o minijuego con datos incompletos/mal formados) -- estos son los mas graves, nunca deben llegar al estudiante.
+- "review": viola 3, 4 o 5 pero no 1/2/6 -- probablemente utilizable pero conviene que un humano lo confirme.`;
 
 export function questionToText(q: any): string {
   const parts = [`Tipo: ${q.type}`, `Pregunta: ${q.q}`];
@@ -54,6 +62,20 @@ export function questionToText(q: any): string {
   if (q.answers) parts.push(`Respuestas aceptadas: ${JSON.stringify(q.answers)}`);
   if (q.pairs) parts.push(`Pares: ${JSON.stringify(q.pairs)}`);
   if (q.keywords) parts.push(`Palabras clave esperadas: ${JSON.stringify(q.keywords)}`);
+
+  // Review 360 (2026-09-13), §3.3: esta linea no existia, y era la causa
+  // localizada del 83,3% de rechazo humano de minijuegos contra 26,2% de las
+  // preguntas clasicas (medido sobre lesson_questions en produccion:
+  // impostor_cognitivo 0 aprobadas de 7, cuarto_crisis 0 de 6).
+  //
+  // TODO el contenido de un minijuego vive en game_data: el crisis_scenario y
+  // la telemetry_data de cuarto_crisis, las statements de impostor_cognitivo,
+  // los items de linea_del_tiempo. Sin serializarlo, el juez leia literalmente
+  // `Tipo: cuarto_crisis / Pregunta: "Resuelve la crisis"` y nada mas -- era
+  // ciego al 100% del contenido que debia evaluar, asi que no filtraba nada y
+  // toda la basura llegaba al profesor para que la rechazara a mano.
+  if (q.game_data) parts.push(`Datos del minijuego (${q.game_type ?? q.type}): ${JSON.stringify(q.game_data)}`);
+
   if (q.exp) parts.push(`Explicacion: ${q.exp}`);
   return parts.join('\n');
 }
@@ -133,6 +155,46 @@ ${questionToText(question)}`;
 const BATCH_SIZE = 8;
 const BATCH_CONCURRENCY = 3;
 
+// Review 360 (2026-09-13): al empezar a serializar game_data (§3.3), una
+// pregunta de minijuego pasa de ~370 chars a ~2760 chars en el prompt
+// (medido sobre un cuarto_crisis real de produccion). Con lotes de 8 fijos,
+// un lote de minijuegos supera los 20k chars de solo preguntas y Gemini
+// devuelve un JSON truncado: en la corrida de verificacion, 5 lotes seguidos
+// fallaron el parseo y cayeron al fallback individual -- que es justo lo que
+// el batching existe para evitar, porque quema la cuota de 20 req/dia a razon
+// de una request por pregunta.
+//
+// Por eso los lotes ahora se arman por PRESUPUESTO DE CARACTERES ademas de
+// por conteo: las preguntas clasicas (~400 chars) siguen entrando de a 8 como
+// antes, y los minijuegos caen solos a ~3 por lote. El limite no es el
+// contexto de entrada de Gemini (que sobra), sino el tamaño de la RESPUESTA
+// que puede emitir sin truncarse.
+const BATCH_CHAR_BUDGET = 9000;
+
+// Agrupa preguntas en lotes respetando a la vez BATCH_SIZE y
+// BATCH_CHAR_BUDGET. Una pregunta que por si sola excede el presupuesto va en
+// su propio lote (nunca se descarta). Exportada para poder testear el armado
+// sin red.
+export function buildBatches(questions: any[], maxSize = BATCH_SIZE, charBudget = BATCH_CHAR_BUDGET): any[][] {
+  const batches: any[][] = [];
+  let current: any[] = [];
+  let currentChars = 0;
+
+  for (const q of questions) {
+    const chars = questionToText(q).length;
+    const noCabe = current.length > 0 && (current.length >= maxSize || currentChars + chars > charBudget);
+    if (noCabe) {
+      batches.push(current);
+      current = [];
+      currentChars = 0;
+    }
+    current.push(q);
+    currentChars += chars;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
 function buildBatchPrompt(batch: any[], sourceMaterial: string): string {
   const numbered = batch
     .map((q, i) => `### PREGUNTA ${i + 1}\n${questionToText(q)}`)
@@ -198,10 +260,7 @@ export async function judgeQuestionsBatch(
   const results = new Map<string, JudgeResult | null>();
   if (questions.length === 0) return results;
 
-  const batches: any[][] = [];
-  for (let i = 0; i < questions.length; i += BATCH_SIZE) {
-    batches.push(questions.slice(i, i + BATCH_SIZE));
-  }
+  const batches = buildBatches(questions);
 
   let idx = 0;
   async function worker() {
