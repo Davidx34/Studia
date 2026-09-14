@@ -187,6 +187,16 @@ export async function judgeModuleQuestionPool(
 
   let approved = 0, rejected = 0, humanReview = 0, judgeUnavailable = 0;
 
+  // Migracion 044: cada veredicto queda firmado con quien lo produjo
+  // (reviewed_by) y por que (review_reason). Antes, una fila 'rejected' era
+  // indistinguible entre "la reprobo el juez IA" y "la reprobo el profesor",
+  // lo que hacia imposible medir el acuerdo entre ambos -- la unica metrica
+  // que dice si el pipeline de IA esta mejorando. Y la razon que el juez ya
+  // calculaba se descartaba por completo, dejando al profesor una cola de
+  // revision sin ninguna pista de por que cada pregunta estaba ahi.
+  const now = new Date().toISOString();
+  const updates: { id: string; review_status: string; is_backup?: boolean; review_reason: string | null }[] = [];
+
   for (const q of pending) {
     const result = verdicts.get(q.id);
     if (!result) {
@@ -194,16 +204,17 @@ export async function judgeModuleQuestionPool(
       // aprueba por omision -- se manda a revision humana, igual que un
       // veredicto "review" explicito, para que el profesor decida.
       judgeUnavailable++;
-      await supabase
-        .from('lesson_questions')
-        .update({ review_status: 'human_review' })
-        .eq('id', q.id);
       humanReview++;
+      updates.push({
+        id: q.id,
+        review_status: 'human_review',
+        review_reason: 'El juez no pudo emitir veredicto (cuota agotada, sin API key o respuesta ilegible).',
+      });
       continue;
     }
     if (result.verdict === 'pass') {
       approved++;
-      await supabase.from('lesson_questions').update({ review_status: 'approved' }).eq('id', q.id);
+      updates.push({ id: q.id, review_status: 'approved', review_reason: result.reason });
     } else if (result.verdict === 'fail') {
       rejected++;
       // is_backup=true saca la pregunta de circulacion activa de inmediato
@@ -211,11 +222,34 @@ export async function judgeModuleQuestionPool(
       // la haya reemplazado. No se auto-reemplaza aqui (backfill desde el
       // pool de backup): eso queda para cuando haya senal real de cuantas
       // preguntas activas se pierden por rechazo en el piloto.
-      await supabase.from('lesson_questions').update({ review_status: 'rejected', is_backup: true }).eq('id', q.id);
+      updates.push({ id: q.id, review_status: 'rejected', is_backup: true, review_reason: result.reason });
     } else {
       humanReview++;
-      await supabase.from('lesson_questions').update({ review_status: 'human_review' }).eq('id', q.id);
+      updates.push({ id: q.id, review_status: 'human_review', review_reason: result.reason });
     }
+  }
+
+  // Antes esto era un UPDATE por pregunta dentro del bucle: con los 18 modulos
+  // de Microeconomia y ~20 pendientes cada uno, ~360 round-trips secuenciales
+  // desde una funcion serverless (review 360 §2.1). Se agrupan las escrituras
+  // que comparten estado y flag; la razon, que es distinta por fila, se manda
+  // en tandas paralelas acotadas en vez de una por una en serie.
+  const WRITE_CONCURRENCY = 8;
+  for (let i = 0; i < updates.length; i += WRITE_CONCURRENCY) {
+    await Promise.all(
+      updates.slice(i, i + WRITE_CONCURRENCY).map((u) =>
+        supabase
+          .from('lesson_questions')
+          .update({
+            review_status: u.review_status,
+            ...(u.is_backup !== undefined ? { is_backup: u.is_backup } : {}),
+            reviewed_by: 'ai_judge',
+            reviewed_at: now,
+            review_reason: u.review_reason,
+          })
+          .eq('id', u.id)
+      )
+    );
   }
 
   revalidatePath(`/teacher/classrooms/${classroomId}/objectives`);
@@ -227,11 +261,16 @@ export async function judgeModuleQuestionPool(
 // Usadas desde la pagina de revision (/teacher/classrooms/[id]/review) para
 // que el profesor resuelva a mano las preguntas en human_review antes del
 // piloto.
+// reviewed_by:'teacher' es lo que convierte estas dos acciones en la VERDAD DE
+// REFERENCIA del proyecto: son las unicas etiquetas producidas por un humano,
+// y contra ellas se mide si el juez IA acierta (ver scripts/eval-judge.ts).
+// Sin esta firma, una fila 'approved' del profesor es indistinguible de una
+// del juez y el acuerdo no se puede calcular.
 export async function approveReviewQuestion(questionId: string, classroomId: string): Promise<ActionResult> {
   const { supabase } = await requireUser();
   const { error } = await supabase
     .from('lesson_questions')
-    .update({ review_status: 'approved' })
+    .update({ review_status: 'approved', reviewed_by: 'teacher', reviewed_at: new Date().toISOString() })
     .eq('id', questionId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/teacher/classrooms/${classroomId}/review`);
@@ -242,7 +281,12 @@ export async function rejectReviewQuestion(questionId: string, classroomId: stri
   const { supabase } = await requireUser();
   const { error } = await supabase
     .from('lesson_questions')
-    .update({ review_status: 'rejected', is_backup: true })
+    .update({
+      review_status: 'rejected',
+      is_backup: true,
+      reviewed_by: 'teacher',
+      reviewed_at: new Date().toISOString(),
+    })
     .eq('id', questionId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/teacher/classrooms/${classroomId}/review`);
