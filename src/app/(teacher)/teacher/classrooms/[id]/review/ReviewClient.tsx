@@ -16,6 +16,9 @@ interface ReviewQuestion {
   answers: string[] | null;
   exp: string | null;
   concept_tag: string | null;
+  game_type: string | null;
+  game_data: unknown;
+  review_reason: string | null;
 }
 
 // Fase 1.3: vista funcional, no decorativa, a proposito -- el plan explicita
@@ -106,7 +109,31 @@ export default function ReviewClient({ classroomId, questions }: { classroomId: 
                       {q.answers && (
                         <p className="text-xs text-slate-400 mt-1.5">Respuesta: {q.answers.join(', ')}</p>
                       )}
+                      {/* Un minijuego no tiene su contenido en "q" (que suele
+                          ser un titulo generico como "Resuelve la crisis")
+                          sino en game_data. Sin esto, el profesor tenia que
+                          decidir sobre una pregunta cuyo contenido no veia --
+                          el mismo problema que tenia el juez IA (review 360
+                          §3.3), pero del lado humano. */}
+                      {q.game_data != null && (
+                        <details className="mt-1.5">
+                          <summary className="text-xs text-slate-400 cursor-pointer premium-focus rounded">
+                            Ver contenido del minijuego{q.game_type ? ` (${q.game_type})` : ''}
+                          </summary>
+                          <pre className="text-[11px] text-slate-400 mt-1.5 p-2 rounded-lg bg-black/30 overflow-x-auto whitespace-pre-wrap break-words">
+                            {JSON.stringify(q.game_data, null, 2)}
+                          </pre>
+                        </details>
+                      )}
                       {q.exp && <p className="text-xs text-slate-500 mt-1.5 italic">{q.exp}</p>}
+                      {/* La razon del juez (migracion 044) -- antes se
+                          calculaba y se tiraba, dejando al profesor una cola
+                          sin ninguna pista de por que cada pregunta esta ahi. */}
+                      {q.review_reason && (
+                        <p className="text-xs mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200/90">
+                          <span className="font-medium">Por qué la marcó la IA:</span> {q.review_reason}
+                        </p>
+                      )}
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
                       <button

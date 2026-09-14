@@ -263,7 +263,16 @@ async function judgeModule(moduleId: string): Promise<ModuleStats | null> {
         stats.humanReview++;
       }
       if (!args.dryRun) {
-        const update: Record<string, unknown> = { review_status: status };
+        // Migracion 044: firmar el veredicto igual que el juez en vivo. Sin
+        // esto, este script escribiria filas sin procedencia y volveria a
+        // hacer indistinguible una decision de IA de una del profesor, que es
+        // justo lo que rompe la medicion de acuerdo (scripts/eval-judge.ts).
+        const update: Record<string, unknown> = {
+          review_status: status,
+          reviewed_by: 'ai_judge',
+          reviewed_at: new Date().toISOString(),
+          review_reason: v?.reason ?? null,
+        };
         if (status === 'rejected') update.is_backup = true;
         await supabase.from('lesson_questions').update(update).eq('id', q.id);
       }
