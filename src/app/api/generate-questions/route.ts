@@ -200,7 +200,36 @@ export async function POST(req: NextRequest) {
     // sentido cuando hay un modulo real (se cachean/trackean como el resto), y
     // solo si el tema efectivamente se presta para ese formato (si no aplica,
     // Cohere genera en su lugar una pregunta mas de los tipos configurados).
-    const minigameTypes = moduleId ? shuffle(Object.keys(MINIGAME_RULES)).slice(0, MAX_MINIGAMES_PER_MODULE) : [];
+    //
+    // Review 360 (2026-09-13), §3.4: antes esta linea era
+    //   shuffle(Object.keys(MINIGAME_RULES)).slice(0, 2)
+    // -- sorteaba 2 minijuegos al azar de los 8 IGNORANDO por completo los
+    // que el profesor habia elegido en /teacher/.../objectives y que quedan
+    // guardados en content_modules.minigame_types. regeneratePool.ts:97 si
+    // los respetaba, asi que habia dos caminos de generacion con dos
+    // comportamientos distintos: el que corre cuando el profesor regenera el
+    // pool obedecia la configuracion, y el que corre cuando un ESTUDIANTE
+    // abre la leccion la ignoraba. Para un docente en piloto eso se ve como
+    // "la configuracion no sirve", que es la forma mas rapida de perder su
+    // confianza en el resto del panel.
+    //
+    // Ahora: si el profesor configuro tipos, se usan esos (hasta el maximo);
+    // si no configuro ninguno, se mantiene el sorteo de antes, que es el
+    // comportamiento correcto para los modulos auto-generados que nunca
+    // pasaron por la pantalla de objetivos.
+    const { data: moduleConfig } = moduleId && supabase
+      ? await supabase.from('content_modules').select('minigame_types').eq('id', moduleId).single()
+      : { data: null };
+
+    const configuredMinigames = (moduleConfig?.minigame_types ?? []).filter(
+      (mg: string) => mg in MINIGAME_RULES
+    );
+
+    const minigameTypes = !moduleId
+      ? []
+      : configuredMinigames.length > 0
+        ? shuffle(configuredMinigames).slice(0, MAX_MINIGAMES_PER_MODULE)
+        : shuffle(Object.keys(MINIGAME_RULES)).slice(0, MAX_MINIGAMES_PER_MODULE);
     for (const mg of minigameTypes) {
       typeInstructions += `\n- 1 pregunta adicional de tipo "${mg}" ${MINIGAME_RULES[mg]}; si no aplica, genera en su lugar una pregunta mas de los tipos de arriba. Formato JSON: ${jsonFormats[mg]}`;
     }
