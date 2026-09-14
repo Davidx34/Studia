@@ -64,6 +64,8 @@ export default function LessonPage() {
   const [score, setScore] = useState(0);
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState(false);
+  // Review 360 §3.6: si la generacion falla no se inventan preguntas, se dice.
+  const [generationFailed, setGenerationFailed] = useState(false);
   const [shortAnswerText, setShortAnswerText] = useState('');
   const [shortAnswerMatchedCount, setShortAnswerMatchedCount] = useState(0);
   const [fillBlankText, setFillBlankText] = useState('');
@@ -128,6 +130,8 @@ export default function LessonPage() {
         if (data.questions?.length > 0) {
           setQuestions(data.questions);
           setLoading(false);
+          lessonStartedAtRef.current = Date.now();
+          markInProgress();
           setMood('happy');
           showMessage('¡Listo! Vamos a aprender 🚀');
           return;
@@ -137,14 +141,82 @@ export default function LessonPage() {
       console.warn('Error generando preguntas:', e);
     }
 
-    setQuestions([
-      { type: 'multiple_choice', q: 'Pregunta 1 sobre ' + modData.title, opts: ['A. Opcion A', 'B. Opcion B', 'C. Opcion C', 'D. Opcion D'], ok: 0, exp: 'Correcto.' },
-      { type: 'true_false', q: 'Este modulo es importante para el aprendizaje', ok: true, exp: 'Si, es fundamental.' },
-      { type: 'multiple_choice', q: 'Pregunta 3 sobre ' + modData.title, opts: ['A. Opcion A', 'B. Opcion B', 'C. Opcion C', 'D. Opcion D'], ok: 2, exp: 'Correcto.' },
-    ]);
+    // Review 360 (2026-09-13), §3.6: aqui habia un fallback que le servia al
+    // estudiante 3 preguntas de relleno literales ("Pregunta 1 sobre <modulo>"
+    // con opciones "A. Opcion A" ... "D. Opcion D"), indistinguibles de una
+    // leccion real. Peor: el flujo seguia completo hasta saveProgress, asi que
+    // se otorgaba el XP del modulo por responder "A. Opcion A"; y como esas
+    // preguntas no tienen id en lesson_questions, recordAttempt las descartaba
+    // (`if (!question?.id) return`), de modo que el profesor no tenia forma de
+    // enterarse de que habia pasado.
+    //
+    // Un producto educativo no puede fingir contenido: si la generacion falla,
+    // falla visible, sin XP y sin progreso, con la opcion de reintentar.
+    console.error('[GENERACION_FALLIDA]', { moduleId, moduleTitle: modData.title });
+    setGenerationFailed(true);
     setLoading(false);
-    setMood('happy');
-    showMessage('¡Listo! Vamos a aprender 🚀');
+    setMood('sad');
+    showMessage('No pude preparar esta leccion. ¿Probamos de nuevo?', 0);
+  };
+
+  // Marca el modulo como empezado en cuanto el estudiante ve la primera
+  // pregunta. Antes de este cambio, saveProgress escribia SIEMPRE
+  // status:'completed'/completion_percentage:100 y no existia ni una sola
+  // escritura de 'in_progress' en todo el codigo -- las 10 filas de
+  // student_progress en produccion estaban en 'completed' por construccion.
+  // Consecuencia: el producto no podia ver donde abandona un estudiante, que
+  // es la informacion mas valiosa que tiene una herramienta educativa, y el
+  // estado "en progreso" del mapa (LearningMap) representaba algo que nunca
+  // habia ocurrido en produccion. Ver review 360 §3.5.
+  const markInProgress = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: existing } = await supabase
+        .from('student_progress')
+        .select('status, started_at')
+        .eq('student_id', user.id)
+        .eq('module_id', moduleId)
+        .maybeSingle();
+
+      // Un modulo ya completado no vuelve a 'in_progress' por reintentarlo:
+      // eso borraria el hecho de que el estudiante ya lo habia terminado.
+      if (existing?.status === 'completed') return;
+
+      const now = new Date().toISOString();
+      await supabase.from('student_progress').upsert({
+        student_id: user.id,
+        module_id: moduleId,
+        status: 'in_progress',
+        completion_percentage: 0,
+        started_at: existing?.started_at ?? now,
+        last_attempt_at: now,
+      }, { onConflict: 'student_id,module_id' });
+    } catch (e) {
+      console.warn('Error marcando modulo en progreso:', e);
+    }
+  };
+
+  // Tiempo real dedicado a la leccion. student_progress.time_spent_seconds se
+  // LEE en 4 lugares del panel del profesor (classroom-progress.ts:209 tiempo
+  // total, :216-219 grafico de minutos por semana, :263 tiempo por estudiante)
+  // y no se escribia en NINGUNO: las 10 filas de produccion tenian 0. El
+  // docente abria "Progreso" y veia "0 min" para todo el curso, que es
+  // justamente la pantalla que mas importa para justificar la herramienta.
+  // Ver review 360 §3.5.
+  //
+  // Se mide desde que el estudiante ve la primera pregunta (no desde que entra
+  // a la pantalla de carga) y se acumula sobre lo ya registrado, para que un
+  // segundo intento sume en vez de pisar. El tope evita que una pestaña
+  // olvidada abierta toda la noche contamine la metrica del profesor: es
+  // preferible subestimar el tiempo a reportar 9 horas de "estudio".
+  const lessonStartedAtRef = useRef<number | null>(null);
+  const MAX_SESSION_SECONDS = 2 * 60 * 60;
+
+  const elapsedSeconds = (): number => {
+    if (lessonStartedAtRef.current === null) return 0;
+    const secs = Math.round((Date.now() - lessonStartedAtRef.current) / 1000);
+    return Math.max(0, Math.min(secs, MAX_SESSION_SECONDS));
   };
 
   // Racha de fallos seguidos (cualquier tipo de pregunta) para que Toñito
@@ -179,6 +251,13 @@ export default function LessonPage() {
         concept_tag: question.concept_tag ?? null,
         was_correct: wasCorrect,
         answer_given: answerGiven ?? null,
+        // Review 360 §3.3: game_type existe desde la migracion 028 y estaba
+        // en NULL en las 78 filas de question_attempts de produccion, porque
+        // recordAttempt nunca lo escribia -- ni siquiera en los 8 call sites
+        // que SI vienen de un minijuego. Resultado: cero medicion de si
+        // alguien jugo un minijuego alguna vez, sobre 1300 lineas de codigo
+        // que son la diferenciacion del producto.
+        game_type: question.game_type ?? null,
       });
     } catch (e) {
       console.warn('Error registrando intento:', e);
@@ -427,7 +506,7 @@ export default function LessonPage() {
 
       const { data: existing } = await supabase
         .from('student_progress')
-        .select('status, attempts, best_score, started_at')
+        .select('status, attempts, best_score, started_at, time_spent_seconds')
         .eq('student_id', user.id)
         .eq('module_id', moduleId)
         .maybeSingle();
@@ -442,6 +521,9 @@ export default function LessonPage() {
         score: scorePercent,
         best_score: Math.max(existing?.best_score ?? 0, scorePercent),
         attempts: (existing?.attempts ?? 0) + 1,
+        // Acumula sobre lo ya registrado: un segundo intento suma tiempo en
+        // vez de pisar el del primero (review 360 §3.5).
+        time_spent_seconds: (existing?.time_spent_seconds ?? 0) + elapsedSeconds(),
         earned_xp: mod!.base_xp_reward, // ver nota de invariante en recordAttempt
         started_at: existing?.started_at ?? now,
         completed_at: now,
@@ -479,6 +561,39 @@ export default function LessonPage() {
   );
 
   if (!mod) return <div className="text-white p-8">No encontrado</div>;
+
+  // Review 360 §3.6: antes de este cambio, un fallo de generacion se disfrazaba
+  // de leccion con preguntas de relleno y otorgaba XP igual. Ahora se dice, no
+  // se guarda progreso ni XP, y se ofrece reintentar.
+  if (generationFailed) return (
+    <div className="flex flex-col items-center justify-center min-h-64 text-white p-8 text-center premium-fade-in-up">
+      <TonitoCharacter mood="sad" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={110} />
+      <h2 className="text-xl font-semibold mt-4">No pude preparar esta lección</h2>
+      <p className="text-sm text-white/60 mt-2 max-w-sm">
+        Hubo un problema generando las preguntas de <strong>{mod.title}</strong>. No es culpa
+        tuya, y tu progreso no se vio afectado.
+      </p>
+      <div className="flex gap-3 mt-6">
+        <button
+          onClick={() => {
+            setGenerationFailed(false);
+            setLoading(true);
+            generateQuestions(mod);
+          }}
+          className="premium-btn premium-focus px-5 py-2.5 rounded-xl font-semibold text-slate-900"
+          style={{ background: 'linear-gradient(135deg, var(--premium-gold) 0%, #e8a87c 100%)' }}
+        >
+          Intentar de nuevo
+        </button>
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="premium-focus px-5 py-2.5 rounded-xl font-medium bg-white/5 border border-white/10 text-white/80 transition-all duration-300 ease-out hover:bg-white/10"
+        >
+          Volver al inicio
+        </button>
+      </div>
+    </div>
+  );
 
   if (showIntro) return (
     <CinematicScene
