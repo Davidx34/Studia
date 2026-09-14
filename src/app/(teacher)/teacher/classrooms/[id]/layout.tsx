@@ -36,7 +36,7 @@ export default async function ClassroomLayout({
         Mis clases
       </Link>
 
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6">
+      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold text-white">{classroom.name}</h1>

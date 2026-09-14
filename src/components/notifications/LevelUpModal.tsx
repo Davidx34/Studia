@@ -139,8 +139,11 @@ export function LevelUpModal() {
         {/* Continue button */}
         <button
           onClick={dismissLevelUp}
-          className="px-8 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-bold rounded-2xl shadow-2xl hover:scale-105 active:scale-95 transition-all animate-button-in"
-          style={{ boxShadow: '0 10px 40px rgba(251,146,60,0.5)' }}
+          className="premium-btn px-8 py-3 text-slate-900 font-bold rounded-2xl shadow-2xl hover:scale-105 active:scale-95 transition-all animate-button-in"
+          style={{
+            background: 'linear-gradient(135deg, var(--premium-gold) 0%, #e8a87c 100%)',
+            boxShadow: '0 10px 40px rgba(240,198,116,0.4)',
+          }}
         >
           ¡Seguir conquistando! ✨
         </button>

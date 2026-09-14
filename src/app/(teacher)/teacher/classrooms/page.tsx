@@ -68,7 +68,7 @@ export default async function TeacherClassroomsPage() {
               <Link
                 key={c.id}
                 href={`/teacher/classrooms/${c.id}/students`}
-                className="group block rounded-2xl bg-slate-900 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-900/80 p-5 transition"
+                className="group block rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl hover:border-violet-500/50 hover:bg-slate-900/80 p-5 transition"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center">
@@ -129,7 +129,7 @@ export default async function TeacherClassroomsPage() {
           })}
         </div>
       ) : (
-        <div className="text-center py-20 rounded-2xl bg-slate-900 border border-slate-800">
+        <div className="text-center py-20 rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl">
           <BookOpen className="w-12 h-12 text-slate-600 mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-white mb-2">
             Aún no tienes clases creadas

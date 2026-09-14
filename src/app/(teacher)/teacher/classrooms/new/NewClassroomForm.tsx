@@ -40,7 +40,7 @@ export default function NewClassroomForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl bg-slate-900 border border-slate-800 p-6 space-y-5"
+      className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-6 space-y-5"
     >
       {error && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">

@@ -30,7 +30,7 @@ export default function InviteStudentsForm({ classroomId }: { classroomId: strin
     <div className="space-y-3">
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3"
+        className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 space-y-3"
       >
         <p className="text-xs text-slate-400">
           Pega o escribe emails separados por coma, punto y coma, espacios o saltos de línea.
@@ -61,7 +61,7 @@ export default function InviteStudentsForm({ classroomId }: { classroomId: strin
       </form>
 
       {result && (
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 space-y-2 text-sm">
+        <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-4 space-y-2 text-sm">
           {!result.ok && result.error && (
             <div className="flex items-start gap-2 text-red-300">
               <AlertCircle className="w-4 h-4 mt-0.5" />

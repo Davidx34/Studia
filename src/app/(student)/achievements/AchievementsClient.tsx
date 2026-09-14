@@ -150,22 +150,25 @@ export function AchievementsClient({ allAchievements, userAchievements, progress
         <div className="relative">
           <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
             <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-xl">
-                <Trophy className="w-7 h-7 text-white" />
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl"
+                style={{ background: 'linear-gradient(135deg, var(--premium-gold) 0%, #e8a87c 100%)' }}
+              >
+                <Trophy className="w-7 h-7 text-slate-900" />
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-white">Tus logros</h1>
-                <p className="text-sm text-white/70">
+                <p className="text-sm text-white/60">
                   {earnedCount} de {totalCount} desbloqueados
                 </p>
               </div>
             </div>
 
             <div className="text-right">
-              <div className="text-4xl font-bold text-white">
-                {completionPct}<span className="text-xl text-white/60">%</span>
+              <div className="text-4xl font-bold text-white font-mono tabular-nums">
+                {completionPct}<span className="text-xl text-white/50">%</span>
               </div>
-              <div className="text-xs text-white/60 uppercase tracking-wider font-semibold">
+              <div className="text-xs text-white/50 uppercase tracking-wider font-semibold">
                 Completado
               </div>
             </div>
@@ -174,8 +177,8 @@ export function AchievementsClient({ allAchievements, userAchievements, progress
           {/* Barra de progreso global */}
           <div className="h-3 bg-black/20 rounded-full overflow-hidden border border-white/10">
             <div
-              className="h-full bg-gradient-to-r from-yellow-300 via-orange-400 to-pink-500 transition-all duration-1000 ease-out"
-              style={{ width: `${completionPct}%` }}
+              className="h-full transition-all duration-1000 ease-out"
+              style={{ width: `${completionPct}%`, background: 'linear-gradient(90deg, var(--premium-gold), var(--premium-accent))' }}
             />
           </div>
         </div>

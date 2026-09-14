@@ -55,7 +55,7 @@ export default async function ClassroomStudentsPage({ params }: PageProps) {
         </header>
 
         {students && students.length > 0 ? (
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
+          <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl overflow-hidden">
             {students.map((s) => (
               <div
                 key={s.id}
@@ -81,7 +81,7 @@ export default async function ClassroomStudentsPage({ params }: PageProps) {
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 rounded-2xl bg-slate-900 border border-slate-800 border-dashed">
+          <div className="text-center py-8 rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl border-dashed">
             <p className="text-sm text-slate-500">
               Aún no hay estudiantes inscritos. Invita emails abajo.
             </p>

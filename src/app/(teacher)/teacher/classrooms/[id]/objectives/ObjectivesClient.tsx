@@ -144,7 +144,7 @@ export default function ObjectivesClient({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 flex items-start gap-4 flex-wrap">
+      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 flex items-start gap-4 flex-wrap">
         <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
           <Target className="w-5 h-5 text-violet-300" />
         </div>
@@ -208,7 +208,7 @@ export default function ObjectivesClient({
       )}
 
       {judgeSummary && (
-        <div className="rounded-xl bg-slate-900 border border-slate-800 p-4 text-sm text-slate-300 space-y-2">
+        <div className="rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-4 text-sm text-slate-300 space-y-2">
           <p className="font-medium text-white">
             Juez: {judgeSummary.approved} aprobadas · {judgeSummary.rejected} rechazadas · {judgeSummary.humanReview} a revisión
             {judgeSummary.judgeUnavailable > 0 && ` (${judgeSummary.judgeUnavailable} sin poder evaluar, mandadas a revisión)`}
@@ -441,7 +441,7 @@ function ObjectiveCard({
   }
 
   return (
-    <div className="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
+    <div className="rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl overflow-hidden">
       <button
         onClick={onToggle}
         className="w-full flex items-start gap-3 p-4 text-left hover:bg-slate-800/40 transition"

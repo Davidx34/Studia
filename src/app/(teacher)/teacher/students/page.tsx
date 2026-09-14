@@ -53,7 +53,7 @@ export default async function TeacherStudentsPage() {
       </div>
 
       {/* Lista */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
+      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl overflow-hidden">
         {/* Header */}
         <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 border-b border-slate-800 bg-slate-900/50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
           <div className="col-span-4">Estudiante</div>

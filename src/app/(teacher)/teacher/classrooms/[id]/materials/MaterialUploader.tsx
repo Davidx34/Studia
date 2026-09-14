@@ -359,7 +359,7 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
           {progress.map((row, i) => (
             <div
               key={i}
-              className="rounded-xl bg-slate-900 border border-slate-800 p-3"
+              className="rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-3"
             >
               <div className="flex items-center gap-2 text-sm">
                 {row.status === 'done' ? (

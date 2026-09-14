@@ -171,7 +171,7 @@ export default function NewModuleWizard() {
       </div>
 
       {/* Contenido del paso */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6 space-y-5">
+      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-6 space-y-5">
         {step === 1 && (
           <>
             <div>
