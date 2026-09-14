@@ -13,11 +13,22 @@ export const RAG_MATCH_COUNT = 5;
 // hardcodeados en 3 sitios distintos (generate-questions x2,
 // regeneratePool x1) y desincronizados entre si -- quedaba truncado a
 // menudo el primer parrafo del material, cortando derivaciones largas
-// (ej. maximizacion de utilidad con Lagrange). Aya 32B (el modelo detras
-// de Cohere en este proyecto) soporta contexto de sobra para 5500
-// caracteres. Un solo punto de verdad: quien necesite truncar el
-// contexto RAG debe importar esta constante, nunca hardcodear el numero.
-export const RAG_CONTEXT_CHAR_LIMIT = 5500;
+// (ej. maximizacion de utilidad con Lagrange). Un solo punto de verdad:
+// quien necesite truncar el contexto RAG debe importar esta constante,
+// nunca hardcodear el numero.
+//
+// Review 360 (2026-09-13): subido de 5500 a 16000. Con 5500 y el tamaño
+// real de chunk medido en produccion (avg 1821 chars, 456 tokens -- el
+// chunker esta bien calibrado contra CHUNK_TARGET_TOKENS=500), solo
+// entraban 3 chunks: el 4to acumulaba >5500 y joinChunksWithinLimit
+// cortaba. Es decir, de los RAG_MATCH_COUNT=5 chunks recuperados se
+// descartaba el 40% SIEMPRE, de forma deterministica -- se pagaba el
+// embedding y la busqueda para tirar dos resultados. 16000 chars son
+// ~4000 tokens: holgado para Aya 32B (contexto de 8k+) incluso sumando
+// el resto del prompt (instrucciones por tipo + taxonomia + reglas de
+// minijuego rondan los 3000 chars), y deja entrar los 5 chunks completos
+// con margen.
+export const RAG_CONTEXT_CHAR_LIMIT = 16000;
 
 // Une chunks de material respetando RAG_CONTEXT_CHAR_LIMIT a nivel de CHUNK
 // COMPLETO -- nunca corta un chunk a la mitad. Antes cada llamador (aqui
@@ -70,25 +81,42 @@ export async function getRagContext(supabase: any, moduleId: string): Promise<st
 
   if (!moduleRow) return '';
 
+  const queryText = `${moduleRow.title}. ${moduleRow.description || ''}`.trim();
+  const embedding = await generateEmbedding(queryText);
+  const scopedMaterialIds: string[] = moduleRow.source_material_ids ?? [];
+
   // Sesion L: si el profesor vinculo materiales especificos a este modulo
   // (via /teacher/classrooms/[id]/objectives), el contexto se restringe a
   // ESOS materiales en vez de buscar en toda la clase — asi las preguntas de
   // un modulo puntual (ej: "Maximizacion de Utilidad") no se contaminan con
   // contenido de otros temas del mismo curso.
-  if (moduleRow.source_material_ids?.length > 0) {
-    const { data: scopedChunks } = await supabase
-      .from('material_chunks')
-      .select('content')
-      .in('material_id', moduleRow.source_material_ids)
-      .order('chunk_index', { ascending: true })
-      .limit(12);
+  //
+  // Review 360 (2026-09-13): ese acotamiento se hacia tomando los primeros 12
+  // chunks por chunk_index -- o sea el PRINCIPIO del documento, sin ninguna
+  // relacion con el tema del modulo -- y ademas SALTANDOSE la busqueda
+  // semantica. Medido en produccion: los 8 modulos de "Civilizaciones
+  // Antiguas" comparten los mismos 3 materiales (87 chunks) y recibian los 8
+  // el mismo contexto identico de 3706 chars (2 de 87 chunks = 2,3% del
+  // material); los modulos de Grecia, Roma y Mitologia recibian 0 caracteres
+  // del documento de Grecia y Roma. La pregunta "¿Que dios ayudo a Perseo a
+  // matar a Medusa?" que quedo en lesson_questions no salia de ningun
+  // material: salia del conocimiento parametrico del modelo, porque el
+  // contexto no tenia una sola palabra sobre Grecia.
+  //
+  // Ahora el acotamiento se aplica COMO FILTRO de la busqueda semantica
+  // (match_material_chunks_scoped, migracion 043) en vez de reemplazarla:
+  // vincular material mejora la pertinencia en lugar de desactivar el RAG.
+  if (embedding && scopedMaterialIds.length > 0) {
+    const { data: scopedChunks } = await supabase.rpc('match_material_chunks_scoped', {
+      query_embedding: embedding,
+      material_ids: scopedMaterialIds,
+      classroom_id_filter: moduleRow.classroom_id,
+      match_count: RAG_MATCH_COUNT,
+    });
     if (scopedChunks && scopedChunks.length > 0) {
       return joinChunksWithinLimit(scopedChunks.map((c: any) => c.content), RAG_CONTEXT_CHAR_LIMIT);
     }
   }
-
-  const queryText = `${moduleRow.title}. ${moduleRow.description || ''}`.trim();
-  const embedding = await generateEmbedding(queryText);
 
   if (embedding) {
     const { data: relevantChunks } = await supabase.rpc('match_material_chunks', {
@@ -98,6 +126,22 @@ export async function getRagContext(supabase: any, moduleId: string): Promise<st
     });
     if (relevantChunks && relevantChunks.length > 0) {
       return joinChunksWithinLimit(relevantChunks.map((c: any) => c.content), RAG_CONTEXT_CHAR_LIMIT);
+    }
+  }
+
+  // Sin embedding (Gemini caido o sin API key) pero con materiales vinculados:
+  // se respeta al menos el acotamiento del profesor, aunque el orden ya no
+  // pueda ser por relevancia. Es el unico camino que sigue usando chunk_index,
+  // y solo como ultimo recurso -- nunca como comportamiento normal.
+  if (scopedMaterialIds.length > 0) {
+    const { data: scopedFallback } = await supabase
+      .from('material_chunks')
+      .select('content')
+      .in('material_id', scopedMaterialIds)
+      .order('chunk_index', { ascending: true })
+      .limit(RAG_MATCH_COUNT);
+    if (scopedFallback && scopedFallback.length > 0) {
+      return joinChunksWithinLimit(scopedFallback.map((c: any) => c.content), RAG_CONTEXT_CHAR_LIMIT);
     }
   }
 
