@@ -5,8 +5,8 @@
 // respuesta simuladas (incluyendo las formas en que un LLM real puede
 // desviarse del formato pedido).
 
-import { describe, it, expect } from 'vitest';
-import { parseBatchResponse, questionToText, buildBatches, RUBRIC } from './judge';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { parseBatchResponse, questionToText, buildBatches, RUBRIC, isDailyQuotaExhausted, resetQuotaBreaker, judgeQuestionsBatch } from './judge';
 
 describe('parseBatchResponse', () => {
   it('parsea un lote bien formado en orden', () => {
@@ -225,4 +225,105 @@ describe('buildBatches', () => {
   it('devuelve lista vacia sin preguntas', () => {
     expect(buildBatches([])).toEqual([]);
   });
+});
+
+// Cuerpo real (recortado a lo relevante) de un 429 de Gemini con la cuota
+// diaria del free tier agotada, capturado en vivo el 2026-09-13.
+const CUERPO_CUOTA_DIARIA = JSON.stringify({
+  error: {
+    code: 429,
+    status: 'RESOURCE_EXHAUSTED',
+    details: [
+      {
+        violations: [
+          {
+            quotaMetric: 'generativelanguage.googleapis.com/generate_content_free_tier_requests',
+            quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+            quotaValue: '20',
+          },
+        ],
+      },
+      { retryDelay: '19s' },
+    ],
+  },
+});
+const CUERPO_CUOTA_MINUTO = CUERPO_CUOTA_DIARIA.replace('PerDay', 'PerMinute');
+
+describe('isDailyQuotaExhausted', () => {
+  it('detecta la cuota diaria agotada con el cuerpo real de Gemini', () => {
+    expect(isDailyQuotaExhausted(429, CUERPO_CUOTA_DIARIA)).toBe(true);
+  });
+
+  it('no confunde un limite por minuto con la cuota diaria: ese si se reintenta', () => {
+    expect(isDailyQuotaExhausted(429, CUERPO_CUOTA_MINUTO)).toBe(false);
+  });
+
+  it('un 429 sin cuerpo reconocible no se trata como cuota diaria', () => {
+    expect(isDailyQuotaExhausted(429, '')).toBe(false);
+  });
+
+  it('solo aplica a 429', () => {
+    expect(isDailyQuotaExhausted(500, CUERPO_CUOTA_DIARIA)).toBe(false);
+  });
+});
+
+// Regresion del bug medido en vivo: con la cuota diaria agotada, judgeBatch
+// registraba "fallo el parseo" y caia al fallback pregunta por pregunta,
+// multiplicando requests contra una cuota que ya no iba a responder (un lote de
+// 8 llegaba a 27 llamadas con backoff). Sin red: fetch simulado.
+describe('judgeQuestionsBatch con la cuota diaria agotada', () => {
+  const clasicas = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ id: `q${i}`, type: 'multiple_choice', q: `pregunta ${i}`, opts: ['A', 'B'], ok: 0 }));
+
+  beforeEach(() => {
+    resetQuotaBreaker();
+    vi.stubEnv('GEMINI_API_KEY', 'clave-de-test');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    resetQuotaBreaker();
+  });
+
+  it('un lote: una sola llamada, sin fallback pregunta por pregunta, y todo queda sin veredicto', async () => {
+    const fetchMock = vi.fn(async () => new Response(CUERPO_CUOTA_DIARIA, { status: 429 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resultado = await judgeQuestionsBatch(clasicas(8), 'material');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(resultado.size).toBe(8);
+    expect(Array.from(resultado.values()).every((v) => v === null)).toBe(true);
+  });
+
+  it('muchos lotes: el cortacircuito deja las llamadas acotadas por la concurrencia, no por el numero de preguntas', async () => {
+    const fetchMock = vi.fn(async () => new Response(CUERPO_CUOTA_DIARIA, { status: 429 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resultado = await judgeQuestionsBatch(clasicas(40), 'material'); // 5 lotes
+
+    // Los 3 workers concurrentes pueden salir a la red antes de que el primero
+    // abra el cortacircuito; los lotes siguientes ya no. Antes: 5 lotes x
+    // (3 intentos + 8 individuales x 3 intentos) = hasta 135 llamadas.
+    expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(3);
+    expect(resultado.size).toBe(40);
+    expect(Array.from(resultado.values()).every((v) => v === null)).toBe(true);
+  });
+
+  it('un limite POR MINUTO si se reintenta: el cortacircuito no se pasa de largo', async () => {
+    const respuestaOk = JSON.stringify({
+      candidates: [{ content: { parts: [{ text: JSON.stringify({ verdicts: [{ index: 1, verdict: 'pass', reason: 'ok' }] }) }] } }],
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(CUERPO_CUOTA_MINUTO, { status: 429 }))
+      .mockResolvedValueOnce(new Response(respuestaOk, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resultado = await judgeQuestionsBatch(clasicas(1), 'material');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(resultado.get('q0')?.verdict).toBe('pass');
+  }, 10_000);
 });
