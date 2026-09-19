@@ -9,7 +9,7 @@
 // antes cada camino tenia su propia copia del prompt y ya habian divergido.
 
 import { isValidQuestion } from '@/lib/lesson/validateQuestion';
-import { getRagContext, normalizeGeneratedQuestion, callCohere } from '@/lib/questions/cohereGeneration';
+import { getRagContext, normalizeGeneratedQuestion, callCohere, hasGenerationProvider } from '@/lib/questions/cohereGeneration';
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
 import { resolveQuestionCount, countServable, planFill } from '@/lib/questions/poolPlan';
 import { resolveConfig, resolveMinigames, enforceAllowedTypes, buildGenerationPrompt } from '@/lib/questions/generationConfig';
@@ -59,7 +59,7 @@ export async function regenerateModulePool(
   // valores por defecto sin que nadie lo note.
   if (configError) console.error('[REGENERATE_CONFIG_READ_FAILED]', { moduleId, error: configError.message });
 
-  if (!process.env.COHERE_API_KEY) return { ok: false, error: 'No API key' };
+  if (!hasGenerationProvider()) return { ok: false, error: 'No API key' };
 
   const config = resolveConfig(aiConfig);
 

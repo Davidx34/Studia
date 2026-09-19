@@ -18,6 +18,7 @@
 // se le dan a Gemini para JUZGARLOS: un solo punto de verdad, asi que ajustar
 // una regla cambia generacion y verificacion a la vez y no pueden divergir.
 import { MINIGAME_TYPE_RULES_TEXT } from '@/lib/questions/cohereGeneration';
+import { callOpenRouter, isOpenRouterConfigured } from '@/lib/ai/openrouter';
 
 const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
@@ -318,6 +319,27 @@ export function parseBatchResponse(text: string, expectedCount: number): (JudgeR
   }
 }
 
+// Respaldo del juez: cuando Gemini no puede dar veredicto (cuota diaria agotada,
+// limite por minuto, caida o sin llave) el lote se le pasa a OpenRouter, con un modelo
+// de otra familia. `bad_request` NO usa el respaldo: es un problema de ESTA peticion y
+// el camino individual ya lo maneja. Si el respaldo tampoco responde, el lote queda sin
+// veredicto y aguas arriba va a revision humana: NUNCA se aprueba por omision.
+async function judgeBatchViaFallback(batch: any[], sourceMaterial: string, why: string): Promise<(JudgeResult | null)[] | null> {
+  if (!isOpenRouterConfigured()) return null;
+  const call = await callOpenRouter(buildBatchPrompt(batch, sourceMaterial), { role: 'judge', maxTokens: 3000 });
+  if (!call.ok) {
+    console.warn(`[JUDGE_FALLBACK] OpenRouter tampoco pudo juzgar el lote de ${batch.length} (${call.reason}${call.status ? ` HTTP ${call.status}` : ''})`);
+    return null;
+  }
+  const parsed = parseBatchResponse(call.text, batch.length);
+  if (!parsed) {
+    console.warn(`[JUDGE_FALLBACK] respuesta ilegible de ${call.model}; el lote queda sin veredicto`);
+    return null;
+  }
+  console.log(`[JUDGE_FALLBACK] lote de ${batch.length} juzgado por ${call.model} (Gemini: ${why})`);
+  return parsed;
+}
+
 // Juzga un lote (BATCH_SIZE preguntas) con UNA sola llamada a Gemini. El
 // fallback pregunta por pregunta solo tiene sentido cuando puede rescatar algo:
 //   - la respuesta llego pero es ilegible (formato, conteo que no coincide);
@@ -344,16 +366,16 @@ async function judgeBatch(batch: any[], sourceMaterial: string): Promise<(JudgeR
       console.warn(`[judgeBatch] lote de ${n}: Gemini rechazo la peticion${http}, cayendo a evaluacion individual (fallback)`);
       return Promise.all(batch.map((q) => judgeQuestion(q, sourceMaterial)));
     case 'quota_daily':
-      console.warn(`[judgeBatch] cuota diaria de Gemini agotada: lote de ${n} queda sin veredicto`);
-      return batch.map(() => null);
+      console.warn(`[judgeBatch] cuota diaria de Gemini agotada: lote de ${n} pasa al respaldo`);
+      return (await judgeBatchViaFallback(batch, sourceMaterial, 'cuota diaria')) ?? batch.map(() => null);
     case 'rate_limited':
-      console.warn(`[judgeBatch] lote de ${n}: limite por minuto persistente${http}; queda sin veredicto`);
-      return batch.map(() => null);
+      console.warn(`[judgeBatch] lote de ${n}: limite por minuto persistente${http}; pasa al respaldo`);
+      return (await judgeBatchViaFallback(batch, sourceMaterial, 'limite por minuto')) ?? batch.map(() => null);
     case 'server':
-      console.warn(`[judgeBatch] lote de ${n}: error del servicio o de red${http} tras reintentos; queda sin veredicto`);
-      return batch.map(() => null);
+      console.warn(`[judgeBatch] lote de ${n}: error del servicio o de red${http} tras reintentos; pasa al respaldo`);
+      return (await judgeBatchViaFallback(batch, sourceMaterial, 'caida')) ?? batch.map(() => null);
     case 'no_key':
-      return batch.map(() => null);
+      return (await judgeBatchViaFallback(batch, sourceMaterial, 'sin llave')) ?? batch.map(() => null);
   }
 }
 

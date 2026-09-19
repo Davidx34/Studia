@@ -5,6 +5,7 @@
 // formato JSON por tipo ni la normalizacion de minijuegos en dos lugares.
 
 import { generateEmbedding } from '@/lib/embeddings/generate';
+import { callOpenRouter, isOpenRouterConfigured } from '@/lib/ai/openrouter';
 
 export const RAG_MATCH_COUNT = 5;
 
@@ -339,17 +340,26 @@ function extractJsonQuestions(text: string): any[] | null {
 // llamada (ver regeneratePool.ts, que ahora separa activas/backup en dos
 // llamadas en vez de una sola pidiendo el pool completo).
 const MAX_OUTPUT_TOKENS = 4096;
+const COHERE_TIMEOUT_MS = 100_000;
 
 async function callCohereOnce(prompt: string, apiKey: string): Promise<{ questions: any[] | null; httpError?: string }> {
-  const res = await fetch('https://api.cohere.com/v2/chat', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'c4ai-aya-expanse-32b',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: MAX_OUTPUT_TOKENS,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch('https://api.cohere.com/v2/chat', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'c4ai-aya-expanse-32b',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: MAX_OUTPUT_TOKENS,
+      }),
+      // Sin limite, un Cohere colgado bloqueaba la generacion hasta el corte de la
+      // funcion (300 s) y una caida de red lanzaba una excepcion que tiraba todo.
+      signal: AbortSignal.timeout(COHERE_TIMEOUT_MS),
+    });
+  } catch (e: any) {
+    return { questions: null, httpError: e?.name === 'TimeoutError' ? `timeout tras ${COHERE_TIMEOUT_MS / 1000} s` : `error de red: ${String(e?.message ?? e)}` };
+  }
   if (!res.ok) {
     return { questions: null, httpError: `HTTP ${res.status}: ${(await res.text()).slice(0, 300)}` };
   }
@@ -369,22 +379,53 @@ async function callCohereOnce(prompt: string, apiKey: string): Promise<{ questio
   return { questions };
 }
 
+// Hay al menos un proveedor con el que generar preguntas.
+export function hasGenerationProvider(): boolean {
+  return !!process.env.COHERE_API_KEY || isOpenRouterConfigured();
+}
+
+// Respaldo: el mismo prompt, por OpenRouter. El prompt ya pide JSON con {"questions":[...]}
+// y el parser es el mismo que el de Cohere, asi que el resto del pipeline no cambia
+// (validacion, tipos permitidos, guardado).
+async function callFallbackQuestions(prompt: string): Promise<any[] | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const call = await callOpenRouter(prompt, { role: 'generation', maxTokens: 6000 });
+    if (!call.ok) {
+      console.warn(`[callFallback] OpenRouter fallo: ${call.reason}${call.status ? ` (HTTP ${call.status})` : ''}`);
+      // Sin llave valida o sin credito no tiene sentido intentarlo de nuevo.
+      if (call.reason === 'unauthorized' || call.reason === 'no_key' || call.reason === 'rate_limited') return null;
+      continue;
+    }
+    const questions = extractJsonQuestions(call.text);
+    if (questions && questions.length > 0) {
+      console.log(`[LLM_FALLBACK] generacion servida por OpenRouter (${call.model}): ${questions.length} preguntas`);
+      return questions;
+    }
+    console.warn(`[callFallback] respuesta de ${call.model} sin preguntas parseables`);
+  }
+  return null;
+}
+
 // Reintenta con backoff ante: error HTTP (rate limit/5xx transitorio),
 // respuesta no parseable como JSON, o un conteo de preguntas muy por debajo
 // de lo pedido (senal de que Cohere trunco o ignoro la instruccion de
 // cantidad). Antes un solo fallo aqui tiraba toda la generacion sin
-// reintentar — causa confirmada del "Cohere generation failed" visto en la
-// corrida real de Sesion L (modulo "Maximizacion de Utilidad y Demanda
-// Marshaliana").
+// reintentar.
+//
+// Si Cohere no logra una respuesta suficiente y OpenRouter esta configurado, se
+// intenta con el respaldo. Con respaldo disponible Cohere reintenta menos (2
+// intentos en vez de 3): esperar mas a un proveedor caido cuesta mas que cambiar.
 export async function callCohere(prompt: string, expectedCount?: number): Promise<any[] | null> {
   const COHERE_API_KEY = process.env.COHERE_API_KEY;
-  if (!COHERE_API_KEY) return null;
+  const fallbackAvailable = isOpenRouterConfigured();
+  if (!COHERE_API_KEY && !fallbackAvailable) return null;
 
-  const RETRIES = 2;
+  const RETRIES = fallbackAvailable ? 1 : 2;
   const BASE_DELAY_MS = 1500;
+  const enough = (n: number) => !expectedCount || n >= Math.ceil(expectedCount * 0.7);
   let best: any[] | null = null;
 
-  for (let attempt = 0; attempt <= RETRIES; attempt++) {
+  for (let attempt = 0; COHERE_API_KEY && attempt <= RETRIES; attempt++) {
     const { questions, httpError } = await callCohereOnce(prompt, COHERE_API_KEY);
     if (httpError) {
       console.warn(`[callCohere] intento ${attempt + 1}/${RETRIES + 1} fallo HTTP: ${httpError}`);
@@ -394,8 +435,7 @@ export async function callCohere(prompt: string, expectedCount?: number): Promis
       // Nos quedamos con la mejor respuesta vista hasta ahora (mas preguntas
       // es mejor), por si el ultimo reintento sale peor que uno anterior.
       if (!best || questions.length > best.length) best = questions;
-      const meetsExpected = !expectedCount || questions.length >= Math.ceil(expectedCount * 0.7);
-      if (meetsExpected) return questions;
+      if (enough(questions.length)) return questions;
       console.warn(`[callCohere] intento ${attempt + 1}/${RETRIES + 1}: solo ${questions.length}/${expectedCount} preguntas, reintentando`);
     }
     if (attempt < RETRIES) {
@@ -403,5 +443,11 @@ export async function callCohere(prompt: string, expectedCount?: number): Promis
     }
   }
 
+  if (!fallbackAvailable) return best;
+
+  console.warn(`[LLM_FALLBACK] Cohere no dio una respuesta suficiente (${best?.length ?? 0}/${expectedCount ?? '?'}); probando OpenRouter`);
+  const alt = await callFallbackQuestions(prompt);
+  // Lo mejor de los dos: el respaldo no debe empeorar lo que Cohere ya habia dado.
+  if (alt && (!best || alt.length > best.length)) return alt;
   return best;
 }

@@ -17,6 +17,7 @@
 // explicita de usar EXACTAMENTE uno de esos tags.
 
 import { getRagContext } from './cohereGeneration';
+import { callOpenRouter, isOpenRouterConfigured } from '@/lib/ai/openrouter';
 
 export interface ClosedConcept {
   tag: string;
@@ -27,17 +28,37 @@ export interface ClosedConcept {
 // documentaba (sin validar) el prompt de generate-questions.
 const CONCEPT_TAG_RE = /^[a-z0-9]+(_[a-z0-9]+)*$/;
 
-async function callCohereForConcepts(prompt: string): Promise<ClosedConcept[] | null> {
+// Texto de la respuesta del modelo: Cohere primero y, si no responde (sin llave, caida,
+// error de red, timeout), OpenRouter. Nunca lanza: la taxonomia es una mejora, no puede
+// tumbar la generacion de preguntas.
+async function conceptsResponseText(prompt: string): Promise<string | null> {
   const COHERE_API_KEY = process.env.COHERE_API_KEY;
-  if (!COHERE_API_KEY) return null;
-  const res = await fetch('https://api.cohere.com/v2/chat', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + COHERE_API_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'c4ai-aya-expanse-32b', messages: [{ role: 'user', content: prompt }] }),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const text = data.message?.content?.[0]?.text || '';
+  if (COHERE_API_KEY) {
+    try {
+      const res = await fetch('https://api.cohere.com/v2/chat', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + COHERE_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'c4ai-aya-expanse-32b', messages: [{ role: 'user', content: prompt }] }),
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.message?.content?.[0]?.text || '';
+      }
+    } catch {
+      // cae al respaldo
+    }
+  }
+  if (isOpenRouterConfigured()) {
+    const call = await callOpenRouter(prompt, { role: 'generation', maxTokens: 1500, timeoutMs: 45_000 });
+    if (call.ok) return call.text;
+  }
+  return null;
+}
+
+async function callCohereForConcepts(prompt: string): Promise<ClosedConcept[] | null> {
+  const text = await conceptsResponseText(prompt);
+  if (text === null) return null;
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
   try {

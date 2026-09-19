@@ -6,6 +6,7 @@ import {
   getRagContext,
   normalizeGeneratedQuestion,
   callCohere,
+  hasGenerationProvider,
   RAG_CONTEXT_CHAR_LIMIT,
   ANTI_HALLUCINATION_BLOCK,
 } from '@/lib/questions/cohereGeneration';
@@ -46,7 +47,7 @@ async function generateRemediationQuestions(
   weakConcepts: string[],
   config: ResolvedConfig
 ): Promise<any[]> {
-  if (!process.env.COHERE_API_KEY) return [];
+  if (!hasGenerationProvider()) return [];
 
   const context = await getRagContext(supabase, moduleId);
 
@@ -146,7 +147,7 @@ export async function POST(req: NextRequest) {
     // quien lo tomo, y caduca: ver src/lib/questions/generationLock.ts.
     const outcome = await withGenerationLock(supabase, moduleId, async () => {
     // 3. Cache insuficiente (o sin moduleId): generar con Cohere.
-    if (!process.env.COHERE_API_KEY) {
+    if (!hasGenerationProvider()) {
       return NextResponse.json({ error: 'No API key' }, { status: 500 });
     }
 
