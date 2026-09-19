@@ -131,6 +131,7 @@ export type Database = {
           id: string
           language_level: string | null
           learning_objectives: string | null
+          minigame_types: string[]
           question_depth: number | null
           question_style: string | null
           skill_analysis: boolean | null
@@ -161,6 +162,7 @@ export type Database = {
           id?: string
           language_level?: string | null
           learning_objectives?: string | null
+          minigame_types?: string[]
           question_depth?: number | null
           question_style?: string | null
           skill_analysis?: boolean | null
@@ -191,6 +193,7 @@ export type Database = {
           id?: string
           language_level?: string | null
           learning_objectives?: string | null
+          minigame_types?: string[]
           question_depth?: number | null
           question_style?: string | null
           skill_analysis?: boolean | null

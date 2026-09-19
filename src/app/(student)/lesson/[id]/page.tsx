@@ -113,16 +113,12 @@ export default function LessonPage() {
       // La seleccion de contexto relevante (RAG via match_material_chunks) ahora
       // vive en el servidor (/api/generate-questions), que ya tiene acceso al
       // GEMINI_API_KEY necesario para generar el embedding de busqueda.
-      const { data: aiConfig } = await supabase
-        .from('classroom_ai_config')
-        .select('*')
-        .eq('classroom_id', modData.classroom_id!) // un modulo real siempre pertenece a una clase
-        .single();
-
+      // La configuracion de IA de la clase la lee el SERVIDOR a partir del moduleId
+      // (ver /api/generate-questions): ya no se lee aqui ni viaja en la peticion.
       const res = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ moduleId, moduleTitle: modData.title, aiConfig })
+        body: JSON.stringify({ moduleId, moduleTitle: modData.title })
       });
 
       if (res.ok) {

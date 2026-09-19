@@ -4,15 +4,21 @@ import { isValidQuestion } from '@/lib/lesson/validateQuestion';
 import {
   shuffle,
   getRagContext,
-  jsonFormats,
-  MINIGAME_RULES,
-  MINIGAME_TYPE_RULES_TEXT,
   normalizeGeneratedQuestion,
   callCohere,
   RAG_CONTEXT_CHAR_LIMIT,
   ANTI_HALLUCINATION_BLOCK,
-  typeInstructionLine,
 } from '@/lib/questions/cohereGeneration';
+import {
+  resolveConfig,
+  resolveMinigames,
+  allowedTypeSet,
+  enforceAllowedTypes,
+  buildGenerationPrompt,
+  remediationPreamble,
+  type AiConfigRow,
+  type ResolvedConfig,
+} from '@/lib/questions/generationConfig';
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
 import { acquireGenerationLock, releaseGenerationLock } from '@/lib/questions/generationLock';
 
@@ -42,7 +48,8 @@ async function generateRemediationQuestions(
   supabase: any,
   moduleId: string,
   moduleTitle: string,
-  weakConcepts: string[]
+  weakConcepts: string[],
+  config: ResolvedConfig
 ): Promise<any[]> {
   if (!process.env.COHERE_API_KEY) return [];
 
@@ -51,7 +58,7 @@ async function generateRemediationQuestions(
   const prompt = `Eres un profesor de apoyo haciendo un repaso corto y alentador con un estudiante.
 
 TEMA DEL MODULO: ${moduleTitle}
-CONTENIDO DEL MATERIAL:
+${remediationPreamble(config)}CONTENIDO DEL MATERIAL:
 ${(context || '').substring(0, RAG_CONTEXT_CHAR_LIMIT)}
 
 El estudiante tuvo dificultad especificamente con estos conceptos: ${weakConcepts.join(', ')}.
@@ -85,9 +92,38 @@ export async function POST(req: NextRequest) {
 
     if (moduleId) supabase = await createServerSupabase();
 
+    // La configuracion de IA se lee AQUI, en el servidor, a partir del moduleId.
+    // Antes la leia el navegador del estudiante y la mandaba en el cuerpo de la
+    // peticion: (a) cualquiera podia inyectar instrucciones propias en el prompt;
+    // (b) si esa lectura fallaba o el estudiante no tenia acceso, la configuracion
+    // se ignoraba EN SILENCIO y se generaba con valores por defecto; (c) era un
+    // segundo camino de lectura que podia divergir del de regeneratePool.
+    // El cuerpo solo se usa cuando no hay moduleId (peticion sin modulo real).
+    let dbConfig: AiConfigRow | null = null;
+    let moduleChosen: string[] | null = null;
+    if (moduleId && supabase) {
+      const { data: modRow } = await supabase
+        .from('content_modules')
+        .select('classroom_id, minigame_types')
+        .eq('id', moduleId)
+        .single();
+      moduleChosen = modRow?.minigame_types ?? null;
+      if (modRow?.classroom_id) {
+        const { data: cfg, error: cfgError } = await supabase
+          .from('classroom_ai_config')
+          .select('*')
+          .eq('classroom_id', modRow.classroom_id)
+          .maybeSingle();
+        // Un fallo aqui NO debe pasar callado: la clase generaria con valores por defecto.
+        if (cfgError) console.error('[GENERATE_CONFIG_READ_FAILED]', { moduleId, error: cfgError.message });
+        dbConfig = cfg ?? null;
+      }
+    }
+    const config = resolveConfig(moduleId ? dbConfig : aiConfig);
+
     // 0. Modo repaso dirigido (Sesion E.1): atajo completo, nunca toca el cache normal.
     if (remediationConcepts?.length > 0 && moduleId && supabase) {
-      const questions = await generateRemediationQuestions(supabase, moduleId, moduleTitle, remediationConcepts);
+      const questions = await generateRemediationQuestions(supabase, moduleId, moduleTitle, remediationConcepts, config);
       return NextResponse.json({ questions, cached: false });
     }
 
@@ -108,7 +144,13 @@ export async function POST(req: NextRequest) {
 
       // Sesion I, Fix 1: filtrar filas invalidas del cache (pueden existir de
       // antes de este fix, o de una generacion que se colo con datos incompletos).
-      const validCached = poolToUse.map(rowToQuestion).filter((q) => isValidQuestion(q).valid);
+      // Un cambio de configuracion (p.ej. apagar un minijuego) debe tener efecto sobre
+      // lo YA generado: el cache no puede seguir sirviendo tipos que la clase desactivo.
+      const allowedNow = allowedTypeSet(config);
+      const validCached = poolToUse
+        .map(rowToQuestion)
+        .filter((q) => isValidQuestion(q).valid)
+        .filter((q) => allowedNow.has(q.type));
 
       if (validCached.length >= MIN_CACHE_SIZE) {
         const picked = shuffle(validCached).slice(0, SERVE_COUNT);
@@ -153,136 +195,38 @@ export async function POST(req: NextRequest) {
       ? await getOrCreateModuleConcepts(supabase, moduleId, moduleTitle)
       : [];
 
-    const skills = [];
-    if (aiConfig?.skill_memory) skills.push('recordar hechos');
-    if (aiConfig?.skill_comprehension) skills.push('comprender conceptos');
-    if (aiConfig?.skill_application) skills.push('aplicar conocimiento');
-    if (aiConfig?.skill_analysis) skills.push('analizar y descomponer');
-    if (aiConfig?.skill_synthesis) skills.push('sintetizar ideas');
-    if (aiConfig?.skill_evaluation) skills.push('evaluar criticamente');
-
-    const types = [];
-    if (aiConfig?.type_multiple_choice) types.push('opcion_multiple');
-    if (aiConfig?.type_true_false) types.push('verdadero_falso');
-    if (aiConfig?.type_fill_blank) types.push('completar_frase');
-    if (aiConfig?.type_match) types.push('conectar_conceptos');
-    if (aiConfig?.type_short_answer) types.push('respuesta_corta');
-
-    const depth = aiConfig?.question_depth || 3;
-    const langLevel = aiConfig?.language_level || 'intermediate';
-    const customInstructions = aiConfig?.custom_instructions || '';
-    const goodExample = aiConfig?.example_good_question || '';
-    const badExample = aiConfig?.example_bad_question || '';
-    const emphasize = aiConfig?.topics_emphasize || '';
-    const avoid = aiConfig?.topics_avoid || '';
-    const gradeDetail = aiConfig?.grade_level_detail || '';
-    const subjectDesc = aiConfig?.subject_description || '';
-
-    // Minijuegos disponibles como "bonus" fuera de la distribucion normal (no le
-    // roban cupo a los tipos que el profesor configuro). Maximo 2 minijuegos por
-    // modulo para no perder variedad pedagogica: si hay mas de 2 tipos disponibles,
-    // se sortean 2 por generacion en vez de pedirlos todos.
-    const MAX_MINIGAMES_PER_MODULE = 2;
-
-    // Distribuir exactamente TOTAL_QUESTIONS entre los tipos activos (nunca solo opcion_multiple
-    // si hay mas tipos habilitados). Sin esto, Cohere tiende a generar todo opcion_multiple.
+    // Los tipos base y los minijuegos salen de la configuracion de la clase; el
+    // prompt lo construye el mismo codigo que usa regeneratePool
+    // (src/lib/questions/generationConfig.ts), asi que no pueden divergir.
     const TOTAL_QUESTIONS = moduleId ? GENERATE_COUNT : SERVE_COUNT;
-    const activeTypes = types.length > 0 ? types : ['opcion_multiple'];
-    const base = Math.floor(TOTAL_QUESTIONS / activeTypes.length);
-    let remainder = TOTAL_QUESTIONS % activeTypes.length;
-    const counts = activeTypes.map(() => base + (remainder-- > 0 ? 1 : 0));
+    const minigameTypes = moduleId ? resolveMinigames({ classAllowed: config.allowedMinigames, moduleChosen }) : [];
+    const built = buildGenerationPrompt({
+      config,
+      moduleTitle,
+      context,
+      classicCount: TOTAL_QUESTIONS,
+      minigames: minigameTypes,
+      conceptBlock: conceptTaxonomyPromptBlock(closedConcepts),
+    });
 
-    let typeInstructions = activeTypes
-      .map((t, i) => typeInstructionLine(t, counts[i]))
-      .join('\n');
-
-    // Los minijuegos son un bonus fuera de la distribucion normal: solo tienen
-    // sentido cuando hay un modulo real (se cachean/trackean como el resto), y
-    // solo si el tema efectivamente se presta para ese formato (si no aplica,
-    // Cohere genera en su lugar una pregunta mas de los tipos configurados).
-    //
-    // Review 360 (2026-09-13), §3.4: antes esta linea era
-    //   shuffle(Object.keys(MINIGAME_RULES)).slice(0, 2)
-    // -- sorteaba 2 minijuegos al azar de los 8 IGNORANDO por completo los
-    // que el profesor habia elegido en /teacher/.../objectives y que quedan
-    // guardados en content_modules.minigame_types. regeneratePool.ts:97 si
-    // los respetaba, asi que habia dos caminos de generacion con dos
-    // comportamientos distintos: el que corre cuando el profesor regenera el
-    // pool obedecia la configuracion, y el que corre cuando un ESTUDIANTE
-    // abre la leccion la ignoraba. Para un docente en piloto eso se ve como
-    // "la configuracion no sirve", que es la forma mas rapida de perder su
-    // confianza en el resto del panel.
-    //
-    // Ahora: si el profesor configuro tipos, se usan esos (hasta el maximo);
-    // si no configuro ninguno, se mantiene el sorteo de antes, que es el
-    // comportamiento correcto para los modulos auto-generados que nunca
-    // pasaron por la pantalla de objetivos.
-    const { data: moduleConfig } = moduleId && supabase
-      ? await supabase.from('content_modules').select('minigame_types').eq('id', moduleId).single()
-      : { data: null };
-
-    const configuredMinigames = (moduleConfig?.minigame_types ?? []).filter(
-      (mg: string) => mg in MINIGAME_RULES
-    );
-
-    const minigameTypes = !moduleId
-      ? []
-      : configuredMinigames.length > 0
-        ? shuffle(configuredMinigames).slice(0, MAX_MINIGAMES_PER_MODULE)
-        : shuffle(Object.keys(MINIGAME_RULES)).slice(0, MAX_MINIGAMES_PER_MODULE);
-    for (const mg of minigameTypes) {
-      typeInstructions += `\n- 1 pregunta adicional de tipo "${mg}" ${MINIGAME_RULES[mg]}; si no aplica, genera en su lugar una pregunta mas de los tipos de arriba. Formato JSON: ${jsonFormats[mg]}`;
-    }
-    const TOTAL_WITH_MINIGAME = TOTAL_QUESTIONS + minigameTypes.length;
-
-    const prompt = `Eres un profesor experto generando preguntas de evaluacion.
-
-MATERIA: ${subjectDesc || moduleTitle}
-GRADO: ${gradeDetail}
-TEMA DEL MODULO: ${moduleTitle}
-NIVEL DE PROFUNDIDAD: ${depth}/5
-NIVEL DE LENGUAJE: ${langLevel}
-HABILIDADES A EVALUAR: ${skills.join(', ') || 'comprension general'}
-${emphasize ? 'TEMAS A ENFATIZAR: ' + emphasize : ''}
-${avoid ? 'TEMAS A EVITAR: ' + avoid : ''}
-${customInstructions ? 'INSTRUCCIONES ESPECIALES: ' + customInstructions : ''}
-${goodExample ? 'EJEMPLO DE PREGUNTA IDEAL: ' + goodExample : ''}
-${badExample ? 'PREGUNTA A EVITAR: ' + badExample : ''}
-
-CONTENIDO DEL MATERIAL:
-${(context || '').substring(0, RAG_CONTEXT_CHAR_LIMIT)}
-
-Genera EXACTAMENTE ${TOTAL_WITH_MINIGAME} preguntas, distribuidas asi (respeta la cantidad exacta de cada tipo, no generes solo un tipo):
-${typeInstructions}
-
-No repitas preguntas ni reformules la misma idea dos veces; cada pregunta debe cubrir un aspecto distinto del tema.
-
-REGLAS ADICIONALES POR TIPO:
-- short_answer: la pregunta debe ser especifica y acotada (nunca vaga tipo "¿que es importante?"), con una respuesta esperada clara. "keywords" debe tener entre 2 y 5 palabras u expresiones concretas que se esperan en la respuesta.
-- fill_blank: "q" debe tener UN SOLO espacio en blanco marcado con "___", y "answers" debe tener exactamente 1 palabra o frase corta que lo completa (no varios blancos en la misma oracion).
-- match: "pairs" debe tener entre 3 y 4 pares concepto-definicion, cada uno claramente distinto de los demas para evitar ambiguedad.
-${MINIGAME_TYPE_RULES_TEXT}
-
-NOTACION MATEMATICA: si el contenido requiere formulas, ecuaciones o simbolos matematicos (ej: funciones, derivadas, condiciones de optimizacion), escribelos en LaTeX: usa $...$ para notacion inline (ej: $U(x,y) = x^{0.5}y^{0.5}$) y $$...$$ para ecuaciones en bloque. No uses LaTeX si el tema no lo requiere.
-
-${conceptTaxonomyPromptBlock(closedConcepts) || 'CONCEPT_TAG (obligatorio en cada pregunta): identifica el concepto especifico que evalua la pregunta (no el tema general del modulo), como un identificador snake_case corto en español (ej: "revolucion_industrial_causas", "fotosintesis_clorofila"). Si dos preguntas evaluan el mismo concepto especifico, deben usar EXACTAMENTE el mismo concept_tag.'}
-
-${ANTI_HALLUCINATION_BLOCK}
-
-Responde SOLO con JSON valido:
-{"questions":[...${TOTAL_WITH_MINIGAME} preguntas aqui, en el orden y cantidad indicados arriba...]}`;
-
-    const questions = await callCohere(prompt, TOTAL_WITH_MINIGAME);
+    const questions = await callCohere(built.prompt, built.total);
     if (!questions) return NextResponse.json({ error: 'Cohere generation failed' }, { status: 500 });
     // Normaliza cada minijuego a la misma forma anidada (game_type/game_data) que usan
     // las filas servidas desde cache, para que el cliente no tenga que manejar N shapes.
     const generated: any[] = questions.map(normalizeGeneratedQuestion);
 
+    // Defensa en profundidad: el modelo puede ignorar "TIPOS PERMITIDOS". Lo que
+    // la configuracion no pidio no llega al estudiante ni se guarda.
+    const { kept: onConfig, dropped: offConfig } = enforceAllowedTypes(generated, new Set(built.requestedTypes));
+    if (offConfig.length > 0) {
+      console.warn('[GENERATION_OFF_CONFIG]', { moduleId, descartadas: offConfig.map((q: any) => q.type) });
+    }
+
     // Sesion I, Fix 1: descartar preguntas/minijuegos con datos incompletos
     // ANTES de guardarlos en cache o servirlos — nunca deben llegar al
     // estudiante en blanco o rotos. isValidQuestion es la misma validacion
     // que usa lesson/[id]/page.tsx para el fallback de "saltar pregunta".
-    const validGenerated = generated.filter((q) => {
+    const validGenerated = onConfig.filter((q) => {
       const check = isValidQuestion(q);
       if (!check.valid) {
         console.warn('[GENERATION_VALIDATION_FAILED]', { type: q.type, error: check.error });

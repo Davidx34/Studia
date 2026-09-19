@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import ObjectivesClient from './ObjectivesClient';
+import { ALL_MINIGAME_IDS, sanitizeMinigameIds } from '@/lib/questions/minigameCatalog';
 
 export default async function ObjectivesPage({ params }: { params: { id: string } }) {
   const supabase = await createServerSupabase();
@@ -29,12 +30,21 @@ export default async function ObjectivesPage({ params }: { params: { id: string 
     .eq('classroom_id', params.id)
     .order('created_at', { ascending: false });
 
+  // Minijuegos habilitados para la clase (Cerebro de la IA). Sin fila = todos.
+  const { data: aiConfig } = await supabase
+    .from('classroom_ai_config')
+    .select('minigame_types')
+    .eq('classroom_id', params.id)
+    .maybeSingle();
+  const allowedMinigames = aiConfig?.minigame_types == null ? [...ALL_MINIGAME_IDS] : sanitizeMinigameIds(aiConfig.minigame_types);
+
   return (
     <ObjectivesClient
       classroomId={params.id}
       objectives={objectives ?? []}
       modules={modules ?? []}
       materials={materials ?? []}
+      allowedMinigames={allowedMinigames}
     />
   );
 }

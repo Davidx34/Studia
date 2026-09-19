@@ -1,7 +1,10 @@
 // Edge Function: generate-classroom-map
 // Fase 11.D · Stud.ia · Clases con IA
 //
-// Recibe { classroom_id }. Lee chunks + topics_detected + classroom info,
+// Recibe { classroom_id, dry_run? }. Lee chunks + topics_detected + classroom info
+// + la configuracion de IA de la clase (classroom_ai_config: objetivos, temas a
+// enfatizar/evitar, nivel de lenguaje...). Con dry_run:true devuelve el prompt
+// que se le enviaria a Gemini SIN llamarlo ni insertar modulos (para verificar).
 // llama a Gemini "Map Designer" con structured output JSON pidiendo entre
 // 5-12 nodos con prerequisites por índice + posiciones x:50-950 y:50-1500.
 // INSERT en content_modules con auto_generated=true. Resuelve prerequisites
@@ -17,6 +20,7 @@
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { buildMapPrompt } from './mapPrompt.ts';
 
 const GEMINI_CHAT_MODEL = 'gemini-2.5-flash';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
@@ -29,6 +33,8 @@ const corsHeaders = {
 
 interface RequestBody {
   classroom_id: string;
+  // Solo construye el prompt y lo devuelve; no llama a Gemini ni escribe en la base.
+  dry_run?: boolean;
 }
 
 interface DesignerModule {
@@ -53,9 +59,6 @@ Deno.serve(async (req: Request) => {
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-  if (!GEMINI_API_KEY) {
-    return jsonResponse({ ok: false, error: 'GEMINI_API_KEY no configurada' }, 500);
-  }
 
   let body: RequestBody;
   try {
@@ -65,6 +68,9 @@ Deno.serve(async (req: Request) => {
   }
   if (!body.classroom_id) {
     return jsonResponse({ ok: false, error: 'classroom_id requerido' }, 400);
+  }
+  if (!GEMINI_API_KEY && !body.dry_run) {
+    return jsonResponse({ ok: false, error: 'GEMINI_API_KEY no configurada' }, 500);
   }
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -103,15 +109,31 @@ Deno.serve(async (req: Request) => {
     if (m.extracted_text_preview) samples.push(`[${m.filename}]\n${m.extracted_text_preview}`);
   }
 
+  // 2b. Configuracion de IA de la clase (Cerebro de la IA). Sin fila = sin configuracion:
+  // el prompt queda como antes. Un error de lectura NO debe pasar callado.
+  const { data: aiConfig, error: cfgErr } = await admin
+    .from('classroom_ai_config')
+    .select('subject_description, grade_level_detail, learning_objectives, language_level, question_depth, topics_emphasize, topics_avoid, custom_instructions')
+    .eq('classroom_id', classroom.id)
+    .maybeSingle();
+  if (cfgErr) console.error('[MAP_CONFIG_READ_FAILED]', cfgErr.message);
+
   // 3. Llamar a Map Designer
-  const designerResult = await callMapDesigner(GEMINI_API_KEY, {
+  const prompt = buildMapPrompt({
     classroomName: classroom.name,
     subjectArea: classroom.subject_area ?? 'general',
     gradeLevel: classroom.grade_level ?? 'sin grado',
     description: classroom.description ?? '',
     topics: Array.from(allTopics),
     samples: samples.join('\n\n').slice(0, 20000),
+    config: aiConfig,
   });
+
+  if (body.dry_run) {
+    return jsonResponse({ ok: true, dry_run: true, config_found: Boolean(aiConfig), prompt });
+  }
+
+  const designerResult = await callMapDesigner(GEMINI_API_KEY!, prompt);
 
   if (!designerResult.modules || designerResult.modules.length < 3) {
     return jsonResponse(
@@ -210,49 +232,8 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.round(n)));
 }
 
-async function callMapDesigner(
-  apiKey: string,
-  input: {
-    classroomName: string;
-    subjectArea: string;
-    gradeLevel: string;
-    description: string;
-    topics: string[];
-    samples: string;
-  }
-): Promise<DesignerResponse> {
+async function callMapDesigner(apiKey: string, prompt: string): Promise<DesignerResponse> {
   const url = `${GEMINI_BASE_URL}/models/${GEMINI_CHAT_MODEL}:generateContent?key=${apiKey}`;
-
-  const prompt = `Eres un diseñador de currículum experto. Tu tarea: diseñar un MAPA DE APRENDIZAJE
-para esta clase, dividido en 5-12 módulos secuenciales con dificultad progresiva.
-
-CLASE:
-- Nombre: ${input.classroomName}
-- Materia: ${input.subjectArea}
-- Grado: ${input.gradeLevel}
-- Descripción: ${input.description}
-
-TEMAS DETECTADOS EN EL MATERIAL:
-${input.topics.length > 0 ? input.topics.map((t) => `- ${t}`).join('\n') : '(ninguno)'}
-
-EXTRACTOS DEL MATERIAL:
-"""
-${input.samples}
-"""
-
-REGLAS:
-- 5 a 12 módulos
-- Dificultad creciente (el primer módulo debe ser difficulty_level 1-3, el último 7-10)
-- El primer módulo NO debe tener prerequisites_indices (debe estar vacío [])
-- Cada módulo posterior puede listar índices (0-based) de módulos que deben completarse antes
-- map_position_x: entre 50 y 950 (ancho del canvas)
-- map_position_y: entre 50 y 1500 (largo del canvas, aumenta hacia abajo)
-- Los módulos más fáciles arriba (y bajo), los difíciles abajo (y alto)
-- estimated_time_minutes: entre 3 y 60
-- topic_keywords: 2-5 palabras clave por módulo
-- Títulos en español neutro, máximo 80 caracteres
-- Descripciones cortas (1-2 oraciones)
-- category: usa EXACTAMENTE uno de estos valores (nunca otro): "math", "science", "language", "history", "logic"`;
 
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
