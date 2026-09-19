@@ -259,7 +259,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ questions: toServe, cached: false });
     });
 
-    if (outcome.busy) {
+    if (outcome.status === 'forbidden') {
+      // Quien llama no es el profesor de este modulo ni un estudiante inscrito: no se
+      // gasta una generacion (cuesta dinero y cuota) para alguien sin acceso.
+      return NextResponse.json({ error: 'Sin acceso a este modulo' }, { status: 403 });
+    }
+    if (outcome.status === 'busy') {
       console.log(`[generate-questions] modulo ${moduleId} ya se esta generando, respondiendo 202`);
       return NextResponse.json(
         { cached: false, message: 'Generación en curso, reintenta en algunos segundos' },
