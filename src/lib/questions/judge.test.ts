@@ -6,7 +6,7 @@
 // desviarse del formato pedido).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseBatchResponse, questionToText, buildBatches, RUBRIC, isDailyQuotaExhausted, resetQuotaBreaker, judgeQuestionsBatch } from './judge';
+import { parseBatchResponse, questionToText, buildBatches, RUBRIC, isDailyQuotaExhausted, resetQuotaBreaker, judgeQuestionsBatch, backoffMs } from './judge';
 
 describe('parseBatchResponse', () => {
   it('parsea un lote bien formado en orden', () => {
@@ -326,4 +326,139 @@ describe('judgeQuestionsBatch con la cuota diaria agotada', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(resultado.get('q0')?.verdict).toBe('pass');
   }, 10_000);
+});
+
+// Corrida real del 2026-09-19 al poblar review_reason: cuatro lotes fallaron con
+// "error de red o del servicio tras reintentos" y cayeron al fallback pregunta
+// por pregunta, gastando buena parte de la cuota diaria. Leyendo el codigo se vio
+// que los 5xx NO se reintentaban (el mensaje mentia) y que el log no guardaba el
+// codigo HTTP. Estos tests fijan la politica: cada causa de fallo tiene su
+// respuesta, y el fallback individual queda solo para lo que puede rescatar.
+describe('judgeQuestionsBatch segun la causa del fallo', () => {
+  const preguntas = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ id: `s${i}`, type: 'multiple_choice', q: `pregunta ${i}`, opts: ['A', 'B'], ok: 0 }));
+
+  const okLote = (n: number) =>
+    new Response(
+      JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    verdicts: Array.from({ length: n }, (_, i) => ({ index: i + 1, verdict: 'pass', reason: 'ok' })),
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      }),
+      { status: 200 }
+    );
+
+  const okIndividual = () =>
+    new Response(
+      JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ verdict: 'pass', reason: 'ok' }) }] } }] }),
+      { status: 200 }
+    );
+
+  async function correr(n: number) {
+    const promesa = judgeQuestionsBatch(preguntas(n), 'material');
+    await vi.runAllTimersAsync();
+    return promesa;
+  }
+
+  beforeEach(() => {
+    resetQuotaBreaker();
+    vi.stubEnv('GEMINI_API_KEY', 'clave-de-test');
+    vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    resetQuotaBreaker();
+  });
+
+  it('un 503 transitorio se reintenta y termina en veredicto (antes: fallaba de inmediato)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockResolvedValueOnce(okLote(1));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resultado = await correr(1);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(resultado.get('s0')?.verdict).toBe('pass');
+  });
+
+  it('un 503 persistente: 3 intentos y SIN fallback individual; queda sin veredicto', async () => {
+    const fetchMock = vi.fn(async () => new Response('', { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    // 3 preguntas y no 2: con 2, el codigo anterior tambien hacia 3 llamadas
+    // (1 del lote + 2 individuales) por pura coincidencia y el test no
+    // distinguia nada. Con 3: antes 4 llamadas (1 + 3 individuales, sin
+    // reintentar el lote), ahora 3 (los 3 intentos del lote, sin individuales).
+    const resultado = await correr(3);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(Array.from(resultado.values()).every((v) => v === null)).toBe(true);
+  });
+
+  it('un 429 POR MINUTO persistente tampoco dispara el fallback individual', async () => {
+    const fetchMock = vi.fn(async () => new Response(CUERPO_CUOTA_MINUTO, { status: 429 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resultado = await correr(3);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(Array.from(resultado.values()).every((v) => v === null)).toBe(true);
+  });
+
+  it('un 400 propio de la peticion no se reintenta y el fallback individual SI rescata', async () => {
+    let llamada = 0;
+    const fetchMock = vi.fn(async () => (llamada++ === 0 ? new Response('', { status: 400 }) : okIndividual()));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resultado = await correr(2);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3); // 1 lote rechazado + 2 individuales
+    expect(resultado.get('s0')?.verdict).toBe('pass');
+    expect(resultado.get('s1')?.verdict).toBe('pass');
+  });
+
+  it('una respuesta que llega pero es ilegible cae al fallback individual', async () => {
+    let llamada = 0;
+    const basura = () =>
+      new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'no soy json' }] } }] }), { status: 200 });
+    const fetchMock = vi.fn(async () => (llamada++ === 0 ? basura() : okIndividual()));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const resultado = await correr(2);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(resultado.get('s0')?.verdict).toBe('pass');
+  });
+
+  it('el log dice el codigo HTTP real y ya no promete "reintentos" en falso', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 503 })));
+
+    await correr(1);
+
+    const mensajes = (console.warn as any).mock.calls.map((c: any[]) => String(c[0]));
+    expect(mensajes.some((m: string) => m.includes('HTTP 503'))).toBe(true);
+  });
+
+  it('el backoff crece con el numero de intento', () => {
+    expect(backoffMs(0)).toBeGreaterThanOrEqual(2500);
+    expect(backoffMs(0)).toBeLessThan(3000);
+    expect(backoffMs(2)).toBeGreaterThanOrEqual(7500);
+  });
 });
