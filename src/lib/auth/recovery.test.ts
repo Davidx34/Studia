@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseRecoveryLink, validateNewPassword, describeResetError, describeRequestError, MIN_PASSWORD_LENGTH } from './recovery';
+import { parseRecoveryLink, validateNewPassword, describeResetError, describeRequestError, sanitizeOtp, validateOtp, describeOtpError, OTP_MIN_LENGTH, OTP_MAX_LENGTH, MIN_PASSWORD_LENGTH } from './recovery';
 import { isAuthPage, isPublicPage } from './routes';
 
 const BASE = 'https://studia-ebon.vercel.app/reset-password';
@@ -129,5 +129,67 @@ describe('rutas publicas del middleware', () => {
     for (const ruta of ['/dashboard', '/teacher/dashboard', '/teacher/classrooms', '/lesson/abc', '/reset-password/extra']) {
       expect(isPublicPage(ruta)).toBe(false);
     }
+  });
+});
+
+// Caso real (2026-09-19): el enlace del correo de recuperacion no funciono en un
+// buzon de Microsoft 365 -- Safe Links lo intercepto (url=null). El codigo que se
+// escribe a mano no pasa por ningun enlace.
+describe('sanitizeOtp', () => {
+  it('deja solo los digitos: la gente pega con espacios, guiones o saltos de linea', () => {
+    expect(sanitizeOtp('123 456')).toBe('123456');
+    expect(sanitizeOtp('123-456')).toBe('123456');
+    expect(sanitizeOtp(' 123456\n')).toBe('123456');
+  });
+
+  it('descarta letras y simbolos', () => {
+    expect(sanitizeOtp('a1b2c3')).toBe('123');
+    expect(sanitizeOtp('abc')).toBe('');
+  });
+
+  it('no deja pasar mas del largo maximo que admite Supabase', () => {
+    expect(sanitizeOtp('1'.repeat(30))).toHaveLength(OTP_MAX_LENGTH);
+  });
+
+  it('tolera la cadena vacia', () => {
+    expect(sanitizeOtp('')).toBe('');
+  });
+});
+
+describe('validateOtp', () => {
+  it('acepta un codigo de largo valido', () => {
+    expect(validateOtp('1'.repeat(OTP_MIN_LENGTH))).toBeNull();
+    expect(validateOtp('1'.repeat(OTP_MAX_LENGTH))).toBeNull();
+  });
+
+  it('rechaza uno demasiado corto, incluido el vacio', () => {
+    expect(validateOtp('12345')).toContain(String(OTP_MIN_LENGTH));
+    expect(validateOtp('')).toContain(String(OTP_MIN_LENGTH));
+  });
+});
+
+describe('describeOtpError', () => {
+  it('un codigo incorrecto o vencido (Supabase no los distingue) dice las dos cosas', () => {
+    for (const err of [{ code: 'otp_expired' }, { status: 403 }, { status: 400 }, { code: 'validation_failed' }]) {
+      const m = describeOtpError(err);
+      expect(m).toContain('no es correcto');
+      expect(m).toContain('venció');
+    }
+  });
+
+  it('el limite de intentos tiene su propio mensaje', () => {
+    expect(describeOtpError({ status: 429 })).toContain('Demasiados intentos');
+    expect(describeOtpError({ code: 'over_request_rate_limit' })).toContain('Demasiados intentos');
+  });
+
+  it('un error de red no acusa al codigo', () => {
+    const m = describeOtpError({ status: 0, message: 'fetch failed' });
+    expect(m).toContain('conexión');
+    expect(m).not.toContain('no es correcto');
+  });
+
+  it('tolera null y undefined', () => {
+    expect(describeOtpError(null).length).toBeGreaterThan(0);
+    expect(describeOtpError(undefined).length).toBeGreaterThan(0);
   });
 });
