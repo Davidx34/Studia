@@ -25,6 +25,12 @@ import type { ContentModule } from '@/types/database';
 const REMEDIATION_ACCURACY_THRESHOLD = 70;
 const REMEDIATION_TRIGGER_SCORE = 80;
 
+// Un 202 de /api/generate-questions significa "otra peticion ya esta generando este
+// modulo", no un fallo: se espera y se reintenta. Antes solo se miraba res.ok y un 202
+// (sin preguntas) caia directo a la pantalla de "No pude preparar esta leccion".
+const BUSY_RETRY_MS = 3000;
+const BUSY_MAX_ATTEMPTS = 60; // ~3 min: lo que tarda en caducar el bloqueo (LOCK_TTL_MS)
+
 // Shape "hidratada" de una pregunta tal como la usa esta pagina (mezcla de
 // filas cacheadas de lesson_questions y preguntas recien generadas que aun
 // no tienen id) -- mismo shape que produce rowToQuestion() en
@@ -115,13 +121,20 @@ export default function LessonPage() {
       // GEMINI_API_KEY necesario para generar el embedding de busqueda.
       // La configuracion de IA de la clase la lee el SERVIDOR a partir del moduleId
       // (ver /api/generate-questions): ya no se lee aqui ni viaja en la peticion.
-      const res = await fetch('/api/generate-questions', {
+      const requestQuestions = () => fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ moduleId, moduleTitle: modData.title })
       });
 
-      if (res.ok) {
+      let res = await requestQuestions();
+      for (let attempt = 0; res.status === 202 && attempt < BUSY_MAX_ATTEMPTS; attempt++) {
+        showMessage('Otra persona esta preparando esta leccion. Esperamos un momento...', 0);
+        await new Promise((r) => setTimeout(r, BUSY_RETRY_MS));
+        res = await requestQuestions();
+      }
+
+      if (res.ok && res.status !== 202) {
         const data = await res.json();
         if (data.questions?.length > 0) {
           setQuestions(data.questions);
