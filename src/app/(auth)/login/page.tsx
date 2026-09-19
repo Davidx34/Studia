@@ -111,6 +111,15 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 className="premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20"
               />
+              <div className="mt-2 text-right">
+                <Link
+                  href="/forgot-password"
+                  className="premium-focus text-sm font-medium transition-colors duration-200 rounded"
+                  style={{ color: 'var(--premium-gold)' }}
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
             </div>
 
             {error && (

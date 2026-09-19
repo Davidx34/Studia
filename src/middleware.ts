@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isAuthPage as isAuthPagePath, isPublicPage as isPublicPagePath } from "@/lib/auth/routes";
 
 const TEACHER_ROUTES = ["/teacher"];
 const STUDENT_ROUTES = ["/dashboard", "/lesson", "/my-classes", "/achievements", "/map"];
@@ -36,8 +37,8 @@ export async function middleware(request: NextRequest) {
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-    const isAuthPage = pathname === "/login" || pathname === "/signup";
-    const isPublicPage = pathname === "/offline";
+    const isAuthPage = isAuthPagePath(pathname);
+    const isPublicPage = isPublicPagePath(pathname);
 
     if (!user && !isAuthPage && !isPublicPage) {
       return NextResponse.redirect(new URL("/login", request.url));
@@ -78,9 +79,8 @@ export async function middleware(request: NextRequest) {
     const isProtectedTeacherRoute = TEACHER_ROUTES.some((r) => pathname.startsWith(r));
     const isProtectedStudentRoute = STUDENT_ROUTES.some((r) => pathname.startsWith(r));
     const isPublicPath =
-      pathname === "/login" ||
-      pathname === "/signup" ||
-      pathname === "/offline" ||
+      isAuthPagePath(pathname) ||
+      isPublicPagePath(pathname) ||
       pathname.startsWith("/dev") ||
       pathname.startsWith("/api/dev");
 
