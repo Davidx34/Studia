@@ -24,6 +24,7 @@ import {
   deleteLearningObjective,
   updateModuleObjectiveConfig,
   regenerateModuleQuestionPool,
+  fillModuleQuestionPool,
   judgeModuleQuestionPool,
 } from '@/lib/actions/learning-objectives';
 
@@ -60,6 +61,7 @@ export default function ObjectivesClient({
   modules,
   materials,
   allowedMinigames,
+  poolStatus,
 }: {
   classroomId: string;
   objectives: Objective[];
@@ -67,6 +69,8 @@ export default function ObjectivesClient({
   materials: MaterialSummary[];
   // Minijuegos habilitados para la clase en el Cerebro de la IA (lista de permitidos).
   allowedMinigames: string[];
+  // Por modulo: preguntas activas y de reserva que sirven hoy, y cuantas faltan para el pool completo.
+  poolStatus: Record<string, { active: number; backup: number; missing: number }>;
 }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
@@ -83,23 +87,29 @@ export default function ObjectivesClient({
   const unassignedModules = modules.filter((m) => !m.learning_objective_id);
   const readyForBulk = modules.filter((m) => (m.source_material_ids?.length ?? 0) > 0);
 
-  async function handleBulkGenerate() {
-    if (
-      !confirm(
-        `¿Generar preguntas para los ${readyForBulk.length} módulos que ya tienen material vinculado? Esto reemplaza el pool de preguntas de cada uno.`
-      )
-    )
-      return;
+  // Modulos con material a los que todavia les faltan preguntas (activas o de reserva).
+  const incomplete = readyForBulk.filter((m) => (poolStatus[m.id]?.missing ?? 1) > 0);
+  const [failed, setFailed] = useState<string[]>([]);
+
+  // Completa el pool de cada modulo incompleto. NO borra nada: solo genera lo que
+  // falta, asi que es seguro sobre modulos que el profesor ya reviso. Un modulo que
+  // falla no detiene a los demas; al final se listan para reintentar.
+  async function handleFillMissing() {
     setBulkRunning(true);
     setError(null);
-    for (let i = 0; i < readyForBulk.length; i++) {
-      const m = readyForBulk[i];
-      setBulkProgress({ current: i + 1, total: readyForBulk.length, title: m.title });
-      const result = await regenerateModuleQuestionPool(m.id, classroomId);
-      if (!result.ok) {
-        setError(`Falló en "${m.title}": ${result.error ?? 'error desconocido'}`);
+    setFailed([]);
+    const failures: string[] = [];
+    for (let i = 0; i < incomplete.length; i++) {
+      const m = incomplete[i];
+      setBulkProgress({ current: i + 1, total: incomplete.length, title: m.title });
+      try {
+        const result = await fillModuleQuestionPool(m.id, classroomId);
+        if (!result.ok) failures.push(`${m.title}: ${result.error ?? 'error desconocido'}`);
+      } catch (e) {
+        failures.push(`${m.title}: ${e instanceof Error ? e.message : 'error de red'}`);
       }
     }
+    setFailed(failures);
     setBulkProgress(null);
     setBulkRunning(false);
     router.refresh();
@@ -150,14 +160,15 @@ export default function ObjectivesClient({
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {readyForBulk.length > 0 && (
+          {incomplete.length > 0 && (
             <button
-              onClick={handleBulkGenerate}
+              onClick={handleFillMissing}
               disabled={bulkRunning || judging}
+              title="Genera solo las preguntas que faltan (activas y de reserva). No borra ninguna pregunta existente."
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 disabled:opacity-50 transition"
             >
               {bulkRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
-              Generar todos los módulos listos ({readyForBulk.length})
+              Generar lo que falta ({incomplete.length})
             </button>
           )}
           {readyForBulk.length > 0 && (
@@ -188,9 +199,24 @@ export default function ObjectivesClient({
         </div>
       </div>
 
+      {incomplete.length > 0 && !bulkRunning && (
+        <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-200">
+          {incomplete.length} de {readyForBulk.length} módulos con material no tienen el pool de preguntas completo. Si un
+          estudiante abre uno de ellos, tendrá que esperar a que se genere en ese momento (hasta ~1 minuto). Usa{' '}
+          <strong>Generar lo que falta</strong> para dejarlo listo antes: no borra nada.
+        </div>
+      )}
+
+      {failed.length > 0 && (
+        <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-200 space-y-1">
+          <p className="font-medium">No se pudo completar {failed.length} módulo(s). Puedes volver a pulsar el botón para reintentarlos:</p>
+          <ul className="text-xs list-disc pl-5">{failed.map((f) => <li key={f}>{f}</li>)}</ul>
+        </div>
+      )}
+
       {bulkProgress && (
         <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3 text-sm text-emerald-200">
-          Generando módulo {bulkProgress.current}/{bulkProgress.total}: {bulkProgress.title}...
+          Completando módulo {bulkProgress.current}/{bulkProgress.total}: {bulkProgress.title}... (cada uno tarda ~1 min; no cierres esta pestaña)
         </div>
       )}
 

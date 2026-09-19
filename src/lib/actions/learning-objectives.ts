@@ -148,6 +148,21 @@ export async function regenerateModuleQuestionPool(
   return result;
 }
 
+// Completa el pool de un modulo SIN borrar nada: genera solo las preguntas que le
+// faltan (activas + reserva). Es lo que usa "Generar lo que falta", para que el
+// profesor deje todo listo antes de que lleguen los estudiantes.
+export async function fillModuleQuestionPool(
+  moduleId: string,
+  classroomId: string
+): Promise<RegeneratePoolResult> {
+  const { supabase } = await requireUser();
+
+  const result = await regenerateModulePool(supabase, moduleId, { mode: 'fill' });
+  if (result.ok) {
+    revalidatePath(`/teacher/classrooms/${classroomId}/objectives`);
+  }
+  return result;
+}
 
 // ============================================================
 // Fase 1.3 (post-auditoria): juez LLM asincrono sobre el pool ya generado
