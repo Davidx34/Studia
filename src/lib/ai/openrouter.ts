@@ -7,11 +7,19 @@
 // OpenAI, asi que un respaldo es una llamada mas y no un SDK nuevo.
 //
 // Regla: es SOLO respaldo. Cohere sigue siendo el generador principal y Gemini el
-// juez principal; OpenRouter se usa cuando ellos fallan o se agotan. Sin
-// OPENROUTER_API_KEY todo se comporta exactamente como antes.
+// juez principal; OpenRouter se usa cuando ellos fallan o se agotan. Sin llave ni
+// conector configurados todo se comporta exactamente como antes.
+//
+// De donde sale la llave (en este orden):
+//   1. OPENROUTER_API_KEY: una llave estatica en las variables de entorno.
+//   2. Vercel Connect: si existe OPENROUTER_CONNECTOR (el ID del conector, p.ej.
+//      "openrouter.ai/studia"; NO es un secreto), la llave se pide en tiempo de ejecucion con
+//      @vercel/connect, que autentica al proyecto con su token OIDC. No hay ninguna llave
+//      guardada en Vercel ni en el repo, y se puede revocar desde el panel de Connect.
 //
 // Variables de entorno (Vercel):
-//   OPENROUTER_API_KEY            obligatoria para activar el respaldo
+//   OPENROUTER_API_KEY            llave estatica (alternativa a Connect)
+//   OPENROUTER_CONNECTOR          ID del conector de Vercel Connect (alternativa a la llave)
 //   OPENROUTER_GENERATION_MODELS  opcional, lista separada por comas, en orden de preferencia
 //   OPENROUTER_JUDGE_MODELS       opcional, idem, para el juez
 //
@@ -34,8 +42,42 @@ const ENV_MODELS: Record<OpenRouterRole, string> = {
 // OpenRouter acepta como maximo 3 modelos en la lista de respaldo de una peticion.
 const MAX_MODELS_PER_REQUEST = 3;
 
+// Sincrona a proposito: solo mira la configuracion, no pide ningun token. Si Connect
+// esta activado pero falla al pedirlo, callOpenRouter lo reporta como 'no_key'.
 export function isOpenRouterConfigured(): boolean {
-  return !!process.env.OPENROUTER_API_KEY;
+  return !!process.env.OPENROUTER_API_KEY || !!process.env.OPENROUTER_CONNECTOR;
+}
+
+type KeySource = { key: string; source: 'env' | 'connect' };
+type GetTokenFn = (connector: string, params: { subject: { type: 'app' } }) => Promise<string>;
+
+async function resolveApiKey(getTokenImpl?: GetTokenFn): Promise<KeySource | null> {
+  const fromEnv = process.env.OPENROUTER_API_KEY;
+  if (fromEnv) return { key: fromEnv, source: 'env' };
+
+  const connector = process.env.OPENROUTER_CONNECTOR;
+  if (!connector) return null;
+  try {
+    // Import dinamico: si la llave viene del entorno, el SDK ni se carga.
+    const getToken: GetTokenFn = getTokenImpl ?? ((await import('@vercel/connect')).getToken as GetTokenFn);
+    const token = await getToken(connector, { subject: { type: 'app' } });
+    return token ? { key: token, source: 'connect' } : null;
+  } catch (e: any) {
+    console.warn('[OPENROUTER_CONNECT_FAILED]', { connector, error: String(e?.message ?? e).slice(0, 200) });
+    return null;
+  }
+}
+
+// El token que Connect entrego fue rechazado: que la proxima peticion pida uno nuevo.
+async function dropCachedConnectToken(): Promise<void> {
+  try {
+    const connector = process.env.OPENROUTER_CONNECTOR;
+    if (!connector) return;
+    const { deleteTokenCacheEntry } = await import('@vercel/connect');
+    deleteTokenCacheEntry(connector, { subject: { type: 'app' } });
+  } catch {
+    // sin cache que limpiar
+  }
 }
 
 export function openRouterModels(role: OpenRouterRole): string[] {
@@ -62,6 +104,7 @@ export interface OpenRouterOptions {
   // Inyectables para poder probarlo sin red.
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
+  getTokenImpl?: GetTokenFn;
 }
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
@@ -74,8 +117,8 @@ export function classifyStatus(status: number): OpenRouterFailure {
 }
 
 export async function callOpenRouter(prompt: string, opts: OpenRouterOptions): Promise<OpenRouterCall> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) return { ok: false, reason: 'no_key' };
+  let credential = await resolveApiKey(opts.getTokenImpl);
+  if (!credential) return { ok: false, reason: 'no_key' };
 
   const doFetch = opts.fetchImpl ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
@@ -83,13 +126,14 @@ export async function callOpenRouter(prompt: string, opts: OpenRouterOptions): P
   const models = openRouterModels(opts.role);
 
   let last: OpenRouterCall = { ok: false, reason: 'server' };
+  let refreshed = false;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const res = await doFetch(ENDPOINT, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${credential.key}`,
           'Content-Type': 'application/json',
           // Identifican la app en OpenRouter (opcionales, pero recomendados por ellos).
           'HTTP-Referer': 'https://studia-theta.vercel.app',
@@ -111,6 +155,18 @@ export async function callOpenRouter(prompt: string, opts: OpenRouterOptions): P
         const failure = classifyStatus(res.status);
         last = { ok: false, reason: failure, status: res.status };
         // Sin permiso, peticion invalida o sin credito: reintentar no cambia nada.
+        // Con un token de Connect, un 401 puede ser solo un token vencido: se pide uno
+        // nuevo y se reintenta UNA vez antes de rendirse.
+        if (failure === 'unauthorized' && credential.source === 'connect' && !refreshed) {
+          refreshed = true;
+          await dropCachedConnectToken();
+          const fresh = await resolveApiKey(opts.getTokenImpl);
+          if (fresh) {
+            credential = fresh;
+            attempt--; // este intento no cuenta
+            continue;
+          }
+        }
         if (failure === 'unauthorized' || failure === 'bad_request' || res.status === 402) return last;
       } else {
         const data: any = await res.json();

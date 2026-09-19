@@ -16,7 +16,7 @@ export async function GET() {
     env: {
       cohere: !!process.env.COHERE_API_KEY,
       gemini: !!process.env.GEMINI_API_KEY,
-      openrouter: !!process.env.OPENROUTER_API_KEY, // respaldo de generacion y juez
+      openrouter: !!process.env.OPENROUTER_API_KEY || !!process.env.OPENROUTER_CONNECTOR, // respaldo de generacion y juez
       devAuth: !!process.env.DEV_PASSWORD && !!process.env.DEV_SESSION_SECRET,
       supabase: !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     },
