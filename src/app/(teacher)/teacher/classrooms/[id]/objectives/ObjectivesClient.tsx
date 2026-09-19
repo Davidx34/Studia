@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { MINIGAME_LABELS } from '@/lib/questions/minigameCatalog';
 import { useRouter } from 'next/navigation';
 import {
   Target,
@@ -53,27 +54,19 @@ interface MaterialSummary {
   processing_status: string;
 }
 
-const MINIGAME_LABELS: Record<string, string> = {
-  el_descifrador: '🔤 El Descifrador',
-  linea_del_tiempo: '📅 Línea del Tiempo',
-  categorias_rapidas: '⏱️ Categorías Rápidas',
-  flashcard_rapida: '🃏 Flashcard Rápida',
-  impostor_cognitivo: '🕵️ El Impostor Cognitivo',
-  alquimia_conceptual: '⚗️ Alquimia Conceptual',
-  cuarto_crisis: '🚨 Cuarto de Crisis',
-  juicio_conocimiento: '⚖️ El Juicio al Conocimiento',
-};
-
 export default function ObjectivesClient({
   classroomId,
   objectives,
   modules,
   materials,
+  allowedMinigames,
 }: {
   classroomId: string;
   objectives: Objective[];
   modules: ModuleRow[];
   materials: MaterialSummary[];
+  // Minijuegos habilitados para la clase en el Cerebro de la IA (lista de permitidos).
+  allowedMinigames: string[];
 }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
@@ -258,6 +251,7 @@ export default function ObjectivesClient({
               modules={modules.filter((m) => m.learning_objective_id === obj.id)}
               unassignedModules={unassignedModules}
               materials={materials}
+              allowedMinigames={allowedMinigames}
               expanded={expandedId === obj.id}
               onToggle={() => setExpandedId(expandedId === obj.id ? null : obj.id)}
               onError={setError}
@@ -378,6 +372,7 @@ function ObjectiveCard({
   modules,
   unassignedModules,
   materials,
+  allowedMinigames,
   expanded,
   onToggle,
   onError,
@@ -387,6 +382,7 @@ function ObjectiveCard({
   modules: ModuleRow[];
   unassignedModules: ModuleRow[];
   materials: MaterialSummary[];
+  allowedMinigames: string[];
   expanded: boolean;
   onToggle: () => void;
   onError: (e: string | null) => void;
@@ -496,7 +492,7 @@ function ObjectiveCard({
             modules
               .sort((a, b) => (a.order_in_objective ?? 0) - (b.order_in_objective ?? 0))
               .map((m) => (
-                <ModuleConfigRow key={m.id} module={m} classroomId={classroomId} materials={materials} onError={onError} />
+                <ModuleConfigRow key={m.id} module={m} classroomId={classroomId} materials={materials} allowedMinigames={allowedMinigames} onError={onError} />
               ))
           )}
 
@@ -533,16 +529,18 @@ function ModuleConfigRow({
   module,
   classroomId,
   materials,
+  allowedMinigames,
   onError,
 }: {
   module: ModuleRow;
   classroomId: string;
   materials: MaterialSummary[];
+  allowedMinigames: string[];
   onError: (e: string | null) => void;
 }) {
   const router = useRouter();
   const [questionCount, setQuestionCount] = useState(module.configured_question_count ?? 10);
-  const [minigameTypes, setMinigameTypes] = useState<string[]>(module.minigame_types ?? []);
+  const [minigameTypes, setMinigameTypes] = useState<string[]>((module.minigame_types ?? []).filter((t) => allowedMinigames.includes(t)));
   const [materialIds, setMaterialIds] = useState<string[]>(module.source_material_ids ?? []);
   const [savePending, startSave] = useTransition();
   const [regenPending, startRegen] = useTransition();
@@ -673,8 +671,14 @@ function ModuleConfigRow({
 
       <div>
         <p className="text-xs text-slate-500 mb-1.5">Minijuegos permitidos (además de los tipos base de la clase)</p>
+        {allowedMinigames.length === 0 && (
+          <p className="text-xs text-amber-300 mb-1.5">La clase no tiene minijuegos activos: se activan en el Cerebro de la IA.</p>
+        )}
+        {allowedMinigames.length > 0 && allowedMinigames.length < Object.keys(MINIGAME_LABELS).length && (
+          <p className="text-xs text-slate-500 mb-1.5">Solo aparecen los que la clase tiene activos en el Cerebro de la IA.</p>
+        )}
         <div className="flex flex-wrap gap-1.5">
-          {Object.entries(MINIGAME_LABELS).map(([type, label]) => (
+          {Object.entries(MINIGAME_LABELS).filter(([type]) => allowedMinigames.includes(type)).map(([type, label]) => (
             <button
               key={type}
               type="button"
