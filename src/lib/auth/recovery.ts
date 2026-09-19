@@ -82,3 +82,45 @@ export function describeRequestError(err: AuthErrorLike): string {
   }
   return 'No pudimos enviar el correo. Revisa tu conexión e intenta de nuevo.';
 }
+
+// ---------------------------------------------------------------------------
+// Codigo de un solo uso (OTP) enviado por correo.
+//
+// Por que existe: un flujo que exige HACER CLIC en un enlace del correo es
+// fragil para cualquiera con correo corporativo. Microsoft 365 (Safe Links),
+// Google Workspace y otros escaneres abren o reescriben los enlaces: si abren
+// el de Supabase (/auth/v1/verify), gastan el token de un solo uso antes de que
+// llegue la persona; si lo reescriben mal, el clic ni llega a Supabase. Caso
+// real (2026-09-19, buzon @urosario.edu.co): outlook.cloud.microsoft/mail/
+// safelink.html?url=null -- "We can't check the safety of this website".
+// Un codigo que la persona ESCRIBE no tiene enlace que un escaner pueda tocar.
+// ---------------------------------------------------------------------------
+
+// Supabase permite configurar el largo del OTP entre 6 (por defecto) y 10.
+export const OTP_MIN_LENGTH = 6;
+export const OTP_MAX_LENGTH = 10;
+
+// La gente pega el codigo con espacios o guiones ("123 456", "123-456") o con
+// un salto de linea al final: solo interesan los digitos.
+export function sanitizeOtp(input: string): string {
+  return input.replace(/\D/g, '').slice(0, OTP_MAX_LENGTH);
+}
+
+export function validateOtp(code: string): string | null {
+  if (code.length < OTP_MIN_LENGTH) return `El código tiene al menos ${OTP_MIN_LENGTH} dígitos.`;
+  return null;
+}
+
+// Supabase no distingue "codigo incorrecto" de "codigo vencido" (ambos son
+// otp_expired), asi que el mensaje cubre los dos.
+export function describeOtpError(err: AuthErrorLike): string {
+  const code = err?.code ?? '';
+  const status = err?.status;
+  if (status === 429 || code === 'over_request_rate_limit' || code === 'over_email_send_rate_limit') {
+    return 'Demasiados intentos seguidos. Espera unos minutos e intenta de nuevo.';
+  }
+  if (code === 'otp_expired' || code === 'validation_failed' || status === 400 || status === 401 || status === 403 || status === 422) {
+    return 'El código no es correcto o ya venció. Revísalo, o pide uno nuevo.';
+  }
+  return 'No pudimos verificar el código. Revisa tu conexión e intenta de nuevo.';
+}
