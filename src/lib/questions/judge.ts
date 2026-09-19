@@ -95,9 +95,25 @@ export function questionToText(q: any): string {
 // preguntas clasicas, que no tienen ningun problema de tamaño -- y solo 7 de
 // 48 preguntas obtuvieron veredicto. Una sonda directa confirmo HTTP 429 con
 // quotaId GenerateRequestsPerDayPerProjectPerModel-FreeTier.
+//
+// Causas de fallo, distinguidas porque cada una pide una respuesta distinta:
+//   quota_daily  cuota diaria agotada -> no reintentar, no hacer fallback
+//   rate_limited 429 por minuto que persistio tras los reintentos -> no hacer
+//                fallback (las llamadas individuales pegarian contra el mismo
+//                limite)
+//   server       5xx o error de red que persistio tras los reintentos -> no
+//                hacer fallback por el mismo motivo
+//   bad_request  4xx propio de ESTA peticion (p.ej. 400 por prompt invalido o
+//                demasiado grande) -> el fallback individual SI puede rescatar,
+//                porque el prompt de una sola pregunta es mucho mas chico
+//   no_key       sin GEMINI_API_KEY
+// `status` es el codigo HTTP real cuando lo hubo: sin el, el log solo podia
+// decir "error", y en la corrida real del 2026-09-19 cuatro lotes fallaron sin
+// que nadie pudiera saber por que.
+type GeminiFailure = 'quota_daily' | 'rate_limited' | 'server' | 'bad_request' | 'no_key';
 type GeminiCall =
   | { ok: true; text: string }
-  | { ok: false; reason: 'quota_daily' | 'error' | 'no_key' };
+  | { ok: false; reason: GeminiFailure; status?: number };
 
 // Un 429 de Gemini puede ser un limite por minuto (reintentar tras esperar SI
 // sirve) o la cuota diaria (reintentar NO sirve hasta el reinicio, aunque la
@@ -123,10 +139,17 @@ function quotaBreakerOpen(): boolean {
   return dailyQuotaExhaustedAt !== null && Date.now() - dailyQuotaExhaustedAt < QUOTA_BREAKER_MS;
 }
 
+// Espera antes del reintento numero `attempt` (0-based).
+export function backoffMs(attempt: number): number {
+  return 2500 * (attempt + 1) + Math.floor(Math.random() * 500);
+}
+
 async function callGemini(prompt: string, retries: number): Promise<GeminiCall> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return { ok: false, reason: 'no_key' };
   if (quotaBreakerOpen()) return { ok: false, reason: 'quota_daily' };
+
+  let lastFailure: GeminiCall = { ok: false, reason: 'server' };
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -138,31 +161,37 @@ async function callGemini(prompt: string, retries: number): Promise<GeminiCall> 
           generationConfig: { temperature: 0, responseMimeType: 'application/json' },
         }),
       });
-      if (!res.ok) {
-        if (res.status === 429) {
-          const body = await res.text();
-          if (isDailyQuotaExhausted(res.status, body)) {
-            dailyQuotaExhaustedAt = Date.now();
-            return { ok: false, reason: 'quota_daily' };
-          }
-          if (attempt < retries) {
-            await new Promise((r) => setTimeout(r, 2500 * (attempt + 1) + Math.floor(Math.random() * 500)));
-            continue;
-          }
+
+      if (res.ok) {
+        const data = await res.json();
+        return { ok: true, text: data?.candidates?.[0]?.content?.parts?.[0]?.text || '' };
+      }
+
+      if (res.status === 429) {
+        const body = await res.text();
+        if (isDailyQuotaExhausted(res.status, body)) {
+          dailyQuotaExhaustedAt = Date.now();
+          return { ok: false, reason: 'quota_daily', status: 429 };
         }
-        return { ok: false, reason: 'error' };
+        lastFailure = { ok: false, reason: 'rate_limited', status: 429 };
+      } else if (res.status >= 500) {
+        // 5xx (p.ej. 503 "model is overloaded") es transitorio por naturaleza.
+        // Antes se devolvia error de inmediato SIN reintentar, aunque el log
+        // decia "tras reintentos".
+        lastFailure = { ok: false, reason: 'server', status: res.status };
+      } else {
+        // 4xx distinto de 429: reintentar la misma peticion no cambia nada.
+        return { ok: false, reason: 'bad_request', status: res.status };
       }
-      const data = await res.json();
-      return { ok: true, text: data?.candidates?.[0]?.content?.parts?.[0]?.text || '' };
     } catch {
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, 1500));
-        continue;
-      }
-      return { ok: false, reason: 'error' };
+      lastFailure = { ok: false, reason: 'server' };
+    }
+
+    if (attempt < retries) {
+      await new Promise((r) => setTimeout(r, backoffMs(attempt)));
     }
   }
-  return { ok: false, reason: 'error' };
+  return lastFailure;
 }
 
 // Juzga UNA pregunta con UNA llamada a Gemini. Se mantiene exportada para
@@ -290,31 +319,42 @@ export function parseBatchResponse(text: string, expectedCount: number): (JudgeR
 }
 
 // Juzga un lote (BATCH_SIZE preguntas) con UNA sola llamada a Gemini. El
-// fallback pregunta por pregunta solo tiene sentido cuando el problema es del
-// LOTE (respuesta ilegible, conteo que no coincide, error transitorio): ahi
-// evaluar de a una puede rescatar veredictos. Con la cuota diaria agotada o
-// sin API key no rescata nada y solo multiplica llamadas destinadas a fallar,
-// asi que esas preguntas quedan sin veredicto -- y aguas arriba van a
+// fallback pregunta por pregunta solo tiene sentido cuando puede rescatar algo:
+//   - la respuesta llego pero es ilegible (formato, conteo que no coincide);
+//   - Gemini rechazo ESTA peticion con un 4xx (p.ej. prompt demasiado grande),
+//     que un prompt de una sola pregunta puede evitar.
+// Con cuota agotada, 429 por minuto persistente, 5xx persistente o sin API key,
+// evaluar de a una solo multiplica llamadas destinadas a fallar contra lo mismo
+// que acaba de fallar: esas preguntas quedan sin veredicto y aguas arriba van a
 // human_review, nunca a approved (ver judgeModuleQuestionPool).
 async function judgeBatch(batch: any[], sourceMaterial: string): Promise<(JudgeResult | null)[]> {
   const call = await callGemini(buildBatchPrompt(batch, sourceMaterial), 2);
+  const n = batch.length;
 
   if (call.ok) {
-    const parsed = parseBatchResponse(call.text, batch.length);
+    const parsed = parseBatchResponse(call.text, n);
     if (parsed) return parsed;
-    console.warn(`[judgeBatch] lote de ${batch.length}: respuesta ilegible, cayendo a evaluacion individual (fallback)`);
+    console.warn(`[judgeBatch] lote de ${n}: respuesta ilegible, cayendo a evaluacion individual (fallback)`);
     return Promise.all(batch.map((q) => judgeQuestion(q, sourceMaterial)));
   }
 
-  if (call.reason === 'quota_daily') {
-    console.warn(`[judgeBatch] cuota diaria de Gemini agotada: lote de ${batch.length} queda sin veredicto (no se reintenta pregunta por pregunta)`);
-    return batch.map(() => null);
+  const http = call.status ? ` (HTTP ${call.status})` : '';
+  switch (call.reason) {
+    case 'bad_request':
+      console.warn(`[judgeBatch] lote de ${n}: Gemini rechazo la peticion${http}, cayendo a evaluacion individual (fallback)`);
+      return Promise.all(batch.map((q) => judgeQuestion(q, sourceMaterial)));
+    case 'quota_daily':
+      console.warn(`[judgeBatch] cuota diaria de Gemini agotada: lote de ${n} queda sin veredicto`);
+      return batch.map(() => null);
+    case 'rate_limited':
+      console.warn(`[judgeBatch] lote de ${n}: limite por minuto persistente${http}; queda sin veredicto`);
+      return batch.map(() => null);
+    case 'server':
+      console.warn(`[judgeBatch] lote de ${n}: error del servicio o de red${http} tras reintentos; queda sin veredicto`);
+      return batch.map(() => null);
+    case 'no_key':
+      return batch.map(() => null);
   }
-
-  if (call.reason === 'no_key') return batch.map(() => null);
-
-  console.warn(`[judgeBatch] lote de ${batch.length}: error de red o del servicio tras reintentos, cayendo a evaluacion individual (fallback)`);
-  return Promise.all(batch.map((q) => judgeQuestion(q, sourceMaterial)));
 }
 
 export async function judgeQuestionsBatch(
