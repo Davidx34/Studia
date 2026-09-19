@@ -11,20 +11,31 @@
 import { isValidQuestion } from '@/lib/lesson/validateQuestion';
 import { getRagContext, normalizeGeneratedQuestion, callCohere } from '@/lib/questions/cohereGeneration';
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
+import { resolveQuestionCount, countServable, planFill } from '@/lib/questions/poolPlan';
 import { resolveConfig, resolveMinigames, enforceAllowedTypes, buildGenerationPrompt } from '@/lib/questions/generationConfig';
-
-const DEFAULT_QUESTION_COUNT = 10;
-const MIN_QUESTION_COUNT = 5;
-const MAX_QUESTION_COUNT = 15;
 
 export interface RegeneratePoolResult {
   ok: boolean;
   active?: number;
   backup?: number;
   error?: string;
+  // Modo 'fill': el modulo ya tenia el pool completo y no se llamo a la IA.
+  skipped?: boolean;
 }
 
-export async function regenerateModulePool(supabase: any, moduleId: string): Promise<RegeneratePoolResult> {
+// 'replace': borra el pool del modulo y genera uno nuevo completo (el boton
+//            "Regenerar" de un modulo).
+// 'fill':    NO borra nada; genera solo lo que le falta al pool para estar completo
+//            (activas + reserva). Es lo que usa "Generar lo que falta": puede correr
+//            sobre modulos ya revisados sin destruir el trabajo del profesor.
+export type PoolMode = 'replace' | 'fill';
+
+export async function regenerateModulePool(
+  supabase: any,
+  moduleId: string,
+  opts: { mode?: PoolMode } = {}
+): Promise<RegeneratePoolResult> {
+  const mode: PoolMode = opts.mode ?? 'replace';
   const { data: moduleRow, error: moduleError } = await supabase
     .from('content_modules')
     .select('id, classroom_id, title, description, minigame_types, configured_question_count')
@@ -52,11 +63,26 @@ export async function regenerateModulePool(supabase: any, moduleId: string): Pro
 
   const config = resolveConfig(aiConfig);
 
-  const questionCount = Math.min(
-    MAX_QUESTION_COUNT,
-    Math.max(MIN_QUESTION_COUNT, moduleRow.configured_question_count || DEFAULT_QUESTION_COUNT)
-  );
-  const backupCount = questionCount; // reserva = 100% extra, per Mejora Estructural 2
+  const questionCount = resolveQuestionCount(moduleRow.configured_question_count);
+
+  // Cuantas preguntas hay que generar de cada tanda. En 'replace' el pool completo;
+  // en 'fill' solo lo que falta respecto de lo que ya sirve.
+  let activeCount = questionCount;
+  let backupCount = questionCount; // reserva = 100% extra, per Mejora Estructural 2
+  let existingBackup = 0;
+  if (mode === 'fill') {
+    const { data: existing, error: existingError } = await supabase
+      .from('lesson_questions')
+      .select('is_backup, review_status')
+      .eq('module_id', moduleId);
+    if (existingError) return { ok: false, error: existingError.message };
+    const have = countServable(existing ?? []);
+    const plan = planFill(questionCount, have);
+    if (plan.complete) return { ok: true, active: 0, backup: 0, skipped: true };
+    activeCount = plan.needActive;
+    backupCount = plan.needBackup;
+    existingBackup = have.backup;
+  }
 
   const context = await getRagContext(supabase, moduleId);
 
@@ -73,10 +99,12 @@ export async function regenerateModulePool(supabase: any, moduleId: string): Pro
   // y si no, se sortean hasta MAX_MINIGAMES_PER_BATCH de los permitidos. Antes, un
   // modulo sin lista propia se regeneraba SIN minijuegos aunque la clase los
   // tuviera habilitados.
-  const activeMinigames = resolveMinigames({
-    classAllowed: config.allowedMinigames,
-    moduleChosen: moduleRow.minigame_types,
-  });
+  // Al COMPLETAR un pool a medias no se piden minijuegos de mas: reponer 3 preguntas
+  // no debe traer 2 minijuegos nuevos encima. Solo cuando la tanda activa se arma
+  // desde cero (modo 'replace', o un modulo sin ninguna activa).
+  const activeMinigames = activeCount === questionCount
+    ? resolveMinigames({ classAllowed: config.allowedMinigames, moduleChosen: moduleRow.minigame_types })
+    : [];
 
   // Genera un lote de N preguntas en una sola llamada a Cohere. Separado en
   // funcion porque el pool completo (activo+backup, hasta 30) excedia el
@@ -101,7 +129,7 @@ export async function regenerateModulePool(supabase: any, moduleId: string): Pro
   }
 
   const [activeBatch, backupBatch] = await Promise.all([
-    generateBatch(questionCount, activeMinigames),
+    generateBatch(activeCount, activeMinigames),
     generateBatch(backupCount, []),
   ]);
 
@@ -134,8 +162,11 @@ export async function regenerateModulePool(supabase: any, moduleId: string): Pro
     return { ok: false, error: 'No se genero ninguna pregunta valida' };
   }
 
-  // Reemplaza el pool existente del modulo por el nuevo (activo + backup).
-  await supabase.from('lesson_questions').delete().eq('module_id', moduleId);
+  // Solo 'replace' borra el pool existente; 'fill' agrega a lo que ya hay.
+  if (mode === 'replace') {
+    const { error: deleteError } = await supabase.from('lesson_questions').delete().eq('module_id', moduleId);
+    if (deleteError) return { ok: false, error: deleteError.message };
+  }
 
   const rows = [...activeQuestions, ...backupQuestions].map((q: any, i: number) => ({
     module_id: moduleId,
@@ -151,7 +182,7 @@ export async function regenerateModulePool(supabase: any, moduleId: string): Pro
     game_type: q.game_type ?? null,
     game_data: q.game_data ?? null,
     is_backup: i >= activeQuestions.length,
-    backup_pool_size: backupQuestions.length,
+    backup_pool_size: existingBackup + backupQuestions.length,
   }));
 
   const { error: insertError } = await supabase.from('lesson_questions').insert(rows);

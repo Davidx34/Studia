@@ -21,6 +21,7 @@ import {
 } from '@/lib/questions/generationConfig';
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
 import { withGenerationLock } from '@/lib/questions/generationLock';
+import { servableQuestions, drawQuestions } from '@/lib/questions/poolServing';
 
 // Una generacion con Cohere tarda de 37 a 67 s (medido el 2026-09-19 con un prompt de
 // ~28.000 caracteres; la de 67 s incluia un reintento interno), y hasta ~110 s si
@@ -33,20 +34,6 @@ export const maxDuration = 300;
 const MIN_CACHE_SIZE = 5; // debajo de esto, todavia se sirve del cache si alcanza
 const SERVE_COUNT = 5; // preguntas que ve el estudiante por leccion
 const GENERATE_COUNT = 10; // preguntas generadas por llamada a Cohere (puebla el cache mas rapido)
-
-// Convierte una fila de lesson_questions al shape que espera el render de la leccion.
-// Incluye id y concept_tag para que el cliente pueda registrar el intento en question_attempts.
-function rowToQuestion(row: any) {
-  const q: any = { id: row.id, type: row.type, q: row.q, exp: row.exp, concept_tag: row.concept_tag ?? null };
-  if (row.opts) q.opts = row.opts;
-  if (row.ok !== null && row.ok !== undefined) q.ok = row.ok;
-  if (row.answers) q.answers = row.answers;
-  if (row.pairs) q.pairs = row.pairs;
-  if (row.keywords) q.keywords = row.keywords;
-  if (row.game_type) q.game_type = row.game_type;
-  if (row.game_data) q.game_data = row.game_data;
-  return q;
-}
 
 // Genera 4 preguntas cortas (multiple_choice/true_false, sin minijuegos) enfocadas
 // SOLO en los concept_tag debiles que paso el cliente. Se usa para el repaso dirigido
@@ -141,26 +128,14 @@ export async function POST(req: NextRequest) {
         .select('*')
         .eq('module_id', moduleId);
 
-      // Mejora Estructural 2: si el modulo tiene pool activo/backup (creado desde
-      // un objetivo de aprendizaje configurado por el profesor), servir SOLO del
-      // pool activo (is_backup=false) y dejar el resto como reserva. Los modulos
-      // auto-generados de siempre no usan este flujo (todas sus filas ya son
-      // is_backup=false por default), asi que este filtro no les cambia nada.
-      const activePool = (cached || []).filter((row: any) => !row.is_backup);
-      const poolToUse = activePool.length > 0 ? activePool : (cached || []);
-
-      // Sesion I, Fix 1: filtrar filas invalidas del cache (pueden existir de
-      // antes de este fix, o de una generacion que se colo con datos incompletos).
-      // Un cambio de configuracion (p.ej. apagar un minijuego) debe tener efecto sobre
-      // lo YA generado: el cache no puede seguir sirviendo tipos que la clase desactivo.
-      const allowedNow = allowedTypeSet(config);
-      const validCached = poolToUse
-        .map(rowToQuestion)
-        .filter((q) => isValidQuestion(q).valid)
-        .filter((q) => allowedNow.has(q.type));
+      // El estudiante sortea entre TODO el pool que sirve: preguntas activas y de
+      // reserva, sin las rechazadas. Un cambio de configuracion (p.ej. apagar un
+      // minijuego) debe tener efecto sobre lo YA generado, asi que tambien se filtra
+      // por los tipos que la clase permite hoy. Ver src/lib/questions/poolServing.ts.
+      const validCached = servableQuestions(cached || [], allowedTypeSet(config));
 
       if (validCached.length >= MIN_CACHE_SIZE) {
-        const picked = shuffle(validCached).slice(0, SERVE_COUNT);
+        const picked = drawQuestions(validCached, SERVE_COUNT);
         return NextResponse.json({ questions: picked, cached: true });
       }
     }

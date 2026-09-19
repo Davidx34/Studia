@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import ObjectivesClient from './ObjectivesClient';
 import { ALL_MINIGAME_IDS, sanitizeMinigameIds } from '@/lib/questions/minigameCatalog';
+import { countServable, resolveQuestionCount, planFill } from '@/lib/questions/poolPlan';
 
 export default async function ObjectivesPage({ params }: { params: { id: string } }) {
   const supabase = await createServerSupabase();
@@ -24,6 +25,18 @@ export default async function ObjectivesPage({ params }: { params: { id: string 
     .eq('classroom_id', params.id)
     .order('order_index', { ascending: true });
 
+  // Cuanto le falta a cada modulo para tener el pool completo (activas + reserva).
+  const moduleIds = (modules ?? []).map((m) => m.id);
+  const { data: poolRows } = moduleIds.length
+    ? await supabase.from('lesson_questions').select('module_id, is_backup, review_status').in('module_id', moduleIds)
+    : { data: [] as { module_id: string; is_backup: boolean; review_status: string }[] };
+  const poolStatus: Record<string, { active: number; backup: number; missing: number }> = {};
+  for (const m of modules ?? []) {
+    const have = countServable((poolRows ?? []).filter((r) => r.module_id === m.id));
+    const plan = planFill(resolveQuestionCount(m.configured_question_count), have);
+    poolStatus[m.id] = { active: have.active, backup: have.backup, missing: plan.needActive + plan.needBackup };
+  }
+
   const { data: materials } = await supabase
     .from('teaching_materials')
     .select('id, display_name, filename, processing_status')
@@ -45,6 +58,7 @@ export default async function ObjectivesPage({ params }: { params: { id: string 
       modules={modules ?? []}
       materials={materials ?? []}
       allowedMinigames={allowedMinigames}
+      poolStatus={poolStatus}
     />
   );
 }
