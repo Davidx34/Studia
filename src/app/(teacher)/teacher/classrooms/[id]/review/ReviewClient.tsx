@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Check, X, AlertTriangle } from 'lucide-react';
 import { approveReviewQuestion, rejectReviewQuestion } from '@/lib/actions/learning-objectives';
+import RespuestaCorrecta from './RespuestaCorrecta';
 
 interface ReviewQuestion {
   id: string;
@@ -14,6 +15,8 @@ interface ReviewQuestion {
   opts: string[] | null;
   ok: unknown;
   answers: string[] | null;
+  pairs: unknown;
+  keywords: string[] | null;
   exp: string | null;
   concept_tag: string | null;
   game_type: string | null;
@@ -99,16 +102,7 @@ export default function ReviewClient({ classroomId, questions }: { classroomId: 
                         {q.type} {q.concept_tag ? `· ${q.concept_tag}` : ''}
                       </p>
                       <p className="text-sm text-white mt-1">{q.q}</p>
-                      {q.opts && (
-                        <ul className="text-xs text-slate-400 mt-1.5 space-y-0.5">
-                          {q.opts.map((o: string, i: number) => (
-                            <li key={i}>{o}</li>
-                          ))}
-                        </ul>
-                      )}
-                      {q.answers && (
-                        <p className="text-xs text-slate-400 mt-1.5">Respuesta: {q.answers.join(', ')}</p>
-                      )}
+                      <RespuestaCorrecta q={q} />
                       {/* Un minijuego no tiene su contenido en "q" (que suele
                           ser un titulo generico como "Resuelve la crisis")
                           sino en game_data. Sin esto, el profesor tenia que
