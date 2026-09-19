@@ -20,7 +20,15 @@ import {
   type ResolvedConfig,
 } from '@/lib/questions/generationConfig';
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
-import { acquireGenerationLock, releaseGenerationLock } from '@/lib/questions/generationLock';
+import { withGenerationLock } from '@/lib/questions/generationLock';
+
+// Una generacion con Cohere tarda de 37 a 67 s (medido el 2026-09-19 con un prompt de
+// ~28.000 caracteres; la de 67 s incluia un reintento interno), y hasta ~110 s si
+// reintenta 3 veces. El proyecto tiene Fluid compute (default y maximo de 300 s en
+// Hobby). Declararlo explicito evita que alguien lo baje sin darse cuenta: con 60 se
+// cortarian justo las generaciones lentas, dejando al estudiante con un fallo y el
+// bloqueo tomado hasta que caduque.
+export const maxDuration = 300;
 
 const MIN_CACHE_SIZE = 5; // debajo de esto, todavia se sirve del cache si alcanza
 const SERVE_COUNT = 5; // preguntas que ve el estudiante por leccion
@@ -81,8 +89,7 @@ Responde SOLO con JSON valido:
 }
 
 export async function POST(req: NextRequest) {
-  // Declarados fuera del try para que el finally (liberar el lock
-  // anti-stampede) los pueda ver sin importar donde falle el try.
+  // Declarados fuera del try para poder usarlos en el manejo de errores.
   let moduleId: string | undefined;
   let supabase: Awaited<ReturnType<typeof createServerSupabase>> | null = null;
   try {
@@ -158,24 +165,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Lock anti-stampede: solo una generación por módulo simultáneamente
-    // (Protocolo 7.7.3). Si otro request ya está generando, devolver 202 Accepted
-    // para que el cliente reutilice caché o reintente después.
-    if (moduleId && supabase) {
-      const lockAcquired = await acquireGenerationLock(supabase, moduleId);
-      if (!lockAcquired) {
-        console.log(`[generate-questions] Lock not acquired for module ${moduleId}, returning 202`);
-        return NextResponse.json(
-          { cached: false, message: 'Generación en curso, reintenta en algunos segundos' },
-          { status: 202 }
-        );
-      }
-    }
-
-    // 3. Cache insuficiente (o sin moduleId): generar con Cohere como antes.
-    const COHERE_API_KEY = process.env.COHERE_API_KEY;
-    if (!COHERE_API_KEY) {
-      if (moduleId && supabase) await releaseGenerationLock(supabase, moduleId);
+    // 2. Generacion bajo el bloqueo anti-stampede: solo una por modulo a la vez
+    // (Protocolo 7.7.3). Si otra peticion ya esta generando, 202 y el cliente espera
+    // y reintenta (la pagina del estudiante lo maneja). El bloqueo solo lo libera
+    // quien lo tomo, y caduca: ver src/lib/questions/generationLock.ts.
+    const outcome = await withGenerationLock(supabase, moduleId, async () => {
+    // 3. Cache insuficiente (o sin moduleId): generar con Cohere.
+    if (!process.env.COHERE_API_KEY) {
       return NextResponse.json({ error: 'No API key' }, { status: 500 });
     }
 
@@ -261,13 +257,18 @@ export async function POST(req: NextRequest) {
     // El estudiante solo ve SERVE_COUNT, aunque se hayan generado/guardado mas.
     const toServe = moduleId ? shuffle(generatedWithIds).slice(0, SERVE_COUNT) : generatedWithIds;
     return NextResponse.json({ questions: toServe, cached: false });
+    });
+
+    if (outcome.busy) {
+      console.log(`[generate-questions] modulo ${moduleId} ya se esta generando, respondiendo 202`);
+      return NextResponse.json(
+        { cached: false, message: 'Generación en curso, reintenta en algunos segundos' },
+        { status: 202 }
+      );
+    }
+    return outcome.value;
   } catch (e) {
     console.error('Error:', String(e));
     return NextResponse.json({ error: String(e) }, { status: 500 });
-  } finally {
-    // Liberar el lock si fue adquirido
-    if (moduleId && supabase) {
-      await releaseGenerationLock(supabase, moduleId);
-    }
   }
 }
