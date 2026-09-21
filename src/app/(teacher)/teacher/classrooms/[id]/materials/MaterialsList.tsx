@@ -27,6 +27,7 @@ import {
   deleteMaterial,
 } from '@/lib/actions/materials';
 import type { TeachingMaterial } from '@/types/database';
+import { describeExtraction } from '@/lib/materials/extractionLabel';
 
 export default function MaterialsList({
   classroomId,
@@ -79,6 +80,7 @@ function MaterialRow({
     ? { ext: 'notebooklm', label: 'NotebookLM' }
     : { ext: 'link', label: 'Link' };
   const Icon = pickIcon(material);
+  const extraction = describeExtraction(material.extraction_method, material.extraction_report);
 
   async function handleRename() {
     if (!name.trim() || name === (material.display_name ?? material.filename)) {
@@ -189,6 +191,12 @@ function MaterialRow({
 
         {material.processing_status === 'failed' && material.processing_error && (
           <p className="text-xs text-red-300 mt-1">⚠ {material.processing_error}</p>
+        )}
+
+        {material.processing_status === 'completed' && extraction && (
+          <p className={`text-xs mt-1 ${extraction.tone === 'warn' ? 'text-amber-300' : 'text-emerald-300'}`}>
+            {extraction.tone === 'warn' ? '⚠' : '✓'} {extraction.text}
+          </p>
         )}
       </div>
 

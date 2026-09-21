@@ -27,16 +27,20 @@
 // una familia distinta de la de quien genero (Llama/GPT-4o mini frente a Aya y
 // Gemini) para no juzgarse con un modelo del mismo linaje.
 
-export type OpenRouterRole = 'generation' | 'judge';
+export type OpenRouterRole = 'generation' | 'judge' | 'pdf';
 
 export const DEFAULT_MODELS: Record<OpenRouterRole, string[]> = {
   generation: ['meta-llama/llama-3.3-70b-instruct', 'openai/gpt-4o-mini'],
   judge: ['openai/gpt-4o-mini', 'meta-llama/llama-3.3-70b-instruct'],
+  // Leer un PDF con vision (formulas, graficos). OpenRouter exige un saldo minimo de 0,50 USD
+  // para peticiones con archivos: sin ese saldo responde 402 y el llamador cae al texto simple.
+  pdf: ['google/gemini-2.5-flash'],
 };
 
 const ENV_MODELS: Record<OpenRouterRole, string> = {
   generation: 'OPENROUTER_GENERATION_MODELS',
   judge: 'OPENROUTER_JUDGE_MODELS',
+  pdf: 'OPENROUTER_PDF_MODELS',
 };
 
 // OpenRouter acepta como maximo 3 modelos en la lista de respaldo de una peticion.
@@ -105,6 +109,8 @@ export interface OpenRouterOptions {
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
   getTokenImpl?: GetTokenFn;
+  // Archivo adjunto (p.ej. un PDF) como data URL base64. Solo para role 'pdf'.
+  attachment?: { filename: string; dataUrl: string };
 }
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
@@ -144,9 +150,19 @@ export async function callOpenRouter(prompt: string, opts: OpenRouterOptions): P
           // prueba el siguiente dentro de la misma peticion.
           model: models[0],
           models,
-          messages: [{ role: 'user', content: prompt }],
+          messages: [
+            {
+              role: 'user',
+              content: opts.attachment
+                ? [
+                    { type: 'text', text: prompt },
+                    { type: 'file', file: { filename: opts.attachment.filename, file_data: opts.attachment.dataUrl } },
+                  ]
+                : prompt,
+            },
+          ],
           max_tokens: opts.maxTokens ?? 6000,
-          temperature: opts.temperature ?? (opts.role === 'judge' ? 0 : 0.7),
+          temperature: opts.temperature ?? (opts.role === 'generation' ? 0.7 : 0),
         }),
         signal: AbortSignal.timeout(opts.timeoutMs ?? 90_000),
       });

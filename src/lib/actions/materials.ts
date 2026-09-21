@@ -21,6 +21,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '@/lib/materials/constants';
 import { slugifyFilename } from '@/lib/materials/file-helpers';
 import { processLinkMaterial } from '@/lib/materials/processLink';
+import { processPdfMaterial, PDF_MIME } from '@/lib/materials/processPdf';
 import { processYoutubeMaterial, extractYoutubeId } from '@/lib/materials/processYoutube';
 import { processNotebookLMMaterial } from '@/lib/materials/processNotebookLM';
 
@@ -164,14 +165,21 @@ export async function confirmMaterialUpload(
     return { ok: false, error: error?.message ?? 'No se pudo registrar el material.' };
   }
 
-  // Disparar edge function process-material (best-effort, no bloqueante).
-  // Si la function NO está deployed, la fila queda en 'pending' y se puede
-  // reprocesar luego con reprocessMaterial.
-  await supabase.functions
-    .invoke('process-material', { body: { material_id: data.id } })
-    .catch(() => {
-      // Silencioso: el row quedó en pending y el UI lo muestra
-    });
+  if (input.mimeType === PDF_MIME) {
+    // Los PDFs se convierten a Markdown con vision y se procesan aqui, en el mismo request (mismo
+    // patron que link/YouTube): tarda entre unos segundos y un par de minutos segun las paginas.
+    // Si falla, el material queda en 'failed' con el motivo y se puede reprocesar.
+    await processPdfMaterial(supabase, data.id);
+  } else {
+    // Word/Excel: edge function process-material (best-effort, no bloqueante).
+    // Si la function NO está deployed, la fila queda en 'pending' y se puede
+    // reprocesar luego con reprocessMaterial.
+    await supabase.functions
+      .invoke('process-material', { body: { material_id: data.id } })
+      .catch(() => {
+        // Silencioso: el row quedó en pending y el UI lo muestra
+      });
+  }
 
   revalidatePath(`/teacher/classrooms/${input.classroomId}/materials`);
   return { ok: true, materialId: data.id };
@@ -328,7 +336,7 @@ export async function reprocessMaterial(materialId: string) {
 
   const { data: material } = await supabase
     .from('teaching_materials')
-    .select('id, classroom_id, source_type, external_url, extracted_text')
+    .select('id, classroom_id, source_type, external_url, extracted_text, mime_type')
     .eq('id', materialId)
     .eq('teacher_id', user.id)
     .single();
@@ -354,7 +362,9 @@ export async function reprocessMaterial(materialId: string) {
   // solo despues de calcular los embeddings nuevos con exito (ver
   // textProcessing.ts), para no perder contenido bueno si el reintento
   // vuelve a fallar.
-  if (material.source_type !== 'youtube' && material.source_type !== 'notebooklm') {
+  // Los PDF tambien: se procesan in-process con chunkEmbedAndStore.
+  const isPdfFile = material.source_type === 'file' && material.mime_type === PDF_MIME;
+  if (material.source_type !== 'youtube' && material.source_type !== 'notebooklm' && !isPdfFile) {
     await supabase.from('material_chunks').delete().eq('material_id', materialId);
   }
 
@@ -382,6 +392,8 @@ export async function reprocessMaterial(materialId: string) {
         .update({ processing_status: 'failed', processing_error: 'No hay texto guardado para reprocesar. Vuelve a crear el material pegando el markdown.' })
         .eq('id', materialId);
     }
+  } else if (isPdfFile) {
+    await processPdfMaterial(supabase, materialId);
   } else {
     await supabase.functions
       .invoke('process-material', { body: { material_id: materialId } })

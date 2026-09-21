@@ -1300,6 +1300,8 @@ export type Database = {
           external_url: string | null
           extracted_text: string | null
           extracted_text_preview: string | null
+          extraction_method: string | null
+          extraction_report: Json | null
           filename: string
           id: string
           mime_type: string | null
@@ -1331,6 +1333,8 @@ export type Database = {
           external_url?: string | null
           extracted_text?: string | null
           extracted_text_preview?: string | null
+          extraction_method?: string | null
+          extraction_report?: Json | null
           filename: string
           id?: string
           mime_type?: string | null
@@ -1362,6 +1366,8 @@ export type Database = {
           external_url?: string | null
           extracted_text?: string | null
           extracted_text_preview?: string | null
+          extraction_method?: string | null
+          extraction_report?: Json | null
           filename?: string
           id?: string
           mime_type?: string | null
