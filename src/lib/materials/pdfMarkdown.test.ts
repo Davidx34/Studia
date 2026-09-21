@@ -1,35 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
-  splitPageRanges,
   buildPdfPrompt,
+  buildPdfPagesPrompt,
   cleanModelMarkdown,
   parsePages,
   joinPages,
   sanitizeMarkdown,
   countUnreadableSymbols,
-  wordRecall,
-  assessConversion,
-  allowedMissingPages,
   PAGES_PER_BATCH,
 } from './pdfMarkdown';
-
-describe('splitPageRanges', () => {
-  it('un documento corto va en una sola tanda', () => {
-    expect(splitPageRanges(10)).toEqual([{ from: 1, to: 10 }]);
-  });
-
-  it('parte en tandas sin dejar paginas fuera ni repetirlas', () => {
-    const r = splitPageRanges(47);
-    expect(r[0]).toEqual({ from: 1, to: PAGES_PER_BATCH });
-    expect(r[r.length - 1].to).toBe(47);
-    const covered = r.flatMap((x) => Array.from({ length: x.to - x.from + 1 }, (_, i) => x.from + i));
-    expect(covered).toEqual(Array.from({ length: 47 }, (_, i) => i + 1));
-  });
-
-  it('un numero exacto de tandas no crea una tanda vacia', () => {
-    expect(splitPageRanges(PAGES_PER_BATCH * 2)).toHaveLength(2);
-  });
-});
 
 describe('buildPdfPrompt', () => {
   it('pide todo el documento cuando la tanda es la unica', () => {
@@ -48,6 +27,21 @@ describe('buildPdfPrompt', () => {
     expect(p).toMatch(/no lo inventes/i);
     expect(p).toContain('LaTeX');
     expect(p).toContain('[[PAGINA N]]');
+  });
+});
+
+describe('buildPdfPagesPrompt (PDF completo, paginas por su numero real)', () => {
+  it('lista las paginas pedidas y no pide todo el documento', () => {
+    const p = buildPdfPagesPrompt([3, 7, 12], 47);
+    expect(p).toContain('SOLO estas paginas: 3, 7, 12');
+    expect(p).not.toContain('TODO el documento');
+    expect(p).toContain('[[PAGINA N]]');
+  });
+});
+
+describe('PAGES_PER_BATCH', () => {
+  it('es corto: una tanda de 20 paginas dio 503 con flash-lite', () => {
+    expect(PAGES_PER_BATCH).toBeLessThanOrEqual(10);
   });
 });
 
@@ -113,76 +107,5 @@ describe('countUnreadableSymbols', () => {
   it('cuenta caracteres de control y de uso privado, no el texto normal', () => {
     expect(countUnreadableSymbols('hola\n\tmundo')).toBe(0);
     expect(countUnreadableSymbols('a\u0001\u0002b\ue001')).toBe(3);
-  });
-});
-
-describe('wordRecall', () => {
-  const plain = Array.from({ length: 40 }, (_, i) => `palabra${i}xyz`).join(' ');
-
-  it('todo el texto simple aparece: 1', () => {
-    expect(wordRecall(plain, `# T\n${plain}`)).toBe(1);
-  });
-
-  it('ignora mayusculas, tildes y puntuacion', () => {
-    const p = 'Elasticidad demanda consumidor restricción presupuestaria utilidad marginal '.repeat(6) + Array.from({ length: 30 }, (_, i) => `termino${i}abc`).join(' ');
-    const m = p.toUpperCase().replace(/ó/gi, 'o');
-    expect(wordRecall(p, m)).toBeGreaterThan(0.95);
-  });
-
-  it('si el Markdown omite la mitad, baja a ~0,5', () => {
-    const half = plain.split(' ').slice(0, 20).join(' ');
-    const r = wordRecall(plain, half)!;
-    expect(r).toBeGreaterThan(0.45);
-    expect(r).toBeLessThan(0.55);
-  });
-
-  it('con muy poco texto simple no hay con que comparar (null)', () => {
-    expect(wordRecall('hola mundo', 'otra cosa')).toBeNull();
-  });
-});
-
-describe('assessConversion', () => {
-  const plain = Array.from({ length: 60 }, (_, i) => `concepto${i}alfa`).join(' ');
-
-  it('acepta una conversion completa', () => {
-    const r = assessConversion({ expectedPages: 10, pagesFound: 10, plainText: plain, markdown: `# Titulo\n\n${plain}` });
-    expect(r.ok).toBe(true);
-    expect(r.reasons).toEqual([]);
-  });
-
-  it('tolera una pagina casi vacia sin transcribir (10 %, minimo 1)', () => {
-    expect(allowedMissingPages(10)).toBe(1);
-    expect(allowedMissingPages(47)).toBe(4);
-    expect(assessConversion({ expectedPages: 10, pagesFound: 9, plainText: plain, markdown: plain }).ok).toBe(true);
-  });
-
-  it('REGRESION: falta media transcripcion (25 de 47 paginas) -> se rechaza', () => {
-    // Asi fallo el PDF real de 47 paginas cuando una de las dos tandas devolvio error.
-    const r = assessConversion({ expectedPages: 47, pagesFound: 25, plainText: plain, markdown: plain });
-    expect(r.ok).toBe(false);
-    expect(r.reasons.join(' ')).toContain('25 de 47');
-  });
-
-  it('rechaza si el modelo resumio y perdio palabras', () => {
-    const half = plain.split(' ').slice(0, 25).join(' ');
-    const r = assessConversion({ expectedPages: 5, pagesFound: 5, plainText: plain, markdown: half });
-    expect(r.ok).toBe(false);
-    expect(r.reasons.join(' ')).toMatch(/palabras/);
-  });
-
-  it('rechaza un Markdown casi vacio', () => {
-    expect(assessConversion({ expectedPages: 1, pagesFound: 1, plainText: '', markdown: 'x' }).ok).toBe(false);
-  });
-
-  it('rechaza un Markdown desproporcionadamente mas largo (contenido inventado)', () => {
-    const r = assessConversion({ expectedPages: 3, pagesFound: 3, plainText: plain, markdown: `${plain} ${'inventado '.repeat(9000)}` });
-    expect(r.ok).toBe(false);
-    expect(r.reasons.join(' ')).toMatch(/mas largo/);
-  });
-
-  it('un PDF de solo imagenes (sin texto simple) no se puede comparar y no se rechaza por palabras', () => {
-    const r = assessConversion({ expectedPages: 2, pagesFound: 2, plainText: '', markdown: 'Contenido leido de las imagenes '.repeat(5) });
-    expect(r.recall).toBeNull();
-    expect(r.ok).toBe(true);
   });
 });

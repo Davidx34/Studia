@@ -1,34 +1,35 @@
-// PDF -> Markdown: primero se transcribe con un modelo con vision, y solo se usa ese resultado si
-// pasa una compuerta de calidad; si no, se cae al texto simple que la app ya usaba.
+// PDF -> Markdown, HIBRIDO: lo que se puede hacer sin IA se hace sin IA.
 //
-// Medido con los 7 PDFs reales de Microeconomia I (diapositivas): entre 0,1 % y 8,7 % del texto
-// extraido eran caracteres basura (las formulas), casi todas las paginas venian rotadas 90 grados y
-// habia unos 300-400 caracteres por pagina: el contenido estaba en formulas y graficos que la
-// extraccion de texto no puede leer.
+//   1. pdfExtract: TODAS las paginas se convierten de forma determinista (titulos, listas, acentos,
+//      encabezados repetidos) y se clasifican. Gratis e instantaneo.
+//   2. Solo las paginas de RIESGO (formulas ilegibles, imagenes grandes, dibujos, tablas) se recortan
+//      del PDF (pdfSlice) y se mandan a un modelo con vision. Un PDF de texto no llama a ninguna IA.
+//   3. pdfVerify comprueba CADA pagina transcrita (LaTeX valido, simbolos, numeros, palabras). Si una
+//      no pasa, esa pagina se queda con el texto determinista. Nunca se guarda una transcripcion dudosa
+//      y no se le pide nada al profesor.
+//
+// Medido con 7 presentaciones reales de Microeconomia I (232 paginas): el 75 % eran de riesgo; en
+// documentos de texto la proporcion es minima. Con el recorte, cada pagina se envia una sola vez (antes
+// cada tanda reenviaba el PDF completo: ~5 veces el tamaño real).
 
 import { callPdfVision, type PdfVisionCall } from '@/lib/ai/geminiPdf';
-import {
-  splitPageRanges,
-  buildPdfPrompt,
-  cleanModelMarkdown,
-  parsePages,
-  joinPages,
-  sanitizeMarkdown,
-  countUnreadableSymbols,
-  assessConversion,
-} from './pdfMarkdown';
+import { readPdfPages, type PageData } from './pdfExtract';
+import { slicePdf } from './pdfSlice';
+import { verifyPage, defaultLatexRenderer, type LatexRenderer } from './pdfVerify';
+import { buildPdfPrompt, buildPdfPagesPrompt, cleanModelMarkdown, parsePages, sanitizeMarkdown, PAGES_PER_BATCH } from './pdfMarkdown';
 
-export type ConversionMethod = 'vision_gemini' | 'vision_openrouter' | 'vision_mixed' | 'plain_text';
+// 'deterministic': sin IA (o la IA no aporto nada). 'hybrid': al menos una pagina transcrita por IA y verificada.
+export type ConversionMethod = 'deterministic' | 'hybrid';
 
 export interface ConversionReport {
   method: ConversionMethod;
   pages: number;
-  pages_found: number;
-  word_recall: number | null;
-  plain_chars: number;
-  markdown_chars: number;
+  risky_pages: number;
+  ai_pages_accepted: number;
+  ai_pages_rejected: { page: number; reasons: string[] }[];
+  ai_pages_missing: number[];
   unreadable_symbols: number;
-  vision: { batches: number; failed_batches: number; failures: string[]; providers: string[]; prompt_tokens: number; output_tokens: number };
+  vision: { batches: number; failed_batches: number; failures: string[]; providers: string[]; prompt_tokens: number; output_tokens: number; sliced: boolean };
   fallback_reason: string | null;
   warnings: string[];
 }
@@ -40,8 +41,10 @@ export interface ConversionResult {
 }
 
 export interface ConvertDeps {
-  extractPlain?: (bytes: Uint8Array) => Promise<string[]>;
+  readPages?: (bytes: Uint8Array) => Promise<PageData[]>;
+  slice?: (bytes: Uint8Array, pageNumbers: number[]) => Promise<Uint8Array>;
   vision?: (base64: string, prompt: string, opts: { skipGemini?: boolean; timeoutMs?: number }) => Promise<PdfVisionCall>;
+  render?: LatexRenderer;
   concurrency?: number;
   // Inyectables para poder probarlo sin esperar de verdad.
   sleep?: (ms: number) => Promise<void>;
@@ -55,12 +58,7 @@ export const CONVERSION_DEADLINE_MS = 200_000;
 const PER_CALL_TIMEOUT_MS = 90_000;
 const RETRY_BACKOFF_MS = [3000, 8000];
 const TRANSIENT = new Set(['server', 'timeout', 'rate_limited', 'empty']);
-
-async function defaultExtractPlain(bytes: Uint8Array): Promise<string[]> {
-  const { extractText } = await import('unpdf');
-  const result = await extractText(bytes, { mergePages: false });
-  return Array.isArray(result.text) ? result.text.map(String) : [String(result.text ?? '')];
-}
+const MAX_REJECTED_IN_REPORT = 30;
 
 const VISION_FAILURE_TEXT: Record<string, string> = {
   quota: 'se agoto la cuota diaria gratuita de Gemini',
@@ -69,7 +67,7 @@ const VISION_FAILURE_TEXT: Record<string, string> = {
   no_key: 'no hay ningun proveedor de vision configurado',
   server: 'el proveedor de IA fallo o no respondio',
   timeout: 'el proveedor de IA tardo demasiado',
-  bad_request: 'el proveedor de IA rechazo el PDF (¿demasiado grande?)',
+  bad_request: 'el proveedor de IA rechazo el PDF',
   empty: 'el proveedor de IA devolvio una respuesta vacia',
 };
 
@@ -77,141 +75,172 @@ export function describeVisionFailure(reason: string): string {
   return VISION_FAILURE_TEXT[reason] ?? reason;
 }
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
 export async function convertPdfToMarkdown(bytes: Uint8Array, deps: ConvertDeps = {}): Promise<ConversionResult> {
-  const extractPlain = deps.extractPlain ?? defaultExtractPlain;
+  const readPages = deps.readPages ?? readPdfPages;
+  const slice = deps.slice ?? slicePdf;
   const vision = deps.vision ?? ((b64, prompt, o) => callPdfVision(b64, prompt, o));
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const now = deps.now ?? Date.now;
   const deadline = now() + (deps.deadlineMs ?? CONVERSION_DEADLINE_MS);
 
-  // unpdf/pdfjs puede "consumir" el buffer que recibe: se le da una copia.
-  const plainPages = await extractPlain(new Uint8Array(bytes));
-  const totalPages = plainPages.length;
-  if (totalPages === 0) throw new Error('El PDF no tiene paginas.');
+  // ---- 1. Todo, determinista ----
+  const pages = await readPages(new Uint8Array(bytes)); // pdfjs puede consumir el buffer: se le da una copia
+  if (pages.length === 0) throw new Error('El PDF no tiene paginas.');
+  const byNumber = new Map<number, PageData>();
+  pages.forEach((p) => byNumber.set(p.number, p));
+  const risky = pages.filter((p) => p.risk.length > 0);
+  const totalChars = pages.reduce((n, p) => n + p.chars, 0);
+  const unreadable = pages.reduce((n, p) => n + p.unreadable, 0);
 
-  const rawPlain = plainPages.join('\n\n');
-  const plainText = sanitizeMarkdown(rawPlain);
-  const unreadable = countUnreadableSymbols(rawPlain);
-  const scanned = plainText.length < Math.max(50, totalPages * 20);
-
-  // ---- Vision, por tandas de paginas ----
-  const base64 = Buffer.from(bytes).toString('base64');
-  const ranges = splitPageRanges(totalPages);
-  const merged = new Map<number, string>();
+  // ---- 2. IA solo en las paginas de riesgo ----
+  const accepted = new Map<number, string>();
+  const rejected: { page: number; reasons: string[] }[] = [];
+  const answered = new Set<number>();
   const providers = new Set<string>();
+  const failureReasons = new Set<string>();
   let promptTokens = 0;
   let outputTokens = 0;
   let failedBatches = 0;
   let lastFailure: string | null = null;
-  const failureReasons = new Set<string>();
   let geminiDown = false;
+  let usedSlicing = true;
 
-  let next = 0;
-  async function worker() {
-    while (next < ranges.length) {
-      const range = ranges[next++];
-      const prompt = buildPdfPrompt(range, totalPages);
+  const batches = chunk(
+    risky.map((p) => p.number),
+    PAGES_PER_BATCH
+  );
 
-      // Los fallos transitorios (503, timeout, limite por minuto) se reintentan con espera, mientras
-      // quede tiempo. La cuota diaria agotada NO: reintentar no la arregla.
-      let call: PdfVisionCall = { ok: false, reason: 'timeout' };
-      for (let attempt = 0; attempt <= RETRY_BACKOFF_MS.length; attempt++) {
-        const remaining = deadline - now();
-        if (remaining < 15_000) {
-          call = { ok: false, reason: 'timeout' };
-          break;
+  if (batches.length > 0) {
+    const render = deps.render ?? (await defaultLatexRenderer());
+    let next = 0;
+
+    const worker = async () => {
+      while (next < batches.length) {
+        const batchPages = batches[next++];
+
+        // Recorte: el modelo recibe solo estas paginas. Si el recorte falla se manda el PDF completo pidiendo
+        // esas paginas por su numero.
+        let payload: Uint8Array = bytes;
+        let sliced = true;
+        try {
+          payload = await slice(bytes, batchPages);
+        } catch {
+          sliced = false;
+          usedSlicing = false;
         }
-        call = await vision(base64, prompt, { skipGemini: geminiDown, timeoutMs: Math.min(PER_CALL_TIMEOUT_MS, remaining) });
-        if (call.ok || !TRANSIENT.has(call.reason) || attempt === RETRY_BACKOFF_MS.length) break;
-        await sleep(RETRY_BACKOFF_MS[attempt]);
+        const base64 = Buffer.from(payload).toString('base64');
+        const prompt = sliced ? buildPdfPrompt({ from: 1, to: batchPages.length }, batchPages.length) : buildPdfPagesPrompt(batchPages, pages.length);
+
+        // Los fallos transitorios (503, timeout, limite por minuto) se reintentan con espera, mientras
+        // quede tiempo. La cuota diaria agotada NO: reintentar no la arregla.
+        let call: PdfVisionCall = { ok: false, reason: 'timeout' };
+        for (let attempt = 0; attempt <= RETRY_BACKOFF_MS.length; attempt++) {
+          const remaining = deadline - now();
+          if (remaining < 15_000) {
+            call = { ok: false, reason: 'timeout' };
+            break;
+          }
+          call = await vision(base64, prompt, { skipGemini: geminiDown, timeoutMs: Math.min(PER_CALL_TIMEOUT_MS, remaining) });
+          if (call.ok || !TRANSIENT.has(call.reason) || attempt === RETRY_BACKOFF_MS.length) break;
+          await sleep(RETRY_BACKOFF_MS[attempt]);
+        }
+
+        if (!call.ok) {
+          failedBatches++;
+          lastFailure = call.reason;
+          failureReasons.add(call.reason);
+          if (call.reason === 'quota' || call.reason === 'no_key') geminiDown = true;
+          continue;
+        }
+
+        providers.add(call.provider);
+        promptTokens += call.promptTokens ?? 0;
+        outputTokens += call.outputTokens ?? 0;
+
+        const parsed = parsePages(cleanModelMarkdown(call.text)).pages;
+        parsed.forEach((md, marker) => {
+          // El marcador es la posicion dentro del recorte (o el numero real si se mando el PDF completo).
+          const original = sliced ? batchPages[marker - 1] : marker;
+          if (original === undefined || !batchPages.includes(original)) return; // numero inventado
+          answered.add(original);
+          const page = byNumber.get(original)!;
+          // ---- 3. Verificacion automatica de cada pagina ----
+          const verdict = verifyPage(page.text, md, render);
+          if (verdict.ok) accepted.set(original, md);
+          else rejected.push({ page: original, reasons: verdict.reasons });
+        });
       }
-
-      if (!call.ok) {
-        failedBatches++;
-        lastFailure = call.reason;
-        failureReasons.add(call.reason);
-        if (call.reason === 'quota' || call.reason === 'no_key') geminiDown = true;
-        continue;
-      }
-      providers.add(call.provider);
-      promptTokens += call.promptTokens ?? 0;
-      outputTokens += call.outputTokens ?? 0;
-      const { pages } = parsePages(cleanModelMarkdown(call.text));
-      // Solo se aceptan las paginas que se pidieron: un numero fuera de rango es una alucinacion.
-      pages.forEach((body, n) => {
-        if (n >= range.from && n <= range.to) merged.set(n, body);
-      });
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(deps.concurrency ?? 3, ranges.length) }, worker));
-
-  const visionMarkdown = sanitizeMarkdown(joinPages(merged));
-  const quality =
-    merged.size > 0
-      ? assessConversion({ expectedPages: totalPages, pagesFound: merged.size, plainText, markdown: visionMarkdown })
-      : null;
-
-  const baseReport = {
-    pages: totalPages,
-    plain_chars: plainText.length,
-    unreadable_symbols: unreadable,
-    vision: {
-      batches: ranges.length,
-      failed_batches: failedBatches,
-      failures: Array.from(failureReasons),
-      providers: Array.from(providers),
-      prompt_tokens: promptTokens,
-      output_tokens: outputTokens,
-    },
-  };
-
-  if (quality?.ok) {
-    const method: ConversionMethod =
-      providers.size > 1 ? 'vision_mixed' : providers.has('openrouter') ? 'vision_openrouter' : 'vision_gemini';
-    return {
-      markdown: visionMarkdown,
-      method,
-      report: {
-        ...baseReport,
-        method,
-        pages_found: merged.size,
-        word_recall: quality.recall,
-        markdown_chars: visionMarkdown.length,
-        fallback_reason: null,
-        warnings: failedBatches > 0 ? [`${failedBatches} de ${ranges.length} tandas fallaron; revisa que no falten paginas.`] : [],
-      },
     };
+    await Promise.all(Array.from({ length: Math.min(deps.concurrency ?? 3, batches.length) }, worker));
   }
 
-  // ---- Respaldo: texto simple ----
-  const failure = lastFailure as string | null; // se asigna dentro del worker; TS no lo ve
-  const batchCause = failure ? ` (${describeVisionFailure(failure)})` : '';
-  const fallbackReason =
-    quality && quality.reasons.length > 0
-      ? `la conversion no paso el control de calidad: ${quality.reasons.join('; ')}${batchCause}`
-      : failure
-        ? `no se pudo convertir con IA: ${describeVisionFailure(failure)}`
-        : 'no se pudo convertir con IA';
+  // ---- 4. Ensamblado: la transcripcion verificada o, si no, el texto determinista ----
+  const markdown = sanitizeMarkdown(
+    pages
+      .map((p) => accepted.get(p.number) ?? p.markdown)
+      .filter((m) => m.trim().length > 0)
+      .join('\n\n')
+  );
 
-  if (scanned) {
+  const missing = risky.map((p) => p.number).filter((n) => !answered.has(n));
+  const failure = lastFailure as string | null; // se asigna dentro del worker; TS no lo ve
+  const warnings: string[] = [];
+  const stillRisky = risky.length - accepted.size;
+  let fallbackReason: string | null = null;
+
+  if (risky.length > 0 && accepted.size === 0) {
+    const cause = failure ? describeVisionFailure(failure) : rejected.length > 0 ? 'ninguna transcripcion paso la verificacion' : 'sin respuesta';
+    fallbackReason = `no se pudo usar la IA en las ${risky.length} paginas con formulas o graficos: ${cause}`;
+  }
+
+  // Un PDF escaneado (casi sin texto) que la IA no pudo leer no sirve: mejor un error claro que un material vacio.
+  if (totalChars < Math.max(50, pages.length * 20) && accepted.size === 0) {
     throw new Error(
-      `El PDF parece escaneado (casi no tiene texto seleccionable) y ${fallbackReason}. Intenta de nuevo mas tarde o sube una version con texto.`
+      `El PDF parece escaneado (casi no tiene texto seleccionable) y ${fallbackReason ?? 'no se pudo leer con IA'}. Intenta de nuevo mas tarde o sube una version con texto.`
     );
   }
 
-  const warnings = [`Se uso el texto simple: ${fallbackReason}.`];
-  if (unreadable > 0) {
-    warnings.push(`Se perdieron ${unreadable} simbolos que el PDF no permite leer como texto (probablemente formulas) y los graficos no se incluyen.`);
+  if (stillRisky > 0) {
+    warnings.push(
+      `${stillRisky} de ${risky.length} paginas con formulas o graficos quedaron como texto simple` +
+        (rejected.length > 0 ? ` (${rejected.length} no pasaron la verificacion automatica)` : '') +
+        (failedBatches > 0 && failure ? ` (${describeVisionFailure(failure)})` : '') +
+        '.'
+    );
   }
+  // Solo cuentan los simbolos de las paginas que NO se transcribieron: en las demas la IA ya los leyo.
+  const unreadableLeft = pages.filter((p) => !accepted.has(p.number)).reduce((n, p) => n + p.unreadable, 0);
+  if (unreadableLeft > 0) {
+    warnings.push(`Hay ${unreadableLeft} simbolos que el PDF no permite leer como texto (probablemente formulas) sin transcribir.`);
+  }
+
+  const method: ConversionMethod = accepted.size > 0 ? 'hybrid' : 'deterministic';
   return {
-    markdown: plainText,
-    method: 'plain_text',
+    markdown,
+    method,
     report: {
-      ...baseReport,
-      method: 'plain_text',
-      pages_found: merged.size,
-      word_recall: quality?.recall ?? null,
-      markdown_chars: plainText.length,
+      method,
+      pages: pages.length,
+      risky_pages: risky.length,
+      ai_pages_accepted: accepted.size,
+      ai_pages_rejected: rejected.slice(0, MAX_REJECTED_IN_REPORT),
+      ai_pages_missing: missing.slice(0, MAX_REJECTED_IN_REPORT),
+      unreadable_symbols: unreadable,
+      vision: {
+        batches: batches.length,
+        failed_batches: failedBatches,
+        failures: Array.from(failureReasons),
+        providers: Array.from(providers),
+        prompt_tokens: promptTokens,
+        output_tokens: outputTokens,
+        sliced: usedSlicing,
+      },
       fallback_reason: fallbackReason,
       warnings,
     },
