@@ -1,23 +1,12 @@
-// Piezas puras (sin red ni base de datos) de la conversion de PDF a Markdown.
-//
-// El flujo (pdfToMarkdown.ts): un modelo con vision transcribe el PDF a Markdown por tandas de
-// paginas; aqui se arma el pedido, se limpia la respuesta y se decide si el resultado es de fiar
-// comparandolo con el texto que la extraccion simple si pudo leer.
+// Piezas puras (sin red ni base de datos) del pedido al modelo con vision y de la limpieza de su respuesta.
+// El flujo completo esta en pdfToMarkdown.ts; la verificacion de lo que responde, en pdfVerify.ts.
 
-// Tandas de 10 paginas. Medido con gemini-2.5-flash-lite sobre un PDF real de 47 diapositivas: una
-// tanda de 20 paginas tardo 65 s y devolvio 503 ("alta demanda"); una de 10 respondio en 55 s. Cada
-// llamada corta tiene menos riesgo de 503 o de timeout, y la salida cabe holgada en el limite de tokens.
+// Paginas de riesgo por llamada. Medido con gemini-2.5-flash-lite: una tanda de 20 paginas tardo 65 s y
+// devolvio 503 ("alta demanda"); una de 10 respondio en 55 s. Cada llamada corta tiene menos riesgo de 503
+// o de timeout, y la salida cabe holgada en el limite de tokens del modelo.
 export const PAGES_PER_BATCH = 10;
 const PAGE_MARKER_RE = /^\s*\[\[\s*P[ÁA]GINA\s+(\d+)\s*\]\]\s*$/im;
 const PAGE_MARKER_GLOBAL_RE = /^\s*\[\[\s*P[ÁA]GINA\s+(\d+)\s*\]\]\s*$/gim;
-
-export function splitPageRanges(totalPages: number, batchSize = PAGES_PER_BATCH): { from: number; to: number }[] {
-  const ranges: { from: number; to: number }[] = [];
-  for (let from = 1; from <= totalPages; from += batchSize) {
-    ranges.push({ from, to: Math.min(totalPages, from + batchSize - 1) });
-  }
-  return ranges;
-}
 
 export function buildPdfPrompt(range: { from: number; to: number }, totalPages: number): string {
   const scope =
@@ -36,6 +25,15 @@ Reglas:
 - Si algo es ilegible, escribe [ilegible]. No lo inventes.
 - Antes del contenido de cada pagina escribe una linea con exactamente: [[PAGINA N]] (N = numero de pagina del PDF).
 - No escribas introducciones ni despedidas: solo el Markdown.`;
+}
+
+// Cuando NO se pudo recortar el PDF se manda completo y se piden las paginas por su numero real.
+export function buildPdfPagesPrompt(pageNumbers: number[], totalPages: number): string {
+  const list = pageNumbers.join(', ');
+  return buildPdfPrompt({ from: 1, to: totalPages }, totalPages).replace(
+    'Transcribe TODO el documento.',
+    `Transcribe SOLO estas paginas: ${list} (la primera pagina del PDF es la 1). Ignora las demas.`
+  );
 }
 
 // Quita lo que el modelo agrega alrededor: bloque ```markdown envolvente y frases de cortesia
@@ -98,72 +96,4 @@ export function countUnreadableSymbols(text: string): number {
     if ((c < 32 && c !== 10 && c !== 9 && c !== 13) || (c >= 0xe000 && c <= 0xf8ff)) n++;
   }
   return n;
-}
-
-function normalizeWords(text: string): Set<string> {
-  const words = text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .split(/[^a-z0-9]+/)
-    .filter((w) => w.length >= 4);
-  return new Set(words);
-}
-
-// Que fraccion de las palabras del texto simple aparece en el Markdown. Si el modelo se salto
-// una pagina o resumio, esta cifra cae.
-export function wordRecall(plainText: string, markdown: string): number | null {
-  const plain = normalizeWords(plainText);
-  if (plain.size < 30) return null; // muy poco texto simple: no hay con que comparar
-  const md = normalizeWords(markdown);
-  let hit = 0;
-  plain.forEach((w) => {
-    if (md.has(w)) hit++;
-  });
-  return hit / plain.size;
-}
-
-export interface QualityInput {
-  expectedPages: number;
-  pagesFound: number;
-  plainText: string;
-  markdown: string;
-}
-
-export interface QualityResult {
-  ok: boolean;
-  recall: number | null;
-  pageCoverage: number;
-  reasons: string[];
-}
-
-// Paginas que se toleran sin transcribir: una pagina casi vacia (solo un grafico, o en blanco) puede
-// quedar sin marcador. 10 % del documento y, como minimo, una pagina.
-export function allowedMissingPages(expectedPages: number): number {
-  return Math.max(1, Math.floor(expectedPages * 0.1));
-}
-export const MIN_WORD_RECALL = 0.85;
-
-// Decide si el Markdown se puede usar en lugar del texto simple.
-export function assessConversion(input: QualityInput): QualityResult {
-  const reasons: string[] = [];
-  const pageCoverage = input.expectedPages > 0 ? input.pagesFound / input.expectedPages : 0;
-  if (input.expectedPages - input.pagesFound > allowedMissingPages(input.expectedPages)) {
-    reasons.push(`solo se transcribieron ${input.pagesFound} de ${input.expectedPages} paginas`);
-  }
-
-  const recall = wordRecall(input.plainText, input.markdown);
-  if (recall !== null && recall < MIN_WORD_RECALL) {
-    reasons.push(`el Markdown solo conserva el ${Math.round(recall * 100)}% de las palabras del texto original`);
-  }
-
-  const mdChars = input.markdown.length;
-  if (mdChars < 50) reasons.push('el Markdown quedo casi vacio');
-  // Mucho mas largo que el original delata contenido inventado (una descripcion de figuras y las
-  // formulas suman, pero no multiplican el texto por seis).
-  if (input.plainText.length > 200 && mdChars > input.plainText.length * 6 + 3000) {
-    reasons.push('el Markdown es desproporcionadamente mas largo que el texto original');
-  }
-
-  return { ok: reasons.length === 0, recall, pageCoverage, reasons };
 }
