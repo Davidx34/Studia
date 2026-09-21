@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// El SDK real de Connect carga un arbol de dependencias y tarda (mas de 5 s en frio, lo que hizo fallar
+// una prueba por tiempo). Ninguna prueba lo necesita: los tokens se inyectan con getTokenImpl.
+vi.mock('@vercel/connect', () => ({ getToken: vi.fn(), deleteTokenCacheEntry: vi.fn() }));
+
 import { callOpenRouter, openRouterModels, isOpenRouterConfigured, classifyStatus, DEFAULT_MODELS } from './openrouter';
 
 const ok = (content: string, model = 'meta-llama/llama-3.3-70b-instruct') =>
