@@ -5,6 +5,7 @@
 
 import { parseHTML } from 'linkedom';
 import { sanitizeText, chunkEmbedAndStore } from './textProcessing';
+import { safeFetch } from '@/lib/security/safeFetch';
 
 const FETCH_TIMEOUT_MS = 15000;
 const MAX_HTML_BYTES = 5 * 1024 * 1024; // 5MB, evita descargar paginas gigantes
@@ -16,26 +17,14 @@ export interface ScrapedLink {
 }
 
 export async function scrapeLink(url: string): Promise<ScrapedLink> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-  let html: string;
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StudiaBot/1.0)' },
-    });
-    if (!res.ok) throw new Error(`No se pudo descargar el link (HTTP ${res.status})`);
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('text/html')) {
-      throw new Error(`El link no apunta a una pagina HTML (${contentType || 'tipo desconocido'})`);
-    }
-    const buf = await res.arrayBuffer();
-    if (buf.byteLength > MAX_HTML_BYTES) throw new Error('La pagina es demasiado grande para procesar.');
-    html = new TextDecoder('utf-8').decode(buf);
-  } finally {
-    clearTimeout(timeout);
+  // safeFetch (src/lib/security/safeFetch.ts) impide que el servidor llegue a direcciones internas (SSRF), valida
+  // cada redireccion y corta la respuesta al llegar al limite.
+  const res = await safeFetch(url, { timeoutMs: FETCH_TIMEOUT_MS, maxBytes: MAX_HTML_BYTES });
+  if (res.status < 200 || res.status >= 300) throw new Error(`No se pudo descargar el link (HTTP ${res.status})`);
+  if (!res.contentType.includes('text/html')) {
+    throw new Error(`El link no apunta a una pagina HTML (${res.contentType || 'tipo desconocido'})`);
   }
+  const html = new TextDecoder('utf-8').decode(res.body);
 
   const { document } = parseHTML(html);
 

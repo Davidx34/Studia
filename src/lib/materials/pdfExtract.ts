@@ -13,6 +13,7 @@
 // La logica pura (analyzePages) esta separada del lector de pdfjs (readPdfPages) para poder probarla.
 
 import { countUnreadableSymbols } from './pdfMarkdown';
+import { MAX_PDF_PAGES } from '@/lib/security/materialGuards';
 
 export interface RawItem {
   str: string;
@@ -253,6 +254,10 @@ export async function readRawPages(bytes: Uint8Array): Promise<RawPage[]> {
   const pdfjs: any = await getResolvedPDFJS();
   const { OPS, Util } = pdfjs;
   const pdf = await getDocumentProxy(new Uint8Array(bytes));
+  // Un PDF de miles de paginas (o una bomba de descompresion) no debe agotar la funcion: se rechaza antes de leerlo.
+  if (pdf.numPages > MAX_PDF_PAGES) {
+    throw new Error(`El PDF tiene ${pdf.numPages} paginas; el maximo es ${MAX_PDF_PAGES}. Divídelo en partes.`);
+  }
   const pages: RawPage[] = [];
 
   for (let n = 1; n <= pdf.numPages; n++) {

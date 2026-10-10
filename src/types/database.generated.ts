@@ -1307,6 +1307,7 @@ export type Database = {
           mime_type: string | null
           processed_at: string | null
           processing_error: string | null
+          processing_started_at: string | null
           processing_status: string
           size_bytes: number | null
           source_type: string
@@ -1340,6 +1341,7 @@ export type Database = {
           mime_type?: string | null
           processed_at?: string | null
           processing_error?: string | null
+          processing_started_at?: string | null
           processing_status?: string
           size_bytes?: number | null
           source_type?: string
@@ -1373,6 +1375,7 @@ export type Database = {
           mime_type?: string | null
           processed_at?: string | null
           processing_error?: string | null
+          processing_started_at?: string | null
           processing_status?: string
           size_bytes?: number | null
           source_type?: string
