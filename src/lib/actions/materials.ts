@@ -22,6 +22,8 @@ import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '@/lib/materials/constan
 import { slugifyFilename } from '@/lib/materials/file-helpers';
 import { processLinkMaterial } from '@/lib/materials/processLink';
 import { processPdfMaterial, PDF_MIME } from '@/lib/materials/processPdf';
+import { parseSafeUrl, UnsafeUrlError } from '@/lib/security/safeFetch';
+import { claimProcessing, validateUploadInput } from '@/lib/security/materialGuards';
 import { processTextFileMaterial } from '@/lib/materials/processTextFile';
 import { TEXT_MIME_TYPES } from '@/lib/materials/constants';
 import { processYoutubeMaterial, extractYoutubeId } from '@/lib/materials/processYoutube';
@@ -146,6 +148,24 @@ export async function confirmMaterialUpload(
     return { ok: false, error: 'Clase no encontrada o sin permisos.' };
   }
 
+  // Lo que manda el navegador no se acepta tal cual: la ruta debe estar dentro de la carpeta de ESTA clase, el tipo
+  // debe coincidir con la extension y el tamaño estar dentro del limite.
+  const valid = validateUploadInput(input);
+  if (!valid.ok) return { ok: false, error: valid.reason };
+
+  // El tamaño REAL sale de Storage, no del navegador. El bucket ya aplica el limite al subir; esto ademas comprueba
+  // que el archivo exista y que lo declarado no mienta.
+  const slash = input.storagePath.lastIndexOf('/');
+  const folder = input.storagePath.slice(0, slash);
+  const baseName = input.storagePath.slice(slash + 1);
+  const { data: listed } = await supabase.storage.from(STORAGE_BUCKET).list(folder, { search: baseName, limit: 5 });
+  const stored = (listed ?? []).find((f: any) => f.name === baseName);
+  if (!stored) return { ok: false, error: 'No encontramos el archivo subido. Intenta subirlo de nuevo.' };
+  const realSize = Number((stored as any).metadata?.size ?? input.sizeBytes);
+  if (!Number.isFinite(realSize) || realSize <= 0 || realSize > MAX_FILE_SIZE_BYTES) {
+    return { ok: false, error: 'El archivo esta vacio o excede 10 MB.' };
+  }
+
   // INSERT en teaching_materials con status='pending'
   const { data, error } = await supabase
     .from('teaching_materials')
@@ -156,9 +176,10 @@ export async function confirmMaterialUpload(
       display_name: input.filename,
       storage_path: input.storagePath,
       mime_type: input.mimeType,
-      size_bytes: input.sizeBytes,
+      size_bytes: realSize,
       content_hash: input.contentHash ?? null,
       processing_status: 'pending',
+      processing_started_at: new Date().toISOString(),
     })
     .select('id')
     .single();
@@ -215,14 +236,11 @@ export async function addLinkMaterial(classroomId: string, url: string): Promise
     return { ok: false, error: 'Clase no encontrada o sin permisos.' };
   }
 
-  let parsed: URL;
+  // Se rechaza ANTES de registrar el material: direcciones internas, credenciales en la URL, puertos raros...
   try {
-    parsed = new URL(url);
-  } catch {
-    return { ok: false, error: 'URL inválida.' };
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return { ok: false, error: 'Solo se aceptan links http/https.' };
+    parseSafeUrl(url);
+  } catch (e) {
+    return { ok: false, error: e instanceof UnsafeUrlError ? e.message : 'URL inválida.' };
   }
 
   const { data, error } = await supabase
@@ -349,6 +367,11 @@ export async function reprocessMaterial(materialId: string) {
   if (!material) {
     return { ok: false as const, error: 'Material no encontrado o sin permisos.' };
   }
+
+  // No se reprocesa un material que ya se esta procesando ni uno procesado hace segundos: cada procesamiento gasta
+  // cuota de IA (embeddings y, en PDF, vision).
+  const claim = await claimProcessing(supabase, materialId);
+  if (!claim.ok) return { ok: false as const, error: claim.reason ?? 'No se puede reprocesar ahora.' };
 
   // Reset status a processing/pending
   const { error: updateErr } = await supabase
