@@ -140,9 +140,16 @@ describe('analyzePages: paginas de riesgo (las unicas que van a la IA)', () => {
     expect(p.risk).toContain('dibujo');
   });
 
-  it('muchos trazos pero mucho texto NO es un grafico (un cuadro decorativo)', () => {
-    const [p] = analyzePages([page(1, [{ text: 'x'.repeat(900), y: 100 }], { paths: 120 })]);
-    expect(p.risk).not.toContain('dibujo');
+  it('REGRESION: una pagina con MUCHO texto y muchos trazos (cuadros, tablas, graficos) tambien es de riesgo', () => {
+    // Asi se escapo la guia real "Caso Maestro": ~1.000 caracteres y 46-116 trazos por pagina, ninguna marcada.
+    const [p] = analyzePages([page(1, [{ text: 'x'.repeat(1200), y: 100 }], { paths: 90 })]);
+    expect(p.risk).toContain('dibujo');
+  });
+
+  it('una pagina de texto con pocos trazos (subrayados, filetes) NO es de riesgo', () => {
+    // Un articulo academico real tiene entre 1 y 9 trazos por pagina.
+    const [p] = analyzePages([page(1, [{ text: 'x'.repeat(3000), y: 100 }], { paths: 9 })]);
+    expect(p.risk).toEqual([]);
   });
 
   it('una tabla (3+ filas con 3+ columnas separadas) es de riesgo', () => {

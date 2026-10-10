@@ -1,7 +1,7 @@
 // Helpers de archivos para materials
 // Fase 11.C · Stud.ia
 
-import { ALLOWED_MIME_TYPES, EXT_TO_MIME, MAX_FILE_SIZE_BYTES } from './constants';
+import { ALLOWED_MIME_TYPES, EXT_TO_MIME, MAX_FILE_SIZE_BYTES, TEXT_MIME_TYPES } from './constants';
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -22,11 +22,13 @@ export function getExtension(filename: string): string {
  * Devuelve null si no se puede determinar.
  */
 export function detectMimeType(file: File): string | null {
+  const byExt = EXT_TO_MIME[getExtension(file.name)] ?? null;
+  // Un .md llega como "" o "text/plain" segun el navegador: la extension decide entre Markdown y texto.
+  if (byExt && TEXT_MIME_TYPES.includes(byExt)) return byExt;
   if (file.type && (ALLOWED_MIME_TYPES as readonly string[]).includes(file.type)) {
     return file.type;
   }
-  const ext = getExtension(file.name);
-  return EXT_TO_MIME[ext] ?? null;
+  return byExt;
 }
 
 export interface FileValidationError {
@@ -48,7 +50,7 @@ export function validateFile(file: File): FileValidationError | null {
   if (!mime) {
     return {
       code: 'invalid_mime',
-      message: 'Tipo de archivo no soportado. Sube PDF, DOCX o XLSX.',
+      message: 'Tipo de archivo no soportado. Sube PDF, DOCX, XLSX, Markdown (.md) o texto (.txt).',
     };
   }
   return null;

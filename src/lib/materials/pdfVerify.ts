@@ -48,7 +48,9 @@ export function latexToUnicodeSymbols(text: string): string {
 
 export function extractMathSegments(markdown: string): { expression: string; display: boolean }[] {
   const out: { expression: string; display: boolean }[] = [];
-  const re = /\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g;
+  // `\$` es un signo de pesos escapado ("CMg = \$2"): no abre ni cierra una formula. Antes se partia ahi y
+  // quedaba "CMg = \" como formula invalida: 9 de 10 paginas de una guia real se rechazaron por eso.
+  const re = /\$\$((?:\\[\s\S]|[^\\])+?)\$\$|\$((?:\\.|[^$\\\n])+?)\$/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(markdown)) !== null) {
     if (m[1] !== undefined) out.push({ expression: m[1].trim(), display: true });

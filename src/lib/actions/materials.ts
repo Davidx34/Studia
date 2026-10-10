@@ -22,6 +22,8 @@ import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '@/lib/materials/constan
 import { slugifyFilename } from '@/lib/materials/file-helpers';
 import { processLinkMaterial } from '@/lib/materials/processLink';
 import { processPdfMaterial, PDF_MIME } from '@/lib/materials/processPdf';
+import { processTextFileMaterial } from '@/lib/materials/processTextFile';
+import { TEXT_MIME_TYPES } from '@/lib/materials/constants';
 import { processYoutubeMaterial, extractYoutubeId } from '@/lib/materials/processYoutube';
 import { processNotebookLMMaterial } from '@/lib/materials/processNotebookLM';
 
@@ -170,6 +172,9 @@ export async function confirmMaterialUpload(
     // patron que link/YouTube): tarda entre unos segundos y un par de minutos segun las paginas.
     // Si falla, el material queda en 'failed' con el motivo y se puede reprocesar.
     await processPdfMaterial(supabase, data.id);
+  } else if (TEXT_MIME_TYPES.includes(input.mimeType)) {
+    // Markdown / texto: ya es texto, no hace falta IA ni edge function.
+    await processTextFileMaterial(supabase, data.id);
   } else {
     // Word/Excel: edge function process-material (best-effort, no bloqueante).
     // Si la function NO está deployed, la fila queda en 'pending' y se puede
@@ -364,7 +369,8 @@ export async function reprocessMaterial(materialId: string) {
   // vuelve a fallar.
   // Los PDF tambien: se procesan in-process con chunkEmbedAndStore.
   const isPdfFile = material.source_type === 'file' && material.mime_type === PDF_MIME;
-  if (material.source_type !== 'youtube' && material.source_type !== 'notebooklm' && !isPdfFile) {
+  const isTextFile = material.source_type === 'file' && !!material.mime_type && TEXT_MIME_TYPES.includes(material.mime_type);
+  if (material.source_type !== 'youtube' && material.source_type !== 'notebooklm' && !isPdfFile && !isTextFile) {
     await supabase.from('material_chunks').delete().eq('material_id', materialId);
   }
 
@@ -394,6 +400,8 @@ export async function reprocessMaterial(materialId: string) {
     }
   } else if (isPdfFile) {
     await processPdfMaterial(supabase, materialId);
+  } else if (isTextFile) {
+    await processTextFileMaterial(supabase, materialId);
   } else {
     await supabase.functions
       .invoke('process-material', { body: { material_id: materialId } })

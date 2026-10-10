@@ -258,7 +258,7 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
             Arrastra archivos o haz clic para seleccionar
           </h3>
           <p className="text-xs text-slate-500">
-            PDF, DOCX o XLSX · Máx {formatBytes(MAX_FILE_SIZE_BYTES)} por archivo
+            PDF, DOCX, XLSX, Markdown o TXT · Máx {formatBytes(MAX_FILE_SIZE_BYTES)} por archivo
           </p>
           <input
             ref={inputRef}
