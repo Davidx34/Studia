@@ -1651,6 +1651,15 @@ export type Database = {
         }
         Returns: number
       }
+      award_xp_module: { Args: { p_module_id: string }; Returns: number }
+      award_xp_plan_round: {
+        Args: { p_plan_id: string; p_round: number; p_score_percent: number }
+        Returns: number
+      }
+      award_xp_remediation: {
+        Args: { p_remediation_id: string; p_score_percent: number }
+        Returns: number
+      }
       check_and_update_streak: { Args: { p_user_id: string }; Returns: Json }
       check_pending_registration: { Args: { p_email: string }; Returns: string }
       dev_add_pending_registration: {
