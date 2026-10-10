@@ -21,6 +21,12 @@ import { TonitoCharacter } from '@/components/tonito/TonitoCharacter';
 import { MathText } from '@/components/MathText';
 import { isValidQuestion } from '@/lib/lesson/validateQuestion';
 import type { ContentModule } from '@/types/database';
+import { CheckCircle2 } from 'lucide-react';
+import { ChoiceQuestion, AnswerFeedback, choiceResult, correctChoiceText, type ChoiceKind, type ChoiceValue } from '@/components/lesson/ChoiceQuestion';
+import { Button } from '@/components/ui/Button';
+import { Card, Badge } from '@/components/ui/Card';
+import { ProgressBar } from '@/components/ui/ProgressBar';
+import { cn } from '@/components/ui/cn';
 
 const REMEDIATION_ACCURACY_THRESHOLD = 70;
 const REMEDIATION_TRIGGER_SCORE = 80;
@@ -85,6 +91,8 @@ export default function LessonPage() {
   const [remediationLoading, setRemediationLoading] = useState(false);
   const [remediationRowId, setRemediationRowId] = useState<string | null>(null);
   const [remediationBonusXp, setRemediationBonusXp] = useState(0);
+  // XP que el SERVIDOR otorgo al terminar el modulo (0 si ya lo habia ganado antes).
+  const [xpGranted, setXpGranted] = useState<number | null>(null);
 
   // Cinematicas (Sesion F.1): cola simple, se muestran en secuencia.
   const [cinematicQueue, setCinematicQueue] = useState<CinematicType[]>([]);
@@ -479,7 +487,8 @@ export default function LessonPage() {
 
   const completeRemediation = async () => {
     const scorePercent = Math.round((score / questions.length) * 100);
-    const bonusXp = Math.round(25 + (score / questions.length) * 25); // 25-50 segun desempeño
+    const bonusXp = Math.round(25 + (score / questions.length) * 25); // 25-50 segun desempeño (lo registrado en la fila)
+    let grantedBonus = 0;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -495,12 +504,16 @@ export default function LessonPage() {
             .eq('id', remediationRowId);
         }
         // El XP lo calcula y lo otorga el SERVIDOR (migracion 052): el navegador ya no escribe profiles.total_xp.
-        if (remediationRowId) await supabase.rpc('award_xp_remediation', { p_remediation_id: remediationRowId, p_score_percent: scorePercent });
+        if (remediationRowId) {
+          const { data: granted } = await supabase.rpc('award_xp_remediation', { p_remediation_id: remediationRowId, p_score_percent: scorePercent });
+          // Se muestra lo que el servidor otorgo (puede ser 0 si hoy ya cobro el bonus de este modulo).
+          grantedBonus = Number(granted ?? 0);
+        }
       }
     } catch (e) {
       console.warn('Error completando repaso:', e);
     }
-    setRemediationBonusXp(bonusXp);
+    setRemediationBonusXp(grantedBonus);
     setRemediationPhase('completed');
     useTonitoStore.getState().onModuleComplete(100);
   };
@@ -539,7 +552,8 @@ export default function LessonPage() {
 
       // El XP lo otorga el SERVIDOR, una sola vez por modulo (libro xp_ledger, migracion 052): reintentar o
       // recargar no lo repite, asi que ya no hace falta decidirlo aqui con alreadyCompleted.
-      await supabase.rpc('award_xp_module', { p_module_id: moduleId });
+      const { data: granted } = await supabase.rpc('award_xp_module', { p_module_id: moduleId });
+      setXpGranted(Number(granted ?? 0));
 
       // Verificar y otorgar logros (el modal de desbloqueo aparece via Realtime).
       await evaluateAchievements();
@@ -549,46 +563,42 @@ export default function LessonPage() {
   };
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-64 text-white p-8">
+    <div role="status" className="flex flex-col items-center justify-center min-h-64 text-fg p-8">
       <div className="tonito-breathing">
         <TonitoCharacter mood="thinking" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={110} />
       </div>
       <p className="text-lg font-semibold mt-4">Estoy preparando preguntas especiales…</p>
-      <p className="text-sm text-white/60 mt-1">Solo un momento</p>
+      <p className="text-sm text-fg-muted mt-1">Solo un momento. La primera vez puede tardar hasta un minuto.</p>
     </div>
   );
 
-  if (!mod) return <div className="text-white p-8">No encontrado</div>;
+  if (!mod) return <div className="text-fg p-8">No encontrado</div>;
 
   // Review 360 §3.6: antes de este cambio, un fallo de generacion se disfrazaba
   // de leccion con preguntas de relleno y otorgaba XP igual. Ahora se dice, no
   // se guarda progreso ni XP, y se ofrece reintentar.
   if (generationFailed) return (
-    <div className="flex flex-col items-center justify-center min-h-64 text-white p-8 text-center premium-fade-in-up">
+    <div role="alert" className="flex flex-col items-center justify-center min-h-64 text-fg p-8 text-center premium-fade-in-up">
       <TonitoCharacter mood="sad" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={110} />
       <h2 className="text-xl font-semibold mt-4">No pude preparar esta lección</h2>
-      <p className="text-sm text-white/60 mt-2 max-w-sm">
+      <p className="text-sm text-fg-muted mt-2 max-w-sm">
         Hubo un problema generando las preguntas de <strong>{mod.title}</strong>. No es culpa
         tuya, y tu progreso no se vio afectado.
       </p>
-      <div className="flex gap-3 mt-6">
-        <button
+      <div className="flex flex-wrap justify-center gap-3 mt-6">
+        <Button
+          variant="accent"
           onClick={() => {
             setGenerationFailed(false);
             setLoading(true);
             generateQuestions(mod);
           }}
-          className="premium-btn premium-focus px-5 py-2.5 rounded-xl font-semibold text-slate-900"
-          style={{ background: 'linear-gradient(135deg, var(--premium-gold) 0%, #e8a87c 100%)' }}
         >
           Intentar de nuevo
-        </button>
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="premium-focus px-5 py-2.5 rounded-xl font-medium bg-white/5 border border-white/10 text-white/80 transition-all duration-300 ease-out hover:bg-white/10"
-        >
+        </Button>
+        <Button variant="secondary" onClick={() => router.push('/dashboard')}>
           Volver al inicio
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -607,7 +617,7 @@ export default function LessonPage() {
       type={cinematicQueue[0]}
       studentName={studentName}
       score={Math.round((score / questions.length) * 100)}
-      xpEarned={cinematicQueue[0] === 'module_complete_good' || cinematicQueue[0] === 'module_complete_low' ? (mod.base_xp_reward ?? undefined) : undefined}
+      xpEarned={cinematicQueue[0] === 'module_complete_good' || cinematicQueue[0] === 'module_complete_low' ? (xpGranted && xpGranted > 0 ? xpGranted : undefined) : undefined}
       streak={streakForCinematic}
       onComplete={() => setCinematicQueue((q) => q.slice(1))}
     />
@@ -623,25 +633,30 @@ export default function LessonPage() {
   );
 
   if (remediationPhase === 'completed') return (
-    <div className="max-w-2xl mx-auto p-8">
-      <div className="bg-green-600 p-8 text-white rounded-lg text-center">
-        <h1 className="text-3xl font-bold mb-4">¡Repaso completado! 🎉</h1>
-        <p className="text-lg mb-2">Ahora estás listo para lo siguiente.</p>
-        <p className="text-lg mb-8">+{remediationBonusXp} XP bonus ganados</p>
-        <button onClick={() => router.back()} className="bg-white text-green-600 px-8 py-3 rounded-lg font-bold">Volver</button>
-      </div>
+    <div className="max-w-2xl mx-auto px-4 py-6 sm:p-8">
+      <Card className="p-8 text-center bg-success/10 border-success/40">
+        <h1 className="text-3xl font-bold text-fg mb-4">¡Repaso completado! 🎉</h1>
+        <p className="text-lg text-fg mb-2">Ahora estás listo para lo siguiente.</p>
+        <p className="text-lg text-fg-muted mb-8">
+          {remediationBonusXp > 0 ? `+${remediationBonusXp} XP bonus ganados` : 'Hoy ya habías ganado el bonus de repaso de este módulo.'}
+        </p>
+        <Button size="lg" onClick={() => router.back()}>Volver</Button>
+      </Card>
     </div>
   );
 
   if (done) return (
-    <div className="max-w-2xl mx-auto p-8">
-      <div className="bg-green-600 p-8 text-white rounded-lg text-center">
-        <h1 className="text-4xl font-bold mb-4">Completado!</h1>
-        <p className="text-2xl mb-2">{score}/{questions.length} correctas</p>
-        <p className="text-lg mb-2 opacity-80">{Math.round((score/questions.length)*100)}% de acierto</p>
-        <p className="text-lg mb-8">+{mod.base_xp_reward} XP ganados</p>
-        <button onClick={() => router.back()} className="bg-white text-green-600 px-8 py-3 rounded-lg font-bold">Volver</button>
-      </div>
+    <div className="max-w-2xl mx-auto px-4 py-6 sm:p-8">
+      <Card className="p-8 text-center bg-success/10 border-success/40">
+        <h1 className="text-4xl font-bold text-fg mb-4">¡Completado!</h1>
+        <p className="text-2xl text-fg mb-2">{score}/{questions.length} correctas</p>
+        <p className="text-lg text-fg-muted mb-2">{Math.round((score / questions.length) * 100)}% de acierto</p>
+        {/* Antes decia siempre "+N XP ganados", tambien al repetir un modulo. Ahora es lo que el servidor otorgo. */}
+        <p className="text-lg text-fg mb-8">
+          {xpGranted && xpGranted > 0 ? `+${xpGranted} XP ganados` : 'Ya habías ganado el XP de este módulo.'}
+        </p>
+        <Button size="lg" onClick={() => router.back()}>Volver</Button>
+      </Card>
     </div>
   );
 
@@ -650,7 +665,7 @@ export default function LessonPage() {
 
   // Da a TS un punto real de narrowing para "q" (isValidQuestion ya trata
   // undefined como invalido en runtime, pero no es un type predicate).
-  if (!q) return <div className="text-white p-8">No hay pregunta para mostrar.</div>;
+  if (!q) return <div className="text-fg p-8">No hay pregunta para mostrar.</div>;
 
   const questionCheck = isValidQuestion(q);
   if (!questionCheck.valid) {
@@ -662,74 +677,61 @@ export default function LessonPage() {
       timestamp: new Date().toISOString(),
     });
     return (
-      <div className="max-w-2xl mx-auto p-8">
-        <div className="bg-gray-800 rounded-xl p-8 text-center space-y-4">
+      <div className="max-w-2xl mx-auto px-4 py-6 sm:p-8">
+        <Card role="alert" className="p-8 text-center space-y-4">
           <TonitoCharacter mood="sad" animation="shake" gradient={['#6C5CE7', '#00D2D3']} size={90} />
-          <h2 className="text-xl font-bold text-white">Ups, hubo un problema con esta pregunta</h2>
-          <p className="text-gray-400 text-sm">{questionCheck.error}</p>
-          <p className="text-gray-500 text-xs">Esto no debería pasar. Ya lo registramos.</p>
-          <button
-            onClick={nextQuestion}
-            className="px-6 py-3 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700"
-          >
-            Saltar a la siguiente →
-          </button>
-        </div>
+          <h2 className="text-xl font-bold text-fg">Ups, hubo un problema con esta pregunta</h2>
+          <p className="text-fg-muted text-sm">{questionCheck.error}</p>
+          <p className="text-fg-muted text-xs">Esto no debería pasar. Ya lo registramos.</p>
+          <Button onClick={nextQuestion}>Saltar a la siguiente →</Button>
+        </Card>
       </div>
     );
   }
 
-  const renderQuestion = () => {
-    if (q.type === 'multiple_choice') return (
-      <div className="space-y-3">
-        {(q.opts || []).map((o, i) => (
-          <button key={i} onClick={() => handleAnswer(i)} disabled={answered}
-            className={"w-full p-4 rounded-lg text-left font-medium border-2 transition-all " + (
-              selected === i ? (i === q.ok ? 'bg-green-600 text-white border-green-400' : 'bg-red-600 text-white border-red-400')
-              : answered && i === q.ok ? 'bg-green-600 text-white border-green-400'
-              : 'bg-gray-700 text-gray-200 hover:bg-gray-600 border-transparent'
-            )}><MathText content={o} /></button>
-        ))}
-      </div>
-    );
+  // Resultado de una pregunta de opcion unica (opcion multiple o verdadero/falso), una vez respondida.
+  const isChoice = q.type === 'multiple_choice' || q.type === 'true_false';
+  const result = isChoice ? choiceResult(answered, selected, q.ok) : null;
+  const correctText = isChoice ? correctChoiceText(q.type as ChoiceKind, q.opts || [], q.ok as ChoiceValue | undefined) : null;
 
-    if (q.type === 'true_false') return (
-      <div className="grid grid-cols-2 gap-4">
-        {[true, false].map((val) => (
-          <button key={String(val)} onClick={() => handleAnswer(val)} disabled={answered}
-            className={"p-6 rounded-lg text-center font-bold text-xl border-2 transition-all " + (
-              selected === val ? (val === q.ok ? 'bg-green-600 text-white border-green-400' : 'bg-red-600 text-white border-red-400')
-              : answered && val === q.ok ? 'bg-green-600 text-white border-green-400'
-              : 'bg-gray-700 text-white hover:bg-gray-600 border-transparent'
-            )}>{val ? 'Verdadero' : 'Falso'}</button>
-        ))}
-      </div>
+  const renderQuestion = () => {
+    if (q.type === 'multiple_choice' || q.type === 'true_false') return (
+      <ChoiceQuestion
+        kind={q.type as ChoiceKind}
+        options={q.opts || []}
+        selected={selected}
+        answered={answered}
+        correct={q.ok as ChoiceValue | undefined}
+        onAnswer={(v) => handleAnswer(v)}
+      />
     );
 
     if (q.type === 'fill_blank') return (
       <div className="space-y-4">
-        <p className="text-gray-300 text-sm">Escribe las palabras que faltan en los espacios</p>
-        <div className="bg-gray-700 p-4 rounded-lg text-white text-lg"><MathText content={q.q} /></div>
-        <textarea className="w-full bg-gray-700 text-white rounded-lg p-4 border border-gray-600 focus:border-purple-500 outline-none resize-none h-24"
+        <p className="text-fg-muted text-sm">Escribe las palabras que faltan en los espacios</p>
+        <div className="bg-surface-2 p-4 rounded-xl text-fg text-lg"><MathText content={q.q} /></div>
+        <textarea
+          aria-label="Palabras que faltan"
+          className="w-full min-h-[96px] bg-surface-2 text-fg text-base rounded-xl p-4 border border-line-strong placeholder:text-fg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
           placeholder="Escribe aqui las palabras que faltan..." disabled={answered}
           value={fillBlankText} onChange={(e) => setFillBlankText(e.target.value)} />
         {fillBlankFeedback === 'retry' && (
-          <div className="bg-red-900 border border-red-500 p-3 rounded-lg text-red-200 text-sm font-medium">
+          <div role="alert" className="bg-danger/10 border border-danger/40 p-3 rounded-xl text-fg text-sm font-medium">
             Intenta de nuevo, te falta al menos una palabra clave.
           </div>
         )}
         {!answered ? (
-          <button onClick={handleFillBlankSubmit} disabled={!fillBlankText.trim()}
-            className="w-full p-4 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-purple-600">
+          <Button size="lg" className="w-full" onClick={handleFillBlankSubmit} disabled={!fillBlankText.trim()}>
             Enviar respuesta
-          </button>
+          </Button>
         ) : fillBlankFeedback === 'correct' ? (
-          <div className="bg-green-900 border border-green-500 p-4 rounded-lg">
-            <p className="text-green-300 font-medium">¡Correcto! 🎉</p>
+          <div className="bg-success/10 border border-success/40 p-4 rounded-xl flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-success" aria-hidden="true" />
+            <p className="text-fg font-medium">¡Correcto! 🎉</p>
           </div>
         ) : (
-          <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg">
-            <p className="text-blue-300 font-medium">Respuesta: <MathText content={q.answers?.join(', ') || ''} /></p>
+          <div className="bg-primary/10 border border-primary/30 p-4 rounded-xl">
+            <p className="text-fg font-medium">Respuesta: <MathText content={q.answers?.join(', ') || ''} /></p>
           </div>
         )}
       </div>
@@ -863,22 +865,23 @@ export default function LessonPage() {
 
     if (q.type === 'short_answer') return (
       <div className="space-y-4">
-        <textarea className="w-full bg-gray-700 text-white rounded-lg p-4 border border-gray-600 focus:border-purple-500 outline-none resize-none h-32"
+        <textarea
+          aria-label="Tu respuesta"
+          className="w-full min-h-[128px] bg-surface-2 text-fg text-base rounded-xl p-4 border border-line-strong placeholder:text-fg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
           placeholder="Escribe tu respuesta aqui..." disabled={answered}
           value={shortAnswerText} onChange={(e) => setShortAnswerText(e.target.value)} />
         {!answered ? (
-          <button onClick={handleShortAnswerSubmit} disabled={!shortAnswerText.trim()}
-            className="w-full p-4 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-purple-600">
+          <Button size="lg" className="w-full" onClick={handleShortAnswerSubmit} disabled={!shortAnswerText.trim()}>
             Enviar respuesta
-          </button>
+          </Button>
         ) : (
-          <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg space-y-1">
-            <p className="text-blue-300 font-medium">
+          <div className="bg-primary/10 border border-primary/30 p-4 rounded-xl space-y-1">
+            <p className="text-fg font-medium">
               {shortAnswerMatchedCount > 0
-                ? `✅ Mencionaste ${shortAnswerMatchedCount} de ${q.keywords?.length || 0} palabras clave`
+                ? `Mencionaste ${shortAnswerMatchedCount} de ${q.keywords?.length || 0} palabras clave`
                 : 'Palabras clave esperadas:'}
             </p>
-            <p className="text-blue-100 text-sm"><MathText content={q.keywords?.join(', ') || ''} /></p>
+            <p className="text-fg-muted text-sm"><MathText content={q.keywords?.join(', ') || ''} /></p>
           </div>
         )}
       </div>
@@ -887,64 +890,67 @@ export default function LessonPage() {
     return null;
   };
 
+  const TYPE_LABELS: Record<string, string> = {
+    multiple_choice: 'Opción múltiple',
+    true_false: 'Verdadero / Falso',
+    fill_blank: 'Completar frase',
+    match: 'Conectar conceptos',
+    short_answer: 'Respuesta corta',
+    el_descifrador: 'El Descifrador',
+    linea_del_tiempo: 'Línea del tiempo',
+    categorias_rapidas: 'Categorías rápidas',
+    flashcard_rapida: 'Flashcard rápida',
+    impostor_cognitivo: 'El Impostor Cognitivo',
+    alquimia_conceptual: 'Alquimia conceptual',
+    cuarto_crisis: 'Cuarto de crisis',
+    juicio_conocimiento: 'El juicio al conocimiento',
+  };
+
   return (
-    <div className="max-w-2xl mx-auto p-8">
+    <div className="max-w-2xl mx-auto px-4 py-6 sm:p-8">
       <div className="mb-6">
         {remediationPhase === 'active' && (
-          <div className="inline-flex items-center gap-1.5 bg-purple-700 text-white text-xs font-bold px-3 py-1 rounded-full mb-2">
-            🔁 Repaso rápido
-          </div>
+          <Badge tone="primary" className="mb-2 font-bold">
+            Repaso rápido
+          </Badge>
         )}
-        <h1 className="text-2xl font-bold text-white mb-1">{mod.title}</h1>
-        <p className="text-gray-300 text-sm mb-4">{mod.description}</p>
-        <div className="flex justify-between text-sm text-gray-400 mb-2">
+        <h1 className="text-2xl font-bold text-fg mb-1 text-balance">{mod.title}</h1>
+        <p className="text-fg-muted text-sm mb-4">{mod.description}</p>
+        <div className="flex justify-between text-sm text-fg-muted mb-2">
           <span>Pregunta {idx + 1} de {questions.length}</span>
           <span>{Math.round(progress)}%</span>
         </div>
-        <div className="w-full bg-gray-700 rounded-full h-2">
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all" style={{width: progress + '%'}}></div>
-        </div>
+        <ProgressBar value={progress} label={`Pregunta ${idx + 1} de ${questions.length}`} />
       </div>
 
-      <div className="bg-gray-800 rounded-xl p-8 mb-6">
+      <Card className="p-5 sm:p-8 mb-6">
         <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs bg-purple-700 text-white px-2 py-1 rounded">
-            {q.type === 'multiple_choice' ? 'Opcion Multiple' :
-             q.type === 'true_false' ? 'Verdadero/Falso' :
-             q.type === 'fill_blank' ? 'Completar Frase' :
-             q.type === 'match' ? 'Conectar Conceptos' :
-             q.type === 'short_answer' ? 'Respuesta Corta' :
-             q.type === 'el_descifrador' ? '🔤 El Descifrador' :
-             q.type === 'linea_del_tiempo' ? '📅 Línea del Tiempo' :
-             q.type === 'categorias_rapidas' ? '⏱️ Categorías Rápidas' :
-             q.type === 'flashcard_rapida' ? '🃏 Flashcard Rápida' :
-             q.type === 'impostor_cognitivo' ? '🕵️ El Impostor Cognitivo' :
-             q.type === 'alquimia_conceptual' ? '⚗️ Alquimia Conceptual' :
-             q.type === 'cuarto_crisis' ? '🚨 Cuarto de Crisis' :
-             q.type === 'juicio_conocimiento' ? '⚖️ El Juicio al Conocimiento' : 'Pregunta'}
-          </span>
+          <Badge tone="primary">{TYPE_LABELS[q.type] ?? 'Pregunta'}</Badge>
         </div>
-        <p className="text-white font-bold text-lg mb-6"><MathText content={q.q} /></p>
+        <p className="text-fg font-bold text-lg mb-6"><MathText content={q.q} /></p>
         {renderQuestion()}
+
+        {/* Resultado de la pregunta: se ANUNCIA a lectores de pantalla y no depende solo del color. */}
+        <AnswerFeedback result={result} correctText={correctText} />
+
         {answered && q.exp && (
-          <div className="mt-6 p-4 bg-blue-900 bg-opacity-50 border-l-4 border-blue-400 rounded">
-            <p className="text-blue-200 font-medium">Explicacion:</p>
-            <p className="text-blue-100 mt-1"><MathText content={q.exp} /></p>
+          <div className="mt-6 p-4 bg-primary/10 border-l-4 border-primary rounded-lg">
+            <p className="text-primary-text font-medium">Explicación:</p>
+            <p className="text-fg mt-1"><MathText content={q.exp} /></p>
           </div>
         )}
-      </div>
+      </Card>
 
       {answered && (
-        <button onClick={nextQuestion} disabled={moduleFinishing}
-          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition text-lg disabled:opacity-60 disabled:cursor-wait">
+        <Button size="lg" className="w-full text-lg" onClick={nextQuestion} disabled={moduleFinishing} loading={moduleFinishing} autoFocus>
           {moduleFinishing
             ? 'Guardando...'
             : idx < questions.length - 1
-            ? 'Siguiente Pregunta'
+            ? 'Siguiente pregunta'
             : remediationPhase === 'active'
-            ? 'Terminar Repaso'
-            : 'Terminar Modulo'}
-        </button>
+            ? 'Terminar repaso'
+            : 'Terminar módulo'}
+        </Button>
       )}
     </div>
   );
