@@ -19,7 +19,7 @@ Convierte este documento (puede ser un articulo o diapositivas) a Markdown para 
 Reglas:
 - Conserva el orden y el texto EXACTO. No resumas, no expliques, no agregues ejemplos ni contenido que no este en la pagina.
 - Titulos con # o ##; listas con "- "; tablas en formato de tabla Markdown.
-- Formulas en LaTeX: en linea entre $...$ y en bloque entre $$...$$.
+- Formulas en LaTeX: en linea entre $...$ y en bloque entre $$...$$. Un signo de pesos que es DINERO (precios) se escribe \$ , por ejemplo "$P = \$2$".
 - Si hay un grafico o figura, agrega una linea: "> [Figura: descripcion breve de lo que muestra, con ejes y etiquetas visibles]".
 - Omite numeros de pagina y encabezados o pies de pagina que se repiten.
 - Si algo es ilegible, escribe [ilegible]. No lo inventes.

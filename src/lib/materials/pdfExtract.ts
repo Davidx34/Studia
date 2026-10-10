@@ -6,6 +6,7 @@
 //
 // Tambien CLASIFICA cada pagina: si tiene formulas ilegibles, imagenes grandes, dibujos con poco texto
 // o tablas, esa pagina es "de riesgo" y solo esas van a un modelo con vision (ver pdfToMarkdown.ts).
+// OJO: una pagina con muchos trazos es de riesgo AUNQUE tenga mucho texto (cuadros, tablas, graficos).
 // Medido con 7 presentaciones reales de Microeconomia I (231 paginas): el 77 % eran de riesgo, pero en
 // un PDF de texto (articulos, apuntes) casi ninguna lo es y no se llama a ninguna IA.
 //
@@ -50,8 +51,12 @@ export interface PageData {
 }
 
 const BIG_IMAGE_PIXELS = 60_000; // un logo de ~200x200 no cuenta; una figura de diapositiva si
-const DRAWING_PATHS = 40;
-const DRAWING_MAX_CHARS = 500;
+// Trazos vectoriales que hacen de una pagina un grafico o una tabla con bordes. Medido con dos PDF de texto
+// reales: un articulo academico tiene entre 1 y 9 trazos por pagina (subrayados, filetes); una guia con
+// cuadros, tablas y graficos de oferta y demanda tiene entre 46 y 116 aunque cada pagina lleve ~1.000
+// caracteres. La primera version exigia ademas MENOS de 500 caracteres y ninguna de esas paginas se
+// marcaba: la tabla de contenido salia aplastada y los graficos como "D CMg=S EC=$80".
+const DRAWING_PATHS = 30;
 const TABLE_MIN_SEGMENTS = 3;
 const TABLE_MIN_LINES = 3;
 const HEADING_RATIO = 1.15;
@@ -228,7 +233,7 @@ export function analyzePages(raw: RawPage[]): PageData[] {
     const risk: RiskReason[] = [];
     if (unreadable > 0) risk.push('formulas_ilegibles');
     if (page.images.some((i) => i.w * i.h >= BIG_IMAGE_PIXELS)) risk.push('imagen');
-    if (page.paths >= DRAWING_PATHS && chars < DRAWING_MAX_CHARS) risk.push('dibujo');
+    if (page.paths >= DRAWING_PATHS) risk.push('dibujo');
     let run = 0;
     let tableRun = false;
     for (const l of lines) {

@@ -8,7 +8,12 @@ export const ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/msword',
   'application/vnd.ms-excel',
+  'text/markdown',
+  'text/plain',
 ] as const;
+
+// Texto plano y Markdown: ya son texto, se procesan sin IA (ver processTextFile.ts).
+export const TEXT_MIME_TYPES: readonly string[] = ['text/markdown', 'text/plain'];
 
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const MAX_FILE_SIZE_MB = 10;
@@ -26,6 +31,8 @@ export const MIME_INFO: Record<string, { ext: string; label: string }> = {
     label: 'Excel',
   },
   'application/vnd.ms-excel': { ext: 'xls', label: 'Excel (legacy)' },
+  'text/markdown': { ext: 'md', label: 'Markdown' },
+  'text/plain': { ext: 'txt', label: 'Texto' },
 };
 
 // Mapeo extensión → MIME (para validación cliente cuando el navegador no detecta MIME)
@@ -35,9 +42,12 @@ export const EXT_TO_MIME: Record<string, string> = {
   doc: 'application/msword',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   xls: 'application/vnd.ms-excel',
+  md: 'text/markdown',
+  markdown: 'text/markdown',
+  txt: 'text/plain',
 };
 
-export const ACCEPT_ATTRIBUTE = '.pdf,.docx,.doc,.xlsx,.xls';
+export const ACCEPT_ATTRIBUTE = '.pdf,.docx,.doc,.xlsx,.xls,.md,.markdown,.txt';
 
 // Polling
 export const POLLING_INTERVAL_MS = 5000;

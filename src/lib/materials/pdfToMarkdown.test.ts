@@ -231,7 +231,7 @@ describe('cableado', () => {
 
   it('reprocesar un PDF usa el mismo camino y no borra los chunks antes de tener los nuevos', () => {
     expect(actions).toContain('isPdfFile');
-    expect(actions).toMatch(/!isPdfFile\) \{\s*await supabase\.from\('material_chunks'\)\.delete\(\)/);
+    expect(actions).toMatch(/!isPdfFile && !isTextFile\) \{\s*await supabase\.from\('material_chunks'\)\.delete\(\)/);
     expect(actions).toMatch(/else if \(isPdfFile\) \{\s*await processPdfMaterial\(supabase, materialId\)/);
   });
 
