@@ -153,15 +153,9 @@ export async function advanceRemediationPlan(
     .eq('id', planId);
   if (error) return { ok: false, error: error.message };
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('total_xp')
-    .eq('id', user.id)
-    .single();
-  await supabase
-    .from('profiles')
-    .update({ total_xp: ((profile as any)?.total_xp ?? 0) + bonusXp })
-    .eq('id', user.id);
+  // El XP lo otorga el SERVIDOR (migracion 052), una vez por ronda del plan. bonusXp es solo el valor que se
+  // muestra: la misma formula (15..30) vive en award_xp_plan_round.
+  await supabase.rpc('award_xp_plan_round', { p_plan_id: planId, p_round: modulesCompleted, p_score_percent: scorePercent });
 
   return { ok: true, completed, bonusXp };
 }

@@ -494,8 +494,8 @@ export default function LessonPage() {
             })
             .eq('id', remediationRowId);
         }
-        const { data: profile } = await supabase.from('profiles').select('total_xp').eq('id', user.id).single();
-        await supabase.from('profiles').update({ total_xp: (profile?.total_xp ?? 0) + bonusXp }).eq('id', user.id);
+        // El XP lo calcula y lo otorga el SERVIDOR (migracion 052): el navegador ya no escribe profiles.total_xp.
+        if (remediationRowId) await supabase.rpc('award_xp_remediation', { p_remediation_id: remediationRowId, p_score_percent: scorePercent });
       }
     } catch (e) {
       console.warn('Error completando repaso:', e);
@@ -520,8 +520,6 @@ export default function LessonPage() {
         .eq('module_id', moduleId)
         .maybeSingle();
 
-      const alreadyCompleted = existing?.status === 'completed';
-
       await supabase.from('student_progress').upsert({
         student_id: user.id,
         module_id: moduleId,
@@ -539,18 +537,9 @@ export default function LessonPage() {
         last_attempt_at: now,
       }, { onConflict: 'student_id,module_id' });
 
-      // El XP solo se otorga la primera vez que se completa el modulo, para evitar farmear reintentos.
-      if (!alreadyCompleted) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('total_xp')
-          .eq('id', user.id)
-          .single();
-        await supabase
-          .from('profiles')
-          .update({ total_xp: (profile?.total_xp ?? 0) + (mod!.base_xp_reward ?? 0) })
-          .eq('id', user.id);
-      }
+      // El XP lo otorga el SERVIDOR, una sola vez por modulo (libro xp_ledger, migracion 052): reintentar o
+      // recargar no lo repite, asi que ya no hace falta decidirlo aqui con alreadyCompleted.
+      await supabase.rpc('award_xp_module', { p_module_id: moduleId });
 
       // Verificar y otorgar logros (el modal de desbloqueo aparece via Realtime).
       await evaluateAchievements();

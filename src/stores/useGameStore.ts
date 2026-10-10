@@ -18,10 +18,6 @@ interface GameState {
 
   // Acciones
   loadFromProfile: (profile: any) => void;
-  loseHeart: () => Promise<void>;
-  addCoins: (amount: number) => void;
-  spendCoins: (amount: number) => boolean;
-  addXP: (amount: number) => Promise<void>;
   recoverHearts: () => Promise<void>;
   setShowLevelUpModal: (show: boolean) => void;
 }
@@ -35,6 +31,9 @@ function xpForNextLevel(level: number): number {
   return (level + 1) * (level + 1) * 50;
 }
 
+// La economia (XP, monedas, corazones, nivel) la ESCRIBE EL SERVIDOR (migraciones 052 y 053): este store solo la
+// lee y la muestra. Antes tenia loseHeart, addCoins, spendCoins y addXP, que escribian valores absolutos en
+// profiles desde el navegador; ninguna se usaba, y cualquier estudiante podia hacer lo mismo desde la consola.
 export const useGameStore = create<GameState>((set, get) => ({
   hearts: 5,
   maxHearts: 5,
@@ -58,96 +57,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastHeartLostAt: profile.last_heart_lost_at,
       isLoaded: true,
     });
-  },
-
-  loseHeart: async () => {
-    const { hearts } = get();
-    if (hearts <= 0) return;
-
-    const newHearts = hearts - 1;
-    const now = new Date().toISOString();
-
-    set({ hearts: newHearts, lastHeartLostAt: now });
-
-    // Sync con DB
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      await supabase
-        .from('profiles')
-        .update({ current_hearts: newHearts, last_heart_lost_at: now })
-        .eq('id', user.id);
-    }
-  },
-
-  addCoins: (amount) => {
-    const newCoins = get().coins + amount;
-    set({ coins: newCoins });
-
-    // Async sync (fire & forget)
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        supabase
-          .from('profiles')
-          .update({ coins: newCoins })
-          .eq('id', user.id);
-      }
-    });
-  },
-
-  spendCoins: (amount) => {
-    const { coins } = get();
-    if (coins < amount) return false;
-
-    const newCoins = coins - amount;
-    set({ coins: newCoins });
-
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        supabase
-          .from('profiles')
-          .update({ coins: newCoins })
-          .eq('id', user.id);
-      }
-    });
-
-    return true;
-  },
-
-  addXP: async (amount) => {
-    const { totalXP, currentLevel } = get();
-    const newXP = totalXP + amount;
-    const newLevel = calculateLevel(newXP);
-    const didLevelUp = newLevel > currentLevel;
-
-    set({
-      totalXP: newXP,
-      currentLevel: newLevel,
-      pendingXP: amount,
-      showLevelUpModal: didLevelUp,
-    });
-
-    // Limpiar pendingXP después de la animación
-    setTimeout(() => set({ pendingXP: 0 }), 2000);
-
-    // Sync con DB
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      await supabase
-        .from('profiles')
-        .update({
-          total_xp: newXP,
-          current_level: newLevel,
-        })
-        .eq('id', user.id);
-    }
   },
 
   recoverHearts: async () => {
