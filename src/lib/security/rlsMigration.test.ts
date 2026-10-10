@@ -5,7 +5,9 @@ import path from 'path';
 // Guarda de la migracion 051. El comportamiento real (un estudiante que intenta subirse a profesor, crear
 // clases o subir materiales a la clase de otro) se verifico en produccion con una simulacion dentro de una
 // transaccion revertida, porque solo la base real aplica el RLS. Esto evita que alguien quite las defensas.
-const sql = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/051_security_role_and_ownership.sql'), 'utf8').replace(/\r\n/g, '\n');
+const raw = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/051_security_role_and_ownership.sql'), 'utf8').replace(/\r\n/g, '\n');
+// Sin comentarios: la historia de la migracion menciona la politica vieja (FOR ALL) y no debe contar como uso.
+const sql = raw.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');
 
 describe('migracion 051: rol y propiedad', () => {
   it('el rol no se puede cambiar con la sesion de un usuario, pero si desde una funcion de confianza', () => {
