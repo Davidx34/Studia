@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useLayoutEffect, useCallback, useEffect, useMemo } from 'react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { MathText } from '@/components/MathText';
 
 interface Pair {
@@ -138,7 +139,7 @@ export function LessonQuestionMatch({
 
   return (
     <div className="space-y-4">
-      <p className="text-gray-300 text-sm">
+      <p className="text-fg-muted text-sm">
         {locked
           ? allCorrect
             ? '¡Todas las conexiones son correctas!'
@@ -155,7 +156,7 @@ export function LessonQuestionMatch({
               y1={l.y1}
               x2={l.x2}
               y2={l.y2}
-              stroke={!checked ? '#a855f7' : l.ok ? '#10b981' : '#ef4444'}
+              stroke={!checked ? 'rgb(var(--c-primary))' : l.ok ? 'rgb(var(--c-success))' : 'rgb(var(--c-danger))'}
               strokeWidth={3}
               strokeLinecap="round"
               className="transition-all duration-300"
@@ -170,20 +171,26 @@ export function LessonQuestionMatch({
               ref={(el) => { termRefs.current[termIdx] = el; }}
               onClick={() => handleTermClick(termIdx)}
               disabled={locked}
+              aria-pressed={selectedTerm === termIdx}
               className={
                 'w-full text-left p-3 rounded-lg text-sm font-medium border-2 transition-all ' +
                 (isTermCorrect(termIdx)
-                  ? 'bg-green-700 border-green-400 text-white'
+                  ? 'bg-success/15 border-success text-fg'
                   : isTermWrong(termIdx)
-                  ? 'bg-red-700 border-red-400 text-white'
+                  ? 'bg-danger/15 border-danger text-fg'
                   : selectedTerm === termIdx
-                  ? 'bg-purple-600 border-yellow-300 text-white scale-[1.03]'
+                  ? 'bg-primary border-accent text-on-primary scale-[1.03]'
                   : connections[termIdx] !== undefined
-                  ? 'bg-purple-700 border-purple-400 text-white'
-                  : 'bg-purple-900 border-purple-700 text-purple-100 hover:border-purple-400')
+                  ? 'bg-primary/20 border-primary/60 text-fg'
+                  : 'bg-surface-2 border-line-strong text-fg hover:border-primary')
               }
             >
-              <MathText content={p.term} />
+              <span className="flex items-center justify-between gap-2">
+                <MathText content={p.term} />
+                {/* El resultado no depende solo del color: lleva icono y texto para lectores de pantalla. */}
+                {isTermCorrect(termIdx) && (<><CheckCircle2 className="h-4 w-4 flex-shrink-0 text-success" aria-hidden="true" /><span className="sr-only">(conexion correcta)</span></>)}
+                {isTermWrong(termIdx) && (<><XCircle className="h-4 w-4 flex-shrink-0 text-danger" aria-hidden="true" /><span className="sr-only">(conexion incorrecta)</span></>)}
+              </span>
             </button>
           ))}
         </div>
@@ -201,12 +208,12 @@ export function LessonQuestionMatch({
                 className={
                   'w-full text-left p-3 rounded-lg text-sm border-2 transition-all ' +
                   (usedByTermIdx !== null && isTermCorrect(usedByTermIdx)
-                    ? 'bg-green-800 border-green-400 text-white'
+                    ? 'bg-success/15 border-success text-fg'
                     : usedByTermIdx !== null && isTermWrong(usedByTermIdx)
-                    ? 'bg-red-800 border-red-400 text-white'
+                    ? 'bg-danger/15 border-danger text-fg'
                     : usedByTermIdx !== null
-                    ? 'bg-blue-700 border-blue-400 text-white'
-                    : 'bg-blue-900 border-blue-800 text-blue-100 hover:border-blue-400')
+                    ? 'bg-primary/15 border-primary/40 text-fg'
+                    : 'bg-primary/10 border-primary/30 text-fg hover:border-primary')
                 }
               >
                 <MathText content={pairs[origIdx].def} />
@@ -220,7 +227,7 @@ export function LessonQuestionMatch({
         <button
           onClick={handleVerify}
           disabled={!allConnected}
-          className="w-full p-4 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-purple-600"
+          className="w-full p-4 rounded-lg bg-primary text-on-primary font-bold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Verificar conexiones
         </button>
@@ -231,14 +238,14 @@ export function LessonQuestionMatch({
           {attempts + 1 < MAX_ATTEMPTS ? (
             <button
               onClick={handleRetry}
-              className="flex-1 p-4 rounded-lg bg-gray-700 text-white font-bold hover:bg-gray-600"
+              className="flex-1 p-4 rounded-lg bg-surface-2 border border-line text-fg font-bold hover:brightness-110"
             >
               Reintentar ({MAX_ATTEMPTS - attempts - 1} intentos restantes)
             </button>
           ) : (
             <button
               onClick={handleReveal}
-              className="flex-1 p-4 rounded-lg bg-gray-700 text-white font-bold hover:bg-gray-600"
+              className="flex-1 p-4 rounded-lg bg-surface-2 border border-line text-fg font-bold hover:brightness-110"
             >
               Ver respuesta correcta
             </button>

@@ -53,8 +53,8 @@ export function ImpostorCognitivoGame({
 
   return (
     <div className="space-y-4">
-      {gameData.context && <p className="text-gray-300 text-sm">{gameData.context}</p>}
-      <p className="text-purple-300 text-xs font-semibold uppercase tracking-wide">
+      {gameData.context && <p className="text-fg-muted text-sm">{gameData.context}</p>}
+      <p className="text-primary-text text-xs font-semibold uppercase tracking-wide">
         🕵️ ¿Cuál de estas afirmaciones es el impostor (falsa)?
       </p>
 
@@ -70,14 +70,14 @@ export function ImpostorCognitivoGame({
               className={
                 'w-full text-left p-4 rounded-lg border-2 text-sm font-medium transition-all ' +
                 (revealAsImpostor
-                  ? 'bg-red-700 border-red-400 text-white'
+                  ? 'bg-danger/15 border-danger text-fg'
                   : isAccused
                   ? finished === 'won'
-                    ? 'bg-green-700 border-green-400 text-white'
-                    : 'bg-red-700 border-red-400 text-white'
+                    ? 'bg-success/15 border-success text-fg'
+                    : 'bg-danger/15 border-danger text-fg'
                   : finished !== null
-                  ? 'bg-gray-800 border-gray-700 text-gray-400'
-                  : 'bg-gray-700 border-gray-600 text-gray-100 hover:border-purple-400')
+                  ? 'bg-surface-2 border-line-strong text-fg-muted'
+                  : 'bg-surface-2 border-line-strong text-fg hover:border-primary')
               }
             >
               {st.text} {revealAsImpostor && '🎭'}
@@ -87,21 +87,21 @@ export function ImpostorCognitivoGame({
       </div>
 
       {finished === 'won' && (
-        <div className="bg-green-900 border border-green-500 p-4 rounded-lg">
-          <p className="text-green-300 font-bold">🎉 ¡Atrapaste al impostor!</p>
+        <div className="bg-success/10 border border-success p-4 rounded-lg">
+          <p className="text-success font-bold">🎉 ¡Atrapaste al impostor!</p>
           {gameData.exposicion_del_impostor && (
-            <p className="text-green-100 text-sm mt-1">{gameData.exposicion_del_impostor}</p>
+            <p className="text-fg text-sm mt-1">{gameData.exposicion_del_impostor}</p>
           )}
         </div>
       )}
 
       {finished === 'lost' && (
-        <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg">
-          <p className="text-blue-300 font-bold">
+        <div className="bg-primary/10 border border-primary/40 p-4 rounded-lg">
+          <p className="text-primary-text font-bold">
             El impostor era: "{impostor?.text}"
           </p>
           {gameData.exposicion_del_impostor && (
-            <p className="text-blue-100 text-sm mt-1">{gameData.exposicion_del_impostor}</p>
+            <p className="text-fg text-sm mt-1">{gameData.exposicion_del_impostor}</p>
           )}
         </div>
       )}

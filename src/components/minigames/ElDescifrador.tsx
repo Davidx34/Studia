@@ -89,24 +89,24 @@ export function ElDescifrador({
 
   return (
     <div className="space-y-4">
-      <p className="text-gray-300 text-sm">{gameData.initial_clue}</p>
+      <p className="text-fg-muted text-sm">{gameData.initial_clue}</p>
 
-      <div className="bg-gray-700 rounded-lg p-5 text-center">
-        <div className="text-3xl font-mono tracking-[0.3em] text-white">
+      <div className="bg-surface-2 rounded-lg p-5 text-center">
+        <div className="text-3xl font-mono tracking-[0.3em] text-fg">
           {displayWord.map((ch, i) => (
-            <span key={i} className={ch === '_' ? 'text-purple-400' : 'text-white'}>
+            <span key={i} className={ch === '_' ? 'text-primary-text' : 'text-fg'}>
               {ch}
             </span>
           ))}
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-gray-400">
+      <div className="flex items-center justify-between text-xs text-fg-muted">
         <span>❌ {wrongCount}/{MAX_WRONG} intentos fallidos</span>
         <button
           onClick={handleHint}
           disabled={locked || hintsRevealed >= gameData.hints.length}
-          className="px-3 py-1 rounded-lg bg-yellow-900/40 border border-yellow-700 text-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-yellow-900/60"
+          className="px-3 py-1 rounded-lg bg-accent/15 border border-accent/50 text-accent-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/25"
         >
           💡 Pista ({hintsRevealed}/{gameData.hints.length})
         </button>
@@ -115,7 +115,7 @@ export function ElDescifrador({
       {hintsRevealed > 0 && !finished && (
         <div className="space-y-1">
           {gameData.hints.slice(0, hintsRevealed).map((h, i) => (
-            <p key={i} className="text-xs text-yellow-200 bg-yellow-900/20 border border-yellow-800 rounded-lg px-3 py-2">
+            <p key={i} className="text-xs text-fg bg-accent/10 border border-accent/40 rounded-lg px-3 py-2">
               Pista {i + 1}: {h}
             </p>
           ))}
@@ -133,13 +133,14 @@ export function ElDescifrador({
               key={letter}
               onClick={() => handleLetterClick(letter)}
               disabled={locked || used}
+              aria-label={used ? `${letter}: ${isHit ? 'acierto' : 'fallo'}` : letter}
               className={
                 'aspect-square rounded-lg text-sm font-bold border-2 transition-all ' +
                 (isHit
-                  ? 'bg-green-700 border-green-400 text-white'
+                  ? 'bg-success/15 border-success text-fg'
                   : isMiss
-                  ? 'bg-red-900 border-red-700 text-red-300'
-                  : 'bg-gray-800 border-gray-700 text-gray-200 hover:border-purple-400 disabled:opacity-30')
+                  ? 'bg-danger/10 border-danger text-danger'
+                  : 'bg-surface-2 border-line-strong text-fg hover:border-primary disabled:opacity-30')
               }
             >
               {letter}
@@ -149,19 +150,19 @@ export function ElDescifrador({
       </div>
 
       {finished === 'won' && (
-        <div className="bg-green-900 border border-green-500 p-4 rounded-lg">
-          <p className="text-green-300 font-bold">🎉 ¡Descifraste "{word}"!</p>
+        <div className="bg-success/10 border border-success p-4 rounded-lg">
+          <p className="text-success font-bold">🎉 ¡Descifraste "{word}"!</p>
           {gameData.pedagogical_feedback && (
-            <p className="text-green-100 text-sm mt-1">{gameData.pedagogical_feedback}</p>
+            <p className="text-fg text-sm mt-1">{gameData.pedagogical_feedback}</p>
           )}
         </div>
       )}
 
       {finished === 'lost' && (
-        <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg">
-          <p className="text-blue-300 font-bold">La palabra era: {word}</p>
+        <div className="bg-primary/10 border border-primary/40 p-4 rounded-lg">
+          <p className="text-primary-text font-bold">La palabra era: {word}</p>
           {gameData.pedagogical_feedback && (
-            <p className="text-blue-100 text-sm mt-1">{gameData.pedagogical_feedback}</p>
+            <p className="text-fg text-sm mt-1">{gameData.pedagogical_feedback}</p>
           )}
         </div>
       )}

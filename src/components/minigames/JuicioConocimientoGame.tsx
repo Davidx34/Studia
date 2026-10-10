@@ -54,8 +54,8 @@ export function JuicioConocimientoGame({
 
   return (
     <div className="space-y-4">
-      <p className="text-amber-300 text-xs font-semibold uppercase tracking-wide">⚖️ El Juicio al Conocimiento</p>
-      <p className="text-gray-300 text-sm">{gameData.case_file}</p>
+      <p className="text-accent-text text-xs font-semibold uppercase tracking-wide">⚖️ El Juicio al Conocimiento</p>
+      <p className="text-fg-muted text-sm">{gameData.case_file}</p>
 
       {gameData.cross_examination_tip && (
         <div>
@@ -63,12 +63,12 @@ export function JuicioConocimientoGame({
             <button
               onClick={() => setTipShown(true)}
               disabled={locked}
-              className="px-3 py-1 rounded-lg bg-yellow-900/40 border border-yellow-700 text-yellow-300 text-xs disabled:opacity-40 hover:bg-yellow-900/60"
+              className="px-3 py-1 rounded-lg bg-accent/15 border border-accent/50 text-accent-text text-xs disabled:opacity-40 hover:bg-accent/25"
             >
               💡 Pista del fiscal
             </button>
           ) : (
-            <p className="text-xs text-yellow-200 bg-yellow-900/20 border border-yellow-800 rounded-lg px-3 py-2">
+            <p className="text-xs text-fg bg-accent/10 border border-accent/40 rounded-lg px-3 py-2">
               {gameData.cross_examination_tip}
             </p>
           )}
@@ -87,17 +87,17 @@ export function JuicioConocimientoGame({
               className={
                 'w-full text-left p-4 rounded-lg border-2 text-sm transition-all ' +
                 (revealAsGuilty
-                  ? 'bg-red-700 border-red-400 text-white'
+                  ? 'bg-danger/15 border-danger text-fg'
                   : isAccused
                   ? finished === 'won'
-                    ? 'bg-green-700 border-green-400 text-white'
-                    : 'bg-red-700 border-red-400 text-white'
+                    ? 'bg-success/15 border-success text-fg'
+                    : 'bg-danger/15 border-danger text-fg'
                   : finished !== null
-                  ? 'bg-gray-800 border-gray-700 text-gray-400'
-                  : 'bg-gray-700 border-gray-600 text-gray-100 hover:border-purple-400')
+                  ? 'bg-surface-2 border-line-strong text-fg-muted'
+                  : 'bg-surface-2 border-line-strong text-fg hover:border-primary')
               }
             >
-              <span className="font-mono text-xs text-purple-300 mr-2">§{p.paragraph_id}</span>
+              <span className="font-mono text-xs text-primary-text mr-2">§{p.paragraph_id}</span>
               {p.text} {revealAsGuilty && '⚠️'}
             </button>
           );
@@ -105,12 +105,12 @@ export function JuicioConocimientoGame({
       </div>
 
       {finished && (
-        <div className={`p-4 rounded-lg border ${finished === 'won' ? 'bg-green-900 border-green-500' : 'bg-blue-900 border-blue-500'}`}>
-          <p className={`font-bold ${finished === 'won' ? 'text-green-300' : 'text-blue-300'}`}>
+        <div className={`p-4 rounded-lg border ${finished === 'won' ? 'bg-success/10 border-success' : 'bg-primary/10 border-primary/40'}`}>
+          <p className={`font-bold ${finished === 'won' ? 'text-success' : 'text-primary-text'}`}>
             {finished === 'won' ? '🎉 ¡Objeción sostenida!' : `El fraude estaba en el párrafo §${gameData.guilty_paragraph_id}`}
           </p>
           {gameData.verdict_explanation && (
-            <p className={`text-sm mt-1 ${finished === 'won' ? 'text-green-100' : 'text-blue-100'}`}>
+            <p className={`text-sm mt-1 ${finished === 'won' ? 'text-fg' : 'text-fg'}`}>
               {gameData.verdict_explanation}
             </p>
           )}
