@@ -174,8 +174,8 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <MyClassesSection classes={myClasses} />
       <DashboardClient
+        classesSection={<MyClassesSection classes={myClasses} />}
         profile={profile}
         inProgressModule={inProgress}
         nextModule={nextModule}

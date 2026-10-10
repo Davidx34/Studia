@@ -6,6 +6,9 @@ import { useTonitoStore } from '@/stores/useTonitoStore';
 import { BookOpen, Trophy, Target, Map, Sparkles, ArrowRight, CheckCircle2, Zap, Flame, ClipboardList } from 'lucide-react';
 import type { RemediationPlan } from '@/lib/actions/remediation-plans';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
+import { Card, Badge } from '@/components/ui/Card';
+import { ProgressBar } from '@/components/ui/ProgressBar';
+import { cn } from '@/components/ui/cn';
 
 interface Props {
   profile: any;
@@ -16,6 +19,8 @@ interface Props {
   totalCompleted: number;
   weeklyProgress: { date: string; count: number }[];
   activePlan: RemediationPlan | null;
+  // "Mis clases": se muestra DESPUES de la accion principal (continuar), no antes.
+  classesSection?: React.ReactNode;
 }
 
 export function DashboardClient({
@@ -27,6 +32,7 @@ export function DashboardClient({
   totalCompleted,
   weeklyProgress,
   activePlan,
+  classesSection,
 }: Props) {
   const showMessage = useTonitoStore((s) => s.showMessage);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -72,156 +78,127 @@ export function DashboardClient({
     return <CinematicScene type="welcome" studentName={name} onComplete={() => setShowWelcome(false)} />;
   }
 
+  const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg';
+  const heroHref = inProgressModule ? `/lesson/${inProgressModule.module_id}` : nextModule ? `/lesson/${nextModule.id}` : '/map';
+  const heroLabel = inProgressModule ? 'Continúa donde lo dejaste' : nextModule ? `Siguiente en ${nextModule.classroomName}` : 'Empieza tu día';
+  const heroTitle = inProgressModule?.content_modules?.title || nextModule?.title || 'Explora el mapa de aprendizaje';
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 premium-fade-in-up">
       {/* Plan de refuerzo activo (Sesion E.2): no obligatorio, a su ritmo */}
       {activePlan && (
-        <Link href={`/repaso/${activePlan.id}`} className="block group">
-          <div className="rounded-2xl backdrop-blur-xl bg-violet-500/15 border border-violet-400/30 p-4 sm:p-5 hover:bg-violet-500/20 transition-all flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-400 to-fuchsia-500 flex items-center justify-center flex-shrink-0 shadow-lg">
-              <ClipboardList className="w-5 h-5 text-white" />
+        <Link href={`/repaso/${activePlan.id}`} className={cn('block group rounded-2xl', focusRing)}>
+          <Card interactive className="p-4 sm:p-5 flex items-center gap-4 bg-primary/10 border-primary/30">
+            <div className="w-11 h-11 rounded-xl bg-primary text-on-primary flex items-center justify-center flex-shrink-0">
+              <ClipboardList className="w-5 h-5" aria-hidden="true" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-wider text-violet-200">
-                Mi próximo
-              </div>
-              <div className="text-white font-bold truncate">{activePlan.title}</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-primary-text">Mi próximo</div>
+              <div className="text-fg font-bold truncate">{activePlan.title}</div>
               <div className="flex items-center gap-2 mt-1.5">
-                <div className="flex-1 max-w-[180px] h-1.5 bg-white/15 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-violet-400 to-fuchsia-400"
-                    style={{
-                      width: `${Math.min(100, (activePlan.modules_completed / activePlan.modules_target) * 100)}%`,
-                    }}
-                  />
-                </div>
-                <span className="text-xs text-white/70 font-medium">
+                <ProgressBar
+                  className="max-w-[180px]"
+                  label="Módulos completados del plan"
+                  value={(activePlan.modules_completed / Math.max(1, activePlan.modules_target)) * 100}
+                />
+                <span className="text-xs text-fg-muted font-medium">
                   {activePlan.modules_completed}/{activePlan.modules_target} módulos completados
                 </span>
               </div>
             </div>
-            <ArrowRight className="w-6 h-6 text-white/60 group-hover:translate-x-1 transition-transform flex-shrink-0" />
-          </div>
+            <ArrowRight className="w-6 h-6 text-fg-muted group-hover:translate-x-1 transition-transform motion-reduce:transform-none flex-shrink-0" aria-hidden="true" />
+          </Card>
         </Link>
       )}
 
-      {/* Hero card: Continuar / Siguiente modulo / Empezar */}
-      <Link
-        href={
-          inProgressModule
-            ? `/lesson/${inProgressModule.module_id}`
-            : nextModule
-            ? `/lesson/${nextModule.id}`
-            : '/map'
-        }
-        className="block group"
-      >
-        <div className="relative overflow-hidden rounded-3xl backdrop-blur-2xl bg-white/15 border border-white/25 p-6 sm:p-8 hover:bg-white/20 hover:scale-[1.01] transition-all shadow-2xl">
-          <div className="absolute -top-12 -right-12 w-48 h-48 bg-yellow-300/20 rounded-full blur-3xl group-hover:bg-yellow-300/30 transition-colors" />
-
+      {/* Tarjeta principal: Continuar / Siguiente modulo / Empezar. Es LA accion primaria de la pantalla. */}
+      <Link href={heroHref} className={cn('block group rounded-3xl', focusRing)}>
+        <div className="relative overflow-hidden rounded-3xl bg-primary text-on-primary p-6 sm:p-8 shadow-card transition-transform duration-200 motion-reduce:transition-none group-hover:scale-[1.01] motion-reduce:group-hover:scale-100">
+          <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/15 blur-3xl" aria-hidden="true" />
           <div className="relative flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 text-yellow-200 text-sm font-semibold uppercase tracking-wider mb-2">
-                <Sparkles className="w-4 h-4" />
-                {inProgressModule
-                  ? 'Continúa donde lo dejaste'
-                  : nextModule
-                  ? `Siguiente en ${nextModule.classroomName}`
-                  : 'Empieza tu día'}
+              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider mb-2 text-on-primary/90">
+                <Sparkles className="w-4 h-4" aria-hidden="true" />
+                {heroLabel}
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 truncate">
-                {inProgressModule?.content_modules?.title ||
-                  nextModule?.title ||
-                  'Explora el mapa de aprendizaje'}
-              </h2>
+              <h2 className="text-2xl sm:text-3xl font-bold mb-3 text-balance">{heroTitle}</h2>
               {inProgressModule && (
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 max-w-xs h-2 bg-white/15 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-yellow-300 to-orange-400"
-                      style={{ width: `${inProgressModule.completion_percentage}%` }}
-                    />
+                  <div
+                    role="progressbar"
+                    aria-label="Avance del módulo"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={inProgressModule.completion_percentage}
+                    className="flex-1 max-w-xs h-2 rounded-full bg-white/25 overflow-hidden"
+                  >
+                    <div className="h-full rounded-full bg-white" style={{ width: `${inProgressModule.completion_percentage}%` }} />
                   </div>
-                  <span className="text-sm font-semibold text-white/80">
-                    {inProgressModule.completion_percentage}%
-                  </span>
+                  <span className="text-sm font-semibold">{inProgressModule.completion_percentage}%</span>
                 </div>
               )}
             </div>
-            <ArrowRight className="w-8 h-8 text-white/70 group-hover:translate-x-1 transition-transform flex-shrink-0" />
+            <ArrowRight className="w-8 h-8 flex-shrink-0 group-hover:translate-x-1 transition-transform motion-reduce:transform-none" aria-hidden="true" />
           </div>
         </div>
       </Link>
 
-      {/* Grid de stats rápidas */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard icon={Zap} label="XP total" value={profile?.total_xp || 0} color="from-amber-300/80 to-amber-500/80" />
-        <StatCard icon={BookOpen} label="Módulos" value={totalCompleted} color="from-sky-300/80 to-blue-500/80" />
-        <StatCard icon={Flame} label="Racha" value={`${profile?.streak_days || 0}d`} color="from-orange-300/80 to-rose-400/80" />
-        <StatCard icon={Trophy} label="Logros" value={recentAchievements.length} color="from-amber-300/80 to-orange-400/80" />
-        <StatCard icon={Target} label="Misiones hoy" value={`${completedMissions}/${missions.length}`} color="from-fuchsia-300/80 to-rose-400/80" />
-        <StatCard icon={Map} label="Nivel" value={profile?.current_level || 1} color="from-violet-300/80 to-purple-500/80" />
-      </div>
+      {classesSection}
+
+      {/* Grid de stats rapidas */}
+      <section aria-label="Tu resumen">
+        <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <StatCard icon={Zap} label="XP total" value={profile?.total_xp || 0} tone="accent" />
+          <StatCard icon={BookOpen} label="Módulos" value={totalCompleted} tone="primary" />
+          <StatCard icon={Flame} label="Racha" value={`${profile?.streak_days || 0}d`} tone="accent" />
+          <StatCard icon={Trophy} label="Logros" value={recentAchievements.length} tone="primary" />
+          <StatCard icon={Target} label="Misiones hoy" value={`${completedMissions}/${missions.length}`} tone="primary" />
+          <StatCard icon={Map} label="Nivel" value={profile?.current_level || 1} tone="accent" />
+        </ul>
+      </section>
 
       {/* Progreso semanal */}
       <WeeklyProgressChart data={weeklyProgress} />
 
       {/* Misiones del día */}
-      <section>
+      <section aria-labelledby="misiones-titulo">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Target className="w-5 h-5 text-pink-300" /> Misiones de hoy
+          <h3 id="misiones-titulo" className="text-lg font-bold text-fg flex items-center gap-2">
+            <Target className="w-5 h-5 text-primary-text" aria-hidden="true" /> Misiones de hoy
           </h3>
-          <span className="text-xs text-white/60 font-medium">
+          <span className="text-xs text-fg-muted font-medium">
             {completedMissions}/{missions.length} completadas
           </span>
         </div>
 
         <div className="space-y-2">
           {missions.length === 0 && (
-            <div className="text-center py-6 text-white/50 text-sm bg-white/5 rounded-2xl border border-white/10">
-              No hay misiones disponibles hoy. ¡Vuelve mañana!
-            </div>
+            <Card className="text-center py-6 text-fg-muted text-sm shadow-none">No hay misiones disponibles hoy. ¡Vuelve mañana!</Card>
           )}
           {missions.map((mission) => {
             const m = mission.daily_missions;
             const progress = Math.min(100, (mission.current_progress / m.target_value) * 100);
             return (
-              <div
-                key={mission.id}
-                className={`backdrop-blur-xl border rounded-2xl p-4 transition ${
-                  mission.is_completed
-                    ? 'bg-emerald-500/20 border-emerald-400/40'
-                    : 'bg-white/10 border-white/20'
-                }`}
-              >
+              <Card key={mission.id} className={cn('p-4 shadow-none', mission.is_completed && 'bg-success/10 border-success/40')}>
                 <div className="flex items-center justify-between gap-3 mb-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    {mission.is_completed && <CheckCircle2 className="w-5 h-5 text-emerald-300 flex-shrink-0" />}
-                    <span className="font-semibold text-white truncate">{m.title}</span>
+                    {mission.is_completed && <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" aria-hidden="true" />}
+                    <span className="font-semibold text-fg truncate">{m.title}</span>
+                    {mission.is_completed && <span className="sr-only">(completada)</span>}
                   </div>
                   <div className="flex items-center gap-2 text-xs flex-shrink-0">
-                    <span className="text-yellow-300 font-bold">+{m.reward_coins}🪙</span>
-                    <span className="text-purple-300 font-bold">+{m.reward_xp}⚡</span>
+                    <span className="text-accent-text font-bold">+{m.reward_coins} monedas</span>
+                    <span className="text-primary-text font-bold">+{m.reward_xp} XP</span>
                   </div>
                 </div>
-                <div className="h-1.5 bg-black/20 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-700 ${
-                      mission.is_completed
-                        ? 'bg-emerald-400'
-                        : 'bg-gradient-to-r from-pink-400 to-rose-500'
-                    }`}
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-white/60 mt-1">
+                <ProgressBar label={`Progreso de la misión ${m.title}`} value={progress} tone={mission.is_completed ? 'success' : 'primary'} className="h-1.5" />
+                <div className="flex justify-between text-xs text-fg-muted mt-1">
                   <span>{m.description}</span>
                   <span>
                     {mission.current_progress}/{m.target_value}
                   </span>
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
@@ -229,64 +206,46 @@ export function DashboardClient({
 
       {/* Logros recientes */}
       {recentAchievements.length > 0 && (
-        <section>
-          <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-3">
-            <Trophy className="w-5 h-5 text-yellow-300" /> Logros recientes
+        <section aria-labelledby="logros-titulo">
+          <h3 id="logros-titulo" className="text-lg font-bold text-fg flex items-center gap-2 mb-3">
+            <Trophy className="w-5 h-5 text-accent-text" aria-hidden="true" /> Logros recientes
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {recentAchievements.map((ua) => {
               const a = ua.achievements;
               return (
-                <div
-                  key={ua.id}
-                  className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-4 text-center hover:bg-white/15 transition relative overflow-hidden"
-                >
+                <Card key={ua.id} className="p-4 text-center relative overflow-hidden shadow-none">
                   {!ua.seen_by_user && (
-                    <span
-                      className="absolute top-2 right-2 px-2 py-0.5 text-slate-900 text-[10px] font-bold rounded-full"
-                      style={{ background: 'var(--premium-gold)' }}
-                    >
+                    <Badge tone="accent" className="absolute top-2 right-2 text-[10px] font-bold">
                       ¡NUEVO!
-                    </span>
+                    </Badge>
                   )}
                   <div
                     className="w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center text-2xl"
                     style={{ background: a.color, boxShadow: `0 0 20px ${a.color}80` }}
+                    aria-hidden="true"
                   >
                     🏆
                   </div>
-                  <div className="font-bold text-sm text-white truncate">{a.name}</div>
-                  <div className="text-xs text-white/60 mt-1 line-clamp-2">{a.description}</div>
-                </div>
+                  <div className="font-bold text-sm text-fg truncate">{a.name}</div>
+                  <div className="text-xs text-fg-muted mt-1 line-clamp-2">{a.description}</div>
+                </Card>
               );
             })}
           </div>
         </section>
       )}
 
-      {/* CTA al mapa */}
-      <Link
-        href="/map"
-        className="block backdrop-blur-xl bg-gradient-to-r from-violet-500/30 to-cyan-500/30 border border-white/20 rounded-2xl p-5 hover:scale-[1.01] transition group"
-      >
-        <div className="flex items-center justify-between">
+      {/* CTA al mapa. Antes decia "15 módulos esperándote en 5 categorías": un texto fijo que no era cierto. */}
+      <Link href="/map" className={cn('block group rounded-2xl', focusRing)}>
+        <Card interactive className="p-5 flex items-center justify-between">
           <div>
-            <div className="font-bold text-white text-lg">Explorar el mapa</div>
-            <div className="text-sm text-white/70">
-              15 módulos esperándote en 5 categorías
-            </div>
+            <div className="font-bold text-fg text-lg">Explorar el mapa</div>
+            <div className="text-sm text-fg-muted">Mira todos tus módulos y elige por dónde seguir</div>
           </div>
-          <Map className="w-8 h-8 text-white group-hover:rotate-12 transition-transform" />
-        </div>
+          <Map className="w-8 h-8 text-primary-text group-hover:rotate-12 transition-transform motion-reduce:transform-none" aria-hidden="true" />
+        </Card>
       </Link>
-
-      <style jsx>{`
-        @keyframes fade-in {
-          0% { opacity: 0; transform: translateY(8px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in { animation: fade-in 0.5s ease-out; }
-      `}</style>
     </div>
   );
 }
@@ -294,32 +253,29 @@ export function DashboardClient({
 function WeeklyProgressChart({ data }: { data: { date: string; count: number }[] }) {
   const max = Math.max(1, ...data.map((d) => d.count));
   const dayLabels = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+  const summary = data.map((d) => `${dayLabels[new Date(d.date + 'T00:00:00').getDay()]}: ${d.count}`).join(', ');
 
   return (
-    <section className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-4">
-      <h3 className="text-sm font-bold text-white/80 mb-3 flex items-center gap-2">
-        <BookOpen className="w-4 h-4 text-cyan-300" /> Módulos completados esta semana
+    <Card className="p-4 shadow-none">
+      <h3 className="text-sm font-bold text-fg-muted mb-3 flex items-center gap-2">
+        <BookOpen className="w-4 h-4 text-primary-text" aria-hidden="true" /> Módulos completados esta semana
       </h3>
-      <div className="flex items-end justify-between gap-2 h-20">
-        {data.map((d, i) => {
+      {/* Una grafica por si sola no la leen los lectores de pantalla: se resume en texto. */}
+      <div role="img" aria-label={`Módulos completados por día. ${summary}`} className="flex items-end justify-between gap-2 h-20">
+        {data.map((d) => {
           const h = Math.max(4, (d.count / max) * 100);
           const label = dayLabels[new Date(d.date + 'T00:00:00').getDay()];
           return (
             <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
               <div className="w-full flex items-end h-16">
-                <div
-                  className={`w-full rounded-t-md transition-all ${
-                    d.count > 0 ? 'bg-gradient-to-t from-cyan-500 to-blue-400' : 'bg-white/10'
-                  }`}
-                  style={{ height: `${h}%` }}
-                />
+                <div className={cn('w-full rounded-t-md transition-[height] motion-reduce:transition-none', d.count > 0 ? 'bg-primary' : 'bg-surface-2')} style={{ height: `${h}%` }} />
               </div>
-              <span className="text-[10px] text-white/50">{label}</span>
+              <span className="text-[11px] text-fg-muted">{label}</span>
             </div>
           );
         })}
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -327,20 +283,22 @@ function StatCard({
   icon: Icon,
   label,
   value,
-  color,
+  tone,
 }: {
   icon: any;
   label: string;
   value: string | number;
-  color: string;
+  tone: 'primary' | 'accent';
 }) {
   return (
-    <div className="premium-card backdrop-blur-xl bg-white/[0.04] rounded-2xl p-4">
-      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-2 shadow-lg`}>
-        <Icon className="w-5 h-5 text-white" />
-      </div>
-      <div className="text-2xl font-bold text-white font-mono tabular-nums">{value}</div>
-      <div className="text-xs text-white/50 font-medium">{label}</div>
-    </div>
+    <li>
+      <Card className="p-4 h-full">
+        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center mb-2', tone === 'accent' ? 'bg-accent/20 text-accent-text' : 'bg-primary/15 text-primary-text')}>
+          <Icon className="w-5 h-5" aria-hidden="true" />
+        </div>
+        <div className="text-2xl font-bold text-fg font-mono tabular-nums">{value}</div>
+        <div className="text-xs text-fg-muted font-medium">{label}</div>
+      </Card>
+    </li>
   );
 }
