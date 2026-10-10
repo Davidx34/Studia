@@ -2,22 +2,87 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   TOKENS DE DISEÑO (fuente unica de los colores semanticos).
+   Se escriben como "R G B" para que Tailwind pueda aplicar opacidad
+   (bg-primary/15). Los valores oscuros reproducen la paleta actual de
+   la app; el tema CLARO es una opcion y solo se aplica dentro de .theme-scope
+   (las pantallas ya migradas): el resto de la app sigue oscura hasta migrarse.
+   src/lib/design/tokens.test.ts verifica el contraste (WCAG AA 4.5:1) de
+   cada par texto/fondo en AMBOS temas.
+   ============================================================ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --c-bg: 2 6 23;
+  --c-surface: 15 23 42;
+  --c-surface-2: 30 41 59;
+  --c-line: 51 65 85;
+  --c-line-strong: 100 116 139;
+  --c-fg: 241 245 249;
+  --c-fg-muted: 148 163 184;
+  --c-primary: 108 92 231;
+  --c-primary-text: 196 181 253;
+  --c-on-primary: 255 255 255;
+  --c-accent: 240 198 116;
+  --c-on-accent: 15 23 42;
+  --c-accent-text: 240 198 116;
+  --c-success: 127 216 168;
+  --c-danger: 243 139 160;
+  --c-on-danger: 15 23 42;
+  --c-ring: 196 163 255;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Tema claro: SOLO dentro de .theme-scope y cuando <html data-theme="light"> (ver ThemeToggle). */
+html[data-theme="light"] .theme-scope {
+  --c-bg: 245 243 255;
+  --c-surface: 255 255 255;
+  --c-surface-2: 238 238 249;
+  --c-line: 216 220 240;
+  --c-line-strong: 119 129 156;
+  --c-fg: 30 27 75;
+  --c-fg-muted: 71 85 105;
+  --c-primary: 79 70 229;
+  --c-primary-text: 67 56 202;
+  --c-on-primary: 255 255 255;
+  --c-accent: 245 158 11;
+  --c-on-accent: 30 27 75;
+  --c-accent-text: 146 64 14;
+  --c-success: 21 128 61;
+  --c-danger: 185 28 28;
+  --c-on-danger: 255 255 255;
+  --c-ring: 79 70 229;
+  --shadow-card: 0 1px 2px rgb(30 27 75 / 0.06), 0 8px 24px -12px rgb(30 27 75 / 0.18);
+  color-scheme: light;
+}
+
+.theme-scope {
+  background: rgb(var(--c-bg));
+  color: rgb(var(--c-fg));
+}
+
+/* Decoracion que solo tiene sentido sobre fondo oscuro (manchas de luz con mix-blend-screen). */
+html[data-theme="light"] .theme-scope .dark-only {
+  display: none;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: rgb(var(--c-fg));
+  background: rgb(var(--c-bg));
+  font-family: var(--font-sans), system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+
+/* Quien pide menos movimiento, lo recibe en TODA la app (la review 360 encontro soporte en un solo archivo).
+   No se pone animation:none para que lo que dependa de "animationend" siga funcionando. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer utilities {
