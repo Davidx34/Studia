@@ -37,7 +37,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field({ l
             'transition-colors duration-200 motion-reduce:transition-none',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-transparent',
             error ? 'border-danger' : 'border-line-strong',
-            endAdornment && 'pr-24',
+            endAdornment ? 'pr-24' : null,
             className
           )}
           {...rest}
