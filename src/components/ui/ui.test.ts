@@ -39,6 +39,20 @@ describe('Field', () => {
   });
 });
 
+describe('Field: adorno y ayuda', () => {
+  it('con error, aria-describedby no apunta a una ayuda que no se muestra', () => {
+    const html = renderToStaticMarkup(h(Field, { label: 'x', hint: 'ayuda', error: 'mal' }));
+    expect(html).not.toContain('-hint');
+    expect(html).not.toContain('ayuda');
+  });
+
+  it('con un adorno (boton Mostrar) deja espacio a la derecha para que el texto no quede debajo', () => {
+    const html = renderToStaticMarkup(h(Field, { label: 'x', endAdornment: h('button', { type: 'button' }, 'Mostrar') }));
+    expect(html).toContain('pr-24');
+    expect(html).toContain('Mostrar');
+  });
+});
+
 describe('Button', () => {
   it('por defecto es type=button (no envia formularios sin querer)', () => {
     expect(renderToStaticMarkup(h(Button, null, 'Ok'))).toContain('type="button"');
