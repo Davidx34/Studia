@@ -130,7 +130,7 @@ export function TonitoChatWidget() {
   );
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">
+    <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">
       {/* Speech bubble ambient (cuando NO está abierto el chat) */}
       {ambientMessage && !isChatOpen && (
         <div className="pointer-events-auto bg-white/95 backdrop-blur-xl rounded-2xl px-4 py-3 shadow-2xl max-w-xs border-2 border-violet-200 animate-bubble-in relative">
