@@ -1,7 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import { OfflineIndicator } from '@/components/offline/OfflineIndicator';
 import { InstallPrompt } from '@/components/offline/InstallPrompt';
+import { Inter } from 'next/font/google';
+import { THEME_INIT_SCRIPT } from '@/lib/design/theme';
 import './globals.css';
+
+// Tipografia propia (antes: Arial). Se sirve desde el mismo dominio y con font-display: swap.
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
 
 const APP_NAME = 'Stud.ia';
 const APP_DEFAULT_TITLE = 'Stud.ia · Tu compañero de aprendizaje';
@@ -48,15 +53,17 @@ export const viewport: Viewport = {
   themeColor: '#6C5CE7',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
-      <body>
+    <html lang="es" data-theme="dark" suppressHydrationWarning>
+      <head>
+        {/* Aplica el tema elegido antes de pintar, para que no parpadee. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body className={`${inter.variable} font-sans antialiased`}>
         {children}
         <OfflineIndicator />
         <InstallPrompt />

@@ -13,6 +13,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Vite 8 transforma con oxc: JSX automatico para probar componentes con react-dom/server (sin jsdom).
+  oxc: { jsx: { runtime: 'automatic' } },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
