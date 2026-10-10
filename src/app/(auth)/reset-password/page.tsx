@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { AuthShell } from '@/components/auth/AuthShell';
+import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
 import { parseRecoveryLink, validateNewPassword, describeResetError, MIN_PASSWORD_LENGTH } from '@/lib/auth/recovery';
 
 type Estado = 'verificando' | 'listo' | 'invalido';
 
-const INPUT_CLASS =
-  'premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -151,21 +151,20 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <AuthShell subtitle="Crea tu contraseña nueva">
+    <AuthShell subtitle="Crea tu contraseña nueva" themeable>
       {estado === 'verificando' && (
-        <p role="status" className="text-white/60 text-center py-6">
+        <p role="status" className="text-fg-muted text-center py-6">
           Verificando tu enlace...
         </p>
       )}
 
       {estado === 'invalido' && (
         <div role="alert">
-          <h2 className="text-2xl font-semibold text-white mb-3">Enlace no válido</h2>
-          <p className="text-white/60">{motivoInvalido}</p>
+          <h2 className="text-2xl font-semibold text-fg mb-3">Enlace no válido</h2>
+          <p className="text-fg-muted">{motivoInvalido}</p>
           <Link
             href="/forgot-password"
-            className="premium-btn premium-focus mt-6 block w-full py-3 text-center text-slate-900 font-semibold rounded-xl"
-            style={{ background: 'linear-gradient(135deg, var(--premium-gold) 0%, #e8a87c 100%)' }}
+            className="mt-6 inline-flex min-h-[52px] w-full items-center justify-center rounded-xl bg-accent text-on-accent font-semibold hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Pedir un enlace nuevo
           </Link>
@@ -173,76 +172,49 @@ export default function ResetPasswordPage() {
       )}
 
       {estado === 'listo' && hecho && (
-        <p role="status" className="text-white text-center py-6">
+        <p role="status" className="text-fg text-center py-6">
           ¡Listo! Tu contraseña cambió. Entrando...
         </p>
       )}
 
       {estado === 'listo' && !hecho && (
         <>
-          <h2 className="text-2xl font-semibold text-white mb-2">Contraseña nueva</h2>
-          <p className="text-white/60 text-sm mb-6">Elige una contraseña de al menos {MIN_PASSWORD_LENGTH} caracteres.</p>
+          <h2 className="text-2xl font-semibold text-fg mb-2">Contraseña nueva</h2>
+          <p className="text-fg-muted text-sm mb-6">Elige una contraseña de al menos {MIN_PASSWORD_LENGTH} caracteres.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-white/70 mb-2">
-                Contraseña nueva
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={mostrar ? 'text' : 'password'}
-                  required
-                  minLength={MIN_PASSWORD_LENGTH}
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`${INPUT_CLASS} pr-24`}
-                />
+            <Field
+              label="Contraseña nueva"
+              type={mostrar ? 'text' : 'password'}
+              name="password"
+              required
+              minLength={MIN_PASSWORD_LENGTH}
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              endAdornment={
                 <button
                   type="button"
                   onClick={() => setMostrar((m) => !m)}
                   aria-pressed={mostrar}
-                  className="premium-focus absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg text-xs font-medium text-white/60 hover:text-white transition-colors duration-200"
+                  className="min-h-[36px] px-3 rounded-lg text-xs font-medium text-fg-muted hover:text-fg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {mostrar ? 'Ocultar' : 'Mostrar'}
                 </button>
-              </div>
-            </div>
+              }
+            />
 
-            <div>
-              <label htmlFor="confirm" className="block text-sm font-medium text-white/70 mb-2">
-                Repite la contraseña
-              </label>
-              <input
-                id="confirm"
-                type={mostrar ? 'text' : 'password'}
-                required
-                autoComplete="new-password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                className={INPUT_CLASS}
-              />
-            </div>
+            <Field label="Repite la contraseña" type={mostrar ? 'text' : 'password'} name="confirm" required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
 
             {error && (
-              <div
-                role="alert"
-                className="rounded-xl p-3 text-sm text-white border premium-fade-in-up"
-                style={{ background: 'rgba(243, 139, 160, 0.12)', borderColor: 'rgba(243, 139, 160, 0.3)' }}
-              >
+              <div role="alert" className="rounded-xl p-3 text-sm text-fg border border-danger/40 bg-danger/10">
                 {error}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="premium-btn premium-focus w-full py-3 text-slate-900 font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: 'linear-gradient(135deg, var(--premium-gold) 0%, #e8a87c 100%)' }}
-            >
+            <Button type="submit" variant="accent" size="lg" loading={loading} className="w-full">
               {loading ? 'Guardando...' : 'Guardar contraseña'}
-            </button>
+            </Button>
           </form>
         </>
       )}

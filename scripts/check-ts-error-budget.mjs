@@ -31,7 +31,9 @@ console.log(`Corriendo tsc --noEmit (presupuesto actual: ${TS_ERROR_BUDGET} erro
 
 let output = '';
 try {
-  execSync('npx tsc --noEmit', { encoding: 'utf-8', maxBuffer: 20 * 1024 * 1024 });
+  // --incremental false: con la cache de tsbuildinfo, un error nuevo puede NO aparecer en local y si en CI
+  // (paso con Field.tsx: local contaba 28 y CI 29).
+  execSync('npx tsc --noEmit --incremental false', { encoding: 'utf-8', maxBuffer: 20 * 1024 * 1024 });
 } catch (err) {
   output = err.stdout || '';
 }

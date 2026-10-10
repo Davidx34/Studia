@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { AuthShell } from '@/components/auth/AuthShell';
+import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
 
 const PENDING_JOIN_CODE_KEY = 'studia_pending_join_code';
 const PENDING_REGISTRATION_EMAIL_KEY = 'studia_pending_registration_email';
@@ -84,141 +87,85 @@ export default function SignupPage() {
     router.refresh();
   };
 
+  const linkClass =
+    'inline-flex min-h-[44px] items-center font-medium text-accent-text underline-offset-4 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+
   if (checkEmail) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 bg-slate-950 bg-gradient-to-br from-slate-950 via-violet-950 to-slate-950">
-        <div className="w-full max-w-md text-center premium-fade-in-up">
-          <h1 className="text-5xl font-bold text-white tracking-tight mb-8">
-            Stud<span style={{ color: 'var(--premium-gold)' }}>.</span>ia
-          </h1>
-          <div className="premium-card backdrop-blur-2xl bg-white/[0.04] rounded-3xl p-8 shadow-2xl">
-            <h2 className="text-2xl font-semibold text-white mb-3">¡Ya casi! 📬</h2>
-            <p className="text-white/60">
-              Te enviamos un correo a{' '}
-              <span style={{ color: 'var(--premium-gold)' }}>{email}</span> para confirmar tu
-              cuenta. Ábrelo y luego inicia sesión.
-            </p>
-            <Link
-              href="/login"
-              className="premium-focus inline-block mt-6 font-medium rounded transition-colors duration-200"
-              style={{ color: 'var(--premium-gold)' }}
-            >
-              Ir a iniciar sesión
-            </Link>
-          </div>
+      <AuthShell themeable>
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold text-fg mb-3">¡Ya casi! 📬</h2>
+          <p className="text-fg-muted">
+            Te enviamos un correo a <span className="text-accent-text font-medium">{email}</span> para confirmar tu cuenta. Ábrelo y luego inicia sesión.
+          </p>
+          <Link href="/login" className={`${linkClass} mt-4`}>
+            Ir a iniciar sesión
+          </Link>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-slate-950 bg-gradient-to-br from-slate-950 via-violet-950 to-slate-950">
-      <div className="w-full max-w-md premium-fade-in-up">
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-white tracking-tight">
-            Stud<span style={{ color: 'var(--premium-gold)' }}>.</span>ia
-          </h1>
-          <p className="text-white/60 mt-2">¡Empieza tu aventura de aprendizaje!</p>
-        </div>
+    <AuthShell subtitle="¡Empieza tu aventura de aprendizaje!" themeable>
+      <h2 className="text-2xl font-semibold text-fg mb-6">Crear cuenta</h2>
 
-        <div className="premium-card backdrop-blur-2xl bg-white/[0.04] rounded-3xl p-8 shadow-2xl">
-          <h2 className="text-2xl font-semibold text-white mb-6">Crear cuenta</h2>
+      <form onSubmit={handleSignup} className="space-y-4">
+        <Field label="Tu nombre" name="name" autoComplete="name" required value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="¿Cómo te llamas?" />
 
-          <form onSubmit={handleSignup} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">Tu nombre</label>
-              <input
-                type="text"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="¿Cómo te llamas?"
-                className="premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20"
-              />
-            </div>
+        <Field
+          label="Nombre de usuario"
+          name="username"
+          autoComplete="username"
+          required
+          pattern="[a-zA-Z0-9_]+"
+          hint="Solo letras, números y guion bajo."
+          value={username}
+          onChange={(e) => setUsername(e.target.value.toLowerCase())}
+          placeholder="ej: super_estudiante"
+        />
 
-            <div>
-              <label className="block text-sm font-medium text-white/70 mb-2">Nombre de usuario</label>
-              <input
-                type="text"
-                required
-                pattern="[a-zA-Z0-9_]+"
-                value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase())}
-                placeholder="ej: super_estudiante"
-                className="premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20"
-              />
-            </div>
+        <Field label="Email" type="email" name="email" autoComplete="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@email.com" />
 
-            <div>
-              <label className="block text-sm font-medium text-white/70 mb-2">Email</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@email.com"
-                className="premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20"
-              />
-            </div>
+        <Field
+          label="Contraseña"
+          type="password"
+          name="password"
+          autoComplete="new-password"
+          required
+          minLength={6}
+          hint="Mínimo 6 caracteres."
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
 
-            <div>
-              <label className="block text-sm font-medium text-white/70 mb-2">Contraseña</label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
-                className="premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20"
-              />
-            </div>
+        <Field
+          label="Código de clase (opcional)"
+          name="join-code"
+          autoComplete="off"
+          value={joinCode}
+          onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+          placeholder="ej: ANA5A26"
+          className="uppercase"
+        />
 
-            <div>
-              <label className="block text-sm font-medium text-white/70 mb-2">
-                Código de clase <span className="text-white/40 font-normal">(opcional)</span>
-              </label>
-              <input
-                type="text"
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="ej: ANA5A26"
-                className="premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 uppercase transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20"
-              />
-            </div>
+        {error && (
+          <div role="alert" className="rounded-xl p-3 text-sm text-fg border border-danger/40 bg-danger/10">
+            {error}
+          </div>
+        )}
 
-            {error && (
-              <div
-                className="rounded-xl p-3 text-sm text-white border premium-fade-in-up"
-                style={{ background: 'rgba(243, 139, 160, 0.12)', borderColor: 'rgba(243, 139, 160, 0.3)' }}
-              >
-                {error}
-              </div>
-            )}
+        <Button type="submit" variant="accent" size="lg" loading={loading} className="w-full">
+          {loading ? 'Creando tu cuenta...' : '¡Empezar mi aventura!'}
+        </Button>
+      </form>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="premium-btn premium-focus w-full py-3 text-slate-900 font-semibold rounded-xl disabled:opacity-50"
-              style={{ background: 'linear-gradient(135deg, var(--premium-gold) 0%, #e8a87c 100%)' }}
-            >
-              {loading ? 'Creando tu cuenta...' : '¡Empezar mi aventura!'}
-            </button>
-          </form>
-
-          <p className="text-center text-white/50 text-sm mt-6">
-            ¿Ya tienes cuenta?{' '}
-            <Link
-              href="/login"
-              className="premium-focus font-medium transition-colors duration-200 rounded"
-              style={{ color: 'var(--premium-gold)' }}
-            >
-              Inicia sesión
-            </Link>
-          </p>
-        </div>
-      </div>
-    </div>
+      <p className="text-center text-fg-muted text-sm mt-6">
+        ¿Ya tienes cuenta?{' '}
+        <Link href="/login" className={linkClass}>
+          Inicia sesión
+        </Link>
+      </p>
+    </AuthShell>
   );
 }

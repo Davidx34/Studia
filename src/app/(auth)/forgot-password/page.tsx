@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { AuthShell } from '@/components/auth/AuthShell';
+import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
 import {
   describeRequestError,
   describeOtpError,
@@ -19,10 +21,6 @@ const COOLDOWN_SECONDS = 60;
 
 type Paso = 'correo' | 'codigo';
 
-const INPUT_CLASS =
-  'premium-focus w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 transition-all duration-300 ease-out focus:bg-white/[0.07] focus:border-white/20';
-
-const GOLD_BUTTON_STYLE = { background: 'linear-gradient(135deg, var(--premium-gold) 0%, #e8a87c 100%)' };
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -112,130 +110,80 @@ export default function ForgotPasswordPage() {
     setCooldown(0);
   };
 
+  const linkClass =
+    'inline-flex min-h-[44px] items-center font-medium text-accent-text underline-offset-4 hover:underline rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+
   return (
-    <AuthShell subtitle="Recupera tu acceso">
+    <AuthShell subtitle="Recupera tu acceso" themeable>
       {paso === 'correo' ? (
         <>
-          <h2 className="text-2xl font-semibold text-white mb-2">¿Olvidaste tu contraseña?</h2>
-          <p className="text-white/60 text-sm mb-6">
+          <h2 className="text-2xl font-semibold text-fg mb-2">¿Olvidaste tu contraseña?</h2>
+          <p className="text-fg-muted text-sm mb-6">
             Escribe el correo de tu cuenta y te enviaremos un código para crear una contraseña nueva.
           </p>
 
           <form onSubmit={handleSubmitCorreo} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-white/70 mb-2">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@email.com"
-                className={INPUT_CLASS}
-              />
-            </div>
+            <Field label="Email" type="email" name="email" required autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@email.com" />
 
             {error && (
-              <div
-                role="alert"
-                className="rounded-xl p-3 text-sm text-white border premium-fade-in-up"
-                style={{ background: 'rgba(243, 139, 160, 0.12)', borderColor: 'rgba(243, 139, 160, 0.3)' }}
-              >
+              <div role="alert" className="rounded-xl p-3 text-sm text-fg border border-danger/40 bg-danger/10">
                 {error}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={enviando}
-              className="premium-btn premium-focus w-full py-3 text-slate-900 font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              style={GOLD_BUTTON_STYLE}
-            >
+            <Button type="submit" variant="accent" size="lg" loading={enviando} className="w-full">
               {enviando ? 'Enviando...' : 'Enviarme el código'}
-            </button>
+            </Button>
           </form>
         </>
       ) : (
         <>
-          <h2 className="text-2xl font-semibold text-white mb-2">Escribe el código 📬</h2>
-          <p className="text-white/60 text-sm mb-6">
-            Si hay una cuenta con <span style={{ color: 'var(--premium-gold)' }}>{email.trim()}</span>, te enviamos un
-            correo con un código de verificación. Puede tardar un par de minutos; mira también en spam.
+          <h2 className="text-2xl font-semibold text-fg mb-2">Escribe el código 📬</h2>
+          <p className="text-fg-muted text-sm mb-6">
+            Si hay una cuenta con <span className="text-accent-text font-medium">{email.trim()}</span>, te enviamos un correo con un código de
+            verificación. Puede tardar un par de minutos; mira también en spam.
           </p>
 
           <form onSubmit={handleSubmitCodigo} className="space-y-4">
-            <div>
-              <label htmlFor="codigo" className="block text-sm font-medium text-white/70 mb-2">
-                Código de verificación
-              </label>
-              <input
-                id="codigo"
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                autoFocus
-                required
-                maxLength={OTP_MAX_LENGTH + 4}
-                value={codigo}
-                onChange={(e) => setCodigo(sanitizeOtp(e.target.value))}
-                placeholder="000000"
-                aria-describedby="codigo-ayuda"
-                className={`${INPUT_CLASS} text-center text-2xl font-mono tabular-nums tracking-[0.35em]`}
-              />
-              <p id="codigo-ayuda" className="text-xs text-white/40 mt-2">
-                ¿El correo trae un botón en vez de un código? Ábrelo desde ahí.
-              </p>
-            </div>
+            <Field
+              label="Código de verificación"
+              name="codigo"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              required
+              maxLength={OTP_MAX_LENGTH + 4}
+              value={codigo}
+              onChange={(e) => setCodigo(sanitizeOtp(e.target.value))}
+              placeholder="000000"
+              hint="¿El correo trae un botón en vez de un código? Ábrelo desde ahí."
+              className="text-center text-2xl font-mono tabular-nums tracking-[0.35em]"
+            />
 
             {error && (
-              <div
-                role="alert"
-                className="rounded-xl p-3 text-sm text-white border premium-fade-in-up"
-                style={{ background: 'rgba(243, 139, 160, 0.12)', borderColor: 'rgba(243, 139, 160, 0.3)' }}
-              >
+              <div role="alert" className="rounded-xl p-3 text-sm text-fg border border-danger/40 bg-danger/10">
                 {error}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={verificando}
-              className="premium-btn premium-focus w-full py-3 text-slate-900 font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              style={GOLD_BUTTON_STYLE}
-            >
+            <Button type="submit" variant="accent" size="lg" loading={verificando} className="w-full">
               {verificando ? 'Verificando...' : 'Verificar código'}
-            </button>
+            </Button>
           </form>
 
           <div className="mt-4 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={handleReenviar}
-              disabled={enviando || cooldown > 0}
-              className="premium-focus w-full py-2.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 text-white/80 transition-all duration-300 ease-out hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <Button type="button" variant="secondary" onClick={handleReenviar} disabled={enviando || cooldown > 0} className="w-full">
               {cooldown > 0 ? `Reenviar el código en ${cooldown} s` : enviando ? 'Enviando...' : 'Reenviar el código'}
-            </button>
-            <button
-              type="button"
-              onClick={usarOtroCorreo}
-              className="premium-focus text-sm text-white/50 hover:text-white/80 transition-colors duration-200 rounded"
-            >
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={usarOtroCorreo} className="text-fg-muted">
               Usar otro correo
-            </button>
+            </Button>
           </div>
         </>
       )}
 
-      <p className="text-center text-white/50 text-sm mt-6">
-        <Link
-          href="/login"
-          className="premium-focus font-medium transition-colors duration-200 rounded"
-          style={{ color: 'var(--premium-gold)' }}
-        >
+      <p className="text-center mt-6">
+        <Link href="/login" className={linkClass}>
           ← Volver a iniciar sesión
         </Link>
       </p>
