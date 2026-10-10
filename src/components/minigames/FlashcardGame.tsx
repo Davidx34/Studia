@@ -121,9 +121,9 @@ export function FlashcardGame({
 
   return (
     <div className="space-y-4">
-      <p className="text-gray-300 text-sm">Encuentra los pares relacionados. Toca dos tarjetas para compararlas.</p>
+      <p className="text-fg-muted text-sm">Encuentra los pares relacionados. Toca dos tarjetas para compararlas.</p>
 
-      <div className="flex items-center justify-between text-xs text-gray-400">
+      <div className="flex items-center justify-between text-xs text-fg-muted">
         <span>🔁 Movimientos: {moves}</span>
         <span>✓ Pares: {matched.size}/{pairs.length}</span>
       </div>
@@ -149,13 +149,13 @@ export function FlashcardGame({
                 }}
               >
                 <div
-                  className="absolute inset-0 rounded-lg bg-purple-800 border-2 border-purple-600 flex items-center justify-center text-2xl"
+                  className="absolute inset-0 rounded-lg bg-primary/20 border-2 border-primary/60 flex items-center justify-center text-2xl"
                   style={{ backfaceVisibility: 'hidden' }}
                 >
                   ❓
                 </div>
                 <div
-                  className="absolute inset-0 rounded-lg bg-blue-700 border-2 border-blue-400 flex items-center justify-center text-white text-[11px] font-medium text-center p-1 leading-tight"
+                  className="absolute inset-0 rounded-lg bg-primary/15 border-2 border-primary/40 flex items-center justify-center text-fg text-[11px] font-medium text-center p-1 leading-tight"
                   style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                 >
                   {card.text}
@@ -167,11 +167,11 @@ export function FlashcardGame({
       </div>
 
       {finished && (
-        <div className="bg-green-900 border border-green-500 p-4 rounded-lg">
-          <p className="text-green-300 font-bold">🎉 ¡Encontraste todos los pares en {moves} movimientos!</p>
-          <p className="text-green-200 text-sm mt-1">{movesLabel(moves)}</p>
+        <div className="bg-success/10 border border-success p-4 rounded-lg">
+          <p className="text-success font-bold">🎉 ¡Encontraste todos los pares en {moves} movimientos!</p>
+          <p className="text-fg text-sm mt-1">{movesLabel(moves)}</p>
           {gameData.pedagogical_feedback && (
-            <p className="text-green-100 text-sm mt-1">{gameData.pedagogical_feedback}</p>
+            <p className="text-fg text-sm mt-1">{gameData.pedagogical_feedback}</p>
           )}
         </div>
       )}

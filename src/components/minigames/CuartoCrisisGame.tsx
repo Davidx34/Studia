@@ -80,27 +80,27 @@ export function CuartoCrisisGame({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-red-300 text-xs font-semibold uppercase tracking-wide">🚨 Cuarto de Crisis</p>
+        <p className="text-danger text-xs font-semibold uppercase tracking-wide">🚨 Cuarto de Crisis</p>
         <div
           className={
             'px-3 py-1.5 rounded-lg font-mono font-bold text-sm border-2 transition-colors ' +
             (finished
-              ? 'bg-gray-800 border-gray-700 text-gray-400'
+              ? 'bg-surface-2 border-line-strong text-fg-muted'
               : timeUrgent
-              ? 'bg-red-900 border-red-500 text-red-200 animate-pulse'
-              : 'bg-gray-800 border-gray-600 text-gray-200')
+              ? 'bg-danger/10 border-danger text-fg animate-pulse'
+              : 'bg-surface-2 border-line-strong text-fg')
           }
         >
           ⏱️ {timeLeft}s
         </div>
       </div>
 
-      <p className="text-gray-300 text-sm">{gameData.crisis_scenario}</p>
+      <p className="text-fg-muted text-sm">{gameData.crisis_scenario}</p>
 
-      <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-3 space-y-1">
-        <p className="text-xs text-gray-400 font-semibold uppercase">Telemetría</p>
+      <div className="bg-surface/60 border border-line-strong rounded-lg p-3 space-y-1">
+        <p className="text-xs text-fg-muted font-semibold uppercase">Telemetría</p>
         {(gameData.telemetry_data || []).map((t, i) => (
-          <p key={i} className="text-sm text-amber-200">📊 {t}</p>
+          <p key={i} className="text-sm text-fg">📊 {t}</p>
         ))}
       </div>
 
@@ -116,14 +116,14 @@ export function CuartoCrisisGame({
                 'w-full text-left p-4 rounded-lg border-2 text-sm font-medium transition-all ' +
                 (isSelected
                   ? finished === 'won'
-                    ? 'bg-green-700 border-green-400 text-white'
-                    : 'bg-red-700 border-red-400 text-white'
+                    ? 'bg-success/15 border-success text-fg'
+                    : 'bg-danger/15 border-danger text-fg'
                   : finished !== null
-                  ? 'bg-gray-800 border-gray-700 text-gray-400'
-                  : 'bg-gray-700 border-gray-600 text-gray-100 hover:border-purple-400')
+                  ? 'bg-surface-2 border-line-strong text-fg-muted'
+                  : 'bg-surface-2 border-line-strong text-fg hover:border-primary')
               }
             >
-              <span className="font-mono text-xs text-purple-300 mr-2">[{iv.action_code}]</span>
+              <span className="font-mono text-xs text-primary-text mr-2">[{iv.action_code}]</span>
               {iv.description}
             </button>
           );
@@ -131,21 +131,21 @@ export function CuartoCrisisGame({
       </div>
 
       {finished === 'won' && (
-        <div className="bg-green-900 border border-green-500 p-4 rounded-lg">
-          <p className="text-green-300 font-bold">✅ {selected?.consequence}</p>
+        <div className="bg-success/10 border border-success p-4 rounded-lg">
+          <p className="text-success font-bold">✅ {selected?.consequence}</p>
           {gameData.post_mortem_report && (
-            <p className="text-green-100 text-sm mt-1">{gameData.post_mortem_report}</p>
+            <p className="text-fg text-sm mt-1">{gameData.post_mortem_report}</p>
           )}
         </div>
       )}
 
       {finished === 'lost' && (
-        <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg">
-          <p className="text-blue-300 font-bold">
+        <div className="bg-primary/10 border border-primary/40 p-4 rounded-lg">
+          <p className="text-primary-text font-bold">
             {selected ? selected.consequence : '⏰ Se acabó el tiempo. La crisis no fue contenida.'}
           </p>
           {gameData.post_mortem_report && (
-            <p className="text-blue-100 text-sm mt-1">{gameData.post_mortem_report}</p>
+            <p className="text-fg text-sm mt-1">{gameData.post_mortem_report}</p>
           )}
         </div>
       )}

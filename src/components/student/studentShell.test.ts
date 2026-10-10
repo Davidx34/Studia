@@ -15,14 +15,15 @@ import { isThemedStudentRoute, THEMED_STUDENT_ROUTES } from '@/lib/design/themed
 const shell = (pathname: string) => renderToStaticMarkup(h(StudentShell as any, { pathname, user: { email: 'a@b.co', name: 'Kevin' } }, h('p', null, 'contenido')));
 
 describe('rutas con tema claro', () => {
-  it('solo el dashboard esta migrado por ahora', () => {
-    expect(THEMED_STUDENT_ROUTES).toEqual(['/dashboard']);
+  it('el dashboard y la leccion estan migrados', () => {
+    expect(THEMED_STUDENT_ROUTES).toEqual(['/dashboard', '/lesson']);
+    expect(isThemedStudentRoute('/lesson/abc')).toBe(true);
     expect(isThemedStudentRoute('/dashboard')).toBe(true);
     expect(isThemedStudentRoute('/dashboard/algo')).toBe(true);
   });
 
   it('las pantallas sin migrar NO aceptan el tema claro (su texto blanco quedaria ilegible)', () => {
-    for (const r of ['/lesson/abc', '/map', '/achievements', '/my-classes/1', '/repaso/2', '/dashboardx', '']) expect(isThemedStudentRoute(r)).toBe(false);
+    for (const r of ['/lessons', '/map', '/achievements', '/my-classes/1', '/repaso/2', '/dashboardx', '']) expect(isThemedStudentRoute(r)).toBe(false);
   });
 });
 
@@ -33,8 +34,8 @@ describe('StudentShell', () => {
     expect(html).toContain('Tema de color');
   });
 
-  it('en una ruta sin migrar NO aplica el tema ni muestra el selector (sigue oscura)', () => {
-    const html = shell('/lesson/abc');
+  it('en una ruta sin migrar (mapa) NO aplica el tema ni muestra el selector (sigue oscura)', () => {
+    const html = shell('/map');
     expect(html).not.toContain('theme-scope');
     expect(html).not.toContain('Tema de color');
     expect(html).toContain('bg-slate-950');

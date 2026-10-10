@@ -56,9 +56,12 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
+// data-theme lo pone el script de arranque (THEME_INIT_SCRIPT) antes de pintar. NO va en el JSX de <html>: si una
+// hidratacion falla, React re-renderiza el arbol y reescribiria el atributo, pisando el tema que el usuario eligio.
+// Sin atributo = oscuro.
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" data-theme="dark" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <head>
         {/* Aplica el tema elegido antes de pintar, para que no parpadee. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />

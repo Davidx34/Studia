@@ -92,7 +92,7 @@ export function TimelineGame({
 
   return (
     <div className="space-y-4">
-      <p className="text-gray-300 text-sm">Toca los eventos en el orden correcto (del más antiguo al más reciente)</p>
+      <p className="text-fg-muted text-sm">Toca los eventos en el orden correcto (del más antiguo al más reciente)</p>
 
       <div className="space-y-2">
         {Array.from({ length: items.length }, (_, pos) => {
@@ -107,12 +107,12 @@ export function TimelineGame({
               className={
                 'w-full flex items-center gap-3 p-3 rounded-lg text-left border-2 transition-all ' +
                 (finished === 'won'
-                  ? 'bg-green-700 border-green-400 text-white'
+                  ? 'bg-success/15 border-success text-fg'
                   : wrongHere
-                  ? 'bg-red-900 border-red-600 text-red-200'
+                  ? 'bg-danger/10 border-danger text-fg'
                   : item
-                  ? 'bg-purple-800 border-purple-500 text-white'
-                  : 'bg-gray-800 border-dashed border-gray-600 text-gray-500')
+                  ? 'bg-primary/20 border-primary/60 text-fg'
+                  : 'bg-surface-2 border-dashed border-line-strong text-fg-muted')
               }
             >
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-black/25 flex items-center justify-center text-xs font-bold">
@@ -126,20 +126,20 @@ export function TimelineGame({
       </div>
 
       {feedback === 'wrong' && (
-        <div className="bg-red-900 border border-red-500 p-3 rounded-lg text-red-200 text-sm font-medium">
+        <div className="bg-danger/10 border border-danger p-3 rounded-lg text-fg text-sm font-medium">
           Ese orden no es correcto. Intenta de nuevo ({MAX_ATTEMPTS - attempts} intento{MAX_ATTEMPTS - attempts === 1 ? '' : 's'} restante{MAX_ATTEMPTS - attempts === 1 ? '' : 's'}).
         </div>
       )}
 
       {!locked && bank.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Eventos disponibles</p>
+          <p className="text-xs text-fg-muted uppercase tracking-wide">Eventos disponibles</p>
           <div className="flex flex-wrap gap-2">
             {bank.map((idx) => (
               <button
                 key={idx}
                 onClick={() => handleTapBank(idx)}
-                className="px-3 py-2 rounded-lg bg-gray-700 border-2 border-gray-600 text-gray-100 text-sm hover:border-purple-400 transition-all"
+                className="px-3 py-2 rounded-lg bg-surface-2 border-2 border-line-strong text-fg text-sm hover:border-primary transition-all"
               >
                 {items[idx].text}
               </button>
@@ -152,31 +152,31 @@ export function TimelineGame({
         <button
           onClick={handleCheck}
           disabled={placed.length !== items.length || !!feedback}
-          className="w-full p-4 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-purple-600"
+          className="w-full p-4 rounded-lg bg-primary text-on-primary font-bold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Verificar orden
         </button>
       )}
 
       {finished === 'won' && (
-        <div className="bg-green-900 border border-green-500 p-4 rounded-lg">
-          <p className="text-green-300 font-bold">🎉 ¡Orden correcto!</p>
+        <div className="bg-success/10 border border-success p-4 rounded-lg">
+          <p className="text-success font-bold">🎉 ¡Orden correcto!</p>
           {gameData.pedagogical_feedback && (
-            <p className="text-green-100 text-sm mt-1">{gameData.pedagogical_feedback}</p>
+            <p className="text-fg text-sm mt-1">{gameData.pedagogical_feedback}</p>
           )}
         </div>
       )}
 
       {finished === 'lost' && (
-        <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg space-y-2">
-          <p className="text-blue-300 font-bold">El orden correcto era:</p>
-          <ol className="list-decimal list-inside text-blue-100 text-sm space-y-0.5">
+        <div className="bg-primary/10 border border-primary/40 p-4 rounded-lg space-y-2">
+          <p className="text-primary-text font-bold">El orden correcto era:</p>
+          <ol className="list-decimal list-inside text-fg text-sm space-y-0.5">
             {correctOrder.map((item) => (
               <li key={item.id}>{item.text}{item.year ? ` (${item.year})` : ''}</li>
             ))}
           </ol>
           {gameData.pedagogical_feedback && (
-            <p className="text-blue-100 text-sm mt-1">{gameData.pedagogical_feedback}</p>
+            <p className="text-fg text-sm mt-1">{gameData.pedagogical_feedback}</p>
           )}
         </div>
       )}

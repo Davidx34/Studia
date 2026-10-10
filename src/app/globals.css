@@ -61,6 +61,12 @@ html[data-theme="light"] .theme-scope {
   color: rgb(var(--c-fg));
 }
 
+/* Foco de teclado visible en TODO control de una pantalla con tema (los minijuegos no definian ninguno). */
+.theme-scope :is(button, a, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--c-ring));
+  outline-offset: 2px;
+}
+
 /* Decoracion que solo tiene sentido sobre fondo oscuro (manchas de luz con mix-blend-screen). */
 html[data-theme="light"] .theme-scope .dark-only {
   display: none;

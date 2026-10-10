@@ -57,22 +57,22 @@ export function AlquimiaConceptualGame({
   return (
     <div className="space-y-4">
       {gameData.fusion_title && (
-        <p className="text-purple-300 text-xs font-semibold uppercase tracking-wide">
+        <p className="text-primary-text text-xs font-semibold uppercase tracking-wide">
           ⚗️ {gameData.fusion_title}
         </p>
       )}
 
-      <div className="flex items-center justify-center gap-3 bg-gray-700 rounded-lg p-4">
-        <span className="px-3 py-1.5 rounded-lg bg-blue-900 border border-blue-600 text-blue-100 text-sm font-bold">
+      <div className="flex items-center justify-center gap-3 bg-surface-2 rounded-lg p-4">
+        <span className="px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/40 text-fg text-sm font-bold">
           {gameData.element_a}
         </span>
-        <span className="text-2xl text-yellow-300">→ ? →</span>
-        <span className="px-3 py-1.5 rounded-lg bg-pink-900 border border-pink-600 text-pink-100 text-sm font-bold">
+        <span className="text-2xl text-accent-text">→ ? →</span>
+        <span className="px-3 py-1.5 rounded-lg bg-primary/15 border border-primary/40 text-fg text-sm font-bold">
           {gameData.element_b}
         </span>
       </div>
 
-      <p className="text-gray-300 text-sm">{gameData.alchemy_enigma}</p>
+      <p className="text-fg-muted text-sm">{gameData.alchemy_enigma}</p>
 
       <div className="space-y-2">
         {options.map((opt) => {
@@ -86,13 +86,13 @@ export function AlquimiaConceptualGame({
                 'w-full text-left p-4 rounded-lg border-2 text-sm font-medium transition-all ' +
                 (isSelected
                   ? finished === 'won'
-                    ? 'bg-green-700 border-green-400 text-white'
-                    : 'bg-red-700 border-red-400 text-white'
+                    ? 'bg-success/15 border-success text-fg'
+                    : 'bg-danger/15 border-danger text-fg'
                   : finished !== null && opt.is_correct
-                  ? 'bg-green-700 border-green-400 text-white'
+                  ? 'bg-success/15 border-success text-fg'
                   : finished !== null
-                  ? 'bg-gray-800 border-gray-700 text-gray-400'
-                  : 'bg-gray-700 border-gray-600 text-gray-100 hover:border-purple-400')
+                  ? 'bg-surface-2 border-line-strong text-fg-muted'
+                  : 'bg-surface-2 border-line-strong text-fg hover:border-primary')
               }
             >
               {opt.text}
@@ -102,19 +102,19 @@ export function AlquimiaConceptualGame({
       </div>
 
       {finished === 'won' && (
-        <div className="bg-green-900 border border-green-500 p-4 rounded-lg">
-          <p className="text-green-300 font-bold">🎉 ¡Fusión exitosa!</p>
+        <div className="bg-success/10 border border-success p-4 rounded-lg">
+          <p className="text-success font-bold">🎉 ¡Fusión exitosa!</p>
           {gameData.unlocked_knowledge && (
-            <p className="text-green-100 text-sm mt-1">{gameData.unlocked_knowledge}</p>
+            <p className="text-fg text-sm mt-1">{gameData.unlocked_knowledge}</p>
           )}
         </div>
       )}
 
       {finished === 'lost' && (
-        <div className="bg-blue-900 border border-blue-500 p-4 rounded-lg">
-          <p className="text-blue-300 font-bold">El puente correcto era: "{correct?.text}"</p>
+        <div className="bg-primary/10 border border-primary/40 p-4 rounded-lg">
+          <p className="text-primary-text font-bold">El puente correcto era: "{correct?.text}"</p>
           {gameData.unlocked_knowledge && (
-            <p className="text-blue-100 text-sm mt-1">{gameData.unlocked_knowledge}</p>
+            <p className="text-fg text-sm mt-1">{gameData.unlocked_knowledge}</p>
           )}
         </div>
       )}
