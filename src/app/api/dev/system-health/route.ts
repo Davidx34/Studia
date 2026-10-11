@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requireDevSession } from '@/lib/devAuth';
-import { createAnonSupabase } from '@/lib/supabase/anon';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 
 // Solo expone booleans de configuracion (nunca los valores de las keys) y un
 // chequeo simple de conectividad a la base.
 export async function GET() {
   if (!(await requireDevSession())) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-  const supabase = createAnonSupabase();
+  const supabase = createAdminSupabase();
   const start = Date.now();
   const { error: dbError } = await supabase.rpc('dev_analytics_summary');
   const dbLatencyMs = Date.now() - start;

@@ -57,18 +57,43 @@ async function withRetry<T>(fn: () => Promise<T>, retries: number, baseDelayMs: 
   return null;
 }
 
+// Un ID de video de YouTube son 11 caracteres [A-Za-z0-9_-]. Se exige ese formato: el ID termina dentro de URLs que
+// el servidor consulta, y un valor arbitrario no debe poder alterarlas.
+const YOUTUBE_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+
+function isYoutubeHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return h === 'youtube.com' || h.endsWith('.youtube.com');
+}
+
 export function extractYoutubeId(url: string): string | null {
   try {
     const u = new URL(url);
-    if (u.hostname === 'youtu.be') return u.pathname.slice(1).split('/')[0] || null;
-    if (u.hostname.includes('youtube.com')) {
-      if (u.pathname === '/watch') return u.searchParams.get('v');
-      const embedMatch = u.pathname.match(/^\/(embed|shorts|live)\/([^/?]+)/);
-      if (embedMatch) return embedMatch[2];
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+    let id: string | null = null;
+    if (u.hostname.toLowerCase() === 'youtu.be') id = u.pathname.slice(1).split('/')[0] || null;
+    // Antes bastaba que el host CONTUVIERA "youtube.com" (p. ej. youtube.com.otro-sitio.net o notyoutube.com).
+    else if (isYoutubeHost(u.hostname)) {
+      if (u.pathname === '/watch') id = u.searchParams.get('v');
+      else {
+        const embedMatch = u.pathname.match(/^\/(embed|shorts|live)\/([^/?]+)/);
+        if (embedMatch) id = embedMatch[2];
+      }
     }
-    return null;
+    return id && YOUTUBE_ID_RE.test(id) ? id : null;
   } catch {
     return null;
+  }
+}
+
+// El base_url de los subtitulos viene de la respuesta de YouTube; solo se descarga si apunta a youtube.com por https
+// (si la respuesta fuera alterada, el servidor no iria a una direccion interna ni a otro dominio).
+export function isSafeCaptionUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    return u.protocol === 'https:' && !u.username && !u.password && isYoutubeHost(u.hostname) && (u.port === '' || u.port === '443');
+  } catch {
+    return false;
   }
 }
 
@@ -118,6 +143,7 @@ async function fetchInnertubeTranscript(videoId: string): Promise<string | null>
             tracks[0];
           if (!track?.base_url) throw new NoRetryError('caption_track sin base_url');
 
+          if (!isSafeCaptionUrl(track.base_url)) throw new NoRetryError('caption_track con una direccion que no es de YouTube');
           const xmlRes = await fetch(track.base_url, { cache: 'no-store' });
           if (!xmlRes.ok) throw new Error(`timedtext respondio HTTP ${xmlRes.status}`);
           const xml = await xmlRes.text();
