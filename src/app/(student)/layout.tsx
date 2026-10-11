@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/client';
 import { StudentShell } from '@/components/student/StudentShell';
 import { TonitoChatWidget } from '@/components/tonito/TonitoChatWidget';
 import { AchievementUnlockModal } from '@/components/notifications/AchievementUnlockModal';
-import { LevelUpModal } from '@/components/notifications/LevelUpModal';
 import { ToastContainer } from '@/components/notifications/ToastContainer';
 import { useNotificationBridge } from '@/hooks/useNotificationBridge';
 import { evaluateAchievements } from '@/lib/achievements/evaluate';
@@ -59,7 +58,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
       <TonitoChatWidget />
       <ToastContainer />
       <AchievementUnlockModal />
-      <LevelUpModal />
     </StudentShell>
   );
 }

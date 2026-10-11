@@ -121,9 +121,8 @@ export async function getMyActiveRemediationPlan(): Promise<RemediationPlan | nu
 }
 
 export async function advanceRemediationPlan(
-  planId: string,
-  scorePercent: number
-): Promise<{ ok: true; completed: boolean; bonusXp: number } | { ok: false; error: string }> {
+  planId: string
+): Promise<{ ok: true; completed: boolean } | { ok: false; error: string }> {
   const supabase = await createServerSupabase();
   const {
     data: { user },
@@ -139,7 +138,6 @@ export async function advanceRemediationPlan(
   if (!plan) return { ok: false, error: 'Plan no encontrado.' };
 
   const p = plan as RemediationPlan;
-  const bonusXp = Math.round(15 + (scorePercent / 100) * 15); // 15-30 por ronda
   const modulesCompleted = p.modules_completed + 1;
   const completed = modulesCompleted >= p.modules_target;
 
@@ -153,9 +151,5 @@ export async function advanceRemediationPlan(
     .eq('id', planId);
   if (error) return { ok: false, error: error.message };
 
-  // El XP lo otorga el SERVIDOR (migracion 052), una vez por ronda del plan. bonusXp es solo el valor que se
-  // muestra: la misma formula (15..30) vive en award_xp_plan_round.
-  await supabase.rpc('award_xp_plan_round', { p_plan_id: planId, p_round: modulesCompleted, p_score_percent: scorePercent });
-
-  return { ok: true, completed, bonusXp };
+  return { ok: true, completed };
 }

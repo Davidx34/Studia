@@ -51,7 +51,7 @@ export function useSyncListener(onSync: (info: { url: string; method: string }) 
 
 interface PendingAction {
   id: string;
-  type: 'lesson_completion' | 'xp_earned' | 'progress_update' | 'mission_progress';
+  type: 'lesson_completion' | 'progress_update' | 'mission_progress';
   payload: any;
   createdAt: number;
 }

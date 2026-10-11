@@ -37,7 +37,6 @@ export type Database = {
           name: string
           rarity: string | null
           reward_coins: number | null
-          reward_xp: number | null
           sort_order: number | null
         }
         Insert: {
@@ -53,7 +52,6 @@ export type Database = {
           name: string
           rarity?: string | null
           reward_coins?: number | null
-          reward_xp?: number | null
           sort_order?: number | null
         }
         Update: {
@@ -69,7 +67,6 @@ export type Database = {
           name?: string
           rarity?: string | null
           reward_coins?: number | null
-          reward_xp?: number | null
           sort_order?: number | null
         }
         Relationships: []
@@ -371,7 +368,6 @@ export type Database = {
       content_modules: {
         Row: {
           auto_generated: boolean | null
-          base_xp_reward: number | null
           category: string
           classroom_id: string | null
           configured_question_count: number | null
@@ -400,7 +396,6 @@ export type Database = {
         }
         Insert: {
           auto_generated?: boolean | null
-          base_xp_reward?: number | null
           category: string
           classroom_id?: string | null
           configured_question_count?: number | null
@@ -429,7 +424,6 @@ export type Database = {
         }
         Update: {
           auto_generated?: boolean | null
-          base_xp_reward?: number | null
           category?: string
           classroom_id?: string | null
           configured_question_count?: number | null
@@ -489,7 +483,6 @@ export type Database = {
           is_active: boolean | null
           mission_type: string
           reward_coins: number | null
-          reward_xp: number | null
           target_value: number
           title: string
           valid_from: string | null
@@ -503,7 +496,6 @@ export type Database = {
           is_active?: boolean | null
           mission_type: string
           reward_coins?: number | null
-          reward_xp?: number | null
           target_value: number
           title: string
           valid_from?: string | null
@@ -517,7 +509,6 @@ export type Database = {
           is_active?: boolean | null
           mission_type?: string
           reward_coins?: number | null
-          reward_xp?: number | null
           target_value?: number
           title?: string
           valid_from?: string | null
@@ -861,7 +852,6 @@ export type Database = {
           coins: number | null
           created_at: string
           current_hearts: number | null
-          current_level: number | null
           email: string | null
           full_name: string | null
           gemini_preferences: Json | null
@@ -874,7 +864,6 @@ export type Database = {
           streak_days: number | null
           timezone: string | null
           tonito_state: Json | null
-          total_xp: number | null
           updated_at: string
           username: string
         }
@@ -883,7 +872,6 @@ export type Database = {
           coins?: number | null
           created_at?: string
           current_hearts?: number | null
-          current_level?: number | null
           email?: string | null
           full_name?: string | null
           gemini_preferences?: Json | null
@@ -896,7 +884,6 @@ export type Database = {
           streak_days?: number | null
           timezone?: string | null
           tonito_state?: Json | null
-          total_xp?: number | null
           updated_at?: string
           username: string
         }
@@ -905,7 +892,6 @@ export type Database = {
           coins?: number | null
           created_at?: string
           current_hearts?: number | null
-          current_level?: number | null
           email?: string | null
           full_name?: string | null
           gemini_preferences?: Json | null
@@ -918,7 +904,6 @@ export type Database = {
           streak_days?: number | null
           timezone?: string | null
           tonito_state?: Json | null
-          total_xp?: number | null
           updated_at?: string
           username?: string
         }
@@ -1114,7 +1099,6 @@ export type Database = {
           completed_at: string | null
           completion_percentage: number | null
           earned_coins: number | null
-          earned_xp: number | null
           gemini_feedback_history: Json | null
           id: string
           last_attempt_at: string | null
@@ -1131,7 +1115,6 @@ export type Database = {
           completed_at?: string | null
           completion_percentage?: number | null
           earned_coins?: number | null
-          earned_xp?: number | null
           gemini_feedback_history?: Json | null
           id?: string
           last_attempt_at?: string | null
@@ -1148,7 +1131,6 @@ export type Database = {
           completed_at?: string | null
           completion_percentage?: number | null
           earned_coins?: number | null
-          earned_xp?: number | null
           gemini_feedback_history?: Json | null
           id?: string
           last_attempt_at?: string | null
@@ -1178,7 +1160,6 @@ export type Database = {
       }
       student_remediations: {
         Row: {
-          bonus_xp_earned: number
           classroom_id: string
           completed_at: string | null
           concept_tags: string[]
@@ -1192,7 +1173,6 @@ export type Database = {
           was_offered: boolean
         }
         Insert: {
-          bonus_xp_earned?: number
           classroom_id: string
           completed_at?: string | null
           concept_tags: string[]
@@ -1206,7 +1186,6 @@ export type Database = {
           was_offered?: boolean
         }
         Update: {
-          bonus_xp_earned?: number
           classroom_id?: string
           completed_at?: string | null
           concept_tags?: string[]
@@ -1573,81 +1552,12 @@ export type Database = {
           },
         ]
       }
-      weekly_leaderboards: {
-        Row: {
-          classroom_id: string | null
-          id: string
-          modules_completed_week: number | null
-          rank_position: number | null
-          updated_at: string | null
-          user_id: string
-          week_start_date: string
-          xp_earned_week: number | null
-        }
-        Insert: {
-          classroom_id?: string | null
-          id?: string
-          modules_completed_week?: number | null
-          rank_position?: number | null
-          updated_at?: string | null
-          user_id: string
-          week_start_date: string
-          xp_earned_week?: number | null
-        }
-        Update: {
-          classroom_id?: string | null
-          id?: string
-          modules_completed_week?: number | null
-          rank_position?: number | null
-          updated_at?: string | null
-          user_id?: string
-          week_start_date?: string
-          xp_earned_week?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "weekly_leaderboards_classroom_id_fkey"
-            columns: ["classroom_id"]
-            isOneToOne: false
-            referencedRelation: "classrooms"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "weekly_leaderboards_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       apply_pending_registration: { Args: { p_email: string }; Returns: string }
-      calculate_xp: {
-        Args: {
-          p_attempts: number
-          p_base_xp: number
-          p_difficulty: number
-          p_estimated_minutes: number
-          p_score: number
-          p_streak_days: number
-          p_time_seconds: number
-        }
-        Returns: number
-      }
-      award_xp_module: { Args: { p_module_id: string }; Returns: number }
-      award_xp_plan_round: {
-        Args: { p_plan_id: string; p_round: number; p_score_percent: number }
-        Returns: number
-      }
-      award_xp_remediation: {
-        Args: { p_remediation_id: string; p_score_percent: number }
-        Returns: number
-      }
       check_and_update_streak: { Args: { p_user_id: string }; Returns: Json }
       check_pending_registration: { Args: { p_email: string }; Returns: string }
       dev_add_pending_registration: {
@@ -1694,7 +1604,6 @@ export type Database = {
           coins: number | null
           created_at: string
           current_hearts: number | null
-          current_level: number | null
           email: string | null
           full_name: string | null
           gemini_preferences: Json | null
@@ -1707,7 +1616,6 @@ export type Database = {
           streak_days: number | null
           timezone: string | null
           tonito_state: Json | null
-          total_xp: number | null
           updated_at: string
           username: string
         }[]

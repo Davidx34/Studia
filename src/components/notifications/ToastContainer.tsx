@@ -1,18 +1,12 @@
 'use client';
 
 import { useNotificationStore, type Toast, type ToastVariant } from '@/stores/useNotificationStore';
-import { Zap, Coins, Flame, Target, Heart, Info, AlertCircle, X } from 'lucide-react';
+import { Coins, Flame, Target, Heart, Info, AlertCircle, X } from 'lucide-react';
 
 const VARIANT_CONFIG: Record<
   ToastVariant,
   { icon: any; gradient: string; iconBg: string; ring: string }
 > = {
-  xp: {
-    icon: Zap,
-    gradient: 'from-violet-500/30 to-purple-600/30',
-    iconBg: 'from-violet-400 to-purple-500',
-    ring: 'ring-violet-300/40',
-  },
   coins: {
     icon: Coins,
     gradient: 'from-amber-500/30 to-amber-700/30',

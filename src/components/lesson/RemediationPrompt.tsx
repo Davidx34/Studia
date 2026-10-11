@@ -43,7 +43,7 @@ export function RemediationPrompt({
         </ul>
 
         <p className="text-fg-muted text-sm text-center">
-          ¿Hacemos un repaso rápido de esto? No te llevará más de 5 minutos, y ganas XP extra. 🎁
+          ¿Hacemos un repaso rápido de esto? No te llevará más de 5 minutos. 🎁
         </p>
 
         <div className="flex gap-3">

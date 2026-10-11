@@ -34,7 +34,6 @@ export type ContentType = 'reading' | 'video' | 'interactive' | 'quiz' | 'dialog
 export type ItemType = 'avatar_skin' | 'tonito_customization' | 'power_up' | 'streak_freeze'; // shop_items.type
 export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary'; // achievements.rarity
 export type CriteriaType =
-  | 'xp_total'
   | 'streak_days'
   | 'modules_completed'
   | 'perfect_scores'
@@ -44,7 +43,6 @@ export type CriteriaType =
   | 'time_spent'; // achievements.criteria_type
 export type MissionType =
   | 'complete_modules'
-  | 'earn_xp'
   | 'maintain_streak'
   | 'perfect_score'
   | 'time_spent'

@@ -15,8 +15,9 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-// Columnas de la economia: solo las escriben las funciones del servidor (migraciones 052 y 053).
-const ECONOMY = ['total_xp', 'coins', 'current_hearts', 'current_level', 'last_heart_lost_at', 'streak_days', 'max_hearts'];
+// Columnas de la economia (monedas, corazones, racha): solo las escriben las funciones del servidor (migraciones 052 y 053).
+// El XP y los niveles se eliminaron por completo (migracion 064).
+const ECONOMY = ['coins', 'current_hearts', 'last_heart_lost_at', 'streak_days', 'max_hearts'];
 
 describe('la economia del juego la escribe el servidor', () => {
   it('ningun codigo del navegador ni acciones hacen UPDATE de las columnas de la economia en profiles', () => {
@@ -33,32 +34,34 @@ describe('la economia del juego la escribe el servidor', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('la leccion y los planes de repaso otorgan XP por las funciones del servidor', () => {
-    const lesson = read('src/app/(student)/lesson/[id]/page.tsx');
-    expect(lesson).toContain("rpc('award_xp_module'");
-    expect(lesson).toContain("rpc('award_xp_remediation'");
-    expect(read('src/lib/actions/remediation-plans.ts')).toContain("rpc('award_xp_plan_round'");
-  });
-
-  it('el XP no depende de lo que mande el cliente: las funciones no reciben cantidades', () => {
-    const sql = noComments(read('supabase/migrations/052_economy_server_side.sql'));
-    for (const fn of ['award_xp_module', 'award_xp_remediation', 'award_xp_plan_round']) {
-      const sig = sql.match(new RegExp(`FUNCTION public\\.${fn}\\(([^)]*)\\)`))![1];
-      expect(sig).not.toMatch(/\bxp\b|amount|coins/i);
-    }
-  });
-
-  it('cada premio es idempotente (UNIQUE) y la funcion interna no es llamable por el cliente', () => {
-    const sql = noComments(read('supabase/migrations/052_economy_server_side.sql'));
-    expect(sql).toContain('UNIQUE (user_id, source, ref)');
-    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\._grant_xp\([^)]*\) FROM PUBLIC, anon, authenticated/);
-    expect(sql).toMatch(/REVOKE ALL ON public\.xp_ledger FROM anon, authenticated/);
-  });
-
   it('la 053 retira el UPDATE de profiles y solo devuelve columnas de preferencias', () => {
     const sql = noComments(read('supabase/migrations/053_profiles_economy_readonly.sql'));
     expect(sql).toContain('REVOKE UPDATE ON public.profiles FROM anon, authenticated');
     const granted = sql.match(/GRANT UPDATE \(([^)]*)\)/)![1];
     for (const c of [...ECONOMY, 'role', 'email', 'id']) expect(granted).not.toMatch(new RegExp(`\\b${c}\\b`));
+  });
+});
+
+describe('el XP y los niveles ya no existen', () => {
+  const XP = /\bxp\b|xp_|_xp|[a-z]XP|\bXP[A-Z_]|\bXP\b|current_level|total_xp|LevelUp/;
+
+  it('ningun archivo de la app los menciona', () => {
+    const offenders: string[] = [];
+    for (const file of sourceFiles(path.join(process.cwd(), 'src'))) {
+      const rel = path.relative(process.cwd(), file).split(path.sep).join('/');
+      // La palabra "exp" (explicacion) y el nombre de sonido 'levelUp' no son XP.
+      const lines = noComments(fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n'))
+        .split('\n')
+        .filter((l) => !/'levelUp'/.test(l));
+      lines.forEach((l, i) => {
+        if (XP.test(l)) offenders.push(`${rel}:${i + 1}: ${l.trim().slice(0, 80)}`);
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('la leccion ya no llama a funciones de XP', () => {
+    const lesson = read('src/app/(student)/lesson/[id]/page.tsx');
+    expect(lesson).not.toMatch(/award_xp|XP ganados|earned_xp/);
   });
 });

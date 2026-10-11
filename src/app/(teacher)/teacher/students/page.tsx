@@ -22,7 +22,7 @@ export default async function TeacherStudentsPage() {
     .from('profiles')
     .select('*')
     .in('id', studentIds)
-    .order('total_xp', { ascending: false });
+    .order('full_name', { ascending: true });
 
   // Conteo de módulos completados por estudiante
   const { data: progress } = await supabase
@@ -56,9 +56,8 @@ export default async function TeacherStudentsPage() {
       <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl overflow-hidden">
         {/* Header */}
         <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 border-b border-line-strong bg-surface text-xs font-semibold text-fg-muted uppercase tracking-wider">
-          <div className="col-span-4">Estudiante</div>
-          <div className="col-span-2 text-center">Nivel</div>
-          <div className="col-span-2 text-center">XP</div>
+          <div className="col-span-6">Estudiante</div>
+          <div className="col-span-2 text-center">Módulos</div>
           <div className="col-span-2 text-center">Promedio</div>
           <div className="col-span-2 text-center">Última actividad</div>
         </div>
@@ -96,17 +95,10 @@ export default async function TeacherStudentsPage() {
                   </div>
                 </div>
 
-                {/* Nivel */}
-                <div className="hidden md:flex md:col-span-2 justify-center">
-                  <div className="px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary-text text-sm font-semibold">
-                    {s.current_level}
-                  </div>
-                </div>
-
-                {/* XP */}
+                {/* Modulos completados */}
                 <div className="hidden md:block md:col-span-2 text-center">
-                  <div className="font-bold text-fg">{s.total_xp.toLocaleString()}</div>
-                  <div className="text-xs text-fg-muted">{stats.completed} módulos</div>
+                  <div className="font-bold text-fg">{stats.completed}</div>
+                  <div className="text-xs text-fg-muted">completados</div>
                 </div>
 
                 {/* Promedio */}

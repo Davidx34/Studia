@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useNotificationStore, type AchievementUnlock } from '@/stores/useNotificationStore';
-import { Trophy, Sparkles, Coins, Zap } from 'lucide-react';
+import { Trophy, Sparkles, Coins } from 'lucide-react';
 
 const RARITY_CONFIG = {
   common: {
@@ -174,18 +174,12 @@ function AchievementCard({
             <p className="text-sm text-white/70 mb-5">{achievement.description}</p>
 
             {/* Rewards */}
-            {(achievement.rewardCoins > 0 || achievement.rewardXP > 0) && (
+            {achievement.rewardCoins > 0 && (
               <div className="flex items-center justify-center gap-3 mb-5">
                 {achievement.rewardCoins > 0 && (
                   <div className="flex items-center gap-1.5 bg-white/15 border border-white/25 rounded-full px-3 py-1.5">
                     <Coins className="w-4 h-4 text-yellow-300" />
                     <span className="font-bold text-white text-sm">+{achievement.rewardCoins}</span>
-                  </div>
-                )}
-                {achievement.rewardXP > 0 && (
-                  <div className="flex items-center gap-1.5 bg-white/15 border border-white/25 rounded-full px-3 py-1.5">
-                    <Zap className="w-4 h-4 text-purple-300" />
-                    <span className="font-bold text-white text-sm">+{achievement.rewardXP} XP</span>
                   </div>
                 )}
               </div>

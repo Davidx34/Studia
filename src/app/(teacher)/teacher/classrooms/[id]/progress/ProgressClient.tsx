@@ -34,8 +34,6 @@ import {
 
 type SortKey =
   | 'fullName'
-  | 'level'
-  | 'totalXp'
   | 'modulesCompleted'
   | 'avgScore'
   | 'lastActivityAt'
@@ -67,7 +65,7 @@ export default function ProgressClient({
 }) {
   const [tab, setTab] = useState<ProgressTab>('resumen');
   const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('totalXp');
+  const [sortKey, setSortKey] = useState<SortKey>('modulesCompleted');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [filter, setFilter] = useState<FilterKey>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -147,8 +145,8 @@ export default function ProgressClient({
         />
         <StatCard
           icon={<Sparkles className="w-4 h-4" />}
-          label="XP total ganado"
-          value={data.summary.totalXpEarned.toString()}
+          label="Módulos completados"
+          value={data.summary.totalModulesCompleted.toString()}
         />
         <StatCard
           icon={<Award className="w-4 h-4" />}
@@ -232,9 +230,7 @@ export default function ProgressClient({
             <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl overflow-hidden">
               {/* Header de columnas */}
               <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-line-strong bg-surface text-[10px] font-semibold text-fg-muted uppercase tracking-wider">
-                <Th label="Estudiante" k="fullName" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="col-span-3" />
-                <Th label="Nivel" k="level" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="col-span-1 text-center" />
-                <Th label="XP" k="totalXp" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="col-span-1 text-right" />
+                <Th label="Estudiante" k="fullName" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="col-span-5" />
                 <Th label="Completados" k="modulesCompleted" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="col-span-2 text-center" />
                 <Th label="Score" k="avgScore" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="col-span-1 text-center" />
                 <Th label="Racha" k="streakDays" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="col-span-1 text-center" />
@@ -721,7 +717,7 @@ function StudentRowView({
         onClick={onToggle}
         className="w-full grid grid-cols-2 md:grid-cols-12 gap-2 px-4 py-3 text-left hover:bg-surface transition items-center"
       >
-        <div className="md:col-span-3 flex items-center gap-2 min-w-0">
+        <div className="md:col-span-5 flex items-center gap-2 min-w-0">
           <div className="w-8 h-8 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-primary-text text-sm font-semibold flex-shrink-0">
             {s.fullName.charAt(0).toUpperCase()}
           </div>
@@ -729,12 +725,6 @@ function StudentRowView({
             <div className="text-sm font-medium text-fg truncate">{s.fullName}</div>
             <div className="text-xs text-fg-muted truncate">{s.email ?? `@${s.username}`}</div>
           </div>
-        </div>
-        <div className="hidden md:block md:col-span-1 text-center text-sm text-fg-muted">
-          {s.level}
-        </div>
-        <div className="hidden md:block md:col-span-1 text-right text-sm font-mono text-primary-text">
-          {s.totalXp}
         </div>
         <div className="hidden md:block md:col-span-2 text-center text-sm">
           <span className="text-fg">

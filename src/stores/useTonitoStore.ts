@@ -42,7 +42,6 @@ interface TonitoState {
   onCorrectAnswer: () => void;
   onWrongAnswer: () => void;
   onStreak: (days: number) => void;
-  onLevelUp: () => void;
   onModuleComplete: (scorePercent: number) => void;
   onConsecutiveFails: (count: number) => void;
 }
@@ -124,18 +123,6 @@ export const useTonitoStore = create<TonitoState>((set, get) => ({
     setTimeout(
       () => set({ mood: 'happy', animation: 'idle', message: null }),
       3000
-    );
-  },
-
-  onLevelUp: () => {
-    set({
-      mood: 'celebrating',
-      animation: 'supersaiyan',
-      message: '¡SUBISTE DE NIVEL! 🎉✨🏆',
-    });
-    setTimeout(
-      () => set({ mood: 'happy', animation: 'idle', message: null }),
-      5000
     );
   },
 
