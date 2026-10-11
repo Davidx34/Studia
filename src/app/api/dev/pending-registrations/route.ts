@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireDevSession } from '@/lib/devAuth';
-import { createAnonSupabase } from '@/lib/supabase/anon';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 
 export async function GET() {
   if (!(await requireDevSession())) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-  const supabase = createAnonSupabase();
+  const supabase = createAdminSupabase();
   const { data, error } = await supabase.rpc('dev_list_pending_registrations');
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ registrations: data ?? [] });
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Rol invalido' }, { status: 400 });
   }
 
-  const supabase = createAnonSupabase();
+  const supabase = createAdminSupabase();
   const { data, error } = await supabase.rpc('dev_add_pending_registration', {
     p_email: email,
     p_role: role,
