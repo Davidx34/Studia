@@ -34,18 +34,9 @@ export default function SignupPage() {
       return;
     }
 
-    // Registro por invitación: el email debe estar pre-registrado por un
-    // profesor o el administrador antes de poder crear la cuenta.
-    const { data: pendingRole, error: pendingError } = await supabase.rpc(
-      'check_pending_registration',
-      { p_email: email }
-    );
-    if (pendingError || !pendingRole) {
-      setError('Este email no está autorizado para registrarse. Pide que te inviten primero.');
-      setLoading(false);
-      return;
-    }
-
+    // Registro por invitación: el email debe estar pre-registrado por el administrador. La regla la hace cumplir la
+    // base de datos al crear la cuenta (migración 063): antes se consultaba aquí, en el navegador, y quien llamaba
+    // directamente al servicio de Auth se la saltaba.
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -55,9 +46,14 @@ export default function SignupPage() {
     });
 
     if (signUpError) {
+      // Auth responde "Database error saving new user" cuando la base rechaza el alta: es el caso de un correo sin
+      // invitación (no se distingue de otro fallo de base de datos, a propósito: no revela qué correos están invitados).
+      const message = signUpError.message.toLowerCase();
       setError(
-        signUpError.message.includes('already')
+        message.includes('already')
           ? 'Ya existe una cuenta con ese email.'
+          : message.includes('database error')
+          ? 'No pudimos crear tu cuenta. Si tu email no ha sido invitado, pide que te inviten primero.'
           : 'No pudimos crear tu cuenta. Intenta de nuevo.'
       );
       setLoading(false);
