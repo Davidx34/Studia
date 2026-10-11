@@ -28,18 +28,42 @@ function shuffledIndices(n: number): number[] {
   return idxs;
 }
 
+// Resultado de comprobar las conexiones en el servidor.
+export interface MatchVerdict {
+  correct: boolean;
+  final: boolean; // ya no quedan intentos (o acerto)
+  triesLeft?: number;
+  perTerm?: boolean[]; // acierto por termino
+  revealDefs?: string[]; // definicion correcta de cada termino, solo cuando final
+}
+
+// Dos modos:
+//  - `pairs` (modo anterior): el navegador conoce la solucion y la comprueba.
+//  - `terms` + `defs` + `check` (calificacion en el servidor): las definiciones llegan ya mezcladas y SIN decir cual va
+//    con cual; `check` manda al servidor la definicion conectada a cada termino y devuelve su veredicto.
 export function LessonQuestionMatch({
   pairs,
+  terms,
+  defs,
+  check,
   disabled,
   onComplete,
 }: {
-  pairs: Pair[];
+  pairs?: Pair[];
+  terms?: string[];
+  defs?: string[];
+  check?: (given: (string | null)[]) => Promise<MatchVerdict | null>;
   disabled: boolean;
-  // `pairing[i]` = indice del par cuya definicion conecto el estudiante con el termino i (-1 = sin conectar).
+  // `pairing[i]` = indice del par cuya definicion conecto el estudiante con el termino i (-1 = sin conectar). Solo modo anterior.
   onComplete: (correct: boolean, pairing: number[]) => void;
 }) {
-  // shuffledDefs[posición] = índice original del par cuya definición se muestra ahí
-  const shuffledDefs = useMemo(() => shuffledIndices(pairs.length), [pairs]);
+  const serverMode = !pairs && !!terms && !!defs && !!check;
+  const termList: string[] = serverMode ? terms! : (pairs ?? []).map((p) => p.term);
+  const n = termList.length;
+
+  // shuffledDefs[posición] = índice original del par cuya definición se muestra ahí (modo anterior)
+  const shuffledDefs = useMemo(() => shuffledIndices(n), [n, pairs]);
+  const defText = (defPos: number): string => (serverMode ? defs![defPos] : pairs![shuffledDefs[defPos]].def);
 
   const [selectedTerm, setSelectedTerm] = useState<number | null>(null);
   const [connections, setConnections] = useState<Record<number, number>>({});
@@ -47,10 +71,18 @@ export function LessonQuestionMatch({
   const [revealed, setRevealed] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [lines, setLines] = useState<Line[]>([]);
+  const [verdict, setVerdict] = useState<MatchVerdict | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkFailed, setCheckFailed] = useState(false);
 
   const locked = disabled || revealed;
-  const allConnected = pairs.length > 0 && Object.keys(connections).length === pairs.length;
-  const allCorrect = allConnected && pairs.every((_, termIdx) => shuffledDefs[connections[termIdx]] === termIdx);
+  const allConnected = n > 0 && Object.keys(connections).length === n;
+  // Acierto de un termino segun el modo.
+  const termRight = (termIdx: number): boolean =>
+    serverMode
+      ? verdict?.perTerm?.[termIdx] === true
+      : connections[termIdx] !== undefined && shuffledDefs[connections[termIdx]] === termIdx;
+  const allCorrect = !revealed && allConnected && (serverMode ? verdict?.correct === true : termList.every((_, t) => termRight(t)));
 
   const containerRef = useRef<HTMLDivElement>(null);
   const termRefs = useRef<Record<number, HTMLButtonElement | null>>({});
@@ -73,11 +105,11 @@ export function LessonQuestionMatch({
         y1: tb.top + tb.height / 2 - box.top,
         x2: db.left - box.left,
         y2: db.top + db.height / 2 - box.top,
-        ok: checked ? shuffledDefs[defPos] === termIdx : true,
+        ok: checked ? (serverMode ? verdict?.perTerm?.[termIdx] === true : shuffledDefs[defPos] === termIdx) : true,
       });
     }
     setLines(next);
-  }, [connections, checked, shuffledDefs]);
+  }, [connections, checked, shuffledDefs, serverMode, verdict]);
 
   useLayoutEffect(() => {
     recomputeLines();
@@ -89,19 +121,35 @@ export function LessonQuestionMatch({
   }, [recomputeLines]);
 
   const handleTermClick = (termIdx: number) => {
-    if (locked) return;
+    if (locked || checking) return;
     setSelectedTerm((prev) => (prev === termIdx ? null : termIdx));
   };
 
   const handleDefClick = (defPos: number) => {
-    if (locked || selectedTerm === null) return;
+    if (locked || checking || selectedTerm === null) return;
     setConnections((prev) => ({ ...prev, [selectedTerm]: defPos }));
     setSelectedTerm(null);
   };
 
-  const userPairing = () => pairs.map((_, termIdx) => (connections[termIdx] === undefined ? -1 : shuffledDefs[connections[termIdx]]));
+  const userPairing = () => termList.map((_, termIdx) => (connections[termIdx] === undefined ? -1 : shuffledDefs[connections[termIdx]]));
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
+    if (serverMode) {
+      if (checking) return;
+      setChecking(true);
+      setCheckFailed(false);
+      const given = termList.map((_, t) => (connections[t] === undefined ? null : defText(connections[t])));
+      const v = await check!(given);
+      setChecking(false);
+      if (!v) {
+        setCheckFailed(true);
+        return;
+      }
+      setVerdict(v);
+      setChecked(true);
+      if (v.correct) onComplete(true, []);
+      return;
+    }
     setChecked(true);
     if (allCorrect) {
       onComplete(true, userPairing());
@@ -114,31 +162,42 @@ export function LessonQuestionMatch({
       const next: Record<number, number> = {};
       for (const [termIdxStr, defPos] of Object.entries(prev)) {
         const termIdx = Number(termIdxStr);
-        if (shuffledDefs[defPos] === termIdx) next[termIdx] = defPos;
+        if (serverMode ? verdict?.perTerm?.[termIdx] === true : shuffledDefs[defPos] === termIdx) next[termIdx] = defPos;
       }
       return next;
     });
     setChecked(false);
+    setVerdict((v) => (serverMode ? v : null));
     setAttempts((a) => a + 1);
   };
 
   const handleReveal = () => {
     // Lo que el estudiante dejo conectado, ANTES de mostrarle la solucion.
-    const given = userPairing();
+    const given = serverMode ? [] : userPairing();
     setRevealed(true);
     setChecked(true);
     const correctConnections: Record<number, number> = {};
-    shuffledDefs.forEach((origIdx, defPos) => {
-      correctConnections[origIdx] = defPos;
-    });
+    if (serverMode) {
+      const taken = new Set<number>();
+      (verdict?.revealDefs ?? []).forEach((text, termIdx) => {
+        const defPos = defs!.findIndex((d, pos) => d === text && !taken.has(pos));
+        if (defPos >= 0) {
+          taken.add(defPos);
+          correctConnections[termIdx] = defPos;
+        }
+      });
+      setVerdict((v) => (v ? { ...v, perTerm: termList.map(() => true) } : v));
+    } else {
+      shuffledDefs.forEach((origIdx, defPos) => {
+        correctConnections[origIdx] = defPos;
+      });
+    }
     setConnections(correctConnections);
     onComplete(false, given);
   };
 
-  const isTermCorrect = (termIdx: number) =>
-    checked && connections[termIdx] !== undefined && shuffledDefs[connections[termIdx]] === termIdx;
-  const isTermWrong = (termIdx: number) =>
-    checked && connections[termIdx] !== undefined && shuffledDefs[connections[termIdx]] !== termIdx;
+  const isTermCorrect = (termIdx: number) => checked && connections[termIdx] !== undefined && termRight(termIdx);
+  const isTermWrong = (termIdx: number) => checked && connections[termIdx] !== undefined && !termRight(termIdx);
   const isDefUsedBy = (defPos: number) =>
     Object.entries(connections).find(([, dp]) => dp === defPos)?.[0];
 
@@ -170,12 +229,12 @@ export function LessonQuestionMatch({
         </svg>
 
         <div className="space-y-3" style={{ position: 'relative', zIndex: 2 }}>
-          {pairs.map((p, termIdx) => (
+          {termList.map((term, termIdx) => (
             <button
               key={termIdx}
               ref={(el) => { termRefs.current[termIdx] = el; }}
               onClick={() => handleTermClick(termIdx)}
-              disabled={locked}
+              disabled={locked || checking}
               aria-pressed={selectedTerm === termIdx}
               className={
                 'w-full text-left p-3 rounded-lg text-sm font-medium border-2 transition-all ' +
@@ -191,7 +250,7 @@ export function LessonQuestionMatch({
               }
             >
               <span className="flex items-center justify-between gap-2">
-                <MathText content={p.term} />
+                <MathText content={term} />
                 {/* El resultado no depende solo del color: lleva icono y texto para lectores de pantalla. */}
                 {isTermCorrect(termIdx) && (<><CheckCircle2 className="h-4 w-4 flex-shrink-0 text-success" aria-hidden="true" /><span className="sr-only">(conexion correcta)</span></>)}
                 {isTermWrong(termIdx) && (<><XCircle className="h-4 w-4 flex-shrink-0 text-danger" aria-hidden="true" /><span className="sr-only">(conexion incorrecta)</span></>)}
@@ -201,7 +260,7 @@ export function LessonQuestionMatch({
         </div>
 
         <div className="space-y-3" style={{ position: 'relative', zIndex: 2 }}>
-          {shuffledDefs.map((origIdx, defPos) => {
+          {termList.map((_, defPos) => {
             const usedByTerm = isDefUsedBy(defPos);
             const usedByTermIdx = usedByTerm !== undefined ? Number(usedByTerm) : null;
             return (
@@ -209,7 +268,7 @@ export function LessonQuestionMatch({
                 key={defPos}
                 ref={(el) => { defRefs.current[defPos] = el; }}
                 onClick={() => handleDefClick(defPos)}
-                disabled={locked}
+                disabled={locked || checking}
                 className={
                   'w-full text-left p-3 rounded-lg text-sm border-2 transition-all ' +
                   (usedByTermIdx !== null && isTermCorrect(usedByTermIdx)
@@ -221,7 +280,7 @@ export function LessonQuestionMatch({
                     : 'bg-primary/10 border-primary/30 text-fg hover:border-primary')
                 }
               >
-                <MathText content={pairs[origIdx].def} />
+                <MathText content={defText(defPos)} />
               </button>
             );
           })}
@@ -231,21 +290,29 @@ export function LessonQuestionMatch({
       {!locked && !checked && (
         <button
           onClick={handleVerify}
-          disabled={!allConnected}
+          disabled={!allConnected || checking}
           className="w-full p-4 rounded-lg bg-primary text-on-primary font-bold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Verificar conexiones
+          {checking ? 'Comprobando…' : 'Verificar conexiones'}
         </button>
       )}
 
+      <div aria-live="polite" role="status">
+        {checkFailed && (
+          <p role="alert" className="text-sm text-danger font-medium">
+            No pude comprobar tus conexiones. Revisa tu conexion e intenta de nuevo.
+          </p>
+        )}
+      </div>
+
       {!locked && checked && !allCorrect && (
         <div className="flex gap-3">
-          {attempts + 1 < MAX_ATTEMPTS ? (
+          {(serverMode ? verdict?.final !== true : attempts + 1 < MAX_ATTEMPTS) ? (
             <button
               onClick={handleRetry}
               className="flex-1 p-4 rounded-lg bg-surface-2 border border-line text-fg font-bold hover:brightness-110"
             >
-              Reintentar ({MAX_ATTEMPTS - attempts - 1} intentos restantes)
+              Reintentar ({serverMode ? (verdict?.triesLeft ?? 0) : MAX_ATTEMPTS - attempts - 1} intentos restantes)
             </button>
           ) : (
             <button

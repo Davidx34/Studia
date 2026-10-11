@@ -23,6 +23,7 @@ import {
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
 import { withGenerationLock } from '@/lib/questions/generationLock';
 import { servableQuestions, drawQuestions } from '@/lib/questions/poolServing';
+import { startLessonAttempt } from '@/lib/grading/lessonAttempt';
 
 // Una generacion con Cohere tarda de 37 a 67 s (medido el 2026-09-19 con un prompt de
 // ~28.000 caracteres; la de 67 s incluia un reintento interno), y hasta ~110 s si
@@ -137,7 +138,9 @@ export async function POST(req: NextRequest) {
 
       if (validCached.length >= MIN_CACHE_SIZE) {
         const picked = drawQuestions(validCached, SERVE_COUNT);
-        return NextResponse.json({ questions: picked, cached: true });
+        // Con calificacion en el servidor las preguntas clasicas salen SIN claves y con un intento abierto.
+        const served = await startLessonAttempt(supabase, moduleId, picked);
+        return NextResponse.json({ ...served, cached: true });
       }
     }
 
@@ -232,7 +235,8 @@ export async function POST(req: NextRequest) {
 
     // El estudiante solo ve SERVE_COUNT, aunque se hayan generado/guardado mas.
     const toServe = moduleId ? shuffle(generatedWithIds).slice(0, SERVE_COUNT) : generatedWithIds;
-    return NextResponse.json({ questions: toServe, cached: false });
+    const served = moduleId && supabase ? await startLessonAttempt(supabase, moduleId, toServe) : { questions: toServe };
+    return NextResponse.json({ ...served, cached: false });
     });
 
     if (outcome.status === 'forbidden') {

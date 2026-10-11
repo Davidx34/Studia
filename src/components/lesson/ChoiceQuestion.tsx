@@ -62,6 +62,7 @@ export function ChoiceQuestion({
   selected,
   answered,
   correct,
+  pending = false,
   onAnswer,
 }: {
   kind: ChoiceKind;
@@ -69,6 +70,8 @@ export function ChoiceQuestion({
   selected: unknown;
   answered: boolean;
   correct: ChoiceValue | undefined;
+  // El servidor esta comprobando la respuesta: no se puede elegir otra todavia.
+  pending?: boolean;
   onAnswer: (value: ChoiceValue) => void;
 }) {
   if (kind === 'true_false') {
@@ -81,7 +84,7 @@ export function ChoiceQuestion({
               key={String(val)}
               type="button"
               onClick={() => onAnswer(val)}
-              disabled={answered}
+              disabled={answered || pending}
               className={cn(base, STATE_CLASS[state], 'flex items-center justify-center gap-2 p-6 text-center font-bold text-xl')}
             >
               {val ? 'Verdadero' : 'Falso'}
@@ -102,7 +105,7 @@ export function ChoiceQuestion({
             key={i}
             type="button"
             onClick={() => onAnswer(i)}
-            disabled={answered}
+            disabled={answered || pending}
             className={cn(base, STATE_CLASS[state], 'flex items-center justify-between gap-3')}
           >
             <span>
