@@ -27,12 +27,27 @@ export default async function StudyPage({ params, searchParams }: { params: { id
     .eq('processing_status', 'completed')
     .order('created_at', { ascending: false });
 
+  // Solo los materiales que el profesor YA preparo (con fichas, flashcards o infografias). El estudiante no genera.
+  const ids = (materials ?? []).map((m) => m.id);
+  const db: any = supabase;
+  const { data: cardRows } = ids.length ? await db.from('study_cards').select('material_id, kind').in('material_id', ids) : { data: [] };
+  const rows = (cardRows ?? []) as { material_id: string; kind: string }[];
+  const withContent = (materials ?? [])
+    .map((m) => ({
+      id: m.id,
+      display_name: m.display_name ?? 'Material sin título',
+      fichas: rows.filter((r) => r.material_id === m.id && r.kind === 'ficha').length,
+      flashcards: rows.filter((r) => r.material_id === m.id && r.kind === 'flashcard').length,
+      infographics: rows.filter((r) => r.material_id === m.id && r.kind === 'infografia').length,
+    }))
+    .filter((m) => m.fichas + m.flashcards + m.infographics > 0);
+
   return (
     <StudyClient
       userId={user.id}
       classroomId={params.id}
       classroomName={classroom.name}
-      materials={(materials ?? []).map((m) => ({ id: m.id, display_name: m.display_name ?? 'Material sin título' }))}
+      materials={withContent}
       initialMaterialId={searchParams.m ?? null}
     />
   );

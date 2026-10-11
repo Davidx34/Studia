@@ -151,12 +151,10 @@ describe('integracion de la funcion', () => {
     expect(sql).toMatch(/INSERT WITH CHECK \(\s*student_id = auth\.uid\(\)\s*AND EXISTS \(SELECT 1 FROM public\.study_cards/);
   });
 
-  it('la ruta valida usuario, acceso por RLS al material, y reclama la generacion de forma atomica', () => {
+  it('la generacion es del PROFESOR dueño del material (ver teacherStudy.test.ts)', () => {
     const route = read('src/app/api/study/generate/route.ts');
     expect(route).toContain('auth.getUser()');
-    expect(route).toContain("processing_status !== 'completed'");
-    expect(route).toContain(".eq('started_at', current.started_at)"); // compare-and-set
-    expect(route).toContain('RETRY_COOLDOWN_MS');
+    expect(route).toContain(".eq('teacher_id', user.id)");
   });
 
   it('la pagina de estudio y el resto de mis clases aceptan el tema claro', () => {
