@@ -225,14 +225,15 @@ describe('cableado', () => {
   const actions = read('src/lib/actions/materials.ts');
 
   it('subir un PDF lo procesa con processPdfMaterial; Word/Excel siguen por la edge function', () => {
-    expect(actions).toMatch(/input\.mimeType === PDF_MIME[\s\S]*processPdfMaterial\(supabase, data\.id\)/);
+    // En segundo plano (ver background.test.ts): la subida responde al instante y la conversion sigue sola.
+    expect(actions).toMatch(/input\.mimeType === PDF_MIME[\s\S]*runInBackground\(processPdfMaterial\(createAdminSupabase\(\), data\.id\)\)/);
     expect(actions).toMatch(/else \{[\s\S]*functions[\s\S]*process-material/);
   });
 
   it('reprocesar un PDF usa el mismo camino y no borra los chunks antes de tener los nuevos', () => {
     expect(actions).toContain('isPdfFile');
     expect(actions).toMatch(/!isPdfFile && !isTextFile\) \{\s*await supabase\.from\('material_chunks'\)\.delete\(\)/);
-    expect(actions).toMatch(/else if \(isPdfFile\) \{\s*await processPdfMaterial\(supabase, materialId\)/);
+    expect(actions).toMatch(/else if \(isPdfFile\) \{[\s\S]*?runInBackground\(processPdfMaterial\(createAdminSupabase\(\), materialId\)\)/);
   });
 
   it('la pagina de materiales declara maxDuration (una presentacion larga tarda 1-3 minutos)', () => {

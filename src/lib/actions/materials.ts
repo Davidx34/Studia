@@ -22,6 +22,8 @@ import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '@/lib/materials/constan
 import { slugifyFilename } from '@/lib/materials/file-helpers';
 import { processLinkMaterial } from '@/lib/materials/processLink';
 import { processPdfMaterial, PDF_MIME } from '@/lib/materials/processPdf';
+import { runInBackground } from '@/lib/server/background';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 import { parseSafeUrl, UnsafeUrlError } from '@/lib/security/safeFetch';
 import { claimProcessing, validateUploadInput } from '@/lib/security/materialGuards';
 import { processTextFileMaterial } from '@/lib/materials/processTextFile';
@@ -189,10 +191,14 @@ export async function confirmMaterialUpload(
   }
 
   if (input.mimeType === PDF_MIME) {
-    // Los PDFs se convierten a Markdown con vision y se procesan aqui, en el mismo request (mismo
-    // patron que link/YouTube): tarda entre unos segundos y un par de minutos segun las paginas.
-    // Si falla, el material queda en 'failed' con el motivo y se puede reprocesar.
-    await processPdfMaterial(supabase, data.id);
+    // Los PDFs se convierten a Markdown con vision: tarda entre unos segundos y un par de minutos segun las
+    // paginas. Se procesa EN SEGUNDO PLANO: la subida responde al instante y la lista de materiales (que ya
+    // consulta el estado cada pocos segundos) muestra "Procesando" y luego el resultado. Si falla, el material
+    // queda en 'failed' con el motivo y se puede reprocesar.
+    // Se usa la llave de servicio porque el trabajo sigue DESPUES de responder, cuando ya no se puede contar con
+    // las cookies de la sesion. La propiedad del material ya quedo verificada arriba (clase propia + insercion
+    // bajo RLS), asi que aqui solo se procesa el material que acaba de registrarse.
+    runInBackground(processPdfMaterial(createAdminSupabase(), data.id));
   } else if (TEXT_MIME_TYPES.includes(input.mimeType)) {
     // Markdown / texto: ya es texto, no hace falta IA ni edge function.
     await processTextFileMaterial(supabase, data.id);
@@ -422,7 +428,8 @@ export async function reprocessMaterial(materialId: string) {
         .eq('id', materialId);
     }
   } else if (isPdfFile) {
-    await processPdfMaterial(supabase, materialId);
+    // En segundo plano, igual que al subirlo (ver confirmMaterialUpload). La propiedad ya se verifico arriba.
+    runInBackground(processPdfMaterial(createAdminSupabase(), materialId));
   } else if (isTextFile) {
     await processTextFileMaterial(supabase, materialId);
   } else {
