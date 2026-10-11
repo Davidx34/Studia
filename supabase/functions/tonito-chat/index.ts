@@ -24,17 +24,12 @@ function buildSystemPrompt(
   moduleScore: number | null,
   timeOfDay: 'mañana' | 'tarde' | 'noche'
 ): string {
-  const level = profile?.current_level || 1;
   const name = profile?.full_name?.split(' ')[0] || profile?.username || 'amigo';
   const interests = profile?.gemini_preferences?.interests || [];
   const streak = profile?.streak_days || 0;
 
-  const tonePersonality =
-    level < 5
-      ? 'entusiasta y paciente, usa analogías simples y celebra cada avance'
-      : level < 15
-      ? 'motivador pero desafiante, empuja al estudiante a dar lo mejor'
-      : 'respetuoso y profundo, asume conocimiento previo';
+  // Ya no hay niveles (se elimino el XP): un solo tono, el mas cercano y paciente.
+  const tonePersonality = 'entusiasta y paciente, usa analogías simples y celebra cada avance';
 
   const moduleContext = module
     ? `\n\nEl estudiante está estudiando AHORA MISMO el módulo "${module.title}" de ${module.category} (dificultad ${module.difficulty_level}/10)${
@@ -71,7 +66,6 @@ PERSONALIDAD:
 
 CONTEXTO DEL ESTUDIANTE:
 - Nombre: ${name}
-- Nivel actual: ${level}
 - Racha: ${streak} días seguidos${streak >= 7 ? ' (¡impresionante!)' : ''}
 ${moduleContext}${performanceContext}${historyContext}
 

@@ -155,7 +155,6 @@ Deno.serve(async (req: Request) => {
     category: m.category.slice(0, 50),
     difficulty_level: m.difficulty_level,
     content_type: 'interactive' as const,
-    base_xp_reward: 10 * m.difficulty_level,
     estimated_time_minutes: m.estimated_time_minutes,
     prerequisites: [], // se llena en segunda pass
     order_index: idx,

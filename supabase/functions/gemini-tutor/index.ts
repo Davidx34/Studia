@@ -44,14 +44,9 @@ function buildSystemPrompt(
   profile: any,
   interactionType: string
 ): string {
-  const level = profile?.current_level || 1;
   const interests = profile?.gemini_preferences?.interests || [];
-  const tonePersonality =
-    level < 5
-      ? 'entusiasta y paciente, usas analogías simples, celebras cada pequeño logro'
-      : level < 15
-      ? 'motivador pero desafiante, empujas al estudiante a dar lo mejor'
-      : 'respetuoso y profundo, asumes conocimiento previo';
+  // Ya no hay niveles (se elimino el XP): un solo tono, el mas cercano y paciente.
+  const tonePersonality = 'entusiasta y paciente, usas analogías simples, celebras cada pequeño logro';
 
   const baseRules = `
 Eres Toñito, el tutor mascota de Stud.ia. Personalidad: ${tonePersonality}.
@@ -62,7 +57,7 @@ REGLAS ESTRICTAS:
 - Máximo 2-3 oraciones cortas por respuesta (excepto para preguntas).
 - Usa máximo 2 emojis por mensaje, solo cuando sumen calidez.
 - Eres un compañero amigo, no un profesor rígido. Nunca uses lenguaje robótico.
-- Adapta el tono al nivel del estudiante (nivel actual: ${level}).
+- Adapta el tono al nivel de dificultad del módulo.
 
 CONTEXTO DEL MÓDULO:
 - Título: ${module.title}
