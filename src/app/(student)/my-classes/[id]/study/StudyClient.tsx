@@ -5,22 +5,24 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, BookOpenCheck, Layers, Sparkles, RotateCcw, CheckCircle2, Loader2 } from 'lucide-react';
+import { ArrowLeft, BookOpenCheck, Layers, Sparkles, RotateCcw, CheckCircle2, Loader2, Shapes } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Card, Badge } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { MathText } from '@/components/MathText';
 import { isDue, nextState, type Grade } from '@/lib/study/leitner';
+import { InfographicView } from '@/components/study/InfographicView';
+import type { Infographic } from '@/lib/study/infographics';
 
 interface StudyCard {
   id: string;
-  kind: 'ficha' | 'flashcard';
+  kind: 'ficha' | 'flashcard' | 'infografia';
   section: string | null;
   position: number;
   front: string;
   back: string;
-  extra: { puntos_clave?: string[]; terminos?: { termino: string; definicion: string }[]; reflexion?: string } | null;
+  extra: ({ puntos_clave?: string[]; terminos?: { termino: string; definicion: string }[]; reflexion?: string } & Partial<Infographic>) | null;
 }
 
 interface CardState {
@@ -57,7 +59,10 @@ export function StudyClient({
   const [requesting, setRequesting] = useState(false);
   const [cards, setCards] = useState<StudyCard[]>([]);
   const [states, setStates] = useState<Map<string, CardState>>(new Map());
-  const [tab, setTab] = useState<'fichas' | 'flashcards'>('fichas');
+  const [tab, setTab] = useState<'fichas' | 'flashcards' | 'infografias'>('fichas');
+  const [igStatus, setIgStatus] = useState<GenStatus>('none');
+  const [igError, setIgError] = useState<string | null>(null);
+  const [igRequesting, setIgRequesting] = useState(false);
   const [loading, setLoading] = useState(false);
   const activeMaterial = useRef<string | null>(null);
 
@@ -100,16 +105,31 @@ export function StudyClient({
     [supabase, loadCards]
   );
 
+  const refreshIg = useCallback(
+    async (id: string) => {
+      const { data } = await supabase.from('study_infographic_generation' as any).select('status, error').eq('material_id', id).maybeSingle();
+      if (activeMaterial.current !== id) return;
+      const row = data as unknown as { status: GenStatus; error: string | null } | null;
+      const next: GenStatus = row?.status ?? 'none';
+      setIgStatus(next);
+      setIgError(next === 'failed' ? row?.error ?? null : null);
+      if (next === 'ready') await loadCards(id);
+    },
+    [supabase, loadCards]
+  );
+
   useEffect(() => {
     activeMaterial.current = materialId;
+    setIgStatus('none');
+    setIgError(null);
     setCards([]);
     setStates(new Map());
     setStatus('none');
     setGenError(null);
     if (!materialId) return;
     setLoading(true);
-    refreshStatus(materialId).finally(() => setLoading(false));
-  }, [materialId, refreshStatus]);
+    Promise.all([refreshStatus(materialId), refreshIg(materialId)]).finally(() => setLoading(false));
+  }, [materialId, refreshStatus, refreshIg]);
 
   // Mientras otra persona (o este mismo navegador) la esta generando, se consulta cada pocos segundos.
   useEffect(() => {
@@ -117,6 +137,39 @@ export function StudyClient({
     const t = setInterval(() => void refreshStatus(materialId), POLL_MS);
     return () => clearInterval(t);
   }, [status, materialId, refreshStatus]);
+
+  useEffect(() => {
+    if (igStatus !== 'generating' || !materialId) return;
+    const t = setInterval(() => void refreshIg(materialId), POLL_MS);
+    return () => clearInterval(t);
+  }, [igStatus, materialId, refreshIg]);
+
+  const generateInfographics = async () => {
+    if (!materialId) return;
+    setIgRequesting(true);
+    setIgError(null);
+    setIgStatus('generating');
+    try {
+      const res = await fetch('/api/study/infographics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ materialId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (activeMaterial.current !== materialId) return;
+      if (body.status === 'failed' || !res.ok) {
+        setIgStatus('failed');
+        setIgError(body.error ?? 'No se pudieron generar las infografías.');
+      } else {
+        await refreshIg(materialId);
+      }
+    } catch {
+      setIgStatus('failed');
+      setIgError('Se perdió la conexión. Intenta de nuevo.');
+    } finally {
+      setIgRequesting(false);
+    }
+  };
 
   const generate = async () => {
     if (!materialId) return;
@@ -147,6 +200,7 @@ export function StudyClient({
 
   const fichas = useMemo(() => cards.filter((c) => c.kind === 'ficha'), [cards]);
   const flash = useMemo(() => cards.filter((c) => c.kind === 'flashcard'), [cards]);
+  const infographics = useMemo(() => cards.filter((c) => c.kind === 'infografia'), [cards]);
 
   return (
     <div className="theme-scope space-y-6">
@@ -180,45 +234,107 @@ export function StudyClient({
 
           {loading ? (
             <p className="text-fg-muted flex items-center gap-2" role="status"><Loader2 aria-hidden="true" className="w-4 h-4 animate-spin motion-reduce:animate-none" /> Cargando…</p>
-          ) : status === 'ready' ? (
+          ) : (
             <>
-              <div role="tablist" aria-label="Tipo de estudio" className="flex gap-2">
+              <div role="tablist" aria-label="Tipo de estudio" className="flex gap-2 flex-wrap">
                 <TabButton selected={tab === 'fichas'} onClick={() => setTab('fichas')} id="fichas" icon={<BookOpenCheck aria-hidden="true" className="w-4 h-4" />}>
-                  Fichas de lectura <span className="opacity-80">({fichas.length})</span>
+                  Fichas de lectura {status === 'ready' && <span className="opacity-80">({fichas.length})</span>}
                 </TabButton>
                 <TabButton selected={tab === 'flashcards'} onClick={() => setTab('flashcards')} id="flashcards" icon={<Layers aria-hidden="true" className="w-4 h-4" />}>
-                  Flashcards <span className="opacity-80">({flash.length})</span>
+                  Flashcards {status === 'ready' && <span className="opacity-80">({flash.length})</span>}
+                </TabButton>
+                <TabButton selected={tab === 'infografias'} onClick={() => setTab('infografias')} id="infografias" icon={<Shapes aria-hidden="true" className="w-4 h-4" />}>
+                  Infografías {igStatus === 'ready' && <span className="opacity-80">({infographics.length})</span>}
                 </TabButton>
               </div>
               <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
-                {tab === 'fichas' ? (
-                  <Fichas fichas={fichas} />
+                {tab === 'infografias' ? (
+                  igStatus === 'ready' ? (
+                    <ul className="space-y-6">
+                      {infographics.map((c) => (
+                        <li key={c.id}>
+                          <InfographicView title={c.front} section={c.section} data={c.extra as unknown as Infographic} />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <GenerateCard
+                      status={igStatus}
+                      error={igError}
+                      requesting={igRequesting}
+                      onGenerate={generateInfographics}
+                      busyTitle="Dibujando tus infografías…"
+                      emptyTitle="Aún no hay infografías de este material"
+                      emptyHint="La IA busca fechas, comparaciones, pasos o cifras en el material y las dibuja. Se hace una sola vez."
+                      action="Generar infografías"
+                    />
+                  )
+                ) : status === 'ready' ? (
+                  tab === 'fichas' ? (
+                    <Fichas fichas={fichas} />
+                  ) : (
+                    <Flashcards cards={flash} states={states} userId={userId} supabase={supabase} onState={(s) => setStates((prev) => new Map(prev).set(s.card_id, s))} />
+                  )
                 ) : (
-                  <Flashcards cards={flash} states={states} userId={userId} supabase={supabase} onState={(s) => setStates((prev) => new Map(prev).set(s.card_id, s))} />
+                  <GenerateCard
+                    status={status}
+                    error={genError}
+                    requesting={requesting}
+                    onGenerate={generate}
+                    busyTitle="Preparando tus fichas…"
+                    emptyTitle="Aún no hay fichas de este material"
+                    emptyHint="La IA las arma una sola vez y quedan para todos tus compañeros."
+                    action="Generar fichas"
+                  />
                 )}
               </div>
               <p className="text-xs text-fg-muted">Generado con IA a partir del material. Si algo no cuadra, confía en el material original.</p>
             </>
-          ) : status === 'generating' ? (
-            <Card className="p-8 text-center space-y-2" role="status" aria-live="polite">
-              <Loader2 aria-hidden="true" className="w-8 h-8 mx-auto animate-spin motion-reduce:animate-none text-primary-text" />
-              <p className="font-semibold text-fg">Preparando tus fichas…</p>
-              <p className="text-sm text-fg-muted">Puede tardar uno o dos minutos. Puedes quedarte en esta página; se mostrarán solas.</p>
-            </Card>
-          ) : (
-            <Card className="p-8 text-center space-y-3">
-              <Sparkles aria-hidden="true" className="w-8 h-8 mx-auto text-accent-text" />
-              <p className="font-semibold text-fg">Aún no hay fichas de este material</p>
-              <p className="text-sm text-fg-muted">La IA las arma una sola vez y quedan para todos tus compañeros.</p>
-              {genError && <p role="alert" className="text-sm text-danger">{genError}</p>}
-              <Button onClick={generate} loading={requesting}>
-                {status === 'failed' ? 'Intentar de nuevo' : 'Generar fichas'}
-              </Button>
-            </Card>
           )}
         </>
       )}
     </div>
+  );
+}
+
+function GenerateCard({
+  status,
+  error,
+  requesting,
+  onGenerate,
+  busyTitle,
+  emptyTitle,
+  emptyHint,
+  action,
+}: {
+  status: GenStatus;
+  error: string | null;
+  requesting: boolean;
+  onGenerate: () => void;
+  busyTitle: string;
+  emptyTitle: string;
+  emptyHint: string;
+  action: string;
+}) {
+  if (status === 'generating') {
+    return (
+      <Card className="p-8 text-center space-y-2" role="status" aria-live="polite">
+        <Loader2 aria-hidden="true" className="w-8 h-8 mx-auto animate-spin motion-reduce:animate-none text-primary-text" />
+        <p className="font-semibold text-fg">{busyTitle}</p>
+        <p className="text-sm text-fg-muted">Puede tardar uno o dos minutos. Puedes quedarte en esta página; se mostrarán solas.</p>
+      </Card>
+    );
+  }
+  return (
+    <Card className="p-8 text-center space-y-3">
+      <Sparkles aria-hidden="true" className="w-8 h-8 mx-auto text-accent-text" />
+      <p className="font-semibold text-fg">{emptyTitle}</p>
+      <p className="text-sm text-fg-muted">{emptyHint}</p>
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      <Button onClick={onGenerate} loading={requesting}>
+        {status === 'failed' ? 'Intentar de nuevo' : action}
+      </Button>
+    </Card>
   );
 }
 

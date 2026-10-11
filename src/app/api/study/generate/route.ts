@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     if (rows.length === 0) return fail('La IA no devolvio tarjetas validas. Intenta de nuevo en un minuto.');
 
     // Reemplazo completo: borra lo anterior (si lo habia de un intento viejo) e inserta lo nuevo.
-    await admin.from('study_cards').delete().eq('material_id', materialId);
+    await admin.from('study_cards').delete().eq('material_id', materialId).in('kind', ['ficha', 'flashcard']);
     const { error: insertError } = await admin.from('study_cards').insert(rows);
     if (insertError) return fail('No se pudieron guardar las tarjetas.');
 
