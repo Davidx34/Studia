@@ -1,5 +1,5 @@
 // Protocolo 7.1.1: tipo compartido para funciones que reciben un cliente
-// de Supabase ya creado (por processYoutubeMaterial, chunkEmbedAndStore,
+// de Supabase ya creado (por processLinkMaterial, chunkEmbedAndStore,
 // etc.) en vez de crearlo ellas mismas -- evita `supabase: any` en cada
 // firma. Los 4 factories (server/client/admin/anon) devuelven variantes de
 // este mismo tipo generico (createServerClient/createBrowserClient de

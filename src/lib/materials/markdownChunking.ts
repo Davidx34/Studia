@@ -20,7 +20,7 @@
 //    "ANCLAJE" del juez (judge.ts).
 //
 // Para texto SIN headings/tablas/bloques de codigo -- el caso de PDFs
-// extraidos y transcripciones de YouTube, que llegan como texto plano -- el
+// extraidos, que llegan como texto plano -- el
 // resultado es IDENTICO byte a byte al chunking generico anterior (ver
 // textProcessing.test.ts, que sigue pasando sin cambios: ese es exactamente
 // el camino que toma texto sin estructura). Este modulo es un superset

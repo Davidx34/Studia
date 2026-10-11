@@ -655,7 +655,7 @@ function ModuleConfigRow({
 
       <div>
         <p className="text-xs text-slate-500 mb-1.5">
-          Material vinculado (sube el archivo/link/YouTube en la pestaña "Materiales" primero)
+          Material vinculado (sube el archivo o link en la pestaña "Materiales" primero)
         </p>
         {materials.length === 0 ? (
           <p className="text-xs text-slate-600 italic">Aún no hay materiales subidos a esta clase.</p>

@@ -1,5 +1,5 @@
 // Procesa un PDF subido: lo descarga del Storage, lo convierte a Markdown (con vision y control de
-// calidad, ver pdfToMarkdown.ts) y lo pasa por el MISMO pipeline que los enlaces y YouTube
+// calidad, ver pdfToMarkdown.ts) y lo pasa por el MISMO pipeline que los enlaces
 // (chunkEmbedAndStore), que troza respetando titulos y tablas.
 //
 // Antes los PDFs los procesaba la edge function process-material, que tiene su propia copia vieja

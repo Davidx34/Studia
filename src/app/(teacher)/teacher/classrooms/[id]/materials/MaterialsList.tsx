@@ -16,7 +16,6 @@ import {
   Check,
   Clock,
   Link as LinkIcon,
-  Video,
   Sparkles,
 } from 'lucide-react';
 import { MIME_INFO } from '@/lib/materials/constants';
@@ -75,8 +74,6 @@ function MaterialRow({
   const isExternal = material.source_type !== 'file';
   const mimeInfo = material.mime_type
     ? MIME_INFO[material.mime_type] ?? { ext: '?', label: material.mime_type }
-    : material.source_type === 'youtube'
-    ? { ext: 'youtube', label: 'YouTube' }
     : material.source_type === 'notebooklm'
     ? { ext: 'notebooklm', label: 'NotebookLM' }
     : { ext: 'link', label: 'Link' };
@@ -172,12 +169,6 @@ function MaterialRow({
               <span>{formatBytes(material.size_bytes)}</span>
             </>
           )}
-          {material.source_type === 'youtube' && material.transcript_source === 'none' && (
-            <>
-              <span>·</span>
-              <span title="No se encontraron subtítulos automáticos para este video">sin transcripción</span>
-            </>
-          )}
           {material.chunk_count != null && material.chunk_count > 0 && (
             <>
               <span>·</span>
@@ -263,7 +254,6 @@ function MaterialRow({
 }
 
 function pickIcon(material: TeachingMaterial) {
-  if (material.source_type === 'youtube') return Video;
   if (material.source_type === 'notebooklm') return Sparkles;
   if (material.source_type === 'link') return LinkIcon;
   const mime = material.mime_type ?? '';

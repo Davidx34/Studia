@@ -1,6 +1,6 @@
 // Material subido como archivo Markdown (.md) o texto (.txt): ya es texto, asi que NO hace falta IA ni la
 // edge function. Se descarga, se decodifica, se limpia sin aplastar la sangria de las listas y pasa por el mismo
-// pipeline que enlaces, YouTube y PDF (chunkEmbedAndStore, que trocea respetando titulos y tablas).
+// pipeline que enlaces y PDF (chunkEmbedAndStore, que trocea respetando titulos y tablas).
 
 import { sanitizeMarkdown } from './pdfMarkdown';
 import { chunkEmbedAndStore, QuotaExhaustedError } from './textProcessing';
