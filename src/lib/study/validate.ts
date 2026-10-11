@@ -1,3 +1,5 @@
+import { protectLatexBackslashes, escapeInvalidJsonBackslashes } from '@/lib/json/latexJson';
+
 // Parseo y validacion de lo que devuelve el modelo. Sin aprobacion del profesor, la calidad depende de
 // descartar con reglas objetivas: formato, longitudes, duplicados y que el contenido se APOYE EN EL MATERIAL.
 
@@ -62,9 +64,9 @@ export function extractJsonObject(text: string): any | null {
   };
   // Dentro de $...$ una barra simple es LaTeX, no un escape JSON: "\frac" se leeria como salto de pagina (\f) y
   // "\beta" como retroceso (\b) SIN dar error, asi que se doblan antes de parsear. Lo ya doblado no se toca.
-  const math = m[0].replace(/\$[^$\n]*\$/g, (seg) => seg.replace(/(?<!\\)\\(?!\\)/g, '\\\\'));
+  const math = protectLatexBackslashes(m[0]);
   // Respaldo: barras sueltas fuera de formulas que rompen el JSON.
-  return tryParse(math) ?? tryParse(m[0].replace(/\\(?!["\\/bfnrtu])/g, '\\\\'));
+  return tryParse(math) ?? tryParse(escapeInvalidJsonBackslashes(m[0]));
 }
 
 export function validateGroupCards(raw: any, source: string): GroupCards {
