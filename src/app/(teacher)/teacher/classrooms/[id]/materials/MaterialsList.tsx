@@ -28,6 +28,7 @@ import {
 } from '@/lib/actions/materials';
 import type { TeachingMaterial } from '@/types/database';
 import { describeExtraction } from '@/lib/materials/extractionLabel';
+import { isStalledProcessing } from '@/lib/materials/processingState';
 
 export default function MaterialsList({
   classroomId,
@@ -81,6 +82,8 @@ function MaterialRow({
     : { ext: 'link', label: 'Link' };
   const Icon = pickIcon(material);
   const extraction = describeExtraction(material.extraction_method, material.extraction_report);
+  // Un procesamiento en segundo plano que murio sin avisar se ofrece como "interrumpido" para reintentarlo.
+  const stalled = isStalledProcessing(material.processing_status, material.processing_started_at);
 
   async function handleRename() {
     if (!name.trim() || name === (material.display_name ?? material.filename)) {
@@ -200,7 +203,7 @@ function MaterialRow({
         )}
       </div>
 
-      <StatusBadge status={material.processing_status} />
+      <StatusBadge status={material.processing_status} stalled={stalled} />
 
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition">
         {(material.processing_status === 'failed' ||
@@ -218,11 +221,11 @@ function MaterialRow({
             )}
           </button>
         )}
-        {material.processing_status === 'pending' && (
+        {(material.processing_status === 'pending' || stalled) && (
           <button
             onClick={handleReprocess}
             disabled={busy}
-            title="Reintentar"
+            title={stalled ? 'Se interrumpió: reintentar' : 'Reintentar'}
             className="p-2 rounded-lg text-amber-400 hover:bg-amber-500/10 transition"
           >
             {busy ? (
@@ -270,7 +273,14 @@ function pickIcon(material: TeachingMaterial) {
   return FileIcon;
 }
 
-function StatusBadge({ status }: { status: TeachingMaterial['processing_status'] }) {
+function StatusBadge({ status, stalled = false }: { status: TeachingMaterial['processing_status']; stalled?: boolean }) {
+  if (stalled) {
+    return (
+      <span title="El procesamiento se interrumpió. Usa Reintentar." className="inline-flex items-center gap-1 text-xs text-amber-400">
+        <AlertCircle className="w-3.5 h-3.5" /> Interrumpido
+      </span>
+    );
+  }
   if (status === 'completed') {
     return (
       <span
