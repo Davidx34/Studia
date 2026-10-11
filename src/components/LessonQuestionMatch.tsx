@@ -35,7 +35,8 @@ export function LessonQuestionMatch({
 }: {
   pairs: Pair[];
   disabled: boolean;
-  onComplete: (correct: boolean) => void;
+  // `pairing[i]` = indice del par cuya definicion conecto el estudiante con el termino i (-1 = sin conectar).
+  onComplete: (correct: boolean, pairing: number[]) => void;
 }) {
   // shuffledDefs[posición] = índice original del par cuya definición se muestra ahí
   const shuffledDefs = useMemo(() => shuffledIndices(pairs.length), [pairs]);
@@ -98,10 +99,12 @@ export function LessonQuestionMatch({
     setSelectedTerm(null);
   };
 
+  const userPairing = () => pairs.map((_, termIdx) => (connections[termIdx] === undefined ? -1 : shuffledDefs[connections[termIdx]]));
+
   const handleVerify = () => {
     setChecked(true);
     if (allCorrect) {
-      onComplete(true);
+      onComplete(true, userPairing());
     }
   };
 
@@ -120,6 +123,8 @@ export function LessonQuestionMatch({
   };
 
   const handleReveal = () => {
+    // Lo que el estudiante dejo conectado, ANTES de mostrarle la solucion.
+    const given = userPairing();
     setRevealed(true);
     setChecked(true);
     const correctConnections: Record<number, number> = {};
@@ -127,7 +132,7 @@ export function LessonQuestionMatch({
       correctConnections[origIdx] = defPos;
     });
     setConnections(correctConnections);
-    onComplete(false);
+    onComplete(false, given);
   };
 
   const isTermCorrect = (termIdx: number) =>
