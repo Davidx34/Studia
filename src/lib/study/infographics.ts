@@ -135,6 +135,12 @@ ${group.text}`;
 export interface GeneratedInfographics {
   items: (Infographic & { section: string | null })[];
   groupsTried: number;
+  // Motivos de los bloques sin infografia: noResponse (el modelo no contesto), rejected (contesto algo que no paso la
+  // verificacion contra el material), noFit (el fragmento no se presta: respuesta legitima), skipped (tiempo).
+  noResponse: number;
+  rejected: number;
+  noFit: number;
+  skipped: number;
 }
 
 // Un bloque por llamada; reparte los bloques elegidos a lo largo del material (no solo el principio).
@@ -162,30 +168,48 @@ export function pickGroups(groups: ChunkGroup[], max = MAX_INFOGRAPHIC_GROUPS): 
   return Array.from({ length: max }, (_, i) => groups[Math.floor(i * step)]);
 }
 
-export async function generateInfographics(groups: ChunkGroup[], materialName: string, call: ModelCaller, concurrency = 2): Promise<GeneratedInfographics> {
+export async function generateInfographics(
+  groups: ChunkGroup[],
+  materialName: string,
+  call: ModelCaller,
+  concurrency = 2,
+  deadline: number = Infinity
+): Promise<GeneratedInfographics> {
   const chosen = pickGroups(groups);
   const results: (Infographic | null)[] = new Array(chosen.length).fill(null);
+  const why: ('noResponse' | 'rejected' | 'noFit' | 'skipped' | null)[] = new Array(chosen.length).fill(null);
   let next = 0;
   const worker = async () => {
     while (true) {
       const idx = next++;
       if (idx >= chosen.length) return;
+      if (Date.now() > deadline) {
+        why[idx] = 'skipped';
+        continue;
+      }
+      let answered = false;
       for (let attempt = 0; attempt < 2 && !results[idx]; attempt++) {
         const text = await call(buildInfographicPrompt(chosen[idx], materialName));
         if (!text) continue;
+        answered = true;
         const parsed = extractJsonObject(text);
         // {"infografia":null} es una respuesta valida ("no se presta"): no se reintenta.
-        if (parsed && parsed.infografia === null) break;
+        if (parsed && parsed.infografia === null) {
+          why[idx] = 'noFit';
+          break;
+        }
         results[idx] = validateInfographic(parsed?.infografia, chosen[idx].text);
       }
+      if (!results[idx] && why[idx] === null) why[idx] = answered ? 'rejected' : 'noResponse';
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, chosen.length) }, worker));
-  const items: GeneratedInfographics['items'] = [];
+  const out: GeneratedInfographics = { items: [], groupsTried: chosen.length, noResponse: 0, rejected: 0, noFit: 0, skipped: 0 };
   results.forEach((r, i) => {
-    if (r && !items.some((x) => isDuplicate(x, r))) items.push({ ...r, section: chosen[i].section });
+    if (r && !out.items.some((x) => isDuplicate(x, r))) out.items.push({ ...r, section: chosen[i].section });
+    else if (!r && why[i]) out[why[i] as 'noResponse' | 'rejected' | 'noFit' | 'skipped']++;
   });
-  return { items, groupsTried: chosen.length };
+  return out;
 }
 
 export function infographicRow(materialId: string, item: Infographic & { section: string | null }, position: number) {

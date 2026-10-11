@@ -141,16 +141,10 @@ describe('InfographicView', () => {
 describe('integracion', () => {
   const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8').replace(/\r\n/g, '\n');
 
-  it('la regeneracion de fichas ya no borra las infografias', () => {
-    expect(read('src/app/api/study/generate/route.ts')).toContain(".in('kind', ['ficha', 'flashcard'])");
-  });
-
-  it('la ruta de infografias valida usuario, acceso por RLS y reclama de forma atomica', () => {
-    const route = read('src/app/api/study/infographics/route.ts');
-    expect(route).toContain('auth.getUser()');
-    expect(route).toContain("processing_status !== 'completed'");
-    expect(route).toContain(".eq('started_at', current.started_at)");
-    expect(route).toContain('RETRY_COOLDOWN_MS');
+  it('regenerar fichas no borra las infografias (y al reves)', () => {
+    const jobs = read('src/lib/study/jobs.ts');
+    expect(jobs).toContain(".in('kind', ['ficha', 'flashcard'])");
+    expect(jobs).toContain(".eq('kind', 'infografia')");
   });
 
   it('la migracion amplia el tipo y deja la generacion escrita solo por el servidor', () => {

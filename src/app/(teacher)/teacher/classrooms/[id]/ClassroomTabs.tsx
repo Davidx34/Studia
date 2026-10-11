@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, FileText, Map, BarChart3, Brain, Target, ImagePlus } from 'lucide-react';
+import { Users, FileText, Map, BarChart3, Brain, Target, ImagePlus, Sparkles } from 'lucide-react';
 
 export default function ClassroomTabs({ classroomId }: { classroomId: string }) {
   const pathname = usePathname();
@@ -17,6 +17,8 @@ export default function ClassroomTabs({ classroomId }: { classroomId: string }) 
     { href: `${base}/progress`, label: 'Progreso', icon: BarChart3 },
 
     { href: `${base}/brain`, label: 'Configurar IA', icon: Brain },
+    // Al final: se prepara cuando todo lo demas ya esta cargado y procesado.
+    { href: `${base}/study`, label: 'Material de estudio', icon: Sparkles },
   ];
 
   return (

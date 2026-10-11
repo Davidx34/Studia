@@ -32,46 +32,72 @@ export interface GeneratedCards {
   flashcards: (FlashCard & { section: string | null })[];
   groupsOk: number;
   groupsFailed: number;
+  // Por que fallaron los bloques que fallaron (para decirselo al profesor con claridad):
+  //  - noResponse: el modelo no contesto (limite de uso, conexion, sin llave)
+  //  - rejected:   contesto, pero nada paso la verificacion contra el material (formato roto o contenido ajeno)
+  //  - skipped:    no se alcanzo a procesar por el limite de tiempo
+  noResponse: number;
+  rejected: number;
+  skipped: number;
 }
+
+export type GroupOutcome = { cards: NonNullable<ReturnType<typeof validateGroupCards>> } | { reason: 'noResponse' | 'rejected' };
 
 // Hasta 2 intentos por bloque: un JSON mal formado o un bloque sin tarjetas validas suele resolverse al reintentar.
 const ATTEMPTS = 2;
 
-async function generateForGroup(group: ChunkGroup, materialName: string, call: ModelCaller) {
+async function generateForGroup(group: ChunkGroup, materialName: string, call: ModelCaller): Promise<GroupOutcome> {
+  let answered = false;
   for (let i = 0; i < ATTEMPTS; i++) {
     const text = await call(buildStudyPrompt(group, materialName));
     if (!text) continue;
+    answered = true;
     const parsed = extractJsonObject(text);
     if (!parsed) continue;
     const cards = validateGroupCards(parsed, group.text);
-    if (cards.ficha || cards.flashcards.length > 0) return cards;
+    if (cards.ficha || cards.flashcards.length > 0) return { cards };
   }
-  return null;
+  return { reason: answered ? 'rejected' : 'noResponse' };
 }
 
-export async function generateStudyCards(groups: ChunkGroup[], materialName: string, call: ModelCaller, concurrency = 2): Promise<GeneratedCards> {
-  const results: ({ group: ChunkGroup; cards: NonNullable<Awaited<ReturnType<typeof generateForGroup>>> } | null)[] = new Array(groups.length).fill(null);
+export async function generateStudyCards(
+  groups: ChunkGroup[],
+  materialName: string,
+  call: ModelCaller,
+  concurrency = 2,
+  deadline: number = Infinity
+): Promise<GeneratedCards> {
+  const results: ({ group: ChunkGroup; outcome: GroupOutcome | 'skipped' } | null)[] = new Array(groups.length).fill(null);
   let next = 0;
   const worker = async () => {
     while (true) {
       const idx = next++;
       if (idx >= groups.length) return;
-      const cards = await generateForGroup(groups[idx], materialName, call);
-      results[idx] = cards ? { group: groups[idx], cards } : null;
+      // La funcion tiene un tope de tiempo: mejor guardar lo logrado que perderlo todo al cortarse.
+      if (Date.now() > deadline) {
+        results[idx] = { group: groups[idx], outcome: 'skipped' };
+        continue;
+      }
+      results[idx] = { group: groups[idx], outcome: await generateForGroup(groups[idx], materialName, call) };
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, groups.length) }, worker));
 
-  const out: GeneratedCards = { fichas: [], flashcards: [], groupsOk: 0, groupsFailed: 0 };
+  const out: GeneratedCards = { fichas: [], flashcards: [], groupsOk: 0, groupsFailed: 0, noResponse: 0, rejected: 0, skipped: 0 };
   for (const r of results) {
-    if (!r) {
+    if (!r) continue;
+    if (r.outcome === 'skipped') {
       out.groupsFailed++;
-      continue;
+      out.skipped++;
+    } else if ('reason' in r.outcome) {
+      out.groupsFailed++;
+      out[r.outcome.reason]++;
+    } else {
+      out.groupsOk++;
+      const section = r.group.section;
+      if (r.outcome.cards.ficha) out.fichas.push({ ...r.outcome.cards.ficha, section });
+      for (const f of r.outcome.cards.flashcards) out.flashcards.push({ ...f, section });
     }
-    out.groupsOk++;
-    const section = r.group.section;
-    if (r.cards.ficha) out.fichas.push({ ...r.cards.ficha, section });
-    for (const f of r.cards.flashcards) out.flashcards.push({ ...f, section });
   }
   return out;
 }
