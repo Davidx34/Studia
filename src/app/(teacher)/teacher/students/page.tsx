@@ -48,14 +48,14 @@ export default async function TeacherStudentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white">Estudiantes</h1>
-        <p className="text-slate-400 mt-1">{students?.length || 0} en total</p>
+        <h1 className="text-3xl font-bold text-fg">Estudiantes</h1>
+        <p className="text-fg-muted mt-1">{students?.length || 0} en total</p>
       </div>
 
       {/* Lista */}
-      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl overflow-hidden">
+      <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl overflow-hidden">
         {/* Header */}
-        <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 border-b border-slate-800 bg-slate-900/50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 border-b border-line-strong bg-surface text-xs font-semibold text-fg-muted uppercase tracking-wider">
           <div className="col-span-4">Estudiante</div>
           <div className="col-span-2 text-center">Nivel</div>
           <div className="col-span-2 text-center">XP</div>
@@ -63,7 +63,7 @@ export default async function TeacherStudentsPage() {
           <div className="col-span-2 text-center">Última actividad</div>
         </div>
 
-        <div className="divide-y divide-slate-800">
+        <div className="divide-y divide-line">
           {students?.map((s) => {
             const stats = progressMap.get(s.id) || { completed: 0, avgScore: 0 };
             const daysInactive = s.last_activity_date
@@ -78,35 +78,35 @@ export default async function TeacherStudentsPage() {
               <Link
                 key={s.id}
                 href={`/teacher/students/${s.id}`}
-                className="grid grid-cols-12 gap-4 px-5 py-4 items-center hover:bg-slate-800/50 transition group"
+                className="grid grid-cols-12 gap-4 px-5 py-4 items-center hover:bg-surface-2/50 transition group"
               >
                 {/* Nombre */}
                 <div className="col-span-12 md:col-span-4 flex items-center gap-3 min-w-0">
-                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center font-bold text-white flex-shrink-0">
+                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center font-bold text-on-primary flex-shrink-0">
                     {s.full_name?.charAt(0) || s.username.charAt(0)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-white truncate flex items-center gap-2">
+                    <div className="font-semibold text-fg truncate flex items-center gap-2">
                       {s.full_name}
                       {isAtRisk && (
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                        <AlertCircle className="w-3.5 h-3.5 text-accent-text flex-shrink-0" />
                       )}
                     </div>
-                    <div className="text-xs text-slate-500 truncate">@{s.username}</div>
+                    <div className="text-xs text-fg-muted truncate">@{s.username}</div>
                   </div>
                 </div>
 
                 {/* Nivel */}
                 <div className="hidden md:flex md:col-span-2 justify-center">
-                  <div className="px-3 py-1 rounded-full bg-violet-500/15 border border-violet-500/30 text-violet-300 text-sm font-semibold">
+                  <div className="px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary-text text-sm font-semibold">
                     {s.current_level}
                   </div>
                 </div>
 
                 {/* XP */}
                 <div className="hidden md:block md:col-span-2 text-center">
-                  <div className="font-bold text-white">{s.total_xp.toLocaleString()}</div>
-                  <div className="text-xs text-slate-500">{stats.completed} módulos</div>
+                  <div className="font-bold text-fg">{s.total_xp.toLocaleString()}</div>
+                  <div className="text-xs text-fg-muted">{stats.completed} módulos</div>
                 </div>
 
                 {/* Promedio */}
@@ -115,16 +115,16 @@ export default async function TeacherStudentsPage() {
                     <div
                       className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
                         stats.avgScore >= 80
-                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          ? 'bg-success/15 text-success border border-success/30'
                           : stats.avgScore >= 60
-                          ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                          : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                          ? 'bg-accent/15 text-accent-text border border-accent/30'
+                          : 'bg-danger/15 text-danger border border-danger/30'
                       }`}
                     >
                       {stats.avgScore}
                     </div>
                   ) : (
-                    <span className="text-slate-600 text-sm">—</span>
+                    <span className="text-fg-muted text-sm">—</span>
                   )}
                 </div>
 
@@ -132,7 +132,7 @@ export default async function TeacherStudentsPage() {
                 <div className="hidden md:flex md:col-span-2 justify-center items-center gap-2">
                   <span
                     className={`text-xs font-semibold ${
-                      isAtRisk ? 'text-amber-400' : 'text-slate-400'
+                      isAtRisk ? 'text-accent-text' : 'text-fg-muted'
                     }`}
                   >
                     {daysInactive === 0
@@ -141,7 +141,7 @@ export default async function TeacherStudentsPage() {
                       ? 'Ayer'
                       : `Hace ${daysInactive}d`}
                   </span>
-                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all" />
+                  <ChevronRight className="w-4 h-4 text-fg-muted group-hover:text-fg-muted group-hover:translate-x-0.5 transition-all" />
                 </div>
               </Link>
             );

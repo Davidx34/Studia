@@ -208,7 +208,7 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-1 border-b border-slate-800">
+      <div className="flex gap-1 border-b border-line-strong">
         {(
           [
             { id: 'notebooklm' as const, label: 'NotebookLM', icon: Sparkles, hint: 'Recomendado' },
@@ -224,13 +224,13 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
               onClick={() => setTab(t.id)}
               className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition ${
                 tab === t.id
-                  ? 'border-violet-500 text-violet-300'
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
+                  ? 'border-primary text-primary-text'
+                  : 'border-transparent text-fg-muted hover:text-fg-muted'
               }`}
             >
               <TabIcon className="w-3.5 h-3.5" />
               {t.label}
-              {t.hint && <span className="ml-1 rounded-full bg-violet-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-violet-200">{t.hint}</span>}
+              {t.hint && <span className="ml-1 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold text-primary-text">{t.hint}</span>}
             </button>
           );
         })}
@@ -245,19 +245,19 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
           onClick={openPicker}
           className={`rounded-2xl border-2 border-dashed cursor-pointer transition p-8 text-center ${
             dragActive
-              ? 'border-violet-500 bg-violet-500/5'
-              : 'border-slate-700 bg-slate-900/30 hover:border-slate-600 hover:bg-slate-900/50'
+              ? 'border-primary bg-primary/5'
+              : 'border-line-strong bg-surface hover:border-line-strong hover:bg-surface'
           }`}
         >
           <Upload
             className={`w-10 h-10 mx-auto mb-3 ${
-              dragActive ? 'text-violet-300' : 'text-slate-500'
+              dragActive ? 'text-primary-text' : 'text-fg-muted'
             }`}
           />
-          <h3 className="text-sm font-semibold text-white mb-1">
+          <h3 className="text-sm font-semibold text-fg mb-1">
             Arrastra archivos o haz clic para seleccionar
           </h3>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-fg-muted">
             PDF, DOCX, XLSX, Markdown o TXT · Máx {formatBytes(MAX_FILE_SIZE_BYTES)} por archivo
           </p>
           <input
@@ -272,8 +272,8 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
       )}
 
       {tab === 'link' && (
-        <form onSubmit={handleAddExternal} className="rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900/30 p-6 space-y-3">
-          <p className="text-xs text-slate-500">
+        <form onSubmit={handleAddExternal} className="rounded-2xl border-2 border-dashed border-line-strong bg-surface p-6 space-y-3">
+          <p className="text-xs text-fg-muted">
             Pega el link de un artículo o página web. Se extraerá el contenido igual que un documento.
           </p>
           <div className="flex gap-2">
@@ -283,19 +283,19 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
               value={externalUrl}
               onChange={(e) => setExternalUrl(e.target.value)}
               placeholder="https://..."
-              className="flex-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500"
+              className="flex-1 px-3 py-2 rounded-lg bg-bg border border-line-strong text-sm text-fg placeholder-fg-muted focus:outline-none focus:border-primary"
             />
             <button
               type="submit"
               disabled={externalBusy || !externalUrl.trim()}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-violet-500 hover:bg-violet-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary hover:brightness-110 text-on-primary disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {externalBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               Agregar
             </button>
           </div>
           {externalError && (
-            <div className="flex items-center gap-2 text-xs text-red-300">
+            <div className="flex items-center gap-2 text-xs text-danger">
               <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
               {externalError}
             </div>
@@ -304,27 +304,27 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
       )}
 
       {tab === 'notebooklm' && (
-        <form onSubmit={handleAddNotebookLM} className="rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900/30 p-6 space-y-3">
-          <div className="text-xs text-slate-400 space-y-2">
+        <form onSubmit={handleAddNotebookLM} className="rounded-2xl border-2 border-dashed border-line-strong bg-surface p-6 space-y-3">
+          <div className="text-xs text-fg-muted space-y-2">
             <p>
-              La forma más confiable de usar un <strong className="text-slate-200">video</strong> (o cualquier fuente densa): lo
+              La forma más confiable de usar un <strong className="text-fg">video</strong> (o cualquier fuente densa): lo
               resumes en{' '}
               <a
                 href="https://notebooklm.google.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-violet-300 underline hover:text-violet-200"
+                className="text-primary-text underline hover:text-primary-text"
               >
                 NotebookLM
               </a>{' '}
               y pegas aquí el resultado. Tú controlas qué contenido entra.
             </p>
-            <ol className="list-decimal pl-5 space-y-0.5 text-slate-300">
+            <ol className="list-decimal pl-5 space-y-0.5 text-fg-muted">
               <li>Crea un cuaderno en NotebookLM y agrega el video (o PDF, enlaces) como fuente.</li>
               <li>Pídele un resumen detallado en Markdown, con títulos y listas.</li>
               <li>Copia el resultado y pégalo abajo con un título.</li>
             </ol>
-            <p className="text-slate-500">También puedes guardarlo como archivo .md y subirlo desde la pestaña Archivo.</p>
+            <p className="text-fg-muted">También puedes guardarlo como archivo .md y subirlo desde la pestaña Archivo.</p>
           </div>
           <input
             type="text"
@@ -332,7 +332,7 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
             value={notebookTitle}
             onChange={(e) => setNotebookTitle(e.target.value)}
             placeholder="Título del material (ej: Clase 4 - Elasticidad)"
-            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500"
+            className="w-full px-3 py-2 rounded-lg bg-bg border border-line-strong text-sm text-fg placeholder-fg-muted focus:outline-none focus:border-primary"
           />
           <textarea
             required
@@ -340,18 +340,18 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
             onChange={(e) => setNotebookMarkdown(e.target.value)}
             placeholder="Pega aquí el markdown generado por NotebookLM…"
             rows={8}
-            className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 font-mono resize-y"
+            className="w-full px-3 py-2 rounded-lg bg-bg border border-line-strong text-sm text-fg placeholder-fg-muted focus:outline-none focus:border-primary font-mono resize-y"
           />
           <button
             type="submit"
             disabled={notebookBusy || !notebookTitle.trim() || !notebookMarkdown.trim()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-violet-500 hover:bg-violet-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary hover:brightness-110 text-on-primary disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             {notebookBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Agregar
           </button>
           {notebookError && (
-            <div className="flex items-center gap-2 text-xs text-red-300">
+            <div className="flex items-center gap-2 text-xs text-danger">
               <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
               {notebookError}
             </div>
@@ -365,29 +365,29 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
           {progress.map((row, i) => (
             <div
               key={i}
-              className="rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-3"
+              className="rounded-xl border border-line shadow-card bg-surface backdrop-blur-xl p-3"
             >
               <div className="flex items-center gap-2 text-sm">
                 {row.status === 'done' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
                 ) : row.status === 'error' ? (
-                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                  <AlertCircle className="w-4 h-4 text-danger flex-shrink-0" />
                 ) : (
-                  <Loader2 className="w-4 h-4 text-violet-400 animate-spin flex-shrink-0" />
+                  <Loader2 className="w-4 h-4 text-primary-text animate-spin flex-shrink-0" />
                 )}
-                <span className="text-white truncate flex-1">{row.filename}</span>
-                <span className="text-xs text-slate-500">{labelStatus(row.status)}</span>
+                <span className="text-fg truncate flex-1">{row.filename}</span>
+                <span className="text-xs text-fg-muted">{labelStatus(row.status)}</span>
               </div>
               {row.status !== 'error' && row.status !== 'done' && (
-                <div className="mt-2 h-1 rounded-full bg-slate-800 overflow-hidden">
+                <div className="mt-2 h-1 rounded-full bg-surface-2 overflow-hidden">
                   <div
-                    className="h-full bg-violet-500 transition-all"
+                    className="h-full bg-primary transition-all"
                     style={{ width: `${row.pct}%` }}
                   />
                 </div>
               )}
               {row.status === 'error' && row.error && (
-                <p className="text-xs text-red-300 mt-1 ml-6">{row.error}</p>
+                <p className="text-xs text-danger mt-1 ml-6">{row.error}</p>
               )}
             </div>
           ))}

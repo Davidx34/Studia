@@ -29,7 +29,8 @@ export default function CancelPendingButton({
       onClick={handleClick}
       disabled={pending}
       title="Cancelar invitación"
-      className="p-1.5 rounded-lg text-amber-400/60 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50 transition"
+      aria-label="Cancelar invitación"
+      className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-accent-text/60 hover:text-danger hover:bg-danger/10 disabled:opacity-50 transition"
     >
       {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
     </button>

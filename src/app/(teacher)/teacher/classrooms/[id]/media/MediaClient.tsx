@@ -155,54 +155,54 @@ export default function MediaClient({
     setMedia((prev) => prev.map((x) => (x.id === m.id ? { ...x, module_id: value || null } : x)));
   };
 
-  const inputCls = 'w-full min-h-[44px] rounded-lg bg-slate-900 border border-slate-700 px-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500';
+  const inputCls = 'w-full min-h-[44px] rounded-lg bg-surface border border-line-strong px-3 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:border-primary';
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 space-y-2">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <ImagePlus className="w-5 h-5 text-violet-300" aria-hidden="true" /> Imágenes y videos
+      <div className="rounded-2xl border border-line-strong bg-surface p-5 space-y-2">
+        <h2 className="text-lg font-bold text-fg flex items-center gap-2">
+          <ImagePlus className="w-5 h-5 text-primary-text" aria-hidden="true" /> Imágenes y videos
         </h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-fg-muted">
           Sube lo que generaste con Flow, Gemini u otra herramienta y asócialo a un módulo: los estudiantes lo verán dentro de la lección.
           Imágenes PNG, JPG o WebP (se reducen solas a máx. {formatMB(MAX_IMAGE_BYTES)}); videos MP4 o WebM de hasta {formatMB(MAX_VIDEO_BYTES)}.
         </p>
         <div>
-          <div className="flex justify-between text-xs text-slate-400 mb-1">
+          <div className="flex justify-between text-xs text-fg-muted mb-1">
             <span>Espacio de la clase</span>
             <span>
               {formatMB(usedBytes)} de {formatMB(MAX_CLASS_MEDIA_BYTES)} · {media.length}/{MAX_CLASS_MEDIA_COUNT} archivos
             </span>
           </div>
-          <div role="progressbar" aria-label="Espacio usado" aria-valuemin={0} aria-valuemax={100} aria-valuenow={usedPct} className="h-2 rounded-full bg-slate-800 overflow-hidden">
-            <div className={`h-full ${usedPct > 85 ? 'bg-amber-400' : 'bg-violet-500'}`} style={{ width: `${usedPct}%` }} />
+          <div role="progressbar" aria-label="Espacio usado" aria-valuemin={0} aria-valuemax={100} aria-valuenow={usedPct} className="h-2 rounded-full bg-surface-2 overflow-hidden">
+            <div className={`h-full ${usedPct > 85 ? 'bg-accent' : 'bg-primary'}`} style={{ width: `${usedPct}%` }} />
           </div>
         </div>
       </div>
 
-      <form onSubmit={upload} className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 space-y-3">
+      <form onSubmit={upload} className="rounded-2xl border border-line-strong bg-surface p-5 space-y-3">
         <div>
-          <label htmlFor="media-file" className="block text-sm font-medium text-slate-200 mb-1">Archivo</label>
+          <label htmlFor="media-file" className="block text-sm font-medium text-fg mb-1">Archivo</label>
           <input
             id="media-file"
             ref={fileRef}
             type="file"
             accept="image/png,image/jpeg,image/webp,video/mp4,video/webm"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-slate-300 file:mr-3 file:min-h-[44px] file:rounded-lg file:border-0 file:bg-violet-600 file:px-4 file:text-white"
+            className="block w-full text-sm text-fg-muted file:mr-3 file:min-h-[44px] file:rounded-lg file:border-0 file:bg-primary file:px-4 file:text-fg"
           />
         </div>
         <div>
-          <label htmlFor="media-alt" className="block text-sm font-medium text-slate-200 mb-1">Descripción (obligatoria)</label>
+          <label htmlFor="media-alt" className="block text-sm font-medium text-fg mb-1">Descripción (obligatoria)</label>
           <input id="media-alt" value={alt} onChange={(e) => setAlt(e.target.value)} maxLength={300} placeholder="Qué se ve, para quien no pueda verlo" className={inputCls} />
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
-            <label htmlFor="media-caption" className="block text-sm font-medium text-slate-200 mb-1">Pie de foto (opcional)</label>
+            <label htmlFor="media-caption" className="block text-sm font-medium text-fg mb-1">Pie de foto (opcional)</label>
             <input id="media-caption" value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={300} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="media-module" className="block text-sm font-medium text-slate-200 mb-1">Módulo</label>
+            <label htmlFor="media-module" className="block text-sm font-medium text-fg mb-1">Módulo</label>
             <select id="media-module" value={moduleId} onChange={(e) => setModuleId(e.target.value)} className={inputCls}>
               <option value="">Sin módulo (solo en la clase)</option>
               {modules.map((m) => (
@@ -212,26 +212,26 @@ export default function MediaClient({
           </div>
         </div>
         {error && (
-          <p role="alert" className="flex items-start gap-2 text-sm text-red-300">
+          <p role="alert" className="flex items-start gap-2 text-sm text-danger">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" /> {error}
           </p>
         )}
         <button
           type="submit"
           disabled={!file || alt.trim().length < 3 || busy}
-          className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-medium"
+          className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-lg bg-primary hover:brightness-110 disabled:opacity-50 text-on-primary font-medium"
         >
           {busy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />} Subir
         </button>
       </form>
 
       {media.length === 0 ? (
-        <p className="text-slate-400 text-sm">Aún no hay archivos.</p>
+        <p className="text-fg-muted text-sm">Aún no hay archivos.</p>
       ) : (
         <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {media.map((m) => (
-            <li key={m.id} className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
-              <div className="aspect-video bg-slate-950 flex items-center justify-center">
+            <li key={m.id} className="rounded-2xl border border-line-strong bg-surface overflow-hidden">
+              <div className="aspect-video bg-bg flex items-center justify-center">
                 {urls[m.storage_path] ? (
                   m.kind === 'image' ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -240,14 +240,14 @@ export default function MediaClient({
                     <video src={urls[m.storage_path]} controls preload="none" aria-label={m.alt_text} className="w-full h-full" />
                   )
                 ) : (
-                  <Film className="w-8 h-8 text-slate-600" aria-hidden="true" />
+                  <Film className="w-8 h-8 text-fg-muted" aria-hidden="true" />
                 )}
               </div>
               <div className="p-3 space-y-2">
-                <p className="text-sm text-slate-200">{m.alt_text}</p>
-                {m.caption && <p className="text-xs text-slate-400">{m.caption}</p>}
-                <p className="text-xs text-slate-500">{m.kind === 'image' ? 'Imagen' : 'Video'} · {formatMB(m.size_bytes)}</p>
-                <label className="block text-xs text-slate-400">
+                <p className="text-sm text-fg">{m.alt_text}</p>
+                {m.caption && <p className="text-xs text-fg-muted">{m.caption}</p>}
+                <p className="text-xs text-fg-muted">{m.kind === 'image' ? 'Imagen' : 'Video'} · {formatMB(m.size_bytes)}</p>
+                <label className="block text-xs text-fg-muted">
                   Módulo
                   <select value={m.module_id ?? ''} onChange={(e) => void relink(m, e.target.value)} className={inputCls + ' mt-1'}>
                     <option value="">Sin módulo</option>
@@ -256,7 +256,7 @@ export default function MediaClient({
                     ))}
                   </select>
                 </label>
-                <button type="button" onClick={() => void remove(m)} className="inline-flex items-center gap-1.5 min-h-[44px] text-sm text-red-300 hover:text-red-200">
+                <button type="button" onClick={() => void remove(m)} className="inline-flex items-center gap-1.5 min-h-[44px] text-sm text-danger hover:text-danger">
                   <Trash2 className="w-4 h-4" aria-hidden="true" /> Borrar
                 </button>
               </div>

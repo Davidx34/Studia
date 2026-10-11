@@ -45,44 +45,44 @@ export default async function ClassroomStudentsPage({ params }: PageProps) {
       {/* Sección: Inscritos */}
       <section>
         <header className="flex items-center gap-2 mb-3">
-          <UsersIcon className="w-5 h-5 text-violet-300" />
-          <h2 className="text-lg font-semibold text-white">
+          <UsersIcon className="w-5 h-5 text-primary-text" />
+          <h2 className="text-lg font-semibold text-fg">
             Inscritos activos
-            <span className="ml-2 text-sm font-normal text-slate-500">
+            <span className="ml-2 text-sm font-normal text-fg-muted">
               ({students?.length ?? 0})
             </span>
           </h2>
         </header>
 
         {students && students.length > 0 ? (
-          <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl overflow-hidden">
+          <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl overflow-hidden">
             {students.map((s) => (
               <div
                 key={s.id}
-                className="flex items-center gap-3 px-4 py-3 border-b border-slate-800 last:border-0"
+                className="flex items-center gap-3 px-4 py-3 border-b border-line-strong last:border-0"
               >
-                <div className="w-9 h-9 rounded-full bg-violet-500/15 border border-violet-500/30 flex items-center justify-center text-violet-300 text-sm font-semibold flex-shrink-0">
+                <div className="w-9 h-9 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-primary-text text-sm font-semibold flex-shrink-0">
                   {(s.full_name || s.username || '?').charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white truncate">
+                  <div className="text-sm font-medium text-fg truncate">
                     {s.full_name || s.username}
                   </div>
-                  <div className="text-xs text-slate-500 truncate">{s.email ?? '—'}</div>
+                  <div className="text-xs text-fg-muted truncate">{s.email ?? '—'}</div>
                 </div>
-                <div className="hidden sm:flex flex-col items-end text-xs text-slate-400">
+                <div className="hidden sm:flex flex-col items-end text-xs text-fg-muted">
                   <span>
-                    <strong className="text-violet-300">{s.total_xp ?? 0}</strong> XP
+                    <strong className="text-primary-text">{s.total_xp ?? 0}</strong> XP
                   </span>
-                  <span className="text-slate-500">Nivel {s.current_level ?? 1}</span>
+                  <span className="text-fg-muted">Nivel {s.current_level ?? 1}</span>
                 </div>
                 <RemoveEnrollmentButton classroomId={params.id} studentId={s.id} />
               </div>
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl border-dashed">
-            <p className="text-sm text-slate-500">
+          <div className="text-center py-8 rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl border-dashed">
+            <p className="text-sm text-fg-muted">
               Aún no hay estudiantes inscritos. Invita emails abajo.
             </p>
           </div>
@@ -93,24 +93,24 @@ export default async function ClassroomStudentsPage({ params }: PageProps) {
       {pendings && pendings.length > 0 && (
         <section>
           <header className="flex items-center gap-2 mb-3">
-            <Clock className="w-5 h-5 text-amber-300" />
-            <h2 className="text-lg font-semibold text-white">
+            <Clock className="w-5 h-5 text-accent-text" />
+            <h2 className="text-lg font-semibold text-fg">
               Pendientes de signup
-              <span className="ml-2 text-sm font-normal text-slate-500">
+              <span className="ml-2 text-sm font-normal text-fg-muted">
                 ({pendings.length})
               </span>
             </h2>
           </header>
-          <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 overflow-hidden">
+          <div className="rounded-2xl bg-accent/5 border border-accent/20 overflow-hidden">
             {pendings.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center gap-3 px-4 py-2.5 border-b border-amber-500/10 last:border-0"
+                className="flex items-center gap-3 px-4 py-2.5 border-b border-accent/10 last:border-0"
               >
-                <Mail className="w-4 h-4 text-amber-300 flex-shrink-0" />
+                <Mail className="w-4 h-4 text-accent-text flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-white truncate">{p.email}</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-sm text-fg truncate">{p.email}</div>
+                  <div className="text-xs text-fg-muted">
                     Se inscribirá automáticamente al registrarse
                   </div>
                 </div>
@@ -124,8 +124,8 @@ export default async function ClassroomStudentsPage({ params }: PageProps) {
       {/* Sección: Invitar */}
       <section>
         <header className="flex items-center gap-2 mb-3">
-          <UserPlus className="w-5 h-5 text-violet-300" />
-          <h2 className="text-lg font-semibold text-white">Invitar estudiantes</h2>
+          <UserPlus className="w-5 h-5 text-primary-text" />
+          <h2 className="text-lg font-semibold text-fg">Invitar estudiantes</h2>
         </header>
         <InviteStudentsForm classroomId={params.id} />
       </section>

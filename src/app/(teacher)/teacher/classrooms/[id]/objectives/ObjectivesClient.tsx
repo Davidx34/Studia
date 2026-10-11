@@ -147,13 +147,13 @@ export default function ObjectivesClient({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 flex items-start gap-4 flex-wrap">
-        <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
-          <Target className="w-5 h-5 text-violet-300" />
+      <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-5 flex items-start gap-4 flex-wrap">
+        <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center flex-shrink-0">
+          <Target className="w-5 h-5 text-primary-text" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-semibold text-white">Objetivos de aprendizaje</h2>
-          <p className="text-sm text-slate-400 mt-0.5">
+          <h2 className="text-lg font-semibold text-fg">Objetivos de aprendizaje</h2>
+          <p className="text-sm text-fg-muted mt-0.5">
             Agrupa módulos bajo una meta mayor y configura cuántas preguntas y qué
             minijuegos usa cada uno. Esto es opcional: los módulos sin objetivo
             siguen funcionando como siempre.
@@ -165,7 +165,7 @@ export default function ObjectivesClient({
               onClick={handleFillMissing}
               disabled={bulkRunning || judging}
               title="Genera solo las preguntas que faltan (activas y de reserva). No borra ninguna pregunta existente."
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 disabled:opacity-50 transition"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-success/15 text-success border border-success/30 hover:bg-success/25 disabled:opacity-50 transition"
             >
               {bulkRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
               Generar lo que falta ({incomplete.length})
@@ -176,7 +176,7 @@ export default function ObjectivesClient({
               onClick={handleRunJudge}
               disabled={bulkRunning || judging}
               title="Revisa con IA (Gemini Flash) las preguntas generadas antes de que las vea el estudiante"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-sky-500/15 text-sky-300 border border-sky-500/30 hover:bg-sky-500/25 disabled:opacity-50 transition"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-primary/15 text-primary-text border border-primary/30 hover:bg-primary/25 disabled:opacity-50 transition"
             >
               {judging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               Revisar con juez IA
@@ -184,14 +184,14 @@ export default function ObjectivesClient({
           )}
           <Link
             href={`/teacher/classrooms/${classroomId}/review`}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-surface-2 text-fg-muted border border-line-strong hover:bg-surface-2 transition"
           >
             <FileText className="w-4 h-4" />
             Revisión pendiente
           </Link>
           <button
             onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-violet-500 hover:bg-violet-600 text-white transition"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-primary hover:brightness-110 text-on-primary transition"
           >
             <Plus className="w-4 h-4" />
             Nuevo objetivo
@@ -200,7 +200,7 @@ export default function ObjectivesClient({
       </div>
 
       {incomplete.length > 0 && !bulkRunning && (
-        <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-200">
+        <div className="rounded-xl bg-accent/10 border border-accent/30 p-3 text-sm text-accent-text">
           {incomplete.length} de {readyForBulk.length} módulos con material no tienen el pool de preguntas completo. Si un
           estudiante abre uno de ellos, tendrá que esperar a que se genere en ese momento (hasta ~1 minuto). Usa{' '}
           <strong>Generar lo que falta</strong> para dejarlo listo antes: no borra nada.
@@ -208,32 +208,32 @@ export default function ObjectivesClient({
       )}
 
       {failed.length > 0 && (
-        <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-200 space-y-1">
+        <div className="rounded-xl bg-danger/10 border border-danger/30 p-3 text-sm text-danger space-y-1">
           <p className="font-medium">No se pudo completar {failed.length} módulo(s). Puedes volver a pulsar el botón para reintentarlos:</p>
           <ul className="text-xs list-disc pl-5">{failed.map((f) => <li key={f}>{f}</li>)}</ul>
         </div>
       )}
 
       {bulkProgress && (
-        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3 text-sm text-emerald-200">
+        <div className="rounded-xl bg-success/10 border border-success/30 p-3 text-sm text-success">
           Completando módulo {bulkProgress.current}/{bulkProgress.total}: {bulkProgress.title}... (cada uno tarda ~1 min; no cierres esta pestaña)
         </div>
       )}
 
       {judgeProgress && (
-        <div className="rounded-xl bg-sky-500/10 border border-sky-500/30 p-3 text-sm text-sky-200">
+        <div className="rounded-xl bg-primary/10 border border-primary/30 p-3 text-sm text-primary-text">
           Juez revisando módulo {judgeProgress.current}/{judgeProgress.total}: {judgeProgress.title}...
         </div>
       )}
 
       {judgeSummary && (
-        <div className="rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-4 text-sm text-slate-300 space-y-2">
-          <p className="font-medium text-white">
+        <div className="rounded-xl border border-line shadow-card bg-surface backdrop-blur-xl p-4 text-sm text-fg-muted space-y-2">
+          <p className="font-medium text-fg">
             Juez: {judgeSummary.approved} aprobadas · {judgeSummary.rejected} rechazadas · {judgeSummary.humanReview} a revisión
             {judgeSummary.judgeUnavailable > 0 && ` (${judgeSummary.judgeUnavailable} sin poder evaluar, mandadas a revisión)`}
           </p>
           {judgeSummary.byModule.length > 0 && (
-            <ul className="text-xs text-slate-400 space-y-0.5">
+            <ul className="text-xs text-fg-muted space-y-0.5">
               {judgeSummary.byModule.map((m) => (
                 <li key={m.title}>
                   {m.title}: {m.rejected}/{m.total} rechazadas ({m.total > 0 ? Math.round((m.rejected / m.total) * 100) : 0}%)
@@ -245,7 +245,7 @@ export default function ObjectivesClient({
       )}
 
       {error && (
-        <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-3 flex items-start gap-2 text-sm text-red-300">
+        <div className="rounded-xl bg-danger/10 border border-danger/30 p-3 flex items-start gap-2 text-sm text-danger">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -264,8 +264,8 @@ export default function ObjectivesClient({
       )}
 
       {objectives.length === 0 && !creating ? (
-        <div className="text-center py-12 rounded-2xl bg-slate-900/30 border border-slate-800 border-dashed">
-          <p className="text-sm text-slate-500">Aún no hay objetivos de aprendizaje en esta clase.</p>
+        <div className="text-center py-12 rounded-2xl bg-surface border border-line-strong border-dashed">
+          <p className="text-sm text-fg-muted">Aún no hay objetivos de aprendizaje en esta clase.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -333,22 +333,22 @@ function ObjectiveForm({
   }
 
   return (
-    <div className="rounded-xl bg-slate-900 border border-violet-500/30 p-4 space-y-3">
+    <div className="rounded-xl bg-surface border border-primary/30 p-4 space-y-3">
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Título del objetivo (ej: Dominar la Revolución Industrial)"
-        className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+        className="w-full px-3 py-2 rounded-lg bg-surface-2 border border-line-strong text-sm text-fg placeholder-fg-muted focus:outline-none focus:border-primary"
       />
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Descripción (opcional)"
         rows={2}
-        className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 resize-none"
+        className="w-full px-3 py-2 rounded-lg bg-surface-2 border border-line-strong text-sm text-fg placeholder-fg-muted focus:outline-none focus:border-primary resize-none"
       />
       <div className="flex gap-4 flex-wrap">
-        <label className="text-xs text-slate-400 flex items-center gap-2">
+        <label className="text-xs text-fg-muted flex items-center gap-2">
           Duración estimada (semanas)
           <input
             type="number"
@@ -356,10 +356,10 @@ function ObjectiveForm({
             max={52}
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-16 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-sm text-white"
+            className="w-16 px-2 py-1 rounded-lg bg-surface-2 border border-line-strong text-sm text-fg"
           />
         </label>
-        <label className="text-xs text-slate-400 flex items-center gap-2">
+        <label className="text-xs text-fg-muted flex items-center gap-2">
           Dificultad (1-10)
           <input
             type="number"
@@ -367,7 +367,7 @@ function ObjectiveForm({
             max={10}
             value={difficulty}
             onChange={(e) => setDifficulty(Number(e.target.value))}
-            className="w-16 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-sm text-white"
+            className="w-16 px-2 py-1 rounded-lg bg-surface-2 border border-line-strong text-sm text-fg"
           />
         </label>
       </div>
@@ -375,14 +375,14 @@ function ObjectiveForm({
         <button
           onClick={onCancel}
           disabled={pending}
-          className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white transition"
+          className="px-3 py-1.5 rounded-lg text-sm text-fg-muted hover:text-fg transition"
         >
           Cancelar
         </button>
         <button
           onClick={handleSave}
           disabled={pending || !title.trim()}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-violet-500 hover:bg-violet-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary hover:brightness-110 text-on-primary disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           {pending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           Guardar
@@ -463,26 +463,26 @@ function ObjectiveCard({
   }
 
   return (
-    <div className="rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl overflow-hidden">
+    <div className="rounded-xl border border-line shadow-card bg-surface backdrop-blur-xl overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-start gap-3 p-4 text-left hover:bg-slate-800/40 transition"
+        className="w-full flex items-start gap-3 p-4 text-left hover:bg-surface-2/40 transition"
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-sm font-semibold text-white">{objective.title}</h3>
-            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+            <h3 className="text-sm font-semibold text-fg">{objective.title}</h3>
+            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-2 text-fg-muted border border-line-strong">
               {modules.length} {modules.length === 1 ? 'módulo' : 'módulos'}
             </span>
-            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-2 text-fg-muted border border-line-strong">
               Dif {objective.difficulty_level}
             </span>
-            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-2 text-fg-muted border border-line-strong">
               {objective.expected_duration_weeks} sem
             </span>
           </div>
           {objective.description && (
-            <p className="text-xs text-slate-400 mt-1 line-clamp-2">{objective.description}</p>
+            <p className="text-xs text-fg-muted mt-1 line-clamp-2">{objective.description}</p>
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -492,7 +492,7 @@ function ObjectiveCard({
               e.stopPropagation();
               setEditing(true);
             }}
-            className="p-2 rounded-lg text-slate-500 hover:text-violet-300 hover:bg-violet-500/10 transition"
+            className="p-2 rounded-lg text-fg-muted hover:text-primary-text hover:bg-primary/10 transition"
           >
             <Pencil className="w-3.5 h-3.5" />
           </span>
@@ -502,18 +502,18 @@ function ObjectiveCard({
               e.stopPropagation();
               handleDelete();
             }}
-            className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition"
+            className="p-2 rounded-lg text-fg-muted hover:text-danger hover:bg-danger/10 transition"
           >
             {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
           </span>
-          {expanded ? <ChevronUp className="w-4 h-4 text-slate-500 mt-2" /> : <ChevronDown className="w-4 h-4 text-slate-500 mt-2" />}
+          {expanded ? <ChevronUp className="w-4 h-4 text-fg-muted mt-2" /> : <ChevronDown className="w-4 h-4 text-fg-muted mt-2" />}
         </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-slate-800 p-4 space-y-3">
+        <div className="border-t border-line-strong p-4 space-y-3">
           {modules.length === 0 ? (
-            <p className="text-xs text-slate-500">No hay módulos asignados a este objetivo todavía.</p>
+            <p className="text-xs text-fg-muted">No hay módulos asignados a este objetivo todavía.</p>
           ) : (
             modules
               .sort((a, b) => (a.order_in_objective ?? 0) - (b.order_in_objective ?? 0))
@@ -527,7 +527,7 @@ function ObjectiveCard({
               <select
                 value={assignId}
                 onChange={(e) => setAssignId(e.target.value)}
-                className="flex-1 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-violet-500"
+                className="flex-1 px-3 py-1.5 rounded-lg bg-surface-2 border border-line-strong text-xs text-fg focus:outline-none focus:border-primary"
               >
                 <option value="">Asignar módulo existente...</option>
                 {unassignedModules.map((m) => (
@@ -539,7 +539,7 @@ function ObjectiveCard({
               <button
                 onClick={handleAssign}
                 disabled={!assignId || pending}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/15 text-primary-text border border-primary/30 hover:bg-primary/25 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
                 Asignar
               </button>
@@ -630,16 +630,16 @@ function ModuleConfigRow({
   }
 
   return (
-    <div className="rounded-lg bg-slate-800/50 border border-slate-700 p-3 space-y-3">
+    <div className="rounded-lg bg-surface-2/50 border border-line-strong p-3 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <h4 className="text-sm font-medium text-white">{module.title}</h4>
+          <h4 className="text-sm font-medium text-fg">{module.title}</h4>
           {hasMaterial ? (
-            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-success/15 text-success border border-success/30">
               ✓ Con material
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent/15 text-accent-text border border-accent/30">
               <Clock className="w-2.5 h-2.5" /> Esperando material
             </span>
           )}
@@ -647,18 +647,18 @@ function ModuleConfigRow({
         <button
           onClick={handleUnassign}
           disabled={savePending}
-          className="text-xs text-slate-500 hover:text-red-400 transition"
+          className="text-xs text-fg-muted hover:text-danger transition"
         >
           Quitar del objetivo
         </button>
       </div>
 
       <div>
-        <p className="text-xs text-slate-500 mb-1.5">
+        <p className="text-xs text-fg-muted mb-1.5">
           Material vinculado (sube el archivo o link en la pestaña "Materiales" primero)
         </p>
         {materials.length === 0 ? (
-          <p className="text-xs text-slate-600 italic">Aún no hay materiales subidos a esta clase.</p>
+          <p className="text-xs text-fg-muted italic">Aún no hay materiales subidos a esta clase.</p>
         ) : (
           <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
             {materials.map((mat) => (
@@ -669,8 +669,8 @@ function ModuleConfigRow({
                 title={mat.processing_status !== 'completed' ? `Estado: ${mat.processing_status}` : undefined}
                 className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition ${
                   materialIds.includes(mat.id)
-                    ? 'bg-violet-500/20 border-violet-500/50 text-violet-200'
-                    : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300'
+                    ? 'bg-primary/20 border-primary/50 text-primary-text'
+                    : 'bg-surface-2 border-line-strong text-fg-muted hover:text-fg-muted'
                 }`}
               >
                 <FileText className="w-3 h-3" />
@@ -682,7 +682,7 @@ function ModuleConfigRow({
         )}
       </div>
 
-      <label className="flex items-center gap-2 text-xs text-slate-400">
+      <label className="flex items-center gap-2 text-xs text-fg-muted">
         Preguntas activas por sesión
         <input
           type="range"
@@ -692,16 +692,16 @@ function ModuleConfigRow({
           onChange={(e) => setQuestionCount(Number(e.target.value))}
           className="flex-1 accent-violet-500"
         />
-        <span className="w-6 text-center text-white font-mono">{questionCount}</span>
+        <span className="w-6 text-center text-fg font-mono">{questionCount}</span>
       </label>
 
       <div>
-        <p className="text-xs text-slate-500 mb-1.5">Minijuegos permitidos (además de los tipos base de la clase)</p>
+        <p className="text-xs text-fg-muted mb-1.5">Minijuegos permitidos (además de los tipos base de la clase)</p>
         {allowedMinigames.length === 0 && (
-          <p className="text-xs text-amber-300 mb-1.5">La clase no tiene minijuegos activos: se activan en el Cerebro de la IA.</p>
+          <p className="text-xs text-accent-text mb-1.5">La clase no tiene minijuegos activos: se activan en el Cerebro de la IA.</p>
         )}
         {allowedMinigames.length > 0 && allowedMinigames.length < Object.keys(MINIGAME_LABELS).length && (
-          <p className="text-xs text-slate-500 mb-1.5">Solo aparecen los que la clase tiene activos en el Cerebro de la IA.</p>
+          <p className="text-xs text-fg-muted mb-1.5">Solo aparecen los que la clase tiene activos en el Cerebro de la IA.</p>
         )}
         <div className="flex flex-wrap gap-1.5">
           {Object.entries(MINIGAME_LABELS).filter(([type]) => allowedMinigames.includes(type)).map(([type, label]) => (
@@ -711,8 +711,8 @@ function ModuleConfigRow({
               onClick={() => toggleMinigame(type)}
               className={`text-xs px-2 py-1 rounded-lg border transition ${
                 minigameTypes.includes(type)
-                  ? 'bg-violet-500/20 border-violet-500/50 text-violet-200'
-                  : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300'
+                  ? 'bg-primary/20 border-primary/50 text-primary-text'
+                  : 'bg-surface-2 border-line-strong text-fg-muted hover:text-fg-muted'
               }`}
             >
               {label}
@@ -721,13 +721,13 @@ function ModuleConfigRow({
         </div>
       </div>
 
-      {regenResult && <p className="text-xs text-emerald-300">{regenResult}</p>}
+      {regenResult && <p className="text-xs text-success">{regenResult}</p>}
 
       <div className="flex gap-2 justify-end">
         <button
           onClick={handleSaveConfig}
           disabled={savePending}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-50 transition"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-2 hover:bg-surface-2 text-fg disabled:opacity-50 transition"
         >
           {savePending && <Loader2 className="w-3 h-3 animate-spin" />}
           Guardar config
@@ -735,7 +735,7 @@ function ModuleConfigRow({
         <button
           onClick={handleRegenerate}
           disabled={regenPending}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-500 hover:bg-violet-600 text-white disabled:opacity-50 transition"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary hover:brightness-110 text-on-primary disabled:opacity-50 transition"
         >
           {regenPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
           Regenerar pool de preguntas

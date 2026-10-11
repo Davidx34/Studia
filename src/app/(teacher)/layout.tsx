@@ -2,8 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import Link from 'next/link';
-import { LogoutButton } from '@/components/LogoutButton';
+import { TeacherShell } from '@/components/teacher/TeacherShell';
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -23,37 +22,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     checkAuth();
   }, [router, supabase]);
 
-  if (loading) return <div className="text-white text-center p-8">Cargando...</div>;
+  if (loading) return <div role="status" className="theme-scope min-h-dvh bg-bg p-8 text-center text-fg-muted">Cargando…</div>;
 
-  return (
-    <div className="flex min-h-screen bg-slate-950">
-      <aside className="w-64 bg-slate-900/60 backdrop-blur-xl border-r border-white/[0.06] p-6 flex flex-col">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-white mb-8">
-            📚 Stud<span style={{ color: 'var(--premium-accent)' }}>.</span>ia
-          </h1>
-          <nav className="space-y-1.5">
-            <Link
-              href="/teacher/classrooms"
-              className="premium-focus flex items-center gap-2 px-4 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/[0.06] transition-all duration-300 ease-out"
-            >
-              📖 Mis Clases
-            </Link>
-            <Link
-              href="/dashboard"
-              className="premium-focus flex items-center gap-2 px-4 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/[0.06] transition-all duration-300 ease-out"
-            >
-              🎯 Dashboard
-            </Link>
-          </nav>
-        </div>
-        <div className="border-t border-white/[0.06] pt-6 space-y-3">
-          <p className="text-xs text-slate-500 break-words">{user?.email}</p>
-          <p className="text-sm text-slate-200 font-medium">{user?.full_name || user?.username}</p>
-          <LogoutButton />
-        </div>
-      </aside>
-      <main className="flex-1 p-8 overflow-auto">{children}</main>
-    </div>
-  );
+  return <TeacherShell user={{ email: user?.email, name: user?.full_name || user?.username }}>{children}</TeacherShell>;
 }

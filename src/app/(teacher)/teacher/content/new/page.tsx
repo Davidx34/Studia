@@ -127,15 +127,15 @@ export default function NewModuleWizard() {
       {/* Header */}
       <Link
         href="/teacher/content"
-        className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white transition"
+        className="inline-flex items-center gap-2 text-sm text-fg-muted hover:text-fg transition"
       >
         <ArrowLeft className="w-4 h-4" />
         Volver a contenido
       </Link>
 
       <div>
-        <h1 className="text-3xl font-bold text-white">Crear módulo</h1>
-        <p className="text-slate-400 mt-1">Paso {step} de 3</p>
+        <h1 className="text-3xl font-bold text-fg">Crear módulo</h1>
+        <p className="text-fg-muted mt-1">Paso {step} de 3</p>
       </div>
 
       {/* Stepper */}
@@ -150,10 +150,10 @@ export default function NewModuleWizard() {
               <div
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border flex-1 transition ${
                   isActive
-                    ? 'bg-violet-500/15 border-violet-500/40 text-violet-200'
+                    ? 'bg-primary/15 border-primary/40 text-primary-text'
                     : isDone
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                    : 'bg-slate-900 border-slate-800 text-slate-500'
+                    ? 'bg-success/10 border-success/30 text-success'
+                    : 'bg-surface border-line-strong text-fg-muted'
                 }`}
               >
                 {isDone ? (
@@ -171,11 +171,11 @@ export default function NewModuleWizard() {
       </div>
 
       {/* Contenido del paso */}
-      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-6 space-y-5">
+      <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-6 space-y-5">
         {step === 1 && (
           <>
             <div>
-              <label className="block text-sm font-semibold text-white mb-2">
+              <label className="block text-sm font-semibold text-fg mb-2">
                 Título del módulo *
               </label>
               <input
@@ -183,12 +183,12 @@ export default function NewModuleWizard() {
                 value={data.title}
                 onChange={(e) => update('title', e.target.value)}
                 placeholder="ej: Introducción a las fracciones"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 transition"
+                className="w-full px-4 py-3 bg-bg border border-line-strong rounded-xl text-fg placeholder-fg-muted focus:outline-none focus:border-primary transition"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-white mb-2">
+              <label className="block text-sm font-semibold text-fg mb-2">
                 Descripción
               </label>
               <textarea
@@ -196,12 +196,12 @@ export default function NewModuleWizard() {
                 onChange={(e) => update('description', e.target.value)}
                 placeholder="Breve descripción de lo que aprenderán..."
                 rows={3}
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 transition resize-none"
+                className="w-full px-4 py-3 bg-bg border border-line-strong rounded-xl text-fg placeholder-fg-muted focus:outline-none focus:border-primary transition resize-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-white mb-2">Categoría *</label>
+              <label className="block text-sm font-semibold text-fg mb-2">Categoría *</label>
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {CATEGORIES.map((cat) => (
                   <button
@@ -209,8 +209,8 @@ export default function NewModuleWizard() {
                     onClick={() => update('category', cat.value)}
                     className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition ${
                       data.category === cat.value
-                        ? 'bg-violet-500/20 border-violet-500 text-white'
-                        : 'bg-slate-950 border-slate-700 text-slate-400 hover:border-slate-600'
+                        ? 'bg-primary/20 border-primary text-fg'
+                        : 'bg-bg border-line-strong text-fg-muted hover:border-line-strong'
                     }`}
                   >
                     <span className="text-2xl">{cat.emoji}</span>
@@ -225,8 +225,8 @@ export default function NewModuleWizard() {
         {step === 2 && (
           <>
             <div>
-              <label className="block text-sm font-semibold text-white mb-2">
-                Dificultad: <span className="text-violet-300">{data.difficulty_level}/10</span>
+              <label className="block text-sm font-semibold text-fg mb-2">
+                Dificultad: <span className="text-primary-text">{data.difficulty_level}/10</span>
               </label>
               <input
                 type="range"
@@ -236,7 +236,7 @@ export default function NewModuleWizard() {
                 onChange={(e) => update('difficulty_level', Number(e.target.value))}
                 className="w-full accent-violet-500"
               />
-              <div className="flex justify-between text-xs text-slate-500 mt-1">
+              <div className="flex justify-between text-xs text-fg-muted mt-1">
                 <span>Principiante</span>
                 <span>Intermedio</span>
                 <span>Avanzado</span>
@@ -245,7 +245,7 @@ export default function NewModuleWizard() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-white mb-2">
+                <label className="block text-sm font-semibold text-fg mb-2">
                   Tiempo estimado (minutos)
                 </label>
                 <input
@@ -254,12 +254,12 @@ export default function NewModuleWizard() {
                   max="120"
                   value={data.estimated_time_minutes}
                   onChange={(e) => update('estimated_time_minutes', Number(e.target.value))}
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-violet-500 transition"
+                  className="w-full px-4 py-3 bg-bg border border-line-strong rounded-xl text-fg focus:outline-none focus:border-primary transition"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-white mb-2">
+                <label className="block text-sm font-semibold text-fg mb-2">
                   XP base
                 </label>
                 <input
@@ -268,13 +268,13 @@ export default function NewModuleWizard() {
                   max="100"
                   value={data.base_xp_reward}
                   onChange={(e) => update('base_xp_reward', Number(e.target.value))}
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-violet-500 transition"
+                  className="w-full px-4 py-3 bg-bg border border-line-strong rounded-xl text-fg focus:outline-none focus:border-primary transition"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-white mb-2">Tipo de contenido</label>
+              <label className="block text-sm font-semibold text-fg mb-2">Tipo de contenido</label>
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { v: 'quiz', l: 'Quiz' },
@@ -286,8 +286,8 @@ export default function NewModuleWizard() {
                     onClick={() => update('content_type', t.v)}
                     className={`p-3 rounded-xl border text-sm font-semibold transition ${
                       data.content_type === t.v
-                        ? 'bg-violet-500/20 border-violet-500 text-white'
-                        : 'bg-slate-950 border-slate-700 text-slate-400 hover:border-slate-600'
+                        ? 'bg-primary/20 border-primary text-fg'
+                        : 'bg-bg border-line-strong text-fg-muted hover:border-line-strong'
                     }`}
                   >
                     {t.l}
@@ -300,17 +300,17 @@ export default function NewModuleWizard() {
 
         {step === 3 && (
           <>
-            <div className="flex items-start gap-3 p-4 rounded-xl bg-violet-500/10 border border-violet-500/30">
-              <Sparkles className="w-5 h-5 text-violet-300 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-slate-300">
-                <strong className="text-white">Toñito generará las preguntas usando estas instrucciones.</strong>
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/10 border border-primary/30">
+              <Sparkles className="w-5 h-5 text-primary-text flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-fg-muted">
+                <strong className="text-fg">Toñito generará las preguntas usando estas instrucciones.</strong>
                 <br />
                 Sé específico sobre el tema, el estilo y los errores comunes que quieres incluir como distractores.
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-white mb-2">
+              <label className="block text-sm font-semibold text-fg mb-2">
                 Instrucciones para Toñito *
               </label>
               <textarea
@@ -318,15 +318,15 @@ export default function NewModuleWizard() {
                 onChange={(e) => update('gemini_prompt_template', e.target.value)}
                 placeholder="ej: Genera preguntas sobre fracciones equivalentes. Usa pizzas como ejemplos visuales. Incluye un distractor donde se confundan numerador con denominador."
                 rows={6}
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 transition resize-none font-mono text-sm"
+                className="w-full px-4 py-3 bg-bg border border-line-strong rounded-xl text-fg placeholder-fg-muted focus:outline-none focus:border-primary transition resize-none font-mono text-sm"
               />
-              <div className="text-xs text-slate-500 mt-1">
+              <div className="text-xs text-fg-muted mt-1">
                 {data.gemini_prompt_template.length} caracteres · mínimo 10
               </div>
             </div>
 
             <div>
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <div className="text-xs font-semibold text-fg-muted uppercase tracking-wider mb-2">
                 💡 Plantillas sugeridas
               </div>
               <div className="space-y-2">
@@ -334,10 +334,10 @@ export default function NewModuleWizard() {
                   <button
                     key={s.label}
                     onClick={() => update('gemini_prompt_template', s.text)}
-                    className="block w-full text-left p-3 rounded-lg bg-slate-950 border border-slate-800 hover:border-violet-500/40 transition group"
+                    className="block w-full text-left p-3 rounded-lg bg-bg border border-line-strong hover:border-primary/40 transition group"
                   >
-                    <div className="text-xs font-semibold text-violet-300 mb-1">{s.label}</div>
-                    <div className="text-xs text-slate-500 group-hover:text-slate-400">{s.text}</div>
+                    <div className="text-xs font-semibold text-primary-text mb-1">{s.label}</div>
+                    <div className="text-xs text-fg-muted group-hover:text-fg-muted">{s.text}</div>
                   </button>
                 ))}
               </div>
@@ -346,7 +346,7 @@ export default function NewModuleWizard() {
         )}
 
         {error && (
-          <div className="p-3 rounded-lg bg-rose-500/15 border border-rose-500/40 text-sm text-rose-200">
+          <div className="p-3 rounded-lg bg-danger/15 border border-danger/40 text-sm text-danger">
             {error}
           </div>
         )}
@@ -357,7 +357,7 @@ export default function NewModuleWizard() {
         <button
           onClick={() => setStep((s) => (s > 1 ? ((s - 1) as Step) : s))}
           disabled={step === 1}
-          className="px-4 py-2.5 text-sm font-semibold text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition"
+          className="px-4 py-2.5 text-sm font-semibold text-fg-muted hover:text-fg disabled:opacity-30 disabled:cursor-not-allowed transition"
         >
           ← Anterior
         </button>
@@ -366,7 +366,7 @@ export default function NewModuleWizard() {
           <button
             onClick={() => setStep((s) => ((s + 1) as Step))}
             disabled={!canAdvance()}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold rounded-xl hover:scale-[1.02] active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-primary to-primary text-on-primary font-semibold rounded-xl hover:scale-[1.02] active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             Siguiente
             <ArrowRight className="w-4 h-4" />
@@ -375,7 +375,7 @@ export default function NewModuleWizard() {
           <button
             onClick={handleSubmit}
             disabled={!canAdvance() || submitting}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold rounded-xl hover:scale-[1.02] active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-success to-success text-on-primary font-semibold rounded-xl hover:scale-[1.02] active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             {submitting ? 'Creando...' : 'Crear módulo'}
             <Check className="w-4 h-4" />
