@@ -324,3 +324,27 @@ describe('sin llave de servicio (SUPABASE_SERVICE_ROLE_KEY ausente en Vercel)', 
     expect(src).toContain('else await processPdfMaterial(supabase, materialId)');
   });
 });
+
+describe('sondeo del panel del profesor (poco trafico y se detiene si falla)', () => {
+  const panel = read('src/app/(teacher)/teacher/classrooms/[id]/study/StudyGeneratorClient.tsx');
+
+  it('pregunta cada 5 s y solo las 2 tablas de estado; los conteos se piden al empezar y al terminar un trabajo', () => {
+    expect(panel).toContain('const POLL_MS = 5000;');
+    expect(panel).toContain("full ? db.from('study_cards')");
+    expect(panel).toContain('const poll = setInterval(() => void refresh(), POLL_MS);'); // el sondeo normal NO es full
+    expect(panel).toContain('void refresh(true);'); // al montar
+    expect(panel).toMatch(/await refresh\(true\);\s*const fresh = rowsRef\.current/); // al terminar cada trabajo
+  });
+
+  it('tras varios fallos seguidos deja de preguntar y avisa, en vez de insistir para siempre', () => {
+    expect(panel).toContain('const MAX_CONSECUTIVE_FAILURES = 4;');
+    expect(panel).toContain('if (!anyActive || lost) return;');
+    expect(panel).toContain('Se perdió la conexión o tu sesión, así que el panel dejó de actualizarse.');
+    expect(panel).toContain('window.location.reload()');
+  });
+
+  it('la cola tambien se detiene si se perdio la conexion, con un motivo que se muestra', () => {
+    expect(panel).toContain('failuresRef.current >= MAX_CONSECUTIVE_FAILURES');
+    expect(panel).toContain('Recarga la página');
+  });
+});

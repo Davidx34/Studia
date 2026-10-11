@@ -53,7 +53,11 @@ export interface MaterialRow {
 }
 
 type TaskState = 'waiting' | 'running' | 'done' | 'error';
-const POLL_MS = 3000;
+// Mientras algo se genera se pregunta cada 5 s y SOLO las dos tablas de estado (2 consultas). Los conteos de tarjetas se
+// piden al empezar y cuando un trabajo termina. Si fallan varias consultas seguidas (sesion caducada, red caida) se deja
+// de preguntar y se avisa: antes seguia cada 3 s con 3 consultas para siempre.
+const POLL_MS = 5000;
+const MAX_CONSECUTIVE_FAILURES = 4;
 const SOURCE_LABEL: Record<string, string> = { file: 'Archivo', link: 'Enlace', notebooklm: 'NotebookLM' };
 
 export default function StudyGeneratorClient({ classroomId, initialRows }: { classroomId: string; initialRows: MaterialRow[] }) {
@@ -80,30 +84,53 @@ export default function StudyGeneratorClient({ classroomId, initialRows }: { cla
     setNotices((prev) => [{ ...n, id: noticeId.current }, ...prev].slice(0, 30));
   }, []);
 
+  const failuresRef = useRef(0);
+  const [lost, setLost] = useState(false);
+
   // Estado en vivo desde la base (el profesor puede leer las tablas de sus materiales por RLS).
-  const refresh = useCallback(async (): Promise<MaterialRow[]> => {
-    const ids = rowsRef.current.map((r) => r.id);
-    if (ids.length === 0) return rowsRef.current;
-    const db: any = supabase;
-    const [cards, gen, ig] = await Promise.all([
-      db.from('study_cards').select('material_id, kind').in('material_id', ids),
-      db.from('study_card_generation').select('material_id, status, started_at, finished_at, card_count, error').in('material_id', ids),
-      db.from('study_infographic_generation').select('material_id, status, started_at, finished_at, card_count, error').in('material_id', ids),
-    ]);
-    if (cards.error || gen.error || ig.error) return rowsRef.current; // red caida: se conserva lo ultimo visto
-    const c = (cards.data ?? []) as { material_id: string; kind: string }[];
-    const next = rowsRef.current.map((r) => ({
-      ...r,
-      fichas: c.filter((x) => x.material_id === r.id && x.kind === 'ficha').length,
-      flashcards: c.filter((x) => x.material_id === r.id && x.kind === 'flashcard').length,
-      infographics: c.filter((x) => x.material_id === r.id && x.kind === 'infografia').length,
-      cards: ((gen.data ?? []) as any[]).find((x) => x.material_id === r.id) ?? null,
-      ig: ((ig.data ?? []) as any[]).find((x) => x.material_id === r.id) ?? null,
-    }));
-    setRows(next);
-    rowsRef.current = next;
-    return next;
-  }, [supabase]);
+  //   full=false -> solo las tablas de estado (2 consultas); full=true -> ademas los conteos de tarjetas (3 consultas).
+  const refresh = useCallback(
+    async (full = false): Promise<MaterialRow[]> => {
+      const ids = rowsRef.current.map((r) => r.id);
+      if (ids.length === 0) return rowsRef.current;
+      const db: any = supabase;
+      const statusCols = 'material_id, status, started_at, finished_at, card_count, error';
+      const [cards, gen, ig] = await Promise.all([
+        full ? db.from('study_cards').select('material_id, kind').in('material_id', ids) : Promise.resolve({ data: null, error: null }),
+        db.from('study_card_generation').select(statusCols).in('material_id', ids),
+        db.from('study_infographic_generation').select(statusCols).in('material_id', ids),
+      ]);
+      if (cards.error || gen.error || ig.error) {
+        // Red caida o sesion caducada: se conserva lo ultimo visto y se cuenta el fallo.
+        failuresRef.current += 1;
+        if (failuresRef.current >= MAX_CONSECUTIVE_FAILURES) setLost(true);
+        return rowsRef.current;
+      }
+      failuresRef.current = 0;
+      setLost(false);
+      const c = (cards.data ?? null) as { material_id: string; kind: string }[] | null;
+      const wasGenerating = rowsRef.current.some((r) => r.cards?.status === 'generating' || r.ig?.status === 'generating');
+      const next = rowsRef.current.map((r) => ({
+        ...r,
+        ...(c
+          ? {
+              fichas: c.filter((x) => x.material_id === r.id && x.kind === 'ficha').length,
+              flashcards: c.filter((x) => x.material_id === r.id && x.kind === 'flashcard').length,
+              infographics: c.filter((x) => x.material_id === r.id && x.kind === 'infografia').length,
+            }
+          : {}),
+        cards: ((gen.data ?? []) as any[]).find((x) => x.material_id === r.id) ?? null,
+        ig: ((ig.data ?? []) as any[]).find((x) => x.material_id === r.id) ?? null,
+      }));
+      setRows(next);
+      rowsRef.current = next;
+      // Un trabajo acaba de terminar: ahora si se piden los conteos de tarjetas (una vez).
+      const stillGenerating = next.some((r) => r.cards?.status === 'generating' || r.ig?.status === 'generating');
+      if (!full && wasGenerating && !stillGenerating) return refresh(true);
+      return next;
+    },
+    [supabase]
+  );
 
   const queuedKeys = useMemo(() => new Set(queue.filter((t) => taskState[key(t)] === 'waiting').map(key)), [queue, taskState]);
 
@@ -122,18 +149,18 @@ export default function StudyGeneratorClient({ classroomId, initialRows }: { cla
 
   // Reloj (para el cronometro de lo que esta generandose) y consulta periodica mientras haya algo activo.
   useEffect(() => {
-    if (!anyActive) return;
+    if (!anyActive || lost) return;
     const clock = setInterval(() => setNow(Date.now()), 1000);
     const poll = setInterval(() => void refresh(), POLL_MS);
     return () => {
       clearInterval(clock);
       clearInterval(poll);
     };
-  }, [anyActive, refresh]);
+  }, [anyActive, lost, refresh]);
 
   useEffect(() => {
     setNow(Date.now());
-    void refresh();
+    void refresh(true);
   }, [refresh]);
 
   // Al salir de la pagina se deja de abrir tareas nuevas (la que ya esta en el servidor termina sola).
@@ -161,7 +188,7 @@ export default function StudyGeneratorClient({ classroomId, initialRows }: { cla
         if (body.status === 'failed') {
           notify({ tone: 'error', text: `“${name}” (${t.kind === 'cards' ? 'fichas y flashcards' : 'infografías'}): ${body.error ?? 'No se pudo generar.'}` });
           setTaskState((p) => ({ ...p, [key(t)]: 'error' }));
-          await refresh();
+          await refresh(true);
           return;
         }
         // Espera a que el trabajo en segundo plano termine (o se declare interrumpido).
@@ -170,6 +197,9 @@ export default function StudyGeneratorClient({ classroomId, initialRows }: { cla
         while (true) {
           await new Promise((r) => setTimeout(r, POLL_MS));
           if (cancelRef.current) return;
+          if (failuresRef.current >= MAX_CONSECUTIVE_FAILURES) {
+            throw new Error('Se perdió la conexión o tu sesión. Recarga la página: lo que ya estaba generándose en el servidor sigue y aparecerá al volver.');
+          }
           const fresh = await refresh();
           const row = fresh.find((r) => r.id === t.materialId);
           const job = t.kind === 'cards' ? row?.cards : row?.ig;
@@ -184,6 +214,8 @@ export default function StudyGeneratorClient({ classroomId, initialRows }: { cla
         setTaskState((p) => ({ ...p, [key(t)]: 'error' }));
         return;
       }
+      // Los conteos de tarjetas se piden UNA vez, ya terminado el trabajo (el sondeo normal no los trae).
+      await refresh(true);
       const fresh = rowsRef.current.find((r) => r.id === t.materialId);
       const n = outcomeNotice(name, t.kind, finalRow, { fichas: fresh?.fichas ?? 0, flashcards: fresh?.flashcards ?? 0, infographics: fresh?.infographics ?? 0 });
       notify(n);
@@ -209,7 +241,7 @@ export default function StudyGeneratorClient({ classroomId, initialRows }: { cla
     setRunning(false);
     setQueue([]);
     setTaskState({});
-    await refresh();
+    await refresh(true);
   };
 
   const cancelQueue = () => {
@@ -316,6 +348,18 @@ export default function StudyGeneratorClient({ classroomId, initialRows }: { cla
               </div>
             )}
           </Card>
+
+          {lost && (
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm text-fg">
+              <span className="flex items-center gap-2">
+                <XCircle aria-hidden="true" className="h-4 w-4 shrink-0 text-danger" />
+                Se perdió la conexión o tu sesión, así que el panel dejó de actualizarse. Lo que ya se estaba generando en el servidor sigue.
+              </span>
+              <Button size="sm" variant="secondary" onClick={() => window.location.reload()}>
+                Recargar
+              </Button>
+            </div>
+          )}
 
           {/* Avisos */}
           {notices.length > 0 && (
