@@ -159,11 +159,11 @@ describe('integracion de la funcion', () => {
     expect(route).toContain('RETRY_COOLDOWN_MS');
   });
 
-  it('la pagina de estudio acepta el tema claro y el resto de my-classes todavia no', () => {
+  it('la pagina de estudio y el resto de mis clases aceptan el tema claro', () => {
     expect(isThemedStudentRoute('/my-classes/abc/study')).toBe(true);
-    expect(isThemedStudentRoute('/my-classes/abc/library')).toBe(false);
-    expect(isThemedStudentRoute('/my-classes/abc')).toBe(false);
-    expect(isThemedStudentRoute('/my-classes/abc/study/x')).toBe(false);
+    expect(isThemedStudentRoute('/my-classes/abc/library')).toBe(true);
+    expect(isThemedStudentRoute('/my-classes/abc')).toBe(true);
+    expect(isThemedStudentRoute('/my-classesx/abc')).toBe(false);
   });
 
   it('StudyClient no usa colores fijos', () => {

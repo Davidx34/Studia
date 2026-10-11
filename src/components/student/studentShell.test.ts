@@ -15,15 +15,15 @@ import { isThemedStudentRoute, THEMED_STUDENT_ROUTES } from '@/lib/design/themed
 const shell = (pathname: string) => renderToStaticMarkup(h(StudentShell as any, { pathname, user: { email: 'a@b.co', name: 'Kevin' } }, h('p', null, 'contenido')));
 
 describe('rutas con tema claro', () => {
-  it('el dashboard, la leccion, el mapa y los logros estan migrados', () => {
-    expect(THEMED_STUDENT_ROUTES).toEqual(['/dashboard', '/lesson', '/map', '/achievements']);
+  it('todas las pantallas del estudiante estan migradas', () => {
+    expect(THEMED_STUDENT_ROUTES).toEqual(['/dashboard', '/lesson', '/map', '/achievements', '/my-classes', '/repaso']);
     expect(isThemedStudentRoute('/lesson/abc')).toBe(true);
     expect(isThemedStudentRoute('/dashboard')).toBe(true);
     expect(isThemedStudentRoute('/dashboard/algo')).toBe(true);
   });
 
   it('las pantallas sin migrar NO aceptan el tema claro (su texto blanco quedaria ilegible)', () => {
-    for (const r of ['/lessons', '/mapa', '/achievements-x', '/my-classes/1', '/repaso/2', '/dashboardx', '']) expect(isThemedStudentRoute(r)).toBe(false);
+    for (const r of ['/lessons', '/mapa', '/achievements-x', '/my-classesx', '/repasos', '/dashboardx', '']) expect(isThemedStudentRoute(r)).toBe(false);
   });
 });
 
@@ -34,8 +34,8 @@ describe('StudentShell', () => {
     expect(html).toContain('Tema de color');
   });
 
-  it('en una ruta sin migrar (mis clases) NO aplica el tema ni muestra el selector (sigue oscura)', () => {
-    const html = shell('/my-classes/1');
+  it('en una ruta sin migrar NO aplica el tema ni muestra el selector (sigue oscura)', () => {
+    const html = shell('/lessons');
     expect(html).not.toContain('theme-scope');
     expect(html).not.toContain('Tema de color');
     expect(html).toContain('bg-slate-950');
@@ -184,5 +184,39 @@ describe('AchievementsClient', async () => {
       })
     );
     expect(html).not.toContain('NaN');
+  });
+});
+
+describe('mis clases, biblioteca y repaso ya no usan colores fijos', () => {
+  const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8').replace(/\r\n/g, '\n');
+  const FILES = ['src/app/(student)/my-classes/[id]/page.tsx', 'src/app/(student)/my-classes/[id]/library/LibraryClient.tsx', 'src/app/(student)/repaso/[planId]/page.tsx'];
+
+  it.each(FILES)('%s usa tokens', (file) => {
+    const src = read(file);
+    expect(src).not.toMatch(/\btext-white\b|\b(bg|text|border)-(slate|gray|blue|violet|purple|emerald|green|red|amber)-\d/);
+  });
+
+  it('la clase no anida botones dentro de enlaces y dice el estado con texto', () => {
+    const src = read('src/app/(student)/my-classes/[id]/page.tsx');
+    expect(src).not.toMatch(/<Link[^>]*>\s*<button/);
+    for (const t of ['Completado', 'En curso', 'Bloqueado']) expect(src).toContain(t);
+  });
+
+  it('el repaso reusa las preguntas accesibles de la leccion', () => {
+    const src = read('src/app/(student)/repaso/[planId]/page.tsx');
+    expect(src).toContain('<ChoiceQuestion');
+    expect(src).toContain('<AnswerFeedback');
+  });
+
+  it('la biblioteca: buscador y notas con nombre accesible, materiales con estado y controles de 44 px', () => {
+    const src = read('src/app/(student)/my-classes/[id]/library/LibraryClient.tsx');
+    expect(src).toContain('aria-label="Buscar en materiales"');
+    expect(src).toContain('aria-label="Mis notas de este material"');
+    expect(src).toContain('aria-pressed={selected?.id === m.id}');
+    expect(src).not.toContain('w-7 h-7');
+  });
+
+  it('el codigo muerto ClassroomMap ya no esta', () => {
+    expect(fs.existsSync(path.join(process.cwd(), 'src/app/(student)/my-classes/[id]/ClassroomMap.tsx'))).toBe(false);
   });
 });
