@@ -42,3 +42,11 @@ export type GradeLevel = (typeof GRADE_LEVELS)[number];
 export const INVITE_PLACEHOLDER = `luza@studia.test, juan@gmail.com
 maria@hotmail.com
 pablo@studia.test`;
+
+// Lo que de verdad pasa al invitar (la app NO envia correos): se usa en el formulario y en la lista de pendientes.
+export const INVITE_EXPLANATION =
+  'Esta pantalla no envía correos: guarda la invitación. Quien ya tiene cuenta queda inscrito en esta clase la próxima vez que abra su inicio. ' +
+  'Quien aún no tiene cuenta no puede registrarse por su cuenta (el registro es por invitación del administrador): ' +
+  'pídele al administrador que autorice su correo y, al registrarse, quedará inscrito.';
+
+export const PENDING_ROW_NOTE = 'Se inscribirá al abrir su inicio (si ya tiene cuenta) o al registrarse (si su correo está autorizado)';
