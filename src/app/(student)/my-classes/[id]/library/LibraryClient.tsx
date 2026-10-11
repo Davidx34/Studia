@@ -184,6 +184,14 @@ export function LibraryClient({
           <BookOpen className="w-6 h-6 text-blue-400" /> Biblioteca de Clase
         </h1>
         <p className="text-slate-400 text-sm mt-1">{materials.length} materiales disponibles</p>
+        {materials.length > 0 && (
+          <Link
+            href={`/my-classes/${classroomId}/study${selected ? `?m=${selected.id}` : ''}`}
+            className="inline-flex items-center gap-2 mt-3 min-h-[44px] px-4 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition"
+          >
+            <Sparkles className="w-4 h-4" /> Estudiar con fichas y flashcards
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_260px] gap-4">
