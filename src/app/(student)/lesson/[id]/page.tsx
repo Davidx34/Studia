@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { evaluateAchievements } from '@/lib/achievements/evaluate';
 import { normalizeAnswer } from '@/lib/lesson/normalize';
 import { reportShadow } from '@/lib/grading/shadowClient';
+import type { MatchVerdict } from '@/components/LessonQuestionMatch';
 import { LessonQuestionMatch } from '@/components/LessonQuestionMatch';
 import { ElDescifrador } from '@/components/minigames/ElDescifrador';
 import { TimelineGame } from '@/components/minigames/TimelineGame';
@@ -58,7 +59,24 @@ type LessonPageQuestion = {
   keywords?: string[];
   game_type?: string;
   game_data?: any;
+  // Calificacion en el servidor: la pregunta llega SIN claves; lo correcto se revela al responder.
+  serverGraded?: boolean;
+  terms?: string[]; // match (servidor): terminos
+  defs?: string[]; // match (servidor): definiciones mezcladas
 };
+
+// Respuesta de /api/lesson/answer.
+type ServerAnswer = {
+  correct: boolean;
+  final: boolean;
+  tries: number;
+  triesLeft?: number;
+  detail?: { matched?: number; total?: number; perTerm?: boolean[] };
+  reveal?: { ok?: number | boolean; answers?: string[]; keywords?: string[]; defs?: string[] };
+  explanation?: string | null;
+};
+
+const CHECK_ERROR = 'No pude comprobar tu respuesta. Revisa tu conexion e intenta de nuevo.';
 
 type ModuleWithClassroom = ContentModule & { classrooms: { id: string; name: string } | null };
 type WeakConcept = { tag: string; accuracy: number };
@@ -85,6 +103,10 @@ export default function LessonPage() {
   const [fillBlankText, setFillBlankText] = useState('');
   const [fillBlankAttempts, setFillBlankAttempts] = useState(0);
   const [fillBlankFeedback, setFillBlankFeedback] = useState<FillBlankFeedback>(null);
+  // Calificacion en el servidor: intento abierto, respuesta en vuelo y error de conexion.
+  const attemptIdRef = useRef<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
 
   // Repaso dirigido automatico (Sesion E.1).
   const [moduleFinishing, setModuleFinishing] = useState(false);
@@ -144,6 +166,7 @@ export default function LessonPage() {
       if (res.ok && res.status !== 202) {
         const data = await res.json();
         if (data.questions?.length > 0) {
+          attemptIdRef.current = data.attemptId ?? null;
           setQuestions(data.questions);
           setLoading(false);
           lessonStartedAtRef.current = Date.now();
@@ -244,7 +267,8 @@ export default function LessonPage() {
   // no solo al completar el modulo), para poder agregar aciertos/errores por concept_tag.
   // Las preguntas de fallback (sin conexion a Cohere) no tienen id real en lesson_questions,
   // asi que se omiten en vez de violar la FK.
-  const recordAttempt = async (question: LessonPageQuestion, wasCorrect: boolean, answerGiven: any) => {
+  // Sonido y animo de Tonito segun el resultado (no escribe nada).
+  const reactToResult = (wasCorrect: boolean) => {
     play(wasCorrect ? 'coin' : 'error');
     if (wasCorrect) {
       wrongStreakRef.current = 0;
@@ -252,6 +276,34 @@ export default function LessonPage() {
       wrongStreakRef.current += 1;
       useTonitoStore.getState().onConsecutiveFails(wrongStreakRef.current);
     }
+  };
+
+  // Pide al servidor que califique una respuesta. null = no se pudo comprobar (red, sesion, intento cerrado...).
+  const gradeOnServer = async (q: LessonPageQuestion, answer: unknown): Promise<ServerAnswer | null> => {
+    if (!attemptIdRef.current || !q.id) return null;
+    try {
+      const res = await fetch('/api/lesson/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attemptId: attemptIdRef.current, questionId: q.id, answer }),
+      });
+      return res.ok ? ((await res.json()) as ServerAnswer) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Al cerrarse una pregunta el servidor revela la respuesta y la explicacion: se funden en la pregunta para que el
+  // render de siempre (que lee ok / answers / keywords / exp) las muestre.
+  const applyReveal = (index: number, r: ServerAnswer) => {
+    const { ok, answers, keywords } = r.reveal ?? {};
+    setQuestions((prev) =>
+      prev.map((x, i) => (i === index ? { ...x, ...(ok !== undefined ? { ok } : {}), ...(answers ? { answers } : {}), ...(keywords ? { keywords } : {}), exp: r.explanation ?? x.exp } : x))
+    );
+  };
+
+  const recordAttempt = async (question: LessonPageQuestion, wasCorrect: boolean, answerGiven: any) => {
+    reactToResult(wasCorrect);
     if (!question?.id) return;
     // Modo sombra: el servidor califica en paralelo y registra si coincide con este veredicto (no cambia nada visible).
     reportShadow(question.id, answerGiven, wasCorrect);
@@ -282,11 +334,28 @@ export default function LessonPage() {
     }
   };
 
-  const handleAnswer = (answer: number | boolean | string) => {
-    if (answered) return;
+  const handleAnswer = async (answer: number | boolean | string) => {
+    if (answered || checking) return;
+    const q = questions[idx];
+    if (q.serverGraded && (q.type === 'multiple_choice' || q.type === 'true_false')) {
+      setChecking(true);
+      setCheckError(null);
+      setSelected(answer);
+      const r = await gradeOnServer(q, q.type === 'multiple_choice' ? { selectedIndex: answer } : { selected: answer });
+      setChecking(false);
+      if (!r) {
+        setSelected(null);
+        setCheckError(CHECK_ERROR);
+        return;
+      }
+      applyReveal(idx, r);
+      setAnswered(true);
+      if (r.correct) setScore((s) => s + 1);
+      reactToResult(r.correct);
+      return;
+    }
     setSelected(answer);
     setAnswered(true);
-    const q = questions[idx];
     if (q.type === 'multiple_choice') {
       const correct = answer === q.ok;
       if (correct) setScore(s => s + 1);
@@ -300,8 +369,26 @@ export default function LessonPage() {
     if (q.type === 'short_answer') setScore(s => s + 1);
   };
 
-  const handleShortAnswerSubmit = () => {
+  const handleShortAnswerSubmit = async () => {
     const q = questions[idx];
+    if (q.serverGraded) {
+      if (checking) return;
+      setChecking(true);
+      setCheckError(null);
+      const r = await gradeOnServer(q, { text: shortAnswerText });
+      setChecking(false);
+      if (!r) {
+        setCheckError(CHECK_ERROR);
+        return;
+      }
+      applyReveal(idx, r);
+      setShortAnswerMatchedCount(r.detail?.matched ?? 0);
+      setSelected('answered');
+      setAnswered(true);
+      if (r.correct) setScore((s) => s + 1);
+      reactToResult(r.correct);
+      return;
+    }
     const norm = normalizeAnswer(shortAnswerText);
     const matched = (q.keywords || []).filter((k) => norm.includes(normalizeAnswer(k))).length;
     setShortAnswerMatchedCount(matched);
@@ -310,8 +397,31 @@ export default function LessonPage() {
     handleAnswer('answered');
   };
 
-  const handleFillBlankSubmit = () => {
+  const handleFillBlankSubmit = async () => {
     const q = questions[idx];
+    if (q.serverGraded) {
+      if (checking) return;
+      setChecking(true);
+      setCheckError(null);
+      const r = await gradeOnServer(q, { text: fillBlankText });
+      setChecking(false);
+      if (!r) {
+        setCheckError(CHECK_ERROR);
+        return;
+      }
+      if (r.final) {
+        applyReveal(idx, r);
+        setFillBlankFeedback(r.correct ? 'correct' : 'revealed');
+        setAnswered(true);
+        setSelected('filled');
+        if (r.correct) setScore((s) => s + 1);
+        reactToResult(r.correct);
+      } else {
+        setFillBlankAttempts((a) => a + 1);
+        setFillBlankFeedback('retry');
+      }
+      return;
+    }
     const norm = normalizeAnswer(fillBlankText);
     const total = q.answers?.length || 0;
     const matched = (q.answers || []).filter((a) => norm.includes(normalizeAnswer(a))).length;
@@ -348,6 +458,7 @@ export default function LessonPage() {
       setFillBlankText('');
       setFillBlankAttempts(0);
       setFillBlankFeedback(null);
+      setCheckError(null);
     } else if (remediationPhase === 'active') {
       completeRemediation();
     } else {
@@ -681,6 +792,7 @@ export default function LessonPage() {
         selected={selected}
         answered={answered}
         correct={q.ok as ChoiceValue | undefined}
+        pending={checking}
         onAnswer={(v) => handleAnswer(v)}
       />
     );
@@ -692,7 +804,7 @@ export default function LessonPage() {
         <textarea
           aria-label="Palabras que faltan"
           className="w-full min-h-[96px] bg-surface-2 text-fg text-base rounded-xl p-4 border border-line-strong placeholder:text-fg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-          placeholder="Escribe aqui las palabras que faltan..." disabled={answered}
+          placeholder="Escribe aqui las palabras que faltan..." disabled={answered || checking}
           value={fillBlankText} onChange={(e) => setFillBlankText(e.target.value)} />
         {fillBlankFeedback === 'retry' && (
           <div role="alert" className="bg-danger/10 border border-danger/40 p-3 rounded-xl text-fg text-sm font-medium">
@@ -700,8 +812,8 @@ export default function LessonPage() {
           </div>
         )}
         {!answered ? (
-          <Button size="lg" className="w-full" onClick={handleFillBlankSubmit} disabled={!fillBlankText.trim()}>
-            Enviar respuesta
+          <Button size="lg" className="w-full" onClick={handleFillBlankSubmit} disabled={!fillBlankText.trim() || checking} loading={checking}>
+            {checking ? 'Comprobando…' : 'Enviar respuesta'}
           </Button>
         ) : fillBlankFeedback === 'correct' ? (
           <div className="bg-success/10 border border-success/40 p-4 rounded-xl flex items-center gap-2">
@@ -714,6 +826,27 @@ export default function LessonPage() {
           </div>
         )}
       </div>
+    );
+
+    if (q.type === 'match' && q.serverGraded) return (
+      <LessonQuestionMatch
+        key={idx}
+        terms={q.terms || []}
+        defs={q.defs || []}
+        disabled={answered}
+        check={async (given): Promise<MatchVerdict | null> => {
+          const r = await gradeOnServer(q, { defs: given });
+          if (!r) return null;
+          if (r.final) applyReveal(idx, r);
+          return { correct: r.correct, final: r.final, triesLeft: r.triesLeft, perTerm: r.detail?.perTerm, revealDefs: r.reveal?.defs };
+        }}
+        onComplete={(correct) => {
+          setAnswered(true);
+          setSelected('matched');
+          if (correct) setScore((s) => s + 1);
+          reactToResult(correct);
+        }}
+      />
     );
 
     if (q.type === 'match') return (
@@ -847,11 +980,11 @@ export default function LessonPage() {
         <textarea
           aria-label="Tu respuesta"
           className="w-full min-h-[128px] bg-surface-2 text-fg text-base rounded-xl p-4 border border-line-strong placeholder:text-fg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-          placeholder="Escribe tu respuesta aqui..." disabled={answered}
+          placeholder="Escribe tu respuesta aqui..." disabled={answered || checking}
           value={shortAnswerText} onChange={(e) => setShortAnswerText(e.target.value)} />
         {!answered ? (
-          <Button size="lg" className="w-full" onClick={handleShortAnswerSubmit} disabled={!shortAnswerText.trim()}>
-            Enviar respuesta
+          <Button size="lg" className="w-full" onClick={handleShortAnswerSubmit} disabled={!shortAnswerText.trim() || checking} loading={checking}>
+            {checking ? 'Comprobando…' : 'Enviar respuesta'}
           </Button>
         ) : (
           <div className="bg-primary/10 border border-primary/30 p-4 rounded-xl space-y-1">
@@ -913,6 +1046,14 @@ export default function LessonPage() {
 
         {/* Resultado de la pregunta: se ANUNCIA a lectores de pantalla y no depende solo del color. */}
         <AnswerFeedback result={result} correctText={correctText} />
+
+        <div aria-live="polite" role="status">
+          {checkError && (
+            <p role="alert" className="mt-4 rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm font-medium text-fg">
+              {checkError}
+            </p>
+          )}
+        </div>
 
         {answered && q.exp && (
           <div className="mt-6 p-4 bg-primary/10 border-l-4 border-primary rounded-lg">
