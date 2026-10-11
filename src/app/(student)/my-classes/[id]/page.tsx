@@ -63,12 +63,20 @@ export default async function StudentClassPage({ params }: { params: { id: strin
             <p className="text-slate-300 text-sm mt-2">📚 {classroom.subject_area}</p>
           )}
         </div>
-        <Link
-          href={`/my-classes/${params.id}/library`}
-          className="text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition"
-        >
-          📚 Biblioteca de Clase
-        </Link>
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            href={`/my-classes/${params.id}/study`}
+            className="text-sm px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-medium transition"
+          >
+            🧠 Estudiar
+          </Link>
+          <Link
+            href={`/my-classes/${params.id}/library`}
+            className="text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition"
+          >
+            📚 Biblioteca de Clase
+          </Link>
+        </div>
       </div>
 
       {/* Mapa de módulos generados */}
