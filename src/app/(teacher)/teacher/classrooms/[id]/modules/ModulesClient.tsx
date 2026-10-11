@@ -74,15 +74,15 @@ export default function ModulesClient({
   return (
     <div className="space-y-6">
       {/* Header con CTA */}
-      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 flex items-start gap-4 flex-wrap">
-        <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
-          <Map className="w-5 h-5 text-violet-300" />
+      <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-5 flex items-start gap-4 flex-wrap">
+        <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center flex-shrink-0">
+          <Map className="w-5 h-5 text-primary-text" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-semibold text-fg">
             {hasMap ? 'Mapa de aprendizaje generado' : 'Sin mapa generado todavía'}
           </h2>
-          <p className="text-sm text-slate-400 mt-0.5">
+          <p className="text-sm text-fg-muted mt-0.5">
             {hasMap
               ? `${autoModules.length} módulos generados por IA basados en el material que subiste.`
               : 'Sube material en la pestaña "Materiales" y luego genera el mapa con un click.'}
@@ -93,7 +93,7 @@ export default function ModulesClient({
             <button
               onClick={handleRegenerate}
               disabled={generating || !hasCompletedMaterials}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-accent/15 text-accent-text border border-accent/30 hover:bg-accent/25 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {generating ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -106,7 +106,7 @@ export default function ModulesClient({
             <button
               onClick={handleGenerate}
               disabled={generating || !hasCompletedMaterials}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-violet-500 hover:bg-violet-600 text-white disabled:bg-slate-700 disabled:cursor-not-allowed transition"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-primary hover:brightness-110 text-on-primary disabled:bg-surface-2 disabled:cursor-not-allowed transition"
               title={
                 !hasCompletedMaterials
                   ? 'Necesitas al menos un material procesado'
@@ -125,9 +125,9 @@ export default function ModulesClient({
       </div>
 
       {!hasCompletedMaterials && (
-        <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 flex items-start gap-2 text-sm">
-          <AlertCircle className="w-4 h-4 text-amber-300 mt-0.5 flex-shrink-0" />
-          <p className="text-amber-200">
+        <div className="rounded-xl bg-accent/10 border border-accent/30 p-3 flex items-start gap-2 text-sm">
+          <AlertCircle className="w-4 h-4 text-accent-text mt-0.5 flex-shrink-0" />
+          <p className="text-accent-text">
             Aún no hay materiales procesados en esta clase. Sube un PDF/DOCX/XLSX
             en la pestaña "Materiales", espera a que termine de procesarse y vuelve
             acá.
@@ -136,13 +136,13 @@ export default function ModulesClient({
       )}
 
       {error && (
-        <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-3 flex items-start gap-2 text-sm text-red-300">
+        <div className="rounded-xl bg-danger/10 border border-danger/30 p-3 flex items-start gap-2 text-sm text-danger">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
       {success && (
-        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3 text-sm text-emerald-300">
+        <div className="rounded-xl bg-success/10 border border-success/30 p-3 text-sm text-success">
           {success}
         </div>
       )}
@@ -159,8 +159,8 @@ export default function ModulesClient({
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 rounded-2xl bg-slate-900/30 border border-slate-800 border-dashed">
-          <p className="text-sm text-slate-500">No hay módulos en esta clase aún.</p>
+        <div className="text-center py-12 rounded-2xl bg-surface border border-line-strong border-dashed">
+          <p className="text-sm text-fg-muted">No hay módulos en esta clase aún.</p>
         </div>
       )}
     </div>
@@ -192,29 +192,29 @@ function ModuleRow({
   }
 
   return (
-    <div className="rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-4 flex items-start gap-3 group">
-      <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-mono text-slate-400 flex-shrink-0">
+    <div className="rounded-xl border border-line shadow-card bg-surface backdrop-blur-xl p-4 flex items-start gap-3 group">
+      <div className="w-9 h-9 rounded-lg bg-surface-2 border border-line-strong flex items-center justify-center text-xs font-mono text-fg-muted flex-shrink-0">
         {module.order_index + 1}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-sm font-semibold text-white">{module.title}</h3>
+          <h3 className="text-sm font-semibold text-fg">{module.title}</h3>
           {isAuto && (
-            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30">
+            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary-text border border-primary/30">
               IA
             </span>
           )}
-          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-2 text-fg-muted border border-line-strong">
             Dif {module.difficulty_level}
           </span>
-          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-2 text-fg-muted border border-line-strong">
             {module.estimated_time_minutes} min
           </span>
         </div>
         {module.description && (
-          <p className="text-xs text-slate-400 mt-1 line-clamp-2">{module.description}</p>
+          <p className="text-xs text-fg-muted mt-1 line-clamp-2">{module.description}</p>
         )}
-        <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
+        <div className="flex items-center gap-3 mt-2 text-xs text-fg-muted">
           <span className="flex items-center gap-1">
             <Users className="w-3 h-3" />
             {completedBy} {completedBy === 1 ? 'estudiante completó' : 'estudiantes completaron'}
@@ -230,7 +230,8 @@ function ModuleRow({
           onClick={handleDelete}
           disabled={pending}
           title="Eliminar módulo"
-          className="opacity-0 group-hover:opacity-100 p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition flex-shrink-0"
+          aria-label="Eliminar módulo"
+          className="md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 p-2 min-h-[44px] min-w-[44px] rounded-lg text-fg-muted hover:text-danger hover:bg-danger/10 transition flex-shrink-0"
         >
           {pending ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />

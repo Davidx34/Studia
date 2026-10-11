@@ -158,15 +158,15 @@ export default function ProgressClient({
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-1 flex-wrap">
+      <div className="flex gap-1 rounded-xl border border-line shadow-card bg-surface backdrop-blur-xl p-1 flex-wrap">
         {(Object.keys(TAB_LABELS) as ProgressTab[]).map((k) => (
           <button
             key={k}
             onClick={() => setTab(k)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
               tab === k
-                ? 'bg-violet-500/20 text-violet-300'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-primary/20 text-primary-text'
+                : 'text-fg-muted hover:text-fg'
             }`}
           >
             {TAB_LABELS[k]}
@@ -179,23 +179,23 @@ export default function ProgressClient({
           {/* Toolbar: search + filter + export */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por nombre o email…"
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500"
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface border border-line-strong text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:border-primary"
               />
             </div>
-            <div className="flex gap-1 rounded-xl premium-card bg-slate-900/40 backdrop-blur-xl p-1">
+            <div className="flex gap-1 rounded-xl border border-line shadow-card bg-surface backdrop-blur-xl p-1">
               {(Object.keys(FILTER_LABELS) as FilterKey[]).map((k) => (
                 <button
                   key={k}
                   onClick={() => setFilter(k)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                     filter === k
-                      ? 'bg-violet-500/20 text-violet-300'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-primary/20 text-primary-text'
+                      : 'text-fg-muted hover:text-fg'
                   }`}
                 >
                   {FILTER_LABELS[k]}
@@ -205,7 +205,7 @@ export default function ProgressClient({
             <button
               onClick={handleExport}
               disabled={exporting || data.students.length === 0}
-              className="inline-flex items-center gap-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="inline-flex items-center gap-2 bg-success/15 hover:bg-success/25 text-success border border-success/30 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : '📊'}
               Exportar a Excel
@@ -213,7 +213,7 @@ export default function ProgressClient({
           </div>
 
           {exportError && (
-            <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-3 flex items-start gap-2 text-sm text-red-300">
+            <div className="rounded-xl bg-danger/10 border border-danger/30 p-3 flex items-start gap-2 text-sm text-danger">
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>{exportError}</span>
             </div>
@@ -221,17 +221,17 @@ export default function ProgressClient({
 
           {/* Tabla */}
           {filtered.length === 0 ? (
-            <div className="text-center py-12 rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl border-dashed">
-              <p className="text-sm text-slate-500">
+            <div className="text-center py-12 rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl border-dashed">
+              <p className="text-sm text-fg-muted">
                 {data.students.length === 0
                   ? 'Aún no hay estudiantes inscritos en esta clase.'
                   : 'No se encontraron estudiantes con esos filtros.'}
               </p>
             </div>
           ) : (
-            <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl overflow-hidden">
+            <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl overflow-hidden">
               {/* Header de columnas */}
-              <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-slate-800 bg-slate-900/50 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+              <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-line-strong bg-surface text-[10px] font-semibold text-fg-muted uppercase tracking-wider">
                 <Th label="Estudiante" k="fullName" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="col-span-3" />
                 <Th label="Nivel" k="level" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="col-span-1 text-center" />
                 <Th label="XP" k="totalXp" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="col-span-1 text-right" />
@@ -279,9 +279,9 @@ const SEVERITY_STYLES: Record<
   ConceptSeverity,
   { bar: string; badge: string; label: string }
 > = {
-  critical: { bar: 'bg-red-500', badge: 'bg-red-500/15 text-red-300 border-red-500/30', label: '⚠️ CRÍTICO (>50% error)' },
-  important: { bar: 'bg-amber-500', badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30', label: '⚠️ IMPORTANTE (30-50% error)' },
-  good: { bar: 'bg-emerald-500', badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', label: '✓ DOMINADO (<30% error)' },
+  critical: { bar: 'bg-danger', badge: 'bg-danger/15 text-danger border-danger/30', label: '⚠️ CRÍTICO (>50% error)' },
+  important: { bar: 'bg-accent', badge: 'bg-accent/15 text-accent-text border-accent/30', label: '⚠️ IMPORTANTE (30-50% error)' },
+  good: { bar: 'bg-success', badge: 'bg-success/15 text-success border-success/30', label: '✓ DOMINADO (<30% error)' },
 };
 
 function ConceptBreach({ conceptGap }: { conceptGap: ConceptGapData | null }) {
@@ -298,8 +298,8 @@ function ConceptBreach({ conceptGap }: { conceptGap: ConceptGapData | null }) {
   const topCritical = groups.critical[0] ?? groups.important[0] ?? null;
 
   return (
-    <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 space-y-5">
-      <h3 className="text-white font-semibold">Brecha de Conocimiento de la Clase</h3>
+    <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-5 space-y-5">
+      <h3 className="text-fg font-semibold">Brecha de Conocimiento de la Clase</h3>
 
       {(['critical', 'important', 'good'] as ConceptSeverity[]).map((sev) =>
         groups[sev].length > 0 ? (
@@ -308,21 +308,21 @@ function ConceptBreach({ conceptGap }: { conceptGap: ConceptGapData | null }) {
               {SEVERITY_STYLES[sev].label}
             </div>
             {groups[sev].map((c) => (
-              <div key={c.conceptTag} className="rounded-xl bg-slate-950/50 border border-slate-800 p-3.5">
+              <div key={c.conceptTag} className="rounded-xl bg-bg/50 border border-line-strong p-3.5">
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-sm font-medium text-white">{formatConceptLabel(c.conceptTag)}</span>
-                  <span className="text-sm font-mono text-slate-300">
+                  <span className="text-sm font-medium text-fg">{formatConceptLabel(c.conceptTag)}</span>
+                  <span className="text-sm font-mono text-fg-muted">
                     {c.errorRate}% error ({c.errorCount}/{c.totalAttempts})
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden">
+                  <div className="flex-1 h-2 rounded-full bg-surface-2 overflow-hidden">
                     <div
                       className={`h-full ${SEVERITY_STYLES[sev].bar}`}
                       style={{ width: `${Math.min(100, c.errorRate)}%` }}
                     />
                   </div>
-                  <span className="text-xs text-slate-500 whitespace-nowrap">
+                  <span className="text-xs text-fg-muted whitespace-nowrap">
                     {c.affectedStudents} estudiante{c.affectedStudents === 1 ? '' : 's'} afectado{c.affectedStudents === 1 ? '' : 's'}
                   </span>
                 </div>
@@ -333,9 +333,9 @@ function ConceptBreach({ conceptGap }: { conceptGap: ConceptGapData | null }) {
       )}
 
       {topCritical && (
-        <div className="rounded-xl bg-violet-500/10 border border-violet-500/30 p-3.5 flex items-start gap-2">
+        <div className="rounded-xl bg-primary/10 border border-primary/30 p-3.5 flex items-start gap-2">
           <span className="text-lg leading-none">📌</span>
-          <p className="text-sm text-violet-200">
+          <p className="text-sm text-primary-text">
             <strong>Recomendación:</strong> dedica unos minutos a reforzar{' '}
             <strong>"{formatConceptLabel(topCritical.conceptTag)}"</strong> en la próxima clase —{' '}
             {topCritical.errorRate}% de los intentos registrados fallan en este concepto (
@@ -355,9 +355,9 @@ type StudentSort = 'worst' | 'best' | 'name';
 type StudentFilter = 'all' | StudentStatus;
 
 const STATUS_STYLES: Record<StudentStatus, { badge: string; label: string; dot: string }> = {
-  critical: { badge: 'bg-red-500/15 text-red-300 border-red-500/30', label: '🔴 CRÍTICO (<60% general)', dot: 'text-red-400' },
-  low: { badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30', label: '🟡 BAJO (60-75% general)', dot: 'text-amber-400' },
-  good: { badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', label: '🟢 BIEN (>75% general)', dot: 'text-emerald-400' },
+  critical: { badge: 'bg-danger/15 text-danger border-danger/30', label: '🔴 CRÍTICO (<60% general)', dot: 'text-danger' },
+  low: { badge: 'bg-accent/15 text-accent-text border-accent/30', label: '🟡 BAJO (60-75% general)', dot: 'text-accent-text' },
+  good: { badge: 'bg-success/15 text-success border-success/30', label: '🟢 BIEN (>75% general)', dot: 'text-success' },
 };
 
 function StudentPerformance({
@@ -414,14 +414,14 @@ function StudentPerformance({
   };
 
   return (
-    <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 space-y-4">
+    <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-5 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h3 className="text-white font-semibold">Desempeño Individual</h3>
+        <h3 className="text-fg font-semibold">Desempeño Individual</h3>
         <div className="flex gap-2 flex-wrap">
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as StudentFilter)}
-            className="text-xs bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-300"
+            className="text-xs bg-bg border border-line-strong rounded-lg px-2 py-1.5 text-fg-muted"
           >
             <option value="all">Todos</option>
             <option value="critical">Crítico</option>
@@ -431,7 +431,7 @@ function StudentPerformance({
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as StudentSort)}
-            className="text-xs bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-300"
+            className="text-xs bg-bg border border-line-strong rounded-lg px-2 py-1.5 text-fg-muted"
           >
             <option value="worst">Peor primero</option>
             <option value="best">Mejor primero</option>
@@ -447,31 +447,31 @@ function StudentPerformance({
               {STATUS_STYLES[status].label}
             </div>
             {groups[status].map((s) => (
-              <div key={s.studentId} className="rounded-xl bg-slate-950/50 border border-slate-800 p-3.5 space-y-1.5">
+              <div key={s.studentId} className="rounded-xl bg-bg/50 border border-line-strong p-3.5 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-white">{s.studentName}</span>
-                  <span className="text-sm font-mono text-slate-300">
+                  <span className="text-sm font-medium text-fg">{s.studentName}</span>
+                  <span className="text-sm font-mono text-fg-muted">
                     {s.overallAccuracy}% acierto ({s.correctAttempts}/{s.totalAttempts})
                   </span>
                 </div>
                 {s.strengths.length > 0 && (
-                  <p className="text-xs text-emerald-300">
+                  <p className="text-xs text-success">
                     Fortalezas: {s.strengths.map(formatConceptLabel).join(', ')}
                   </p>
                 )}
                 {s.weaknesses.length > 0 ? (
-                  <p className="text-xs text-red-300">
+                  <p className="text-xs text-danger">
                     Áreas débiles: {s.weaknesses
                       .map((tag) => `${formatConceptLabel(tag)} (${s.byConcept[tag].accuracy}%)`)
                       .join(', ')}
                   </p>
                 ) : (
-                  status === 'good' && <p className="text-xs text-slate-500">Puede avanzar a contenido más desafiante.</p>
+                  status === 'good' && <p className="text-xs text-fg-muted">Puede avanzar a contenido más desafiante.</p>
                 )}
                 {status !== 'good' && (
                   <div className="pt-1">
                     {plans[s.studentId] ? (
-                      <span className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                      <span className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/30 text-primary-text">
                         {plans[s.studentId].status === 'completed' ? '✓' : '📋'} Plan activo: {plans[s.studentId].title.replace('Plan de Refuerzo: ', '')} (
                         {Math.round(
                           (plans[s.studentId].modules_completed / plans[s.studentId].modules_target) * 100
@@ -482,18 +482,18 @@ function StudentPerformance({
                       <button
                         onClick={() => handleCreatePlan(s)}
                         disabled={creatingFor === s.studentId}
-                        className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 hover:bg-violet-500/20 transition disabled:opacity-50"
+                        className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/30 text-primary-text hover:bg-primary/20 transition disabled:opacity-50"
                       >
                         {creatingFor === s.studentId ? 'Creando…' : '📋 Crear plan de refuerzo'}
                       </button>
                     )}
                     {confirmedFor === s.studentId && (
-                      <span className="ml-2 text-[11px] text-emerald-400">
+                      <span className="ml-2 text-[11px] text-success">
                         ✓ Plan creado y asignado a {s.studentName.split(' ')[0]}
                       </span>
                     )}
                     {planError && creatingFor === null && (
-                      <span className="ml-2 text-[11px] text-red-400">{planError}</span>
+                      <span className="ml-2 text-[11px] text-danger">{planError}</span>
                     )}
                   </div>
                 )}
@@ -504,7 +504,7 @@ function StudentPerformance({
       )}
 
       {list.length === 0 && (
-        <p className="text-sm text-slate-500 py-4 text-center">Ningún estudiante coincide con este filtro.</p>
+        <p className="text-sm text-fg-muted py-4 text-center">Ningún estudiante coincide con este filtro.</p>
       )}
     </div>
   );
@@ -515,9 +515,9 @@ function StudentPerformance({
 // ============================================================
 
 function accuracyColor(accuracy: number): string {
-  if (accuracy < 60) return 'bg-red-500/70 text-white';
-  if (accuracy <= 80) return 'bg-amber-500/70 text-white';
-  return 'bg-emerald-500/70 text-white';
+  if (accuracy < 60) return 'bg-danger/70 text-fg';
+  if (accuracy <= 80) return 'bg-accent/70 text-fg';
+  return 'bg-success/70 text-fg';
 }
 
 function ConceptStudentMatrix({ conceptGap }: { conceptGap: ConceptGapData | null }) {
@@ -557,19 +557,19 @@ function ConceptStudentMatrix({ conceptGap }: { conceptGap: ConceptGapData | nul
   }
 
   return (
-    <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 space-y-4">
+    <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-5 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h3 className="text-white font-semibold">Matriz Concepto-Estudiante</h3>
+        <h3 className="text-fg font-semibold">Matriz Concepto-Estudiante</h3>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setSortByName((v) => !v)}
-            className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-300 hover:text-white transition"
+            className="text-xs px-2.5 py-1.5 rounded-lg bg-bg border border-line-strong text-fg-muted hover:text-fg transition"
           >
             Ordenar por {sortByName ? 'concepto' : 'nombre'}
           </button>
           <button
             onClick={handleExportCsv}
-            className="text-xs inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 transition"
+            className="text-xs inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-success/15 border border-success/30 text-success hover:bg-success/25 transition"
           >
             <Download className="w-3.5 h-3.5" /> CSV
           </button>
@@ -580,11 +580,11 @@ function ConceptStudentMatrix({ conceptGap }: { conceptGap: ConceptGapData | nul
         <table className="min-w-full text-xs border-separate border-spacing-0">
           <thead>
             <tr>
-              <th className="sticky left-0 bg-slate-900 text-left text-slate-400 font-medium px-3 py-2 border-b border-slate-800">
+              <th className="sticky left-0 bg-surface text-left text-fg-muted font-medium px-3 py-2 border-b border-line-strong">
                 Estudiante
               </th>
               {conceptGap.conceptTags.map((tag) => (
-                <th key={tag} className="text-slate-400 font-medium px-2 py-2 border-b border-slate-800 whitespace-nowrap">
+                <th key={tag} className="text-fg-muted font-medium px-2 py-2 border-b border-line-strong whitespace-nowrap">
                   {formatConceptLabel(tag)}
                 </th>
               ))}
@@ -593,13 +593,13 @@ function ConceptStudentMatrix({ conceptGap }: { conceptGap: ConceptGapData | nul
           <tbody>
             {sortedStudents.map(([studentId, name]) => (
               <tr key={studentId}>
-                <td className="sticky left-0 bg-slate-900 text-white px-3 py-2 border-b border-slate-800/50 whitespace-nowrap">
+                <td className="sticky left-0 bg-surface text-fg px-3 py-2 border-b border-line-strong whitespace-nowrap">
                   {name}
                 </td>
                 {conceptGap.conceptTags.map((tag) => {
                   const cell = cellFor(studentId, tag);
                   return (
-                    <td key={tag} className="px-1 py-1.5 border-b border-slate-800/50 text-center">
+                    <td key={tag} className="px-1 py-1.5 border-b border-line-strong text-center">
                       {cell ? (
                         <span
                           title={`${cell.correct}/${cell.total} correctas`}
@@ -608,7 +608,7 @@ function ConceptStudentMatrix({ conceptGap }: { conceptGap: ConceptGapData | nul
                           {cell.accuracy}%
                         </span>
                       ) : (
-                        <span className="text-slate-700">—</span>
+                        <span className="text-fg-muted">—</span>
                       )}
                     </td>
                   );
@@ -619,10 +619,10 @@ function ConceptStudentMatrix({ conceptGap }: { conceptGap: ConceptGapData | nul
         </table>
       </div>
 
-      <div className="flex items-center gap-4 text-[11px] text-slate-500">
-        <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-500/70 align-middle mr-1" /> &lt;60% crítico</span>
-        <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-500/70 align-middle mr-1" /> 60-80% en desarrollo</span>
-        <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500/70 align-middle mr-1" /> &gt;80% dominado</span>
+      <div className="flex items-center gap-4 text-[11px] text-fg-muted">
+        <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-danger/70 align-middle mr-1" /> &lt;60% crítico</span>
+        <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-accent/70 align-middle mr-1" /> 60-80% en desarrollo</span>
+        <span><span className="inline-block w-2.5 h-2.5 rounded-sm bg-success/70 align-middle mr-1" /> &gt;80% dominado</span>
       </div>
     </div>
   );
@@ -630,12 +630,12 @@ function ConceptStudentMatrix({ conceptGap }: { conceptGap: ConceptGapData | nul
 
 function EmptyConceptState() {
   return (
-    <div className="text-center py-12 rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl border-dashed">
-      <AlertTriangle className="w-6 h-6 text-slate-600 mx-auto mb-2" />
-      <p className="text-sm text-slate-500">
+    <div className="text-center py-12 rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl border-dashed">
+      <AlertTriangle className="w-6 h-6 text-fg-muted mx-auto mb-2" />
+      <p className="text-sm text-fg-muted">
         Todavía no hay suficientes intentos de preguntas registrados para esta clase.
       </p>
-      <p className="text-xs text-slate-600 mt-1">
+      <p className="text-xs text-fg-muted mt-1">
         Esta vista se llena a medida que los estudiantes responden preguntas en sus lecciones.
       </p>
     </div>
@@ -656,12 +656,12 @@ function StatCard({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-3">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-slate-500">
+    <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-3">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-fg-muted">
         {icon}
         {label}
       </div>
-      <div className="text-xl font-bold text-white mt-1">{value}</div>
+      <div className="text-xl font-bold text-fg mt-1">{value}</div>
     </div>
   );
 }
@@ -685,8 +685,8 @@ function Th({
   return (
     <button
       onClick={() => onClick(k)}
-      className={`flex items-center gap-1 hover:text-white transition ${
-        active ? 'text-violet-300' : ''
+      className={`flex items-center gap-1 hover:text-fg transition ${
+        active ? 'text-primary-text' : ''
       } ${className ?? ''}`}
     >
       {label}
@@ -716,31 +716,31 @@ function StudentRowView({
   const isAtRisk = s.daysSinceActivity == null || s.daysSinceActivity > 7;
 
   return (
-    <div className="border-b border-slate-800 last:border-0">
+    <div className="border-b border-line-strong last:border-0">
       <button
         onClick={onToggle}
-        className="w-full grid grid-cols-2 md:grid-cols-12 gap-2 px-4 py-3 text-left hover:bg-slate-900/50 transition items-center"
+        className="w-full grid grid-cols-2 md:grid-cols-12 gap-2 px-4 py-3 text-left hover:bg-surface transition items-center"
       >
         <div className="md:col-span-3 flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-violet-500/15 border border-violet-500/30 flex items-center justify-center text-violet-300 text-sm font-semibold flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-primary-text text-sm font-semibold flex-shrink-0">
             {s.fullName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-white truncate">{s.fullName}</div>
-            <div className="text-xs text-slate-500 truncate">{s.email ?? `@${s.username}`}</div>
+            <div className="text-sm font-medium text-fg truncate">{s.fullName}</div>
+            <div className="text-xs text-fg-muted truncate">{s.email ?? `@${s.username}`}</div>
           </div>
         </div>
-        <div className="hidden md:block md:col-span-1 text-center text-sm text-slate-300">
+        <div className="hidden md:block md:col-span-1 text-center text-sm text-fg-muted">
           {s.level}
         </div>
-        <div className="hidden md:block md:col-span-1 text-right text-sm font-mono text-violet-300">
+        <div className="hidden md:block md:col-span-1 text-right text-sm font-mono text-primary-text">
           {s.totalXp}
         </div>
         <div className="hidden md:block md:col-span-2 text-center text-sm">
-          <span className="text-white">
+          <span className="text-fg">
             {s.modulesCompleted}/{s.modulesTotal}
           </span>
-          <span className="text-slate-500 ml-1">({completionPct}%)</span>
+          <span className="text-fg-muted ml-1">({completionPct}%)</span>
         </div>
         <div className="hidden md:block md:col-span-1 text-center text-sm">
           {s.avgScore > 0 ? `${s.avgScore}%` : '—'}
@@ -750,11 +750,11 @@ function StudentRowView({
         </div>
         <div className="hidden md:block md:col-span-3 text-xs">
           {s.daysSinceActivity == null ? (
-            <span className="text-slate-500">Sin actividad</span>
+            <span className="text-fg-muted">Sin actividad</span>
           ) : s.daysSinceActivity === 0 ? (
-            <span className="text-emerald-400">Hoy</span>
+            <span className="text-success">Hoy</span>
           ) : (
-            <span className={isAtRisk ? 'text-amber-400' : 'text-slate-400'}>
+            <span className={isAtRisk ? 'text-accent-text' : 'text-fg-muted'}>
               Hace {s.daysSinceActivity} día{s.daysSinceActivity === 1 ? '' : 's'}
             </span>
           )}
@@ -762,31 +762,31 @@ function StudentRowView({
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 bg-slate-950/50 border-t border-slate-800/50">
+        <div className="px-4 pb-4 bg-bg/50 border-t border-line-strong">
           <div className="pt-3 space-y-3">
             <Sparkline data={s.weeklyActivity} />
             {details.length > 0 ? (
               <div className="text-xs space-y-1">
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+                <div className="text-[10px] uppercase tracking-wider text-fg-muted mb-1">
                   Detalle por módulo
                 </div>
                 {details.map((d, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between gap-2 py-1 border-b border-slate-800/50 last:border-0"
+                    className="flex items-center justify-between gap-2 py-1 border-b border-line-strong last:border-0"
                   >
-                    <span className="text-slate-300 truncate">{d.moduleTitle}</span>
-                    <span className="text-slate-500 text-[10px] uppercase tracking-wider">
+                    <span className="text-fg-muted truncate">{d.moduleTitle}</span>
+                    <span className="text-fg-muted text-[10px] uppercase tracking-wider">
                       {d.status}
                     </span>
-                    <span className="text-violet-300 font-mono text-xs">
+                    <span className="text-primary-text font-mono text-xs">
                       {d.bestScore}% · {d.attempts}x
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-slate-500">Sin progreso registrado.</p>
+              <p className="text-xs text-fg-muted">Sin progreso registrado.</p>
             )}
           </div>
         </div>
@@ -808,7 +808,7 @@ function Sparkline({ data }: { data: { weekStart: string; minutes: number }[] })
 
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">
+      <div className="text-[10px] uppercase tracking-wider text-fg-muted mb-1">
         Actividad últimas {data.length} semanas (min)
       </div>
       <svg

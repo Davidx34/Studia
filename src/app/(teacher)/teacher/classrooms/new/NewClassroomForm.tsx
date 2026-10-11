@@ -40,18 +40,18 @@ export default function NewClassroomForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-6 space-y-5"
+      className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-6 space-y-5"
     >
       {error && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-danger/10 border border-danger/30 text-danger text-sm">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       <div>
-        <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-1.5">
-          Nombre de la clase <span className="text-red-400">*</span>
+        <label htmlFor="name" className="block text-sm font-medium text-fg-muted mb-1.5">
+          Nombre de la clase <span className="text-danger">*</span>
         </label>
         <input
           id="name"
@@ -61,16 +61,16 @@ export default function NewClassroomForm() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Ej: Geografía de América Latina"
-          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+          className="w-full px-3.5 py-2.5 rounded-xl bg-bg border border-line-strong text-fg text-sm placeholder:text-fg-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
         />
       </div>
 
       <div>
         <label
           htmlFor="description"
-          className="block text-sm font-medium text-slate-300 mb-1.5"
+          className="block text-sm font-medium text-fg-muted mb-1.5"
         >
-          Descripción <span className="text-slate-500">(opcional)</span>
+          Descripción <span className="text-fg-muted">(opcional)</span>
         </label>
         <textarea
           id="description"
@@ -78,7 +78,7 @@ export default function NewClassroomForm() {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Breve descripción de qué aprenderán en esta clase…"
-          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 resize-none"
+          className="w-full px-3.5 py-2.5 rounded-xl bg-bg border border-line-strong text-fg text-sm placeholder:text-fg-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none"
         />
       </div>
 
@@ -86,7 +86,7 @@ export default function NewClassroomForm() {
         <div>
           <label
             htmlFor="subject_area"
-            className="block text-sm font-medium text-slate-300 mb-1.5"
+            className="block text-sm font-medium text-fg-muted mb-1.5"
           >
             Materia
           </label>
@@ -94,7 +94,7 @@ export default function NewClassroomForm() {
             id="subject_area"
             value={subjectArea}
             onChange={(e) => setSubjectArea(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+            className="w-full px-3.5 py-2.5 rounded-xl bg-bg border border-line-strong text-fg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
           >
             <option value="">— Sin especificar —</option>
             {SUBJECT_AREAS.map((s) => (
@@ -108,7 +108,7 @@ export default function NewClassroomForm() {
         <div>
           <label
             htmlFor="grade_level"
-            className="block text-sm font-medium text-slate-300 mb-1.5"
+            className="block text-sm font-medium text-fg-muted mb-1.5"
           >
             Grado
           </label>
@@ -116,7 +116,7 @@ export default function NewClassroomForm() {
             id="grade_level"
             value={gradeLevel}
             onChange={(e) => setGradeLevel(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+            className="w-full px-3.5 py-2.5 rounded-xl bg-bg border border-line-strong text-fg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
           >
             <option value="">— Sin especificar —</option>
             {GRADE_LEVELS.map((g) => (
@@ -132,14 +132,14 @@ export default function NewClassroomForm() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 transition"
+          className="px-4 py-2.5 rounded-xl text-sm font-medium text-fg-muted hover:bg-surface-2 transition"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={submitting || !name.trim()}
-          className="inline-flex items-center gap-2 bg-violet-500 hover:bg-violet-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-sm font-medium transition"
+          className="inline-flex items-center gap-2 bg-primary hover:brightness-110 disabled:bg-surface-2 disabled:cursor-not-allowed text-on-primary px-5 py-2.5 rounded-xl text-sm font-medium transition"
         >
           {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
           {submitting ? 'Creando…' : 'Crear clase'}

@@ -38,8 +38,8 @@ export default function MaterialsList({
 }) {
   if (materials.length === 0) {
     return (
-      <div className="text-center py-12 rounded-2xl bg-slate-900/40 border border-slate-800 border-dashed">
-        <p className="text-sm text-slate-500">
+      <div className="text-center py-12 rounded-2xl bg-surface border border-line-strong border-dashed">
+        <p className="text-sm text-fg-muted">
           Aún no hay materiales subidos. Arrastra archivos arriba para empezar.
         </p>
       </div>
@@ -47,7 +47,7 @@ export default function MaterialsList({
   }
 
   return (
-    <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl overflow-hidden">
+    <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl overflow-hidden">
       {materials.map((m, idx) => (
         <MaterialRow
           key={m.id}
@@ -116,16 +116,16 @@ function MaterialRow({
 
   return (
     <div
-      className={`flex items-start gap-3 px-4 py-3 ${
-        isLast ? '' : 'border-b border-slate-800'
+      className={`flex flex-wrap sm:flex-nowrap items-start gap-3 px-4 py-3 ${
+        isLast ? '' : 'border-b border-line-strong'
       } group`}
       title={material.extracted_text_preview ?? undefined}
     >
-      <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0">
-        <Icon className="w-4 h-4 text-slate-300" />
+      <div className="w-9 h-9 rounded-xl bg-surface-2 border border-line-strong flex items-center justify-center flex-shrink-0">
+        <Icon className="w-4 h-4 text-fg-muted" />
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 basis-40">
         {editing ? (
           <div className="flex items-center gap-2">
             <input
@@ -138,30 +138,30 @@ function MaterialRow({
               }}
               autoFocus
               maxLength={200}
-              className="flex-1 px-2 py-1 rounded-md bg-slate-950 border border-slate-700 text-sm text-white focus:outline-none focus:border-violet-500"
+              className="flex-1 px-2 py-1 rounded-md bg-bg border border-line-strong text-sm text-fg focus:outline-none focus:border-primary"
             />
             <button
               onClick={handleRename}
               disabled={busy}
-              className="p-1 rounded hover:bg-slate-800 text-emerald-400"
+              className="p-1 rounded hover:bg-surface-2 text-success"
             >
               <Check className="w-4 h-4" />
             </button>
             <button
               onClick={() => setEditing(false)}
               disabled={busy}
-              className="p-1 rounded hover:bg-slate-800 text-slate-400"
+              className="p-1 rounded hover:bg-surface-2 text-fg-muted"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         ) : (
-          <div className="text-sm font-medium text-white truncate">
+          <div className="text-sm font-medium text-fg truncate">
             {material.display_name ?? material.filename}
           </div>
         )}
 
-        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 flex-wrap">
+        <div className="flex items-center gap-2 mt-0.5 text-xs text-fg-muted flex-wrap">
           <span className="uppercase">{mimeInfo.ext}</span>
           {!isExternal && (
             <>
@@ -184,11 +184,11 @@ function MaterialRow({
         </div>
 
         {material.processing_status === 'failed' && material.processing_error && (
-          <p className="text-xs text-red-300 mt-1">⚠ {material.processing_error}</p>
+          <p className="text-xs text-danger mt-1">⚠ {material.processing_error}</p>
         )}
 
         {material.processing_status === 'completed' && extraction && (
-          <p className={`text-xs mt-1 ${extraction.tone === 'warn' ? 'text-amber-300' : 'text-emerald-300'}`}>
+          <p className={`text-xs mt-1 ${extraction.tone === 'warn' ? 'text-accent-text' : 'text-success'}`}>
             {extraction.tone === 'warn' ? '⚠' : '✓'} {extraction.text}
           </p>
         )}
@@ -196,19 +196,21 @@ function MaterialRow({
 
       <StatusBadge status={material.processing_status} stalled={stalled} />
 
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition">
+      {/* Visibles siempre en pantallas tactiles y al enfocar con teclado; solo al pasar el cursor en pantallas grandes. */}
+      <div className="ml-auto flex items-center gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition motion-reduce:transition-none">
         {(material.processing_status === 'failed' ||
           material.processing_status === 'completed') && (
           <button
             onClick={handleReprocess}
             disabled={busy}
             title="Reprocesar"
-            className="p-2 rounded-lg text-slate-500 hover:text-violet-300 hover:bg-violet-500/10 transition"
+            aria-label="Reprocesar"
+            className="p-2 rounded-lg text-fg-muted hover:text-primary-text hover:bg-primary/10 transition"
           >
             {busy ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 aria-hidden="true" className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none" />
             ) : (
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw aria-hidden="true" className="w-3.5 h-3.5" />
             )}
           </button>
         )}
@@ -217,12 +219,13 @@ function MaterialRow({
             onClick={handleReprocess}
             disabled={busy}
             title={stalled ? 'Se interrumpió: reintentar' : 'Reintentar'}
-            className="p-2 rounded-lg text-amber-400 hover:bg-amber-500/10 transition"
+            aria-label={stalled ? 'Se interrumpió: reintentar' : 'Reintentar'}
+            className="p-2 rounded-lg text-accent-text hover:bg-accent/10 transition"
           >
             {busy ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 aria-hidden="true" className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none" />
             ) : (
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw aria-hidden="true" className="w-3.5 h-3.5" />
             )}
           </button>
         )}
@@ -231,21 +234,23 @@ function MaterialRow({
             onClick={() => setEditing(true)}
             disabled={busy}
             title="Renombrar"
-            className="p-2 rounded-lg text-slate-500 hover:text-violet-300 hover:bg-violet-500/10 transition"
+            aria-label="Renombrar"
+            className="p-2 rounded-lg text-fg-muted hover:text-primary-text hover:bg-primary/10 transition"
           >
-            <Edit3 className="w-3.5 h-3.5" />
+            <Edit3 aria-hidden="true" className="w-3.5 h-3.5" />
           </button>
         )}
         <button
           onClick={handleDelete}
           disabled={busy}
           title="Eliminar"
-          className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition"
+          aria-label="Eliminar"
+          className="p-2 rounded-lg text-fg-muted hover:text-danger hover:bg-danger/10 transition"
         >
           {busy ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Loader2 aria-hidden="true" className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none" />
           ) : (
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
           )}
         </button>
       </div>
@@ -266,8 +271,8 @@ function pickIcon(material: TeachingMaterial) {
 function StatusBadge({ status, stalled = false }: { status: TeachingMaterial['processing_status']; stalled?: boolean }) {
   if (stalled) {
     return (
-      <span title="El procesamiento se interrumpió. Usa Reintentar." className="inline-flex items-center gap-1 text-xs text-amber-400">
-        <AlertCircle className="w-3.5 h-3.5" /> Interrumpido
+      <span title="El procesamiento se interrumpió. Usa Reintentar." className="inline-flex items-center gap-1 text-xs text-accent-text">
+        <AlertCircle aria-hidden="true" className="w-3.5 h-3.5" /> Interrumpido
       </span>
     );
   }
@@ -275,9 +280,10 @@ function StatusBadge({ status, stalled = false }: { status: TeachingMaterial['pr
     return (
       <span
         title="Procesado"
-        className="inline-flex items-center gap-1 text-xs text-emerald-400"
+        className="inline-flex items-center gap-1 text-xs text-success"
       >
-        <CheckCircle2 className="w-3.5 h-3.5" />
+        <CheckCircle2 aria-hidden="true" className="w-3.5 h-3.5" />
+        <span className="sr-only">Procesado</span>
       </span>
     );
   }
@@ -285,9 +291,10 @@ function StatusBadge({ status, stalled = false }: { status: TeachingMaterial['pr
     return (
       <span
         title="Procesando…"
-        className="inline-flex items-center gap-1 text-xs text-violet-400"
+        className="inline-flex items-center gap-1 text-xs text-primary-text"
       >
-        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        <Loader2 aria-hidden="true" className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none" />
+        <span className="sr-only">Procesando</span>
       </span>
     );
   }
@@ -295,15 +302,17 @@ function StatusBadge({ status, stalled = false }: { status: TeachingMaterial['pr
     return (
       <span
         title="En cola"
-        className="inline-flex items-center gap-1 text-xs text-amber-400"
+        className="inline-flex items-center gap-1 text-xs text-accent-text"
       >
-        <Clock className="w-3.5 h-3.5" />
+        <Clock aria-hidden="true" className="w-3.5 h-3.5" />
+        <span className="sr-only">En cola</span>
       </span>
     );
   }
   return (
-    <span title="Falló" className="inline-flex items-center gap-1 text-xs text-red-400">
-      <AlertCircle className="w-3.5 h-3.5" />
+    <span title="Falló" className="inline-flex items-center gap-1 text-xs text-danger">
+      <AlertCircle aria-hidden="true" className="w-3.5 h-3.5" />
+      <span className="sr-only">Falló</span>
     </span>
   );
 }

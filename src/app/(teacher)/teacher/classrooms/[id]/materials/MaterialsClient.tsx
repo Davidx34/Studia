@@ -25,28 +25,28 @@ export default function MaterialsClient({
   return (
     <div className="space-y-6">
       {/* Header con uso */}
-      <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-4 flex items-center gap-4">
-        <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center">
-          <HardDrive className="w-5 h-5 text-violet-300" />
+      <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-4 flex items-center gap-4">
+        <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center">
+          <HardDrive className="w-5 h-5 text-primary-text" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-white">
+          <div className="text-sm font-medium text-fg">
             {materials.length} {materials.length === 1 ? 'archivo' : 'archivos'} ·{' '}
             {formatBytes(totalBytes)} de {formatBytes(STORAGE_QUOTA_BYTES)}
           </div>
-          <div className="mt-1.5 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+          <div className="mt-1.5 h-1.5 rounded-full bg-surface-2 overflow-hidden">
             <div
-              className="h-full bg-violet-500 transition-all"
+              className="h-full bg-primary transition-all"
               style={{ width: `${usedPct}%` }}
             />
           </div>
-          <div className="text-[10px] text-slate-500 mt-1">
+          <div className="text-[10px] text-fg-muted mt-1">
             Tamaño máximo por archivo: {formatBytes(MAX_FILE_SIZE_BYTES)}
           </div>
         </div>
         {isPolling && (
-          <div className="text-xs text-amber-300 flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+          <div className="text-xs text-accent-text flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
             Procesando…
           </div>
         )}

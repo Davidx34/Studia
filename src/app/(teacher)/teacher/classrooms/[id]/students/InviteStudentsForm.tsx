@@ -30,9 +30,9 @@ export default function InviteStudentsForm({ classroomId }: { classroomId: strin
     <div className="space-y-3">
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-5 space-y-3"
+        className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-5 space-y-3"
       >
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-fg-muted">
           Pega o escribe emails separados por coma, punto y coma, espacios o saltos de línea.
           Los que ya tienen cuenta se inscribirán de inmediato; los demás quedarán pendientes
           y se inscribirán automáticamente cuando hagan signup.
@@ -42,13 +42,13 @@ export default function InviteStudentsForm({ classroomId }: { classroomId: strin
           value={emails}
           onChange={(e) => setEmails(e.target.value)}
           placeholder={INVITE_PLACEHOLDER}
-          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 resize-none font-mono"
+          className="w-full px-3.5 py-2.5 rounded-xl bg-bg border border-line-strong text-fg text-sm placeholder:text-fg-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none font-mono"
         />
         <div className="flex justify-end">
           <button
             type="submit"
             disabled={submitting || !emails.trim()}
-            className="inline-flex items-center gap-2 bg-violet-500 hover:bg-violet-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl text-sm font-medium transition"
+            className="inline-flex items-center gap-2 bg-primary hover:brightness-110 disabled:bg-surface-2 disabled:cursor-not-allowed text-on-primary px-4 py-2 rounded-xl text-sm font-medium transition"
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -61,34 +61,34 @@ export default function InviteStudentsForm({ classroomId }: { classroomId: strin
       </form>
 
       {result && (
-        <div className="rounded-2xl premium-card bg-slate-900/40 backdrop-blur-xl p-4 space-y-2 text-sm">
+        <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-4 space-y-2 text-sm">
           {!result.ok && result.error && (
-            <div className="flex items-start gap-2 text-red-300">
+            <div className="flex items-start gap-2 text-danger">
               <AlertCircle className="w-4 h-4 mt-0.5" />
               <span>{result.error}</span>
             </div>
           )}
           <ResultRow
             ok
-            icon={<CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+            icon={<CheckCircle2 className="w-4 h-4 text-success" />}
             label="Inscritos"
             count={result.enrolled.length}
             items={result.enrolled}
           />
           <ResultRow
-            icon={<Clock className="w-4 h-4 text-amber-400" />}
+            icon={<Clock className="w-4 h-4 text-accent-text" />}
             label="Pendientes"
             count={result.pending.length}
             items={result.pending}
           />
           <ResultRow
-            icon={<AlertCircle className="w-4 h-4 text-slate-400" />}
+            icon={<AlertCircle className="w-4 h-4 text-fg-muted" />}
             label="Ya inscritos"
             count={result.alreadyEnrolled.length}
             items={result.alreadyEnrolled}
           />
           <ResultRow
-            icon={<X className="w-4 h-4 text-red-400" />}
+            icon={<X className="w-4 h-4 text-danger" />}
             label="Inválidos"
             count={result.invalidEmails.length}
             items={result.invalidEmails}
@@ -117,11 +117,11 @@ function ResultRow({
     <div className="flex items-start gap-2">
       <div className="mt-0.5">{icon}</div>
       <div className="flex-1 min-w-0">
-        <span className={ok ? 'text-emerald-300 font-medium' : 'text-slate-300 font-medium'}>
+        <span className={ok ? 'text-success font-medium' : 'text-fg-muted font-medium'}>
           {count}
         </span>{' '}
-        <span className="text-slate-400">{label}:</span>{' '}
-        <span className="text-slate-300 break-words">{items.join(', ')}</span>
+        <span className="text-fg-muted">{label}:</span>{' '}
+        <span className="text-fg-muted break-words">{items.join(', ')}</span>
       </div>
     </div>
   );

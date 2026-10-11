@@ -20,8 +20,8 @@ export default function ClassroomTabs({ classroomId }: { classroomId: string }) 
   ];
 
   return (
-    <div className="border-b border-slate-800 -mx-2 px-2 overflow-x-auto">
-      <nav className="flex gap-1">
+    <div className="border-b border-line-strong -mx-2 px-2 overflow-x-auto">
+      <nav aria-label="Secciones de la clase" className="flex gap-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = pathname.startsWith(tab.href);
@@ -29,13 +29,14 @@ export default function ClassroomTabs({ classroomId }: { classroomId: string }) 
             <Link
               key={tab.href}
               href={tab.href}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition whitespace-nowrap ${
+              aria-current={isActive ? 'page' : undefined}
+              className={`inline-flex min-h-[44px] items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition motion-reduce:transition-none whitespace-nowrap ${
                 isActive
-                  ? 'border-violet-500 text-violet-300'
-                  : 'border-transparent text-slate-400 hover:text-white'
+                  ? 'border-primary text-primary-text'
+                  : 'border-transparent text-fg-muted hover:text-fg'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon aria-hidden="true" className="w-4 h-4" />
               {tab.label}
             </Link>
           );
