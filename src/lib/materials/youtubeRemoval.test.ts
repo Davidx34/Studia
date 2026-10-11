@@ -56,3 +56,33 @@ describe('NotebookLM primero', () => {
     expect(src).not.toMatch(/youtube/i);
   });
 });
+
+describe('migracion 062: borrado de los materiales de YouTube', () => {
+  const sql = read('supabase/migrations/062_drop_youtube_materials.sql')
+    .split('\n')
+    .filter((l) => !l.trim().startsWith('--'))
+    .join('\n');
+
+  it('limpia los ids de content_modules.source_material_ids ANTES de borrar (un arreglo no tiene clave foranea)', () => {
+    expect(sql.indexOf('UPDATE public.content_modules')).toBeGreaterThanOrEqual(0);
+    expect(sql.indexOf('UPDATE public.content_modules')).toBeLessThan(sql.indexOf('DELETE FROM public.teaching_materials'));
+  });
+
+  it("solo borra materiales de tipo youtube y no toca las preguntas de los modulos", () => {
+    expect(sql.match(/DELETE FROM/g)!.length).toBe(1);
+    expect(sql).toContain("DELETE FROM public.teaching_materials WHERE source_type = 'youtube'");
+    expect(sql).not.toMatch(/lesson_questions|generated_questions|TRUNCATE/i);
+  });
+
+  it('cierra la restriccion de tipos sin youtube y retira las columnas propias', () => {
+    expect(sql).toContain("ARRAY['file'::text, 'link'::text, 'notebooklm'::text]");
+    for (const c of ['youtube_video_id', 'transcript_source', 'auto_retry_count', 'duration_seconds', 'thumbnail_url']) {
+      expect(sql).toContain(`DROP COLUMN IF EXISTS ${c}`);
+    }
+  });
+
+  it('los tipos de la app ya no conocen youtube', () => {
+    expect(read('src/types/database.ts')).toContain("MaterialSourceType = 'file' | 'link' | 'notebooklm'");
+    expect(read('src/types/database.generated.ts')).not.toMatch(/youtube_video_id|transcript_source|auto_retry_count/);
+  });
+});

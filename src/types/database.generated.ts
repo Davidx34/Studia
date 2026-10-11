@@ -1287,13 +1287,11 @@ export type Database = {
       }
       teaching_materials: {
         Row: {
-          auto_retry_count: number
           chunk_count: number | null
           classroom_id: string
           content_hash: string | null
           created_at: string | null
           display_name: string | null
-          duration_seconds: number | null
           estimated_difficulty: number | null
           external_favicon: string | null
           external_title: string | null
@@ -1313,21 +1311,16 @@ export type Database = {
           source_type: string
           storage_path: string | null
           teacher_id: string
-          thumbnail_url: string | null
           topics_detected: string[] | null
-          transcript_source: string | null
           updated_at: string | null
           version: number
-          youtube_video_id: string | null
         }
         Insert: {
-          auto_retry_count?: number
           chunk_count?: number | null
           classroom_id: string
           content_hash?: string | null
           created_at?: string | null
           display_name?: string | null
-          duration_seconds?: number | null
           estimated_difficulty?: number | null
           external_favicon?: string | null
           external_title?: string | null
@@ -1347,21 +1340,16 @@ export type Database = {
           source_type?: string
           storage_path?: string | null
           teacher_id: string
-          thumbnail_url?: string | null
           topics_detected?: string[] | null
-          transcript_source?: string | null
           updated_at?: string | null
           version?: number
-          youtube_video_id?: string | null
         }
         Update: {
-          auto_retry_count?: number
           chunk_count?: number | null
           classroom_id?: string
           content_hash?: string | null
           created_at?: string | null
           display_name?: string | null
-          duration_seconds?: number | null
           estimated_difficulty?: number | null
           external_favicon?: string | null
           external_title?: string | null
@@ -1381,12 +1369,9 @@ export type Database = {
           source_type?: string
           storage_path?: string | null
           teacher_id?: string
-          thumbnail_url?: string | null
           topics_detected?: string[] | null
-          transcript_source?: string | null
           updated_at?: string | null
           version?: number
-          youtube_video_id?: string | null
         }
         Relationships: [
           {
