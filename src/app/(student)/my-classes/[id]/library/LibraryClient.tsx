@@ -175,40 +175,41 @@ export function LibraryClient({
   }, [activeChunk, search]);
 
   return (
-    <div className="space-y-4">
+    <div className="theme-scope space-y-4">
       <div>
-        <Link href={`/my-classes/${classroomId}`} className="text-sm text-slate-400 hover:text-white transition">
+        <Link href={`/my-classes/${classroomId}`} className="inline-flex items-center min-h-[44px] text-sm text-fg-muted hover:text-fg transition motion-reduce:transition-none">
           ← {classroomName}
         </Link>
-        <h1 className="text-2xl font-bold text-white mt-1 flex items-center gap-2">
-          <BookOpen className="w-6 h-6 text-blue-400" /> Biblioteca de Clase
+        <h1 className="text-2xl font-bold text-fg mt-1 flex items-center gap-2">
+          <BookOpen aria-hidden="true" className="w-6 h-6 text-primary-text" /> Biblioteca de Clase
         </h1>
-        <p className="text-slate-400 text-sm mt-1">{materials.length} materiales disponibles</p>
+        <p className="text-fg-muted text-sm mt-1">{materials.length} materiales disponibles</p>
         {materials.length > 0 && (
           <Link
             href={`/my-classes/${classroomId}/study${selected ? `?m=${selected.id}` : ''}`}
-            className="inline-flex items-center gap-2 mt-3 min-h-[44px] px-4 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition"
+            className="inline-flex items-center gap-2 mt-3 min-h-[44px] px-4 rounded-xl bg-primary text-on-primary hover:brightness-110 text-sm font-semibold transition motion-reduce:transition-none"
           >
-            <Sparkles className="w-4 h-4" /> Estudiar con fichas y flashcards
+            <Sparkles aria-hidden="true" className="w-4 h-4" /> Estudiar con fichas y flashcards
           </Link>
         )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_260px] gap-4">
         {/* Sidebar */}
-        <aside className="bg-slate-800 rounded-lg border border-slate-700 p-4 space-y-3 lg:max-h-[70vh] lg:overflow-y-auto">
+        <aside className="bg-surface rounded-lg border border-line p-4 space-y-3 lg:max-h-[70vh] lg:overflow-y-auto">
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search aria-hidden="true" className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-muted" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              aria-label="Buscar en materiales"
               placeholder="Buscar en materiales..."
-              className="w-full pl-8 pr-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+              className="w-full min-h-[44px] pl-8 pr-2 py-2 rounded-lg bg-surface-2 border border-line text-base text-fg placeholder:text-fg-muted focus:outline-none focus:border-primary"
             />
           </div>
 
           {filteredMaterials.length === 0 && (
-            <p className="text-sm text-slate-500 text-center py-6">
+            <p className="text-sm text-fg-muted text-center py-6">
               {materials.length === 0 ? 'Aún no hay materiales disponibles.' : 'Ningún material coincide.'}
             </p>
           )}
@@ -218,30 +219,31 @@ export function LibraryClient({
               <button
                 key={m.id}
                 onClick={() => selectMaterial(m)}
-                className={`w-full text-left p-3 rounded-lg border-2 transition ${
+                aria-pressed={selected?.id === m.id}
+                className={`w-full min-h-[44px] text-left p-3 rounded-lg border-2 transition motion-reduce:transition-none ${
                   selected?.id === m.id
-                    ? 'bg-blue-500/15 border-blue-500'
-                    : 'bg-slate-900 border-slate-700 hover:border-slate-500'
+                    ? 'bg-primary/15 border-primary'
+                    : 'bg-surface-2 border-line hover:border-line-strong'
                 }`}
               >
-                <div className="text-sm font-medium text-white truncate">{m.display_name}</div>
-                <div className="text-xs text-slate-400 mt-0.5">{m.chunk_count ?? 0} secciones</div>
+                <div className="text-sm font-medium text-fg truncate">{m.display_name}</div>
+                <div className="text-xs text-fg-muted mt-0.5">{m.chunk_count ?? 0} secciones</div>
               </button>
             ))}
           </div>
         </aside>
 
         {/* Viewer */}
-        <main className="bg-slate-800 rounded-lg border border-slate-700 p-5 min-h-[50vh]">
+        <main className="bg-surface rounded-lg border border-line p-5 min-h-[50vh]">
           {!selected ? (
-            <div className="h-full flex flex-col items-center justify-center text-center py-16 text-slate-500">
-              <BookOpen className="w-10 h-10 mb-3" />
+            <div className="h-full flex flex-col items-center justify-center text-center py-16 text-fg-muted">
+              <BookOpen aria-hidden="true" className="w-10 h-10 mb-3" />
               <p>Elige un material de la izquierda para leerlo.</p>
             </div>
           ) : loadingChunks ? (
-            <p className="text-slate-400 text-sm">Cargando contenido…</p>
+            <p className="text-fg-muted text-sm">Cargando contenido…</p>
           ) : chunks.length === 0 && selected.source_type === 'file' ? (
-            <p className="text-slate-400 text-sm">Este material no tiene contenido procesado todavía.</p>
+            <p className="text-fg-muted text-sm">Este material no tiene contenido procesado todavía.</p>
           ) : (
             <div className="space-y-4">
               {selected.source_type === 'youtube' && selected.youtube_video_id && (
@@ -261,20 +263,20 @@ export function LibraryClient({
                   href={selected.external_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 p-3 rounded-lg bg-slate-900 border border-slate-700 hover:border-slate-500 transition text-sm"
+                  className="flex items-center gap-2 min-h-[44px] p-3 rounded-lg bg-surface-2 border border-line hover:border-line-strong transition motion-reduce:transition-none text-sm"
                 >
                   {selected.external_favicon && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={selected.external_favicon} alt="" className="w-4 h-4 flex-shrink-0" />
                   )}
-                  <span className="text-blue-300 truncate flex-1">{selected.external_title || selected.external_url}</span>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                  <span className="text-primary-text truncate flex-1">{selected.external_title || selected.external_url}</span>
+                  <ExternalLink aria-hidden="true" className="w-3.5 h-3.5 text-fg-muted flex-shrink-0" />
                 </a>
               )}
 
               {selected.source_type === 'youtube' && chunks.length === 0 && (
-                <p className="text-xs text-amber-300 flex items-center gap-1.5">
-                  <Video className="w-3.5 h-3.5" /> No encontramos subtítulos automáticos para este video, así que no
+                <p className="text-xs text-accent-text flex items-center gap-1.5">
+                  <Video aria-hidden="true" className="w-3.5 h-3.5" /> No encontramos subtítulos automáticos para este video, así que no
                   hay preguntas generadas a partir de él todavía.
                 </p>
               )}
@@ -282,33 +284,33 @@ export function LibraryClient({
               {chunks.length > 0 && (
               <>
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <h2 className="text-white font-bold truncate">{selected.display_name}</h2>
+                <h2 className="text-fg font-bold truncate">{selected.display_name}</h2>
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => setFontSize((s) => Math.max(12, s - 2))}
-                    className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center"
+                    className="w-11 h-11 rounded-lg bg-surface-2 border border-line text-fg-muted hover:text-fg flex items-center justify-center"
                     aria-label="Reducir texto"
                   >
-                    <Minus className="w-3.5 h-3.5" />
+                    <Minus aria-hidden="true" className="w-3.5 h-3.5" />
                   </button>
-                  <span className="text-xs text-slate-400 w-8 text-center">{fontSize}px</span>
+                  <span className="text-xs text-fg-muted w-10 text-center" aria-live="polite">{fontSize}px</span>
                   <button
                     onClick={() => setFontSize((s) => Math.min(24, s + 2))}
-                    className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center"
+                    className="w-11 h-11 rounded-lg bg-surface-2 border border-line text-fg-muted hover:text-fg flex items-center justify-center"
                     aria-label="Agrandar texto"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus aria-hidden="true" className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center justify-between text-xs text-fg-muted">
                 <button
                   onClick={() => { setChunkIdx((i) => Math.max(0, i - 1)); setShowFullText(false); }}
                   disabled={chunkIdx === 0}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 disabled:opacity-30 hover:text-white"
+                  className="flex items-center gap-1 min-h-[44px] px-3 rounded-lg bg-surface-2 border border-line disabled:opacity-40 hover:text-fg"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" /> Anterior
+                  <ChevronLeft aria-hidden="true" className="w-3.5 h-3.5" /> Anterior
                 </button>
                 <span>
                   Sección {chunkIdx + 1} / {chunks.length}
@@ -316,35 +318,35 @@ export function LibraryClient({
                 <button
                   onClick={() => { setChunkIdx((i) => Math.min(chunks.length - 1, i + 1)); setShowFullText(false); }}
                   disabled={chunkIdx === chunks.length - 1}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 disabled:opacity-30 hover:text-white"
+                  className="flex items-center gap-1 min-h-[44px] px-3 rounded-lg bg-surface-2 border border-line disabled:opacity-40 hover:text-fg"
                 >
-                  Siguiente <ChevronRight className="w-3.5 h-3.5" />
+                  Siguiente <ChevronRight aria-hidden="true" className="w-3.5 h-3.5" />
                 </button>
               </div>
 
               <div className="max-h-[45vh] overflow-y-auto pr-1 space-y-3">
                 {processing && !activeProcessed && (
-                  <p className="text-xs text-blue-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Preparando un resumen de esta sección…
+                  <p role="status" className="text-xs text-primary-text flex items-center gap-1.5">
+                    <Sparkles aria-hidden="true" className="w-3.5 h-3.5 animate-pulse motion-reduce:animate-none" /> Preparando un resumen de esta sección…
                   </p>
                 )}
 
                 {activeProcessed && !showFullText ? (
                   <>
-                    <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl p-4 text-white">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide opacity-80 mb-1">📌 Resumen</h3>
+                    <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 text-fg">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-text mb-1">Resumen</h3>
                       <p style={{ fontSize: `${fontSize}px` }} className="leading-relaxed">
                         {activeProcessed.summary}
                       </p>
                     </div>
 
                     {activeProcessed.key_points.length > 0 && (
-                      <div className="bg-slate-900/60 rounded-xl p-4 border-l-4 border-emerald-500">
-                        <h3 className="text-xs font-semibold uppercase text-emerald-400 mb-2">✓ Puntos Clave</h3>
+                      <div className="bg-surface-2 rounded-xl p-4 border-l-4 border-success">
+                        <h3 className="text-xs font-semibold uppercase text-success mb-2">Puntos clave</h3>
                         <ul className="space-y-1.5">
                           {activeProcessed.key_points.map((point, i) => (
-                            <li key={i} className="text-slate-200 text-sm pl-4 relative">
-                              <span className="absolute left-0 text-emerald-400">✓</span>
+                            <li key={i} className="text-fg text-sm pl-4 relative">
+                              <span aria-hidden="true" className="absolute left-0 text-success">✓</span>
                               {point}
                             </li>
                           ))}
@@ -355,7 +357,7 @@ export function LibraryClient({
                     {activeProcessed.main_concepts.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {activeProcessed.main_concepts.map((concept, i) => (
-                          <span key={i} className="text-xs px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-200">
+                          <span key={i} className="text-xs px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary-text">
                             {concept}
                           </span>
                         ))}
@@ -364,7 +366,7 @@ export function LibraryClient({
 
                     <button
                       onClick={() => setShowFullText(true)}
-                      className="text-xs text-slate-400 hover:text-white border border-slate-700 rounded-lg px-3 py-1.5 transition"
+                      className="text-xs min-h-[44px] text-fg-muted hover:text-fg border border-line rounded-lg px-3 transition motion-reduce:transition-none"
                     >
                       ▼ Ver texto completo
                     </button>
@@ -374,19 +376,19 @@ export function LibraryClient({
                     {activeProcessed && (
                       <button
                         onClick={() => setShowFullText(false)}
-                        className="text-xs text-slate-400 hover:text-white border border-slate-700 rounded-lg px-3 py-1.5 transition"
+                        className="text-xs min-h-[44px] text-fg-muted hover:text-fg border border-line rounded-lg px-3 transition motion-reduce:transition-none"
                       >
                         ▲ Ocultar texto completo
                       </button>
                     )}
                     <div
-                      className="text-slate-200 leading-relaxed whitespace-pre-wrap"
+                      className="text-fg leading-relaxed whitespace-pre-wrap"
                       style={{ fontSize: `${fontSize}px` }}
                     >
                       {Array.isArray(highlighted)
                         ? highlighted.map((part, i) =>
                             part.toLowerCase() === search.trim().toLowerCase() ? (
-                              <mark key={i} className="bg-blue-500/60 text-white rounded px-0.5">
+                              <mark key={i} className="bg-accent/40 text-fg rounded px-0.5">
                                 {part}
                               </mark>
                             ) : (
@@ -400,14 +402,14 @@ export function LibraryClient({
               </div>
 
               {relatedModules.length > 0 && (
-                <div className="pt-3 border-t border-slate-700">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2">Módulos que usan este material</h3>
+                <div className="pt-3 border-t border-line">
+                  <h3 className="text-xs font-semibold text-fg-muted uppercase mb-2">Módulos que usan este material</h3>
                   <div className="flex flex-wrap gap-2">
                     {relatedModules.map((mod) => (
                       <Link
                         key={mod.id}
                         href={`/lesson/${mod.id}`}
-                        className="text-xs px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-300 hover:bg-blue-500/20 transition"
+                        className="inline-flex items-center min-h-[44px] text-xs px-3 rounded-lg bg-primary/10 border border-primary/30 text-primary-text hover:bg-primary/20 transition motion-reduce:transition-none"
                       >
                         {mod.title} →
                       </Link>
@@ -422,28 +424,29 @@ export function LibraryClient({
         </main>
 
         {/* Notes panel */}
-        <aside className="bg-slate-800 rounded-lg border border-slate-700 p-4 space-y-2 lg:max-h-[70vh]">
-          <h3 className="text-sm font-bold text-white">📝 Mis Notas</h3>
+        <aside className="bg-surface rounded-lg border border-line p-4 space-y-2 lg:max-h-[70vh]">
+          <h3 className="text-sm font-bold text-fg">Mis notas</h3>
           {!selected ? (
-            <p className="text-xs text-slate-500">Elige un material para tomar notas.</p>
+            <p className="text-xs text-fg-muted">Elige un material para tomar notas.</p>
           ) : (
             <>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                aria-label="Mis notas de este material"
                 placeholder="Escribe tus notas aquí..."
-                className="w-full h-40 resize-none rounded-lg bg-slate-900 border border-slate-700 text-sm text-white p-2.5 focus:outline-none focus:border-blue-500"
+                className="w-full h-40 resize-none rounded-lg bg-surface-2 border border-line text-base text-fg p-2.5 focus:outline-none focus:border-primary"
               />
               <button
                 onClick={saveNotes}
                 disabled={notesSaving}
-                className={`w-full text-xs font-semibold py-2 rounded-lg transition ${
+                className={`w-full min-h-[44px] text-sm font-semibold rounded-lg transition motion-reduce:transition-none ${
                   notesSaved
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    ? 'bg-success/15 text-success border border-success/40'
+                    : 'bg-primary text-on-primary hover:brightness-110'
                 }`}
               >
-                {notesSaved ? '✓ Guardado' : notesSaving ? 'Guardando…' : 'Guardar Notas'}
+                {notesSaved ? 'Guardado' : notesSaving ? 'Guardando…' : 'Guardar notas'}
               </button>
             </>
           )}
