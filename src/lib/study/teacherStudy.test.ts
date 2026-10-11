@@ -294,3 +294,33 @@ describe('quien puede generar y que ve el estudiante', () => {
     expect(read('src/lib/study/panelState.ts')).not.toMatch(/from '\.\/(jobs|generate)'/);
   });
 });
+
+describe('sin llave de servicio (SUPABASE_SERVICE_ROLE_KEY ausente en Vercel)', () => {
+  it('hasServiceRoleKey refleja el entorno y createAdminSupabase falla con un mensaje claro', async () => {
+    const { hasServiceRoleKey, createAdminSupabase, MISSING_SERVICE_KEY_MESSAGE } = await import('@/lib/supabase/admin');
+    const saved = { ...process.env };
+    try {
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://x.supabase.co';
+      expect(hasServiceRoleKey()).toBe(false);
+      expect(() => createAdminSupabase()).toThrow(MISSING_SERVICE_KEY_MESSAGE);
+      process.env.SUPABASE_SERVICE_ROLE_KEY = 'una-llave';
+      expect(hasServiceRoleKey()).toBe(true);
+    } finally {
+      process.env = saved;
+    }
+  });
+
+  it('la ruta de generacion responde con el motivo, no con "Error inesperado"', () => {
+    const route = read('src/app/api/study/generate/route.ts');
+    expect(route).toContain('if (!hasServiceRoleKey())');
+    expect(route).toContain('MISSING_SERVICE_KEY_MESSAGE');
+  });
+
+  it('subir/reprocesar un PDF cae al camino de antes (en la peticion) si falta la llave, en vez de fallar', () => {
+    const src = read('src/lib/actions/materials.ts');
+    expect(src.match(/if \(hasServiceRoleKey\(\)\) runInBackground\(processPdfMaterial\(createAdminSupabase\(\)/g)!.length).toBe(2);
+    expect(src).toContain('else await processPdfMaterial(supabase, data.id)');
+    expect(src).toContain('else await processPdfMaterial(supabase, materialId)');
+  });
+});
