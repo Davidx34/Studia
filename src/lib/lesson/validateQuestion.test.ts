@@ -191,4 +191,28 @@ describe('isValidQuestion', () => {
       expect(isValidQuestion({ type: 'juicio_conocimiento', game_data: gdConIdCero }).valid).toBe(true);
     });
   });
+
+  describe('preguntas servidas sin claves (serverGraded)', () => {
+    it('opcion multiple sin "ok" es valida: solo se exigen las opciones', () => {
+      expect(isValidQuestion({ type: 'multiple_choice', serverGraded: true, q: 'x', opts: ['A', 'B'] }).valid).toBe(true);
+      expect(isValidQuestion({ type: 'multiple_choice', serverGraded: true, q: 'x', opts: [] }).valid).toBe(false);
+    });
+
+    it('verdadero/falso, completar y respuesta corta no necesitan clave para mostrarse', () => {
+      for (const type of ['true_false', 'fill_blank', 'short_answer']) {
+        expect(isValidQuestion({ type, serverGraded: true, q: 'x' }).valid).toBe(true);
+        expect(isValidQuestion({ type, serverGraded: true }).valid).toBe(false);
+      }
+    });
+
+    it('emparejar necesita terminos y el mismo numero de definiciones', () => {
+      expect(isValidQuestion({ type: 'match', serverGraded: true, q: 'x', terms: ['a', 'b'], defs: ['2', '1'] }).valid).toBe(true);
+      expect(isValidQuestion({ type: 'match', serverGraded: true, q: 'x', terms: ['a', 'b'], defs: ['1'] }).valid).toBe(false);
+      expect(isValidQuestion({ type: 'match', serverGraded: true, q: 'x', terms: [], defs: [] }).valid).toBe(false);
+    });
+
+    it('sin la marca serverGraded se sigue exigiendo la clave (nada se relaja por accidente)', () => {
+      expect(isValidQuestion({ type: 'multiple_choice', q: 'x', opts: ['A', 'B'] }).valid).toBe(false);
+    });
+  });
 });

@@ -9,8 +9,31 @@ export interface ValidationResult {
   error?: string;
 }
 
+// Pregunta servida con calificacion en el servidor (serverGraded): llega SIN la respuesta correcta, las palabras
+// esperadas ni los pares (eso se revela al responder). Solo se exige lo que hace falta para MOSTRARLA.
+function validateServerGraded(q: any): ValidationResult {
+  if (!q.q) return { valid: false, error: 'Falta el texto de la pregunta.' };
+  switch (q.type) {
+    case 'multiple_choice':
+      if (!Array.isArray(q.opts) || q.opts.length === 0) return { valid: false, error: 'Faltan las opciones.' };
+      return { valid: true };
+    case 'match':
+      if (!Array.isArray(q.terms) || q.terms.length === 0 || !Array.isArray(q.defs) || q.defs.length !== q.terms.length) {
+        return { valid: false, error: 'Faltan los pares para conectar.' };
+      }
+      return { valid: true };
+    case 'true_false':
+    case 'fill_blank':
+    case 'short_answer':
+      return { valid: true };
+    default:
+      return { valid: false, error: 'Tipo de pregunta no reconocido.' };
+  }
+}
+
 export function isValidQuestion(q: any): ValidationResult {
   if (!q || typeof q !== 'object') return { valid: false, error: 'La pregunta no tiene datos.' };
+  if (q.serverGraded === true) return validateServerGraded(q);
 
   switch (q.type) {
     case 'multiple_choice':
