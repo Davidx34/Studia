@@ -24,6 +24,7 @@ import type { ContentModule } from '@/types/database';
 import { CheckCircle2 } from 'lucide-react';
 import { ChoiceQuestion, AnswerFeedback, choiceResult, correctChoiceText, type ChoiceKind, type ChoiceValue } from '@/components/lesson/ChoiceQuestion';
 import { Button } from '@/components/ui/Button';
+import { ModuleMedia } from '@/components/lesson/ModuleMedia';
 import { Card, Badge } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { cn } from '@/components/ui/cn';
@@ -922,6 +923,8 @@ export default function LessonPage() {
         </div>
         <ProgressBar value={progress} label={`Pregunta ${idx + 1} de ${questions.length}`} />
       </div>
+
+      <ModuleMedia moduleId={mod.id} defaultOpen={idx === 0} />
 
       <Card className="p-5 sm:p-8 mb-6">
         <div className="flex items-center gap-2 mb-4">
