@@ -6,6 +6,7 @@
 
 import { generateEmbedding } from '@/lib/embeddings/generate';
 import { callOpenRouter, isOpenRouterConfigured } from '@/lib/ai/openrouter';
+import { protectLatexBackslashes, escapeInvalidJsonBackslashes } from '@/lib/json/latexJson';
 
 export const RAG_MATCH_COUNT = 5;
 
@@ -301,9 +302,7 @@ export function normalizeGeneratedQuestion(q: any): any {
 // parciales) fallaba el 100% de las veces por esto, con finish_reason
 // COMPLETE (no era truncamiento). Duplicamos cualquier backslash que no
 // inicie una secuencia de escape valida, ANTES del parseo.
-function escapeInvalidJsonBackslashes(candidate: string): string {
-  return candidate.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
-}
+// (La logica vive en src/lib/json/latexJson.ts, compartida con el generador de fichas.)
 
 // Extrae el JSON de la respuesta de Cohere de forma tolerante: a veces
 // envuelve la respuesta en fences de markdown (```json ... ```) o agrega
@@ -314,13 +313,16 @@ function extractJsonQuestions(text: string): any[] | null {
   const candidate = fenced ? fenced[1] : text;
   const jsonMatch = candidate.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
+  // Las formulas $...$ llevan barras simples (\frac, \beta, \times): se protegen ANTES de parsear, porque JSON.parse
+  // las convertiria en silencio en saltos de pagina / retrocesos / tabulaciones (ver latexJson.ts).
+  const protectedJson = protectLatexBackslashes(jsonMatch[0]);
   try {
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(protectedJson);
     return Array.isArray(parsed.questions) ? parsed.questions : null;
   } catch {
-    // Reintento con backslashes de LaTeX saneados antes de rendirse.
+    // Reintento con el resto de barras sueltas saneadas antes de rendirse.
     try {
-      const parsed = JSON.parse(escapeInvalidJsonBackslashes(jsonMatch[0]));
+      const parsed = JSON.parse(escapeInvalidJsonBackslashes(protectedJson));
       return Array.isArray(parsed.questions) ? parsed.questions : null;
     } catch {
       return null;
