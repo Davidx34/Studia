@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Send, CheckCircle2, AlertCircle, Clock, X } from 'lucide-react';
 import { inviteStudents, type InviteStudentsResult } from '@/lib/actions/classrooms';
-import { INVITE_PLACEHOLDER } from '@/lib/classrooms/constants';
+import { INVITE_PLACEHOLDER, INVITE_EXPLANATION } from '@/lib/classrooms/constants';
 
 export default function InviteStudentsForm({ classroomId }: { classroomId: string }) {
   const router = useRouter();
@@ -34,9 +34,8 @@ export default function InviteStudentsForm({ classroomId }: { classroomId: strin
       >
         <p className="text-xs text-fg-muted">
           Pega o escribe emails separados por coma, punto y coma, espacios o saltos de línea.
-          Los que ya tienen cuenta se inscribirán de inmediato; los demás quedarán pendientes
-          y se inscribirán automáticamente cuando hagan signup.
         </p>
+        <p className="text-xs text-fg-muted">{INVITE_EXPLANATION}</p>
         <textarea
           rows={5}
           value={emails}
@@ -81,6 +80,12 @@ export default function InviteStudentsForm({ classroomId }: { classroomId: strin
             count={result.pending.length}
             items={result.pending}
           />
+          {result.pending.length > 0 && (
+            <p role="note" className="text-xs text-fg-muted">
+              Nadie recibió un correo. Las invitaciones pendientes se aplican cuando la persona abre su inicio (si ya tiene
+              cuenta) o se registra (si el administrador autorizó su correo).
+            </p>
+          )}
           <ResultRow
             icon={<AlertCircle className="w-4 h-4 text-fg-muted" />}
             label="Ya inscritos"
