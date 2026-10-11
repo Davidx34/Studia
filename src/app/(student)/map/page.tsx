@@ -52,7 +52,7 @@ export default async function MapPage() {
     .eq('student_id', user.id);
 
   if (!modules) {
-    return <div className="text-white">No hay módulos disponibles.</div>;
+    return <p className="theme-scope text-fg">No hay módulos disponibles.</p>;
   }
 
   // Mapear progreso por module_id para lookup rápido
