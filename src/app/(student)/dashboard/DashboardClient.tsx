@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useTonitoStore } from '@/stores/useTonitoStore';
-import { BookOpen, Trophy, Target, Map, Sparkles, ArrowRight, CheckCircle2, Zap, Flame, ClipboardList } from 'lucide-react';
+import { BookOpen, Trophy, Target, Map, Sparkles, ArrowRight, CheckCircle2, Flame, ClipboardList } from 'lucide-react';
 import type { RemediationPlan } from '@/lib/actions/remediation-plans';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
 import { Card, Badge } from '@/components/ui/Card';
@@ -147,13 +147,11 @@ export function DashboardClient({
 
       {/* Grid de stats rapidas */}
       <section aria-label="Tu resumen">
-        <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatCard icon={Zap} label="XP total" value={profile?.total_xp || 0} tone="accent" />
+        <ul className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard icon={BookOpen} label="Módulos" value={totalCompleted} tone="primary" />
           <StatCard icon={Flame} label="Racha" value={`${profile?.streak_days || 0}d`} tone="accent" />
           <StatCard icon={Trophy} label="Logros" value={recentAchievements.length} tone="primary" />
           <StatCard icon={Target} label="Misiones hoy" value={`${completedMissions}/${missions.length}`} tone="primary" />
-          <StatCard icon={Map} label="Nivel" value={profile?.current_level || 1} tone="accent" />
         </ul>
       </section>
 
@@ -188,7 +186,6 @@ export function DashboardClient({
                   </div>
                   <div className="flex items-center gap-2 text-xs flex-shrink-0">
                     <span className="text-accent-text font-bold">+{m.reward_coins} monedas</span>
-                    <span className="text-primary-text font-bold">+{m.reward_xp} XP</span>
                   </div>
                 </div>
                 <ProgressBar label={`Progreso de la misión ${m.title}`} value={progress} tone={mission.is_completed ? 'success' : 'primary'} className="h-1.5" />

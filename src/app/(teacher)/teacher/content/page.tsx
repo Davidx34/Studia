@@ -108,7 +108,6 @@ export default async function TeacherContentPage() {
                         <Clock className="w-3 h-3" />
                         {m.estimated_time_minutes}min
                       </div>
-                      <div>{m.base_xp_reward} XP</div>
                     </div>
                   </div>
                 ))}

@@ -101,16 +101,6 @@ describe('AnswerFeedback', () => {
 describe('la leccion', () => {
   const page = fs.readFileSync(path.join(process.cwd(), 'src/app/(student)/lesson/[id]/page.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
-  it('muestra el XP que otorgo el SERVIDOR, no siempre base_xp_reward (al repetir un modulo el servidor da 0)', () => {
-    expect(page).toContain('setXpGranted(Number(granted ?? 0))');
-    expect(page).toContain('Ya habías ganado el XP de este módulo.');
-    expect(page).not.toMatch(/\+\{mod\.base_xp_reward\} XP ganados/);
-  });
-
-  it('el bonus de repaso mostrado es el que el servidor otorgo', () => {
-    expect(page).toContain('setRemediationBonusXp(grantedBonus)');
-  });
-
   it('las preguntas clasicas y los estados finales usan tokens, no colores fijos', () => {
     const body = page.slice(page.indexOf('if (loading) return ('));
     expect(body).not.toMatch(/\btext-white\b|\bbg-gray-|\bbg-green-|\bbg-purple-|\btext-gray-|\bbg-red-/);

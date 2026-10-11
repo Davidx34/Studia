@@ -20,7 +20,6 @@ export async function persistProgressOffline(
   data: {
     score: number;
     completion_percentage: number;
-    earned_xp: number;
     earned_coins: number;
     time_spent_seconds: number;
   }

@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { ArrowLeft, Flame, Heart, Coins, Zap, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Flame, Heart, Coins, TrendingUp } from 'lucide-react';
 
 interface PageProps {
   params: Promise<{ studentId: string }>;
@@ -102,10 +102,6 @@ export default async function StudentDetailPage({ params }: PageProps) {
             <h1 className="text-2xl font-bold text-fg">{student.full_name}</h1>
             <div className="text-fg-muted text-sm">@{student.username}</div>
             <div className="flex items-center gap-4 mt-3 text-sm">
-              <span className="text-fg-muted">
-                Nivel <span className="text-fg font-semibold">{student.current_level}</span>
-              </span>
-              <span className="text-fg-muted">·</span>
               <span
                 className={`font-semibold ${
                   daysInactive >= 3 ? 'text-accent-text' : 'text-success'
@@ -122,8 +118,7 @@ export default async function StudentDetailPage({ params }: PageProps) {
         </div>
 
         {/* Stats grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
-          <Stat icon={Zap} label="XP totales" value={student.total_xp.toLocaleString()} accent="violet" />
+        <div className="grid grid-cols-3 gap-3 mt-6">
           <Stat icon={Coins} label="Monedas" value={student.coins.toLocaleString()} accent="amber" />
           <Stat icon={Flame} label="Racha" value={`${student.streak_days}d`} accent="orange" />
           <Stat icon={Heart} label="Vidas" value={`${student.current_hearts}/${student.max_hearts}`} accent="rose" />

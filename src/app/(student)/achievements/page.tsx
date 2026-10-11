@@ -26,7 +26,7 @@ export default async function AchievementsPage() {
   // Cargar perfil para el contexto de progreso
   const { data: profile } = await supabase
     .from('profiles')
-    .select('total_xp, streak_days, current_level')
+    .select('streak_days')
     .eq('id', user.id)
     .single();
 
@@ -71,7 +71,6 @@ export default async function AchievementsPage() {
       allAchievements={allAchievements || []}
       userAchievements={userAchievements || []}
       progressContext={{
-        totalXP: profile?.total_xp || 0,
         streakDays: profile?.streak_days || 0,
         modulesCompleted: completedModules || 0,
         perfectScores: perfectScores || 0,

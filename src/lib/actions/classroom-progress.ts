@@ -21,15 +21,12 @@ export interface StudentRow {
   username: string;
   email: string | null;
   avatarUrl: string;
-  level: number;
-  totalXp: number;
   streakDays: number;
   modulesCompleted: number;
   modulesTotal: number;
   avgScore: number;
   lastActivityAt: string | null;
   daysSinceActivity: number | null;
-  earnedXpInClass: number;
   totalTimeSeconds: number;
   // Por semana: ms-key (ISO start of week) -> minutes
   weeklyActivity: { weekStart: string; minutes: number }[];
@@ -45,7 +42,6 @@ export interface ModuleDetailRow {
   bestScore: number;
   attempts: number;
   timeSeconds: number;
-  earnedXp: number;
   completedAt: string | null;
 }
 
@@ -72,7 +68,7 @@ export interface ClassroomProgressData {
     activeStudents: number;
     totalStudents: number;
     avgCompletionPct: number;
-    totalXpEarned: number;
+    totalModulesCompleted: number;
   };
 }
 
@@ -112,7 +108,7 @@ export async function getClassroomProgress(
   // Modulos de la clase
   const { data: modules } = await supabase
     .from('content_modules')
-    .select('id, title, base_xp_reward')
+    .select('id, title')
     .eq('classroom_id', classroomId)
     .eq('is_active', true);
   const moduleIds = (modules ?? []).map((m) => m.id);
@@ -132,7 +128,7 @@ export async function getClassroomProgress(
       ? await supabase
           .from('profiles')
           .select(
-            'id, full_name, username, email, avatar_url, current_level, total_xp, streak_days'
+            'id, full_name, username, email, avatar_url, streak_days'
           )
           .in('id', studentIds)
       : { data: [] };
@@ -180,7 +176,7 @@ export async function getClassroomProgress(
 
   // Construir StudentRows
   const students: StudentRow[] = [];
-  let totalXpEarned = 0;
+  let totalModulesCompleted = 0;
   let totalCompletionSum = 0;
   let activeStudentsCount = 0;
 
@@ -205,7 +201,6 @@ export async function getClassroomProgress(
       daysSinceActivity = Math.floor(diff);
     }
 
-    const earnedXpInClass = rows.reduce((s, r) => s + (r.earned_xp ?? 0), 0);
     const totalTimeSeconds = rows.reduce((s, r) => s + (r.time_spent_seconds ?? 0), 0);
 
     // Weekly buckets: minutos por semana basados en time_spent + last_attempt_at
@@ -226,15 +221,12 @@ export async function getClassroomProgress(
       username: profile.username,
       email: profile.email,
       avatarUrl: profile.avatar_url,
-      level: profile.current_level ?? 1,
-      totalXp: profile.total_xp ?? 0,
       streakDays: profile.streak_days ?? 0,
       modulesCompleted: completed.length,
       modulesTotal: totalModules,
       avgScore,
       lastActivityAt,
       daysSinceActivity,
-      earnedXpInClass,
       totalTimeSeconds,
       weeklyActivity: Array.from(weeklyMap.entries()).map(([weekStart, minutes]) => ({
         weekStart,
@@ -242,7 +234,7 @@ export async function getClassroomProgress(
       })),
     });
 
-    totalXpEarned += earnedXpInClass;
+    totalModulesCompleted += completed.length;
     totalCompletionSum += totalModules > 0 ? completed.length / totalModules : 0;
     if (daysSinceActivity != null && daysSinceActivity <= 7) activeStudentsCount += 1;
   }
@@ -261,7 +253,6 @@ export async function getClassroomProgress(
     bestScore: r.best_score ?? 0,
     attempts: r.attempts ?? 0,
     timeSeconds: r.time_spent_seconds ?? 0,
-    earnedXp: r.earned_xp ?? 0,
     completedAt: r.completed_at,
   }));
 
@@ -290,7 +281,7 @@ export async function getClassroomProgress(
           students.length > 0
             ? Math.round((totalCompletionSum / students.length) * 100)
             : 0,
-        totalXpEarned,
+        totalModulesCompleted,
       },
     },
   };

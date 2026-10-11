@@ -150,14 +150,14 @@ describe('AchievementsClient', async () => {
   const { AchievementsClient } = await import('@/app/(student)/achievements/AchievementsClient');
   const ach = (id: string, rarity: string, name = id) => ({
     id, name, description: 'desc', icon_name: 'x', color: '#fff', criteria_type: 'modules_completed', criteria_value: 4,
-    criteria_category: null, rarity, reward_coins: 5, reward_xp: 10, sort_order: 0,
+    criteria_category: null, rarity, reward_coins: 5, sort_order: 0,
   });
   const render = () =>
     renderToStaticMarkup(
       h(AchievementsClient as any, {
         allAchievements: [ach('a', 'legendary', 'Leyenda'), ach('b', 'common', 'Primeros Pasos')],
         userAchievements: [{ achievement_id: 'b', earned_at: '2026-01-05T10:00:00Z', seen_by_user: true }],
-        progressContext: { totalXP: 0, streakDays: 0, modulesCompleted: 1, perfectScores: 0, categoryCompleted: {} },
+        progressContext: { streakDays: 0, modulesCompleted: 1, perfectScores: 0, categoryCompleted: {} },
       })
     );
 
@@ -180,7 +180,7 @@ describe('AchievementsClient', async () => {
       h(AchievementsClient as any, {
         allAchievements: [{ ...ach('z', 'rare'), criteria_value: 0 }],
         userAchievements: [],
-        progressContext: { totalXP: 0, streakDays: 0, modulesCompleted: 0, perfectScores: 0, categoryCompleted: {} },
+        progressContext: { streakDays: 0, modulesCompleted: 0, perfectScores: 0, categoryCompleted: {} },
       })
     );
     expect(html).not.toContain('NaN');

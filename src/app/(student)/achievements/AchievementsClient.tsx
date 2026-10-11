@@ -16,7 +16,6 @@ interface Achievement {
   criteria_category: string | null;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
   reward_coins: number;
-  reward_xp: number;
   sort_order: number;
 }
 
@@ -30,7 +29,6 @@ interface Props {
   allAchievements: Achievement[];
   userAchievements: UserAchievement[];
   progressContext: {
-    totalXP: number;
     streakDays: number;
     modulesCompleted: number;
     perfectScores: number;
@@ -81,9 +79,6 @@ export function AchievementsClient({ allAchievements, userAchievements, progress
         break;
       case 'streak_days':
         current = progressContext.streakDays;
-        break;
-      case 'xp_total':
-        current = progressContext.totalXP;
         break;
       case 'perfect_scores':
         current = progressContext.perfectScores;
@@ -325,10 +320,9 @@ function AchievementCard({
       <p className="sr-only">Rareza: {rarityLabel}</p>
 
       {/* Recompensas (solo si esta ganado) */}
-      {isEarned && (achievement.reward_coins > 0 || achievement.reward_xp > 0) && (
+      {isEarned && achievement.reward_coins > 0 && (
         <div className="flex items-center justify-center gap-2 mt-2 text-xs font-bold">
           {achievement.reward_coins > 0 && <span className="text-accent-text">+{achievement.reward_coins} 🪙</span>}
-          {achievement.reward_xp > 0 && <span className="text-primary-text">+{achievement.reward_xp} XP</span>}
         </div>
       )}
     </article>

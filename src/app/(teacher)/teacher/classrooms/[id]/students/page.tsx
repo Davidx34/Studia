@@ -28,9 +28,9 @@ export default async function ClassroomStudentsPage({ params }: PageProps) {
     studentIds.length > 0
       ? await supabase
           .from('profiles')
-          .select('id, full_name, username, email, avatar_url, total_xp, current_level')
+          .select('id, full_name, username, email, avatar_url, streak_days')
           .in('id', studentIds)
-          .order('total_xp', { ascending: false })
+          .order('full_name', { ascending: true })
       : { data: [] };
 
   // Pendientes
@@ -72,9 +72,8 @@ export default async function ClassroomStudentsPage({ params }: PageProps) {
                 </div>
                 <div className="hidden sm:flex flex-col items-end text-xs text-fg-muted">
                   <span>
-                    <strong className="text-primary-text">{s.total_xp ?? 0}</strong> XP
+                    <strong className="text-primary-text">{s.streak_days ?? 0}</strong> días de racha
                   </span>
-                  <span className="text-fg-muted">Nivel {s.current_level ?? 1}</span>
                 </div>
                 <RemoveEnrollmentButton classroomId={params.id} studentId={s.id} />
               </div>

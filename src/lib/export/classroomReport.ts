@@ -23,9 +23,6 @@ export async function downloadClassroomReportXlsx(data: ClassroomProgressData): 
     Nombre: s.fullName,
     Usuario: s.username,
     Email: s.email ?? '',
-    Nivel: s.level,
-    'XP total': s.totalXp,
-    'XP ganado en clase': s.earnedXpInClass,
     Racha: s.streakDays,
     'Módulos completados': s.modulesCompleted,
     'Módulos totales': s.modulesTotal,
@@ -51,7 +48,6 @@ export async function downloadClassroomReportXlsx(data: ClassroomProgressData): 
     'Mejor score': d.bestScore,
     Intentos: d.attempts,
     'Tiempo (min)': Math.round(d.timeSeconds / 60),
-    'XP ganado': d.earnedXp,
     'Completado en':
       d.completedAt ? new Date(d.completedAt).toLocaleDateString('es') : '',
   }));
@@ -106,7 +102,7 @@ export async function downloadClassroomReportXlsx(data: ClassroomProgressData): 
       Valor: data.summary.activeStudents,
     },
     { Campo: '% completado promedio', Valor: `${data.summary.avgCompletionPct}%` },
-    { Campo: 'XP total ganado', Valor: data.summary.totalXpEarned },
+    { Campo: 'Módulos completados (total)', Valor: data.summary.totalModulesCompleted },
     { Campo: 'Fecha de creación', Valor: new Date(c.createdAt).toLocaleDateString('es') },
     { Campo: 'Fecha de exportación', Valor: new Date().toLocaleDateString('es') },
   ];

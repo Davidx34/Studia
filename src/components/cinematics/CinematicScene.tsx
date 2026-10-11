@@ -23,7 +23,6 @@ interface CinematicProps {
   studentName?: string;
   moduleTitle?: string;
   score?: number;
-  xpEarned?: number;
   streak?: number;
   onComplete: () => void;
 }
@@ -99,7 +98,7 @@ const SCENES: Record<CinematicType, SceneConfig> = {
 };
 
 export function CinematicScene(props: CinematicProps) {
-  const { type, xpEarned, onComplete } = props;
+  const { type, onComplete } = props;
   const scene = SCENES[type];
   const [lineIdx, setLineIdx] = useState(0);
   const [showCta, setShowCta] = useState(false);
@@ -159,10 +158,6 @@ export function CinematicScene(props: CinematicProps) {
           </p>
         ))}
       </div>
-
-      {typeof xpEarned === 'number' && xpEarned > 0 && lineIdx >= lines.length && (
-        <p className="cinematic-dialogue-in mt-3 text-3xl font-bold text-yellow-300">+{xpEarned} XP</p>
-      )}
 
       {showCta && (
         <button

@@ -27,7 +27,7 @@ type RemediationQuestion = {
   exp?: string | null;
 };
 
-type RoundResult = { completed: boolean; bonusXp: number };
+type RoundResult = { completed: boolean };
 
 export default function RepasoPlanPage() {
   const params = useParams();
@@ -122,10 +122,10 @@ export default function RepasoPlanPage() {
     }
     setSaving(true);
     const scorePercent = Math.round((score / questions.length) * 100);
-    const res = await advanceRemediationPlan(planId, scorePercent);
+    const res = await advanceRemediationPlan(planId);
     setSaving(false);
     if (res.ok) {
-      setResult({ completed: res.completed, bonusXp: res.bonusXp });
+      setResult({ completed: res.completed });
       useTonitoStore.getState().onModuleComplete(100);
     } else {
       setError(res.error);
@@ -165,9 +165,6 @@ export default function RepasoPlanPage() {
           <h1 className="text-2xl font-bold text-fg">¡Ronda completada!</h1>
           <p className="text-fg-muted">
             Acertaste {score}/{questions.length} preguntas.
-          </p>
-          <p className="text-accent-text font-bold text-lg">
-            {result.bonusXp > 0 ? `+${result.bonusXp} XP bonus` : 'Hoy ya habías ganado el bonus de este plan.'}
           </p>
           {result.completed ? (
             <p className="text-success font-medium">¡Completaste todo el plan de refuerzo "{plan.title}"!</p>

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type ToastVariant = 'xp' | 'coins' | 'streak' | 'mission' | 'heart' | 'info' | 'error';
+export type ToastVariant = 'coins' | 'streak' | 'mission' | 'heart' | 'info' | 'error';
 
 export interface Toast {
   id: string;
@@ -19,15 +19,12 @@ export interface AchievementUnlock {
   color: string; // hex
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
   rewardCoins: number;
-  rewardXP: number;
 }
 
 interface NotificationState {
   toasts: Toast[];
   achievementQueue: AchievementUnlock[];
   currentAchievement: AchievementUnlock | null;
-  levelUpFromLevel: number | null;
-  levelUpToLevel: number | null;
 
   // Toast actions
   pushToast: (toast: Omit<Toast, 'id'>) => void;
@@ -38,9 +35,6 @@ interface NotificationState {
   showNextAchievement: () => void;
   dismissAchievement: () => void;
 
-  // Level up
-  triggerLevelUp: (from: number, to: number) => void;
-  dismissLevelUp: () => void;
 }
 
 let toastIdCounter = 0;
@@ -49,8 +43,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   toasts: [],
   achievementQueue: [],
   currentAchievement: null,
-  levelUpFromLevel: null,
-  levelUpToLevel: null,
 
   pushToast: (toast) => {
     const id = `toast-${++toastIdCounter}-${Date.now()}`;
@@ -95,13 +87,5 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     setTimeout(() => {
       get().showNextAchievement();
     }, 400);
-  },
-
-  triggerLevelUp: (from, to) => {
-    set({ levelUpFromLevel: from, levelUpToLevel: to });
-  },
-
-  dismissLevelUp: () => {
-    set({ levelUpFromLevel: null, levelUpToLevel: null });
   },
 }));

@@ -91,9 +91,6 @@ export default function LessonPage() {
   const [weakConcepts, setWeakConcepts] = useState<WeakConcept[]>([]);
   const [remediationLoading, setRemediationLoading] = useState(false);
   const [remediationRowId, setRemediationRowId] = useState<string | null>(null);
-  const [remediationBonusXp, setRemediationBonusXp] = useState(0);
-  // XP que el SERVIDOR otorgo al terminar el modulo (0 si ya lo habia ganado antes).
-  const [xpGranted, setXpGranted] = useState<number | null>(null);
 
   // Cinematicas (Sesion F.1): cola simple, se muestran en secuencia.
   const [cinematicQueue, setCinematicQueue] = useState<CinematicType[]>([]);
@@ -488,8 +485,6 @@ export default function LessonPage() {
 
   const completeRemediation = async () => {
     const scorePercent = Math.round((score / questions.length) * 100);
-    const bonusXp = Math.round(25 + (score / questions.length) * 25); // 25-50 segun desempeño (lo registrado en la fila)
-    let grantedBonus = 0;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -499,22 +494,14 @@ export default function LessonPage() {
             .update({
               was_completed: true,
               score_percent: scorePercent,
-              bonus_xp_earned: bonusXp,
               completed_at: new Date().toISOString(),
             })
             .eq('id', remediationRowId);
-        }
-        // El XP lo calcula y lo otorga el SERVIDOR (migracion 052): el navegador ya no escribe profiles.total_xp.
-        if (remediationRowId) {
-          const { data: granted } = await supabase.rpc('award_xp_remediation', { p_remediation_id: remediationRowId, p_score_percent: scorePercent });
-          // Se muestra lo que el servidor otorgo (puede ser 0 si hoy ya cobro el bonus de este modulo).
-          grantedBonus = Number(granted ?? 0);
         }
       }
     } catch (e) {
       console.warn('Error completando repaso:', e);
     }
-    setRemediationBonusXp(grantedBonus);
     setRemediationPhase('completed');
     useTonitoStore.getState().onModuleComplete(100);
   };
@@ -545,16 +532,10 @@ export default function LessonPage() {
         // Acumula sobre lo ya registrado: un segundo intento suma tiempo en
         // vez de pisar el del primero (review 360 §3.5).
         time_spent_seconds: (existing?.time_spent_seconds ?? 0) + elapsedSeconds(),
-        earned_xp: mod!.base_xp_reward, // ver nota de invariante en recordAttempt
         started_at: existing?.started_at ?? now,
         completed_at: now,
         last_attempt_at: now,
       }, { onConflict: 'student_id,module_id' });
-
-      // El XP lo otorga el SERVIDOR, una sola vez por modulo (libro xp_ledger, migracion 052): reintentar o
-      // recargar no lo repite, asi que ya no hace falta decidirlo aqui con alreadyCompleted.
-      const { data: granted } = await supabase.rpc('award_xp_module', { p_module_id: moduleId });
-      setXpGranted(Number(granted ?? 0));
 
       // Verificar y otorgar logros (el modal de desbloqueo aparece via Realtime).
       await evaluateAchievements();
@@ -618,7 +599,6 @@ export default function LessonPage() {
       type={cinematicQueue[0]}
       studentName={studentName}
       score={Math.round((score / questions.length) * 100)}
-      xpEarned={cinematicQueue[0] === 'module_complete_good' || cinematicQueue[0] === 'module_complete_low' ? (xpGranted && xpGranted > 0 ? xpGranted : undefined) : undefined}
       streak={streakForCinematic}
       onComplete={() => setCinematicQueue((q) => q.slice(1))}
     />
@@ -638,9 +618,7 @@ export default function LessonPage() {
       <Card className="p-8 text-center bg-success/10 border-success/40">
         <h1 className="text-3xl font-bold text-fg mb-4">¡Repaso completado! 🎉</h1>
         <p className="text-lg text-fg mb-2">Ahora estás listo para lo siguiente.</p>
-        <p className="text-lg text-fg-muted mb-8">
-          {remediationBonusXp > 0 ? `+${remediationBonusXp} XP bonus ganados` : 'Hoy ya habías ganado el bonus de repaso de este módulo.'}
-        </p>
+        <div className="mb-8" />
         <Button size="lg" onClick={() => router.back()}>Volver</Button>
       </Card>
     </div>
@@ -652,10 +630,7 @@ export default function LessonPage() {
         <h1 className="text-4xl font-bold text-fg mb-4">¡Completado!</h1>
         <p className="text-2xl text-fg mb-2">{score}/{questions.length} correctas</p>
         <p className="text-lg text-fg-muted mb-2">{Math.round((score / questions.length) * 100)}% de acierto</p>
-        {/* Antes decia siempre "+N XP ganados", tambien al repetir un modulo. Ahora es lo que el servidor otorgo. */}
-        <p className="text-lg text-fg mb-8">
-          {xpGranted && xpGranted > 0 ? `+${xpGranted} XP ganados` : 'Ya habías ganado el XP de este módulo.'}
-        </p>
+        <div className="mb-8" />
         <Button size="lg" onClick={() => router.back()}>Volver</Button>
       </Card>
     </div>

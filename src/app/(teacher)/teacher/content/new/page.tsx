@@ -15,7 +15,6 @@ interface FormData {
   difficulty_level: number;
   content_type: string;
   estimated_time_minutes: number;
-  base_xp_reward: number;
   gemini_prompt_template: string;
 }
 
@@ -56,7 +55,6 @@ export default function NewModuleWizard() {
     difficulty_level: 1,
     content_type: 'quiz',
     estimated_time_minutes: 10,
-    base_xp_reward: 15,
     gemini_prompt_template: '',
   });
 
@@ -106,7 +104,6 @@ export default function NewModuleWizard() {
         difficulty_level: data.difficulty_level,
         content_type: data.content_type,
         estimated_time_minutes: data.estimated_time_minutes,
-        base_xp_reward: data.base_xp_reward,
         gemini_prompt_template: data.gemini_prompt_template,
         order_index: (count || 0) + 100, // empieza alto para no chocar con seed
         is_active: true,
@@ -254,20 +251,6 @@ export default function NewModuleWizard() {
                   max="120"
                   value={data.estimated_time_minutes}
                   onChange={(e) => update('estimated_time_minutes', Number(e.target.value))}
-                  className="w-full px-4 py-3 bg-bg border border-line-strong rounded-xl text-fg focus:outline-none focus:border-primary transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-fg mb-2">
-                  XP base
-                </label>
-                <input
-                  type="number"
-                  min="5"
-                  max="100"
-                  value={data.base_xp_reward}
-                  onChange={(e) => update('base_xp_reward', Number(e.target.value))}
                   className="w-full px-4 py-3 bg-bg border border-line-strong rounded-xl text-fg focus:outline-none focus:border-primary transition"
                 />
               </div>
