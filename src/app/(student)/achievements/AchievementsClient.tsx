@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Trophy, Lock, Sparkles, Crown } from 'lucide-react';
+import { ArrowLeft, Trophy, Lock, Sparkles, Crown, Check } from 'lucide-react';
+import { ProgressBar } from '@/components/ui/ProgressBar';
 
 interface Achievement {
   id: string;
@@ -37,14 +38,12 @@ interface Props {
   };
 }
 
-const RARITY_META: Record<
-  string,
-  { label: string; color: string; gradient: string; order: number }
-> = {
-  common: { label: 'Común', color: '#94a3b8', gradient: 'from-slate-500 to-slate-700', order: 0 },
-  rare: { label: 'Raro', color: '#3b82f6', gradient: 'from-blue-500 to-indigo-700', order: 1 },
-  epic: { label: 'Épico', color: '#a855f7', gradient: 'from-purple-500 to-fuchsia-700', order: 2 },
-  legendary: { label: 'Legendario', color: '#fbbf24', gradient: 'from-amber-400 to-orange-600', order: 3 },
+// El color de rareza es un acento decorativo (borde, medalla). La rareza SIEMPRE se dice tambien con texto y con un icono distinto.
+const RARITY_META: Record<string, { label: string; color: string; order: number }> = {
+  common: { label: 'Común', color: '#94a3b8', order: 0 },
+  rare: { label: 'Raro', color: '#3b82f6', order: 1 },
+  epic: { label: 'Épico', color: '#a855f7', order: 2 },
+  legendary: { label: 'Legendario', color: '#fbbf24', order: 3 },
 };
 
 const ICON_MAP: Record<string, string> = {
@@ -100,7 +99,7 @@ export function AchievementsClient({ allAchievements, userAchievements, progress
     return {
       current,
       target,
-      pct: Math.min(100, Math.round((current / target) * 100)),
+      pct: target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0,
     };
   };
 
@@ -132,75 +131,52 @@ export function AchievementsClient({ allAchievements, userAchievements, progress
   const completionPct = totalCount > 0 ? Math.round((earnedCount / totalCount) * 100) : 0;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="theme-scope space-y-6">
       {/* Back link */}
       <Link
         href="/dashboard"
-        className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white transition"
+        className="inline-flex items-center gap-2 min-h-[44px] text-sm text-fg-muted hover:text-fg transition motion-reduce:transition-none"
       >
-        <ArrowLeft className="w-4 h-4" />
+        <ArrowLeft aria-hidden="true" className="w-4 h-4" />
         Volver al inicio
       </Link>
 
       {/* Hero header con progreso global */}
-      <div className="relative backdrop-blur-2xl bg-white/15 border border-white/25 rounded-3xl p-6 sm:p-8 overflow-hidden shadow-2xl">
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-yellow-300/15 rounded-full blur-3xl" />
-        <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-violet-400/15 rounded-full blur-3xl" />
-
-        <div className="relative">
-          <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
-            <div className="flex items-center gap-3">
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl"
-                style={{ background: 'linear-gradient(135deg, var(--premium-gold) 0%, #e8a87c 100%)' }}
-              >
-                <Trophy className="w-7 h-7 text-slate-900" />
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white">Tus logros</h1>
-                <p className="text-sm text-white/60">
-                  {earnedCount} de {totalCount} desbloqueados
-                </p>
-              </div>
+      <div className="bg-surface border border-line rounded-3xl p-6 sm:p-8">
+        <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-accent text-on-accent">
+              <Trophy aria-hidden="true" className="w-7 h-7" />
             </div>
-
-            <div className="text-right">
-              <div className="text-4xl font-bold text-white font-mono tabular-nums">
-                {completionPct}<span className="text-xl text-white/50">%</span>
-              </div>
-              <div className="text-xs text-white/50 uppercase tracking-wider font-semibold">
-                Completado
-              </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-fg">Tus logros</h1>
+              <p className="text-sm text-fg-muted">
+                {earnedCount} de {totalCount} desbloqueados
+              </p>
             </div>
           </div>
 
-          {/* Barra de progreso global */}
-          <div className="h-3 bg-black/20 rounded-full overflow-hidden border border-white/10">
-            <div
-              className="h-full transition-all duration-1000 ease-out"
-              style={{ width: `${completionPct}%`, background: 'linear-gradient(90deg, var(--premium-gold), var(--premium-accent))' }}
-            />
+          <div className="text-right">
+            <div className="text-4xl font-bold text-fg font-mono tabular-nums">
+              {completionPct}
+              <span className="text-xl text-fg-muted">%</span>
+            </div>
+            <div className="text-xs text-fg-muted uppercase tracking-wider font-semibold">Completado</div>
           </div>
         </div>
+
+        <ProgressBar value={completionPct} label="Logros desbloqueados" tone="accent" className="h-3" />
       </div>
 
       {/* Filtros */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Filtrar logros">
         <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} count={totalCount}>
           Todos
         </FilterChip>
-        <FilterChip
-          active={filter === 'unlocked'}
-          onClick={() => setFilter('unlocked')}
-          count={earnedCount}
-        >
+        <FilterChip active={filter === 'unlocked'} onClick={() => setFilter('unlocked')} count={earnedCount}>
           Desbloqueados
         </FilterChip>
-        <FilterChip
-          active={filter === 'locked'}
-          onClick={() => setFilter('locked')}
-          count={totalCount - earnedCount}
-        >
+        <FilterChip active={filter === 'locked'} onClick={() => setFilter('locked')} count={totalCount - earnedCount}>
           Pendientes
         </FilterChip>
       </div>
@@ -213,25 +189,25 @@ export function AchievementsClient({ allAchievements, userAchievements, progress
           const meta = RARITY_META[rarity];
 
           return (
-            <section key={rarity}>
+            <section key={rarity} aria-labelledby={`rareza-${rarity}`}>
               <div className="flex items-center gap-3 mb-4">
                 <div
-                  className={`w-8 h-8 rounded-lg bg-gradient-to-br ${meta.gradient} flex items-center justify-center shadow-lg`}
+                  aria-hidden="true"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: meta.color, color: '#0f172a' }}
                 >
-                  {rarity === 'legendary' && <Crown className="w-4 h-4 text-white" />}
-                  {rarity === 'epic' && <Sparkles className="w-4 h-4 text-white" />}
-                  {rarity !== 'legendary' && rarity !== 'epic' && (
-                    <Trophy className="w-4 h-4 text-white" />
-                  )}
+                  {rarity === 'legendary' && <Crown className="w-4 h-4" />}
+                  {rarity === 'epic' && <Sparkles className="w-4 h-4" />}
+                  {rarity !== 'legendary' && rarity !== 'epic' && <Trophy className="w-4 h-4" />}
                 </div>
-                <h2 className="text-lg font-bold text-white">{meta.label}</h2>
-                <div className="flex-1 h-px bg-white/10" />
-                <span className="text-xs text-white/50 font-semibold">
+                <h2 id={`rareza-${rarity}`} className="text-lg font-bold text-fg">{meta.label}</h2>
+                <div aria-hidden="true" className="flex-1 h-px bg-line" />
+                <span className="text-xs text-fg-muted font-semibold">
                   {items.filter((a) => earnedMap.has(a.id)).length}/{items.length}
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {items.map((a) => {
                   const userAch = earnedMap.get(a.id);
                   const isEarned = !!userAch;
@@ -239,37 +215,31 @@ export function AchievementsClient({ allAchievements, userAchievements, progress
                   const icon = ICON_MAP[a.name] || '🏆';
 
                   return (
-                    <AchievementCard
-                      key={a.id}
-                      achievement={a}
-                      icon={icon}
-                      isEarned={isEarned}
-                      earnedAt={userAch?.earned_at}
-                      progress={progress}
-                      rarityColor={meta.color}
-                    />
+                    <li key={a.id}>
+                      <AchievementCard
+                        achievement={a}
+                        icon={icon}
+                        isEarned={isEarned}
+                        earnedAt={userAch?.earned_at}
+                        progress={progress}
+                        rarityColor={meta.color}
+                        rarityLabel={meta.label}
+                      />
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
             </section>
           );
         })}
 
         {Object.values(filtered).every((arr) => arr.length === 0) && (
-          <div className="text-center py-16 text-white/50">
-            <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <div className="text-center py-16 text-fg-muted">
+            <Trophy aria-hidden="true" className="w-12 h-12 mx-auto mb-3 opacity-40" />
             <p>No hay logros en esta vista.</p>
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        @keyframes fade-in {
-          0% { opacity: 0; transform: translateY(8px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in { animation: fade-in 0.4s ease-out; }
-      `}</style>
     </div>
   );
 }
@@ -287,15 +257,17 @@ function FilterChip({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`px-4 py-2 rounded-xl text-sm font-semibold transition border ${
+      aria-pressed={active}
+      className={`min-h-[44px] px-4 py-2 rounded-xl text-sm font-semibold transition motion-reduce:transition-none border ${
         active
-          ? 'bg-white/20 border-white/40 text-white'
-          : 'bg-white/5 border-white/15 text-white/60 hover:bg-white/10 hover:text-white'
+          ? 'bg-primary border-primary text-on-primary'
+          : 'bg-surface border-line text-fg-muted hover:text-fg hover:border-line-strong'
       }`}
     >
       {children}
-      <span className="ml-1.5 text-xs opacity-70">{count}</span>
+      <span className="ml-1.5 text-xs opacity-80">{count}</span>
     </button>
   );
 }
@@ -307,6 +279,7 @@ function AchievementCard({
   earnedAt,
   progress,
   rarityColor,
+  rarityLabel,
 }: {
   achievement: Achievement;
   icon: string;
@@ -314,105 +287,50 @@ function AchievementCard({
   earnedAt?: string;
   progress: { current: number; target: number; pct: number } | null;
   rarityColor: string;
+  rarityLabel: string;
 }) {
   return (
-    <div
-      className={`relative rounded-2xl p-4 backdrop-blur-xl border transition group ${
-        isEarned
-          ? 'bg-white/15 border-white/30 hover:bg-white/20 shadow-lg'
-          : 'bg-white/5 border-white/10 hover:bg-white/10'
-      }`}
-      style={
-        isEarned
-          ? { boxShadow: `0 4px 24px ${rarityColor}30, inset 0 1px 0 rgba(255,255,255,0.15)` }
-          : undefined
-      }
+    <article
+      className={`h-full rounded-2xl p-4 border-2 ${isEarned ? 'bg-surface' : 'bg-surface-2 border-line'}`}
+      style={isEarned ? { borderColor: rarityColor } : undefined}
     >
-      {/* Glow halo for earned */}
-      {isEarned && (
-        <div
-          className="absolute inset-0 rounded-2xl pointer-events-none opacity-30"
-          style={{
-            background: `radial-gradient(circle at top, ${rarityColor}40, transparent 60%)`,
-          }}
-        />
+      {/* Icono: medalla si esta ganado, candado si no */}
+      <div
+        aria-hidden="true"
+        className={`w-14 h-14 mx-auto mb-3 rounded-full flex items-center justify-center text-2xl ${isEarned ? '' : 'bg-surface border border-line'}`}
+        style={isEarned ? { background: rarityColor } : undefined}
+      >
+        {isEarned ? icon : <Lock className="w-5 h-5 text-fg-muted" />}
+      </div>
+
+      <h3 className="text-center text-sm font-bold mb-1 text-fg">{achievement.name}</h3>
+      <p className="text-center text-xs text-fg-muted leading-snug mb-2 min-h-[32px]">{achievement.description}</p>
+
+      {isEarned ? (
+        <div className="flex items-center justify-center gap-1 text-xs text-success font-semibold">
+          <Check aria-hidden="true" className="w-3.5 h-3.5" />
+          Desbloqueado{earnedAt ? ` · ${new Date(earnedAt).toLocaleDateString('es', { day: 'numeric', month: 'short' })}` : ''}
+        </div>
+      ) : (
+        progress && (
+          <div className="space-y-1">
+            <ProgressBar value={progress.pct} label={`Progreso de ${achievement.name}`} tone="primary" className="h-1.5" />
+            <div className="text-center text-xs text-fg-muted font-semibold">
+              {progress.current.toLocaleString()}/{progress.target.toLocaleString()}
+            </div>
+          </div>
+        )
       )}
 
-      <div className="relative">
-        {/* Icon */}
-        <div
-          className={`w-14 h-14 mx-auto mb-3 rounded-full flex items-center justify-center text-2xl transition ${
-            isEarned ? 'shadow-lg' : 'grayscale opacity-30'
-          }`}
-          style={
-            isEarned
-              ? {
-                  background: `linear-gradient(135deg, ${rarityColor}, ${rarityColor}88)`,
-                  boxShadow: `0 0 24px ${rarityColor}60`,
-                }
-              : { background: 'rgba(0,0,0,0.3)' }
-          }
-        >
-          {isEarned ? icon : <Lock className="w-5 h-5 text-white/40" />}
+      <p className="sr-only">Rareza: {rarityLabel}</p>
+
+      {/* Recompensas (solo si esta ganado) */}
+      {isEarned && (achievement.reward_coins > 0 || achievement.reward_xp > 0) && (
+        <div className="flex items-center justify-center gap-2 mt-2 text-xs font-bold">
+          {achievement.reward_coins > 0 && <span className="text-accent-text">+{achievement.reward_coins} 🪙</span>}
+          {achievement.reward_xp > 0 && <span className="text-primary-text">+{achievement.reward_xp} XP</span>}
         </div>
-
-        {/* Name */}
-        <h3
-          className={`text-center text-sm font-bold mb-1 ${
-            isEarned ? 'text-white' : 'text-white/40'
-          }`}
-        >
-          {achievement.name}
-        </h3>
-
-        {/* Description / progress */}
-        {isEarned ? (
-          <>
-            <p className="text-center text-[11px] text-white/60 line-clamp-2 leading-tight mb-2 min-h-[28px]">
-              {achievement.description}
-            </p>
-            {earnedAt && (
-              <div className="text-center text-[10px] text-emerald-300 font-semibold">
-                ✓ {new Date(earnedAt).toLocaleDateString('es', { day: 'numeric', month: 'short' })}
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <p className="text-center text-[11px] text-white/40 line-clamp-2 leading-tight mb-2 min-h-[28px]">
-              {achievement.description}
-            </p>
-            {progress && (
-              <div className="space-y-1">
-                <div className="h-1.5 bg-black/30 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${progress.pct}%`,
-                      background: `linear-gradient(90deg, ${rarityColor}88, ${rarityColor})`,
-                    }}
-                  />
-                </div>
-                <div className="text-center text-[10px] text-white/50 font-semibold">
-                  {progress.current.toLocaleString()}/{progress.target.toLocaleString()}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Rewards (solo si está earned) */}
-        {isEarned && (achievement.reward_coins > 0 || achievement.reward_xp > 0) && (
-          <div className="flex items-center justify-center gap-2 mt-2 text-[10px]">
-            {achievement.reward_coins > 0 && (
-              <span className="text-yellow-300 font-bold">+{achievement.reward_coins}🪙</span>
-            )}
-            {achievement.reward_xp > 0 && (
-              <span className="text-purple-300 font-bold">+{achievement.reward_xp}⚡</span>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    </article>
   );
 }
