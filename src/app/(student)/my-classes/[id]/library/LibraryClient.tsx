@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { BookOpen, Search, ChevronLeft, ChevronRight, Minus, Plus, Sparkles, ExternalLink, Video } from 'lucide-react';
+import { BookOpen, Search, ChevronLeft, ChevronRight, Minus, Plus, Sparkles, ExternalLink } from 'lucide-react';
 
 interface MaterialSummary {
   id: string;
@@ -18,13 +18,10 @@ interface MaterialSummary {
   chunk_count: number | null;
   topics_detected: string[] | null;
   created_at: string;
-  source_type: 'file' | 'link' | 'youtube';
+  source_type: 'file' | 'link' | 'notebooklm';
   external_url: string | null;
   external_title: string | null;
   external_favicon: string | null;
-  youtube_video_id: string | null;
-  thumbnail_url: string | null;
-  transcript_source: string | null;
 }
 
 interface Chunk {
@@ -246,18 +243,6 @@ export function LibraryClient({
             <p className="text-fg-muted text-sm">Este material no tiene contenido procesado todavía.</p>
           ) : (
             <div className="space-y-4">
-              {selected.source_type === 'youtube' && selected.youtube_video_id && (
-                <div className="aspect-video w-full rounded-lg overflow-hidden bg-black">
-                  <iframe
-                    className="w-full h-full"
-                    src={`https://www.youtube.com/embed/${selected.youtube_video_id}`}
-                    title={selected.display_name}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-              )}
-
               {selected.source_type === 'link' && selected.external_url && (
                 <a
                   href={selected.external_url}
@@ -272,13 +257,6 @@ export function LibraryClient({
                   <span className="text-primary-text truncate flex-1">{selected.external_title || selected.external_url}</span>
                   <ExternalLink aria-hidden="true" className="w-3.5 h-3.5 text-fg-muted flex-shrink-0" />
                 </a>
-              )}
-
-              {selected.source_type === 'youtube' && chunks.length === 0 && (
-                <p className="text-xs text-accent-text flex items-center gap-1.5">
-                  <Video aria-hidden="true" className="w-3.5 h-3.5" /> No encontramos subtítulos automáticos para este video, así que no
-                  hay preguntas generadas a partir de él todavía.
-                </p>
               )}
 
               {chunks.length > 0 && (

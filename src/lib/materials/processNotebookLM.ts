@@ -1,11 +1,10 @@
 // Material tipo "notebooklm": el profesor procesa el video (u otra fuente
-// densa) externamente con NotebookLM -- que si tiene acceso privilegiado a
-// infraestructura de Google para "ver"/"escuchar" contenido, cosa que este
-// proyecto no puede replicar de forma legal ni gratuita (ver Sección 2 de
-// docs/AUDITORIA_TECNICA_STUDIA.md sobre YouTube) -- y pega aqui las notas/
-// resumen estructurado en markdown que NotebookLM genera.
+// densa) externamente con NotebookLM -- que si puede "ver"/"escuchar" ese
+// contenido, cosa que este proyecto no puede replicar de forma confiable ni
+// gratuita (por eso ya no se descargan transcripciones de YouTube) -- y pega
+// aqui las notas/resumen estructurado en markdown que NotebookLM genera.
 //
-// A diferencia de processYoutube/processLink, este pipeline NO hace ningun
+// A diferencia de processLink, este pipeline NO hace ningun
 // fetch externo: el contenido ya esta en manos del profesor. Por eso es
 // sincrono y no puede fallar por bloqueos de terceros -- el unico fallo
 // posible es que el texto pegado este vacio o que chunkEmbedAndStore falle

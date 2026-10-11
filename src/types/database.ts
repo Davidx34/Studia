@@ -51,7 +51,7 @@ export type MissionType =
   | 'answer_questions'; // daily_missions.mission_type
 
 export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed'; // teaching_materials.processing_status, CHECK real (migracion 005)
-export type MaterialSourceType = 'file' | 'link' | 'youtube' | 'notebooklm'; // teaching_materials.source_type, CHECK real (migraciones 005, 035, 042)
+export type MaterialSourceType = 'file' | 'link' | 'youtube' | 'notebooklm'; // 'youtube' = solo materiales viejos: ya no se pueden crear (ver migracion 061) // teaching_materials.source_type, CHECK real (migraciones 005, 035, 042)
 export type QuestionReviewStatus = 'pending' | 'approved' | 'rejected' | 'human_review'; // lesson_questions.review_status (Fase 1.3)
 
 // ============================================================

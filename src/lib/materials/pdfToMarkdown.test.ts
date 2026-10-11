@@ -253,7 +253,7 @@ describe('cableado', () => {
     expect(types).toContain('extraction_report?: Json | null');
   });
 
-  it('processPdf usa el mismo pipeline que enlaces y YouTube y guarda el metodo y el informe', () => {
+  it('processPdf usa el mismo pipeline que los enlaces y guarda el metodo y el informe', () => {
     const src = read('src/lib/materials/processPdf.ts');
     expect(src).toContain('chunkEmbedAndStore(');
     expect(src).toContain('extraction_method: converted.method');

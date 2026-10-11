@@ -28,7 +28,6 @@ import { parseSafeUrl, UnsafeUrlError } from '@/lib/security/safeFetch';
 import { claimProcessing, validateUploadInput } from '@/lib/security/materialGuards';
 import { processTextFileMaterial } from '@/lib/materials/processTextFile';
 import { TEXT_MIME_TYPES } from '@/lib/materials/constants';
-import { processYoutubeMaterial, extractYoutubeId } from '@/lib/materials/processYoutube';
 import { processNotebookLMMaterial } from '@/lib/materials/processNotebookLM';
 
 const STORAGE_BUCKET = 'teaching-materials';
@@ -218,13 +217,13 @@ export async function confirmMaterialUpload(
 }
 
 // ============================================================
-// addLinkMaterial / addYoutubeMaterial (Sesion K)
+// addLinkMaterial / addNotebookLMMaterial (Sesion K)
 // ============================================================
 //
 // A diferencia de confirmMaterialUpload (que dispara la edge function y
 // vuelve enseguida), estas dos esperan el procesamiento completo antes de
 // responder: no hay archivo que subir de por medio, así que el "trabajo
-// pesado" (scraping/oEmbed + captions + embeddings) es lo único que hay que
+// pesado" (scraping + embeddings) es lo único que hay que
 // esperar, y mantenerlo en el mismo request evita duplicar la lógica de
 // scraping/transcripción en una ruta API aparte (mismo patrón que se usó
 // para regenerateModulePool en Mejora Estructural 2).
@@ -273,46 +272,9 @@ export async function addLinkMaterial(classroomId: string, url: string): Promise
   return { ok: true, materialId: data.id };
 }
 
-export async function addYoutubeMaterial(classroomId: string, url: string): Promise<AddMaterialResult> {
-  const { supabase, user } = await requireUser();
-
-  if (!(await requireClassroomOwnership(supabase, classroomId, user.id))) {
-    return { ok: false, error: 'Clase no encontrada o sin permisos.' };
-  }
-
-  const videoId = extractYoutubeId(url);
-  if (!videoId) {
-    return { ok: false, error: 'No reconocemos ese link como un video de YouTube.' };
-  }
-
-  const { data, error } = await supabase
-    .from('teaching_materials')
-    .insert({
-      classroom_id: classroomId,
-      teacher_id: user.id,
-      filename: url,
-      display_name: url,
-      source_type: 'youtube',
-      external_url: url,
-      youtube_video_id: videoId,
-      processing_status: 'processing',
-    })
-    .select('id')
-    .single();
-
-  if (error || !data) {
-    return { ok: false, error: error?.message ?? 'No se pudo registrar el video.' };
-  }
-
-  await processYoutubeMaterial(supabase, data.id, url);
-
-  revalidatePath(`/teacher/classrooms/${classroomId}/materials`);
-  return { ok: true, materialId: data.id };
-}
-
 // El profesor procesa el video/fuente externamente con NotebookLM y pega
 // aqui el markdown resultante (notas/resumen estructurado). No hay fetch
-// externo: es sincrono y no puede fallar por bloqueos de YouTube/terceros.
+// externo: es sincrono y no puede fallar por bloqueos de terceros.
 export async function addNotebookLMMaterial(
   classroomId: string,
   title: string,
@@ -391,15 +353,14 @@ export async function reprocessMaterial(materialId: string) {
 
   if (updateErr) return { ok: false as const, error: updateErr.message };
 
-  // Borrar chunks viejos para que se regeneren — excepto para youtube y
-  // notebooklm, donde chunkEmbedAndStore ya borra los viejos internamente
+  // Borrar chunks viejos para que se regeneren — excepto para notebooklm, donde chunkEmbedAndStore ya borra los viejos internamente
   // solo despues de calcular los embeddings nuevos con exito (ver
   // textProcessing.ts), para no perder contenido bueno si el reintento
   // vuelve a fallar.
   // Los PDF tambien: se procesan in-process con chunkEmbedAndStore.
   const isPdfFile = material.source_type === 'file' && material.mime_type === PDF_MIME;
   const isTextFile = material.source_type === 'file' && !!material.mime_type && TEXT_MIME_TYPES.includes(material.mime_type);
-  if (material.source_type !== 'youtube' && material.source_type !== 'notebooklm' && !isPdfFile && !isTextFile) {
+  if (material.source_type !== 'notebooklm' && !isPdfFile && !isTextFile) {
     await supabase.from('material_chunks').delete().eq('material_id', materialId);
   }
 
@@ -409,12 +370,10 @@ export async function reprocessMaterial(materialId: string) {
     p_classroom_id: material.classroom_id,
   });
 
-  // Sesion K: link/youtube se reprocesan in-process (mismo pipeline que al
+  // Sesion K: los links se reprocesan in-process (mismo pipeline que al
   // crearlos); los archivos siguen yendo por la edge function.
   if (material.source_type === 'link' && material.external_url) {
     await processLinkMaterial(supabase, materialId, material.external_url);
-  } else if (material.source_type === 'youtube' && material.external_url) {
-    await processYoutubeMaterial(supabase, materialId, material.external_url);
   } else if (material.source_type === 'notebooklm') {
     // No hay URL externa que re-descargar: reprocesar re-chunkea/re-embebe
     // el mismo texto pegado que ya se guardo en extracted_text la primera
@@ -490,7 +449,7 @@ export async function deleteMaterial(materialId: string) {
   if (!material) return { ok: false as const, error: 'Material no encontrado.' };
 
   // Best-effort: borrar archivo de Storage (si falla seguimos). Materiales
-  // de tipo link/youtube no tienen storage_path.
+  // de tipo link/notebooklm no tienen storage_path.
   if (material.storage_path) {
     await supabase.storage
       .from(STORAGE_BUCKET)

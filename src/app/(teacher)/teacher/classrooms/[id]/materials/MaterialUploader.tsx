@@ -2,12 +2,11 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, Loader2, AlertCircle, CheckCircle2, Link as LinkIcon, Video, FileUp, Sparkles } from 'lucide-react';
+import { Upload, Loader2, AlertCircle, CheckCircle2, Link as LinkIcon, FileUp, Sparkles } from 'lucide-react';
 import {
   getUploadSignedUrl,
   confirmMaterialUpload,
   addLinkMaterial,
-  addYoutubeMaterial,
   addNotebookLMMaterial,
 } from '@/lib/actions/materials';
 import {
@@ -28,14 +27,15 @@ interface UploadProgress {
   error?: string;
 }
 
-type UploadTab = 'file' | 'link' | 'youtube' | 'notebooklm';
+type UploadTab = 'file' | 'link' | 'notebooklm';
 
 export default function MaterialUploader({ classroomId }: { classroomId: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [progress, setProgress] = useState<UploadProgress[]>([]);
-  const [tab, setTab] = useState<UploadTab>('file');
+  // NotebookLM es la via recomendada para videos y fuentes densas: queda como primera pestaña y es la que abre por defecto.
+  const [tab, setTab] = useState<UploadTab>('notebooklm');
   const [externalUrl, setExternalUrl] = useState('');
   const [externalBusy, setExternalBusy] = useState(false);
   const [externalError, setExternalError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
     setExternalBusy(true);
     setExternalError(null);
 
-    const result = tab === 'youtube' ? await addYoutubeMaterial(classroomId, url) : await addLinkMaterial(classroomId, url);
+    const result = await addLinkMaterial(classroomId, url);
 
     setExternalBusy(false);
     if (!result.ok) {
@@ -211,10 +211,9 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
       <div className="flex gap-1 border-b border-slate-800">
         {(
           [
-            { id: 'file' as const, label: 'Archivo', icon: FileUp },
-            { id: 'link' as const, label: 'Link', icon: LinkIcon },
-            { id: 'youtube' as const, label: 'YouTube', icon: Video },
-            { id: 'notebooklm' as const, label: 'NotebookLM', icon: Sparkles },
+            { id: 'notebooklm' as const, label: 'NotebookLM', icon: Sparkles, hint: 'Recomendado' },
+            { id: 'file' as const, label: 'Archivo', icon: FileUp, hint: null },
+            { id: 'link' as const, label: 'Link', icon: LinkIcon, hint: null },
           ]
         ).map((t) => {
           const TabIcon = t.icon;
@@ -231,6 +230,7 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
             >
               <TabIcon className="w-3.5 h-3.5" />
               {t.label}
+              {t.hint && <span className="ml-1 rounded-full bg-violet-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-violet-200">{t.hint}</span>}
             </button>
           );
         })}
@@ -271,12 +271,10 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
         </div>
       )}
 
-      {(tab === 'link' || tab === 'youtube') && (
+      {tab === 'link' && (
         <form onSubmit={handleAddExternal} className="rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900/30 p-6 space-y-3">
           <p className="text-xs text-slate-500">
-            {tab === 'youtube'
-              ? 'Pega el link de un video de YouTube. Se intentará obtener la transcripción automática para generar preguntas.'
-              : 'Pega el link de un artículo o página web. Se extraerá el contenido igual que un documento.'}
+            Pega el link de un artículo o página web. Se extraerá el contenido igual que un documento.
           </p>
           <div className="flex gap-2">
             <input
@@ -284,7 +282,7 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
               required
               value={externalUrl}
               onChange={(e) => setExternalUrl(e.target.value)}
-              placeholder={tab === 'youtube' ? 'https://www.youtube.com/watch?v=...' : 'https://...'}
+              placeholder="https://..."
               className="flex-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500"
             />
             <button
@@ -307,19 +305,27 @@ export default function MaterialUploader({ classroomId }: { classroomId: string 
 
       {tab === 'notebooklm' && (
         <form onSubmit={handleAddNotebookLM} className="rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900/30 p-6 space-y-3">
-          <p className="text-xs text-slate-500">
-            Procesa el video (u otra fuente) por tu cuenta en{' '}
-            <a
-              href="https://notebooklm.google.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-violet-300 underline hover:text-violet-200"
-            >
-              NotebookLM
-            </a>{' '}
-            y pega aquí las notas/resumen que genera (markdown). Es la vía más confiable para
-            videos sin subtítulos o con contenido denso.
-          </p>
+          <div className="text-xs text-slate-400 space-y-2">
+            <p>
+              La forma más confiable de usar un <strong className="text-slate-200">video</strong> (o cualquier fuente densa): lo
+              resumes en{' '}
+              <a
+                href="https://notebooklm.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-violet-300 underline hover:text-violet-200"
+              >
+                NotebookLM
+              </a>{' '}
+              y pegas aquí el resultado. Tú controlas qué contenido entra.
+            </p>
+            <ol className="list-decimal pl-5 space-y-0.5 text-slate-300">
+              <li>Crea un cuaderno en NotebookLM y agrega el video (o PDF, enlaces) como fuente.</li>
+              <li>Pídele un resumen detallado en Markdown, con títulos y listas.</li>
+              <li>Copia el resultado y pégalo abajo con un título.</li>
+            </ol>
+            <p className="text-slate-500">También puedes guardarlo como archivo .md y subirlo desde la pestaña Archivo.</p>
+          </div>
           <input
             type="text"
             required
