@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { evaluateAchievements } from '@/lib/achievements/evaluate';
 import { normalizeAnswer } from '@/lib/lesson/normalize';
+import { reportShadow } from '@/lib/grading/shadowClient';
 import { LessonQuestionMatch } from '@/components/LessonQuestionMatch';
 import { ElDescifrador } from '@/components/minigames/ElDescifrador';
 import { TimelineGame } from '@/components/minigames/TimelineGame';
@@ -252,6 +253,8 @@ export default function LessonPage() {
       useTonitoStore.getState().onConsecutiveFails(wrongStreakRef.current);
     }
     if (!question?.id) return;
+    // Modo sombra: el servidor califica en paralelo y registra si coincide con este veredicto (no cambia nada visible).
+    reportShadow(question.id, answerGiven, wasCorrect);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -718,11 +721,11 @@ export default function LessonPage() {
         key={idx}
         pairs={q.pairs || []}
         disabled={answered}
-        onComplete={(correct) => {
+        onComplete={(correct, pairing) => {
           setAnswered(true);
           setSelected('matched');
           if (correct) setScore((s) => s + 1);
-          recordAttempt(q, correct, null);
+          recordAttempt(q, correct, { pairing });
         }}
       />
     );
