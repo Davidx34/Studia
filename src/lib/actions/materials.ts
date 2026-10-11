@@ -23,7 +23,7 @@ import { slugifyFilename } from '@/lib/materials/file-helpers';
 import { processLinkMaterial } from '@/lib/materials/processLink';
 import { processPdfMaterial, PDF_MIME } from '@/lib/materials/processPdf';
 import { runInBackground } from '@/lib/server/background';
-import { createAdminSupabase } from '@/lib/supabase/admin';
+import { createAdminSupabase, hasServiceRoleKey } from '@/lib/supabase/admin';
 import { parseSafeUrl, UnsafeUrlError } from '@/lib/security/safeFetch';
 import { claimProcessing, validateUploadInput } from '@/lib/security/materialGuards';
 import { processTextFileMaterial } from '@/lib/materials/processTextFile';
@@ -197,7 +197,10 @@ export async function confirmMaterialUpload(
     // Se usa la llave de servicio porque el trabajo sigue DESPUES de responder, cuando ya no se puede contar con
     // las cookies de la sesion. La propiedad del material ya quedo verificada arriba (clase propia + insercion
     // bajo RLS), asi que aqui solo se procesa el material que acaba de registrarse.
-    runInBackground(processPdfMaterial(createAdminSupabase(), data.id));
+    // Si el servidor no tiene la llave de servicio, se procesa EN la peticion con la sesion del profesor (como antes):
+    // mas lento para quien sube, pero funciona. Antes esto reventaba con "supabaseKey is required".
+    if (hasServiceRoleKey()) runInBackground(processPdfMaterial(createAdminSupabase(), data.id));
+    else await processPdfMaterial(supabase, data.id);
   } else if (TEXT_MIME_TYPES.includes(input.mimeType)) {
     // Markdown / texto: ya es texto, no hace falta IA ni edge function.
     await processTextFileMaterial(supabase, data.id);
@@ -388,7 +391,8 @@ export async function reprocessMaterial(materialId: string) {
     }
   } else if (isPdfFile) {
     // En segundo plano, igual que al subirlo (ver confirmMaterialUpload). La propiedad ya se verifico arriba.
-    runInBackground(processPdfMaterial(createAdminSupabase(), materialId));
+    if (hasServiceRoleKey()) runInBackground(processPdfMaterial(createAdminSupabase(), materialId));
+    else await processPdfMaterial(supabase, materialId);
   } else if (isTextFile) {
     await processTextFileMaterial(supabase, materialId);
   } else {

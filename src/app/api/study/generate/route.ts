@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { createAdminSupabase } from '@/lib/supabase/admin';
+import { createAdminSupabase, hasServiceRoleKey, MISSING_SERVICE_KEY_MESSAGE } from '@/lib/supabase/admin';
 import { hasStudyProvider } from '@/lib/study/generate';
 import { claimJob, runJob, type JobKind } from '@/lib/study/jobs';
 import { runInBackground } from '@/lib/server/background';
@@ -37,6 +37,8 @@ export async function POST(req: NextRequest) {
     if (material.processing_status !== 'completed') return NextResponse.json({ error: 'El material aún no está procesado' }, { status: 409 });
 
     if (!hasStudyProvider()) return NextResponse.json({ status: 'failed', error: 'No hay un proveedor de IA configurado.' }, { status: 503 });
+    // Sin la llave de servicio el trabajo en segundo plano no puede escribir: se dice con claridad (antes: "Error inesperado").
+    if (!hasServiceRoleKey()) return NextResponse.json({ status: 'failed', error: MISSING_SERVICE_KEY_MESSAGE }, { status: 503 });
 
     // Las tablas nuevas aun no estan en los tipos generados de Supabase.
     const admin: any = createAdminSupabase();

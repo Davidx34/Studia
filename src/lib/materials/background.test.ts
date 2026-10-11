@@ -77,7 +77,9 @@ describe('integracion', () => {
 
   it('subir o reprocesar un PDF ya no espera la conversion: la lanza en segundo plano con la llave de servicio', () => {
     const src = read('src/lib/actions/materials.ts');
-    expect(src).not.toMatch(/await processPdfMaterial\(/);
+    // Con llave de servicio: segundo plano. Solo SIN ella (entorno mal configurado) se espera en la peticion, como antes.
+    expect(src.match(/await processPdfMaterial\(/g)!.length).toBe(2);
+    expect(src.match(/if \(hasServiceRoleKey\(\)\) runInBackground\(/g)!.length).toBe(2);
     expect(src.match(/runInBackground\(processPdfMaterial\(createAdminSupabase\(\)/g)!.length).toBe(2);
   });
 
