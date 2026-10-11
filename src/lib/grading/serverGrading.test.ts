@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { gradeAnswer } from './gradeAnswer';
+import { isValidQuestion } from '@/lib/lesson/validateQuestion';
 import { buildReveal, isFinalTry, isServerGradedType, sanitizeQuestion, serverGradingEnabled, MAX_TRIES } from './serverGrading';
 
 const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8').replace(/\r\n/g, '\n');
@@ -39,6 +40,13 @@ describe('sanitizeQuestion: lo que llega al navegador no trae la solucion', () =
     expect(sanitizeQuestion(game)).toBe(game);
     const sinId = { type: 'multiple_choice', q: 'x', opts: ['a'], ok: 0 };
     expect(sanitizeQuestion(sinId)).toBe(sinId);
+  });
+});
+
+describe('la pregunta sin claves la acepta la validacion de la leccion', () => {
+  it.each([MC, TF, FILL, SHORT, MATCH])('$type', (q) => {
+    // Regresion: la validacion exigia la respuesta correcta y la leccion mostraba "Falta la respuesta correcta".
+    expect(isValidQuestion(sanitizeQuestion(q)).valid).toBe(true);
   });
 });
 
