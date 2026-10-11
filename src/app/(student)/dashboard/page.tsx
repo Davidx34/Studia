@@ -12,6 +12,15 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/login');
 
+  // Invitaciones de un profesor a este correo que quedaron pendientes (cuenta creada antes de la invitacion): se
+  // convierten en inscripcion antes de listar las clases. Un fallo aqui no debe impedir abrir el inicio.
+  try {
+    // La funcion es nueva y aun no esta en los tipos generados.
+    await (supabase as any).rpc('claim_pending_enrollments');
+  } catch (e) {
+    console.warn('[claim_pending_enrollments]', e);
+  }
+
   // Cargar perfil
   const { data: profile } = await supabase
     .from('profiles')
