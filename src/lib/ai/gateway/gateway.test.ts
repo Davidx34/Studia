@@ -90,7 +90,8 @@ describe('cadenas', () => {
   it('solo entran proveedores con llave', () => {
     expect(chainFor('judge', {}).length).toBe(0);
     const chain = chainFor('judge', { GROQ_API_KEY: 'x' });
-    expect(chain.map((c) => c.provider)).toEqual(['groq']);
+    expect(new Set(chain.map((c) => c.provider))).toEqual(new Set(['groq']));
+    expect(chain.length).toBeGreaterThanOrEqual(2); // Qwen y gpt-oss
   });
 
   it('un proveedor con variables extra faltantes no entra (Cloudflare necesita la cuenta)', () => {
@@ -101,6 +102,13 @@ describe('cadenas', () => {
   it('Gemini no esta en las cadenas de generacion (su llave sostiene embeddings, juez y PDF)', () => {
     for (const task of ['generation', 'study'] as const) expect(DEFAULT_CHAINS[task].some((c) => c.provider === 'gemini')).toBe(false);
     expect(DEFAULT_CHAINS.judge.some((c) => c.provider === 'gemini')).toBe(true);
+  });
+
+  it('Groq: solo modelos que existen en la cuenta del proyecto (los Llama 3.x ya no estan)', () => {
+    const known = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'];
+    for (const chain of Object.values(DEFAULT_CHAINS)) {
+      for (const c of chain.filter((k) => k.provider === 'groq')) expect(known).toContain(c.model);
+    }
   });
 
   it('AI_CHAIN_<TAREA> reemplaza la cadena y descarta lo invalido', () => {
