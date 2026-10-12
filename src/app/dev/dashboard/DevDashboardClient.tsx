@@ -48,6 +48,12 @@ interface AnalyticsSummary {
 
 interface SystemHealth {
   env: { cohere: boolean; gemini: boolean; devAuth: boolean; supabase: boolean };
+  ai?: {
+    providers: { id: string; label: string; tier: string; configured: boolean; signup: string }[];
+    chains: Record<string, string[]>;
+    breakers: { key: string; available: boolean; reopensInSeconds: number; successRate: number; latencyMs: number; calls: number }[];
+    flags: { serviceRoleKey: boolean; serverGrading: boolean };
+  };
   database: { ok: boolean; latencyMs: number; error: string | null };
 }
 
@@ -304,6 +310,55 @@ function HealthTab() {
       ))}
       {health.database.error && (
         <p className="text-xs text-red-300 mt-2">{health.database.error}</p>
+      )}
+
+      {health.ai && (
+        <div className="space-y-4 pt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-white">Proveedores de IA (producción)</h3>
+          <div className="space-y-2">
+            {health.ai.providers.map((p) => (
+              <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-900 border border-slate-800 px-4 py-2.5">
+                <span className="text-sm text-white">
+                  {p.label} <span className="text-xs text-slate-500">[{p.tier}]</span>
+                </span>
+                {p.configured ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-slate-600" />}
+              </div>
+            ))}
+          </div>
+
+          <h3 className="text-sm font-semibold text-white pt-2">Cadenas activas por tarea</h3>
+          {Object.entries(health.ai.chains).map(([task, chain]) => (
+            <div key={task} className="rounded-lg bg-slate-900 border border-slate-800 px-4 py-2.5">
+              <p className="text-xs uppercase tracking-wide text-slate-400">{task}</p>
+              <p className="text-xs text-slate-200 mt-1 break-words">{chain.length ? chain.join('  →  ') : 'sin proveedores configurados'}</p>
+            </div>
+          ))}
+
+          <h3 className="text-sm font-semibold text-white pt-2">Cortacircuitos (solo de esta instancia)</h3>
+          {health.ai.breakers.length === 0 ? (
+            <p className="text-xs text-slate-500">Sin llamadas todavía en esta instancia.</p>
+          ) : (
+            health.ai.breakers.map((b) => (
+              <div key={b.key} className="flex items-center justify-between rounded-lg bg-slate-900 border border-slate-800 px-4 py-2 text-xs text-slate-200">
+                <span>{b.key}</span>
+                <span>
+                  {b.available ? 'disponible' : `apartado ${b.reopensInSeconds}s`} · éxito {b.successRate}% · {b.latencyMs} ms · {b.calls} llamadas
+                </span>
+              </div>
+            ))
+          )}
+
+          <h3 className="text-sm font-semibold text-white pt-2">Interruptores</h3>
+          {[
+            { label: 'SUPABASE_SERVICE_ROLE_KEY (tareas en segundo plano)', ok: health.ai.flags.serviceRoleKey },
+            { label: 'SERVER_GRADING=on (calificación en el servidor)', ok: health.ai.flags.serverGrading },
+          ].map((f) => (
+            <div key={f.label} className="flex items-center justify-between rounded-lg bg-slate-900 border border-slate-800 px-4 py-2.5">
+              <span className="text-sm text-white">{f.label}</span>
+              {f.ok ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
