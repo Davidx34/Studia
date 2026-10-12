@@ -5,7 +5,7 @@
 // formato JSON por tipo ni la normalizacion de minijuegos en dos lugares.
 
 import { generateEmbedding } from '@/lib/embeddings/generate';
-import { callOpenRouter, isOpenRouterConfigured } from '@/lib/ai/openrouter';
+import { routeText, describeAttempts, hasProviderFor } from '@/lib/ai/gateway';
 import { protectLatexBackslashes, escapeInvalidJsonBackslashes } from '@/lib/json/latexJson';
 
 export const RAG_MATCH_COUNT = 5;
@@ -383,29 +383,33 @@ async function callCohereOnce(prompt: string, apiKey: string): Promise<{ questio
 
 // Hay al menos un proveedor con el que generar preguntas.
 export function hasGenerationProvider(): boolean {
-  return !!process.env.COHERE_API_KEY || isOpenRouterConfigured();
+  return !!process.env.COHERE_API_KEY || hasProviderFor('generation');
 }
 
-// Respaldo: el mismo prompt, por OpenRouter. El prompt ya pide JSON con {"questions":[...]}
-// y el parser es el mismo que el de Cohere, asi que el resto del pipeline no cambia
-// (validacion, tipos permitidos, guardado).
-async function callFallbackQuestions(prompt: string): Promise<any[] | null> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const call = await callOpenRouter(prompt, { role: 'generation', maxTokens: 6000 });
-    if (!call.ok) {
-      console.warn(`[callFallback] OpenRouter fallo: ${call.reason}${call.status ? ` (HTTP ${call.status})` : ''}`);
-      // Sin llave valida o sin credito no tiene sentido intentarlo de nuevo.
-      if (call.reason === 'unauthorized' || call.reason === 'no_key' || call.reason === 'rate_limited') return null;
-      continue;
-    }
-    const questions = extractJsonQuestions(call.text);
-    if (questions && questions.length > 0) {
-      console.log(`[LLM_FALLBACK] generacion servida por OpenRouter (${call.model}): ${questions.length} preguntas`);
-      return questions;
-    }
-    console.warn(`[callFallback] respuesta de ${call.model} sin preguntas parseables`);
+// Respaldo: el mismo prompt, por la pasarela de IA (src/lib/ai/gateway): recorre los proveedores configurados (Cerebras, Groq,
+// Mistral, OpenRouter... lo que haya con llave) con cortacircuito y orden adaptativo. El prompt ya pide JSON con
+// {"questions":[...]} y el parser es el mismo que el de Cohere, asi que el resto del pipeline no cambia (validacion, tipos
+// permitidos, guardado). La calidad es la fraccion de lo pedido que llego: si un proveedor devuelve menos del 70 %, se sigue
+// con el siguiente y se conserva la mejor respuesta.
+async function callFallbackQuestions(prompt: string, expectedCount?: number): Promise<any[] | null> {
+  const r = await routeText<any[]>({
+    task: 'generation',
+    prompt,
+    maxTokens: 6000,
+    json: true,
+    validate: (text) => {
+      const questions = extractJsonQuestions(text);
+      if (!questions || questions.length === 0) return null;
+      return { value: questions, quality: expectedCount ? Math.min(1, questions.length / expectedCount) : 1 };
+    },
+    acceptQuality: 0.7,
+  });
+  if (!r.ok) {
+    console.warn(`[callFallback] sin respaldo utilizable (${r.reason}): ${describeAttempts(r.attempts)}`);
+    return null;
   }
-  return null;
+  console.log(`[LLM_FALLBACK] generacion servida por ${r.provider}/${r.model}: ${r.value.length} preguntas (${describeAttempts(r.attempts)})`);
+  return r.value;
 }
 
 // Reintenta con backoff ante: error HTTP (rate limit/5xx transitorio),
@@ -419,7 +423,7 @@ async function callFallbackQuestions(prompt: string): Promise<any[] | null> {
 // intentos en vez de 3): esperar mas a un proveedor caido cuesta mas que cambiar.
 export async function callCohere(prompt: string, expectedCount?: number): Promise<any[] | null> {
   const COHERE_API_KEY = process.env.COHERE_API_KEY;
-  const fallbackAvailable = isOpenRouterConfigured();
+  const fallbackAvailable = hasProviderFor('generation');
   if (!COHERE_API_KEY && !fallbackAvailable) return null;
 
   const RETRIES = fallbackAvailable ? 1 : 2;
@@ -447,8 +451,8 @@ export async function callCohere(prompt: string, expectedCount?: number): Promis
 
   if (!fallbackAvailable) return best;
 
-  console.warn(`[LLM_FALLBACK] Cohere no dio una respuesta suficiente (${best?.length ?? 0}/${expectedCount ?? '?'}); probando OpenRouter`);
-  const alt = await callFallbackQuestions(prompt);
+  console.warn(`[LLM_FALLBACK] Cohere no dio una respuesta suficiente (${best?.length ?? 0}/${expectedCount ?? '?'}); probando el respaldo`);
+  const alt = await callFallbackQuestions(prompt, expectedCount);
   // Lo mejor de los dos: el respaldo no debe empeorar lo que Cohere ya habia dado.
   if (alt && (!best || alt.length > best.length)) return alt;
   return best;

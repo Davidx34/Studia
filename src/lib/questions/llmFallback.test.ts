@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { callCohere, hasGenerationProvider } from './cohereGeneration';
 import { judgeQuestionsBatch, resetQuotaBreaker } from './judge';
+import { sharedHealth } from '@/lib/ai/gateway';
 
 // fetch simulado por destino. Cada proveedor responde lo que el test le indique.
 type Handler = (url: string, init?: any) => Response | Promise<Response>;
@@ -34,6 +35,7 @@ const orOk = (text: string) => new Response(JSON.stringify({ model: 'meta-llama/
 const orQuestions = (n: number) => orOk(JSON.stringify({ questions: questions(n, 'or') }));
 
 beforeEach(() => {
+  sharedHealth.reset(); // el cortacircuito de la pasarela es global al proceso
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
   process.env.COHERE_API_KEY = 'c';
