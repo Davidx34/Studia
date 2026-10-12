@@ -1,8 +1,8 @@
 // EVALUACION 3: ¿la recuperacion encuentra el fragmento correcto?
 //
 // Complementa eval-context.ts (que mide propiedades estructurales: cobertura, relleno, contextos repetidos). Este mide
-// RELEVANCIA con una verdad conocida: para una muestra de fragmentos, un modelo escribe una pregunta de estudio que SOLO ese
-// fragmento responde (parafraseando, sin copiar frases); luego se comprueba en que puesto devuelve cada estrategia ese
+// RELEVANCIA con una verdad conocida: para una muestra de fragmentos, un modelo escribe (a) una pregunta de estudio que SOLO
+// ese fragmento responde (parafraseada) y (b) un "tema" corto como titulo de modulo; luego se comprueba en que puesto devuelve cada estrategia ese
 // fragmento. Metricas: Hit@1 / Hit@3 / Hit@5 y MRR@10.
 //
 // Estrategias comparadas:
@@ -22,7 +22,7 @@ import fs from 'fs';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { embedWithGemini, embedQuery, LEGACY_EMBEDDING_PROFILE, QUERYABLE_PROFILES } from '../src/lib/embeddings/embed';
-import { routeText } from '../src/lib/ai/gateway';
+import { routeText, describeAttempts } from '../src/lib/ai/gateway';
 
 const args = process.argv.slice(2);
 const arg = (name: string, def?: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : def);
@@ -68,29 +68,51 @@ async function main() {
     console.log(`\n=== ${aula.name} — ${sample.length} consultas de ${pool.length} fragmentos ===`);
     console.log('  perfiles de embedding:', JSON.stringify(perfiles));
 
-    // 1. Una pregunta por fragmento (verdad conocida).
-    const queries: { chunk: string; q: string }[] = [];
+    // 1. Por fragmento, DOS consultas con verdad conocida (el fragmento que las responde):
+    //    - "pregunta": una pregunta de estudio PARAFRASEADA (poco solape de palabras: el caso mas dificil para el texto).
+    //    - "tema": 5-10 palabras como un titulo de modulo, con los terminos tecnicos del fragmento (lo que de verdad se
+    //      busca en produccion: titulo + palabras clave del modulo).
+    type Q = { chunk: string; kind: 'pregunta' | 'tema'; text: string };
+    const queries: Q[] = [];
+    let failures = 0;
+    let lastWhy = '';
     for (const c of sample) {
-      const res = await routeText<string>({
+      const res = await routeText<{ question: string; topic: string }>({
         task: 'analysis',
         json: true,
-        maxTokens: 200,
-        prompt: `Lee el fragmento y escribe UNA pregunta de estudio, en español, que solo ese fragmento pueda responder. Parafrasea: NO copies frases literales ni uses nombres de seccion. Responde solo JSON: {"question":"..."}\n\nFRAGMENTO:\n${c.content.slice(0, 1800)}`,
+        // Los modelos gpt-oss "piensan" antes de responder y ese razonamiento cuenta como salida: con pocos tokens la
+        // respuesta llega vacia. Presupuesto holgado.
+        maxTokens: 2000,
+        prompt: `Lee el fragmento y devuelve DOS cosas en español, solo JSON: {"question":"...","topic":"..."}
+- "question": UNA pregunta de estudio que solo ese fragmento pueda responder. Parafrasea: NO copies frases literales ni uses nombres de seccion.
+- "topic": entre 5 y 10 palabras, como el titulo de un modulo de clase sobre lo que trata el fragmento, con sus terminos tecnicos principales.
+
+FRAGMENTO:
+${c.content.slice(0, 1800)}`,
         validate: (t) => {
           try {
-            const q = JSON.parse(t.match(/\{[\s\S]*\}/)![0]).question;
-            return typeof q === 'string' && q.length > 10 ? { value: q, quality: 1 } : null;
+            const o = JSON.parse(t.match(/\{[\s\S]*\}/)![0]);
+            return typeof o.question === 'string' && o.question.length > 10 && typeof o.topic === 'string' && o.topic.length > 5 ? { value: { question: o.question, topic: o.topic }, quality: 1 } : null;
           } catch {
             return null;
           }
         },
       });
-      if (res.ok) queries.push({ chunk: c.id, q: res.value });
+      if (res.ok) {
+        queries.push({ chunk: c.id, kind: 'pregunta', text: res.value.question }, { chunk: c.id, kind: 'tema', text: res.value.topic });
+      } else {
+        failures++;
+        lastWhy = describeAttempts(res.attempts);
+      }
+      // Los niveles gratuitos limitan a ~30 peticiones por minuto: sin este ritmo, el cortacircuito aparta al proveedor.
+      await new Promise((r) => setTimeout(r, 2500));
     }
+    console.log(`  consultas generadas: ${queries.length / 2}/${sample.length}${failures ? `   (fallaron ${failures}; ultimo motivo: ${lastWhy})` : ''}`);
     if (queries.length === 0) {
       console.log('  No se pudo generar ninguna pregunta: configura una llave de la cadena "analysis" (npm run ai:doctor).');
       continue;
     }
+    if (queries.length / 2 < 15) console.log('  AVISO: muestra pequena (<15): las cifras de abajo NO son concluyentes.');
 
     // 2. Buscar con cada estrategia y ver en que puesto sale el fragmento correcto.
     const search = async (s: Strategy, q: string): Promise<string[]> => {
@@ -113,23 +135,27 @@ async function main() {
       return ((data ?? []) as any[]).map((x) => x.chunk_id);
     };
 
-    const rows: any[] = [];
-    for (const s of STRATEGIES) {
-      let h1 = 0, h3 = 0, h5 = 0, rr = 0, answered = 0;
-      for (const { chunk, q } of queries) {
-        const ranked = await search(s, q);
-        if (ranked.length) answered++;
-        const pos = ranked.indexOf(chunk);
-        if (pos === 0) h1++;
-        if (pos >= 0 && pos < 3) h3++;
-        if (pos >= 0 && pos < 5) h5++;
-        if (pos >= 0) rr += 1 / (pos + 1);
+    for (const kind of ['pregunta', 'tema'] as const) {
+      const set = queries.filter((x) => x.kind === kind);
+      const rows: any[] = [];
+      for (const s of STRATEGIES) {
+        let h1 = 0, h3 = 0, h5 = 0, rr = 0, answered = 0;
+        for (const { chunk, text } of set) {
+          const ranked = await search(s, text);
+          if (ranked.length) answered++;
+          const pos = ranked.indexOf(chunk);
+          if (pos === 0) h1++;
+          if (pos >= 0 && pos < 3) h3++;
+          if (pos >= 0 && pos < 5) h5++;
+          if (pos >= 0) rr += 1 / (pos + 1);
+        }
+        const n = set.length;
+        rows.push({ estrategia: s, 'Hit@1': +(h1 / n).toFixed(3), 'Hit@3': +(h3 / n).toFixed(3), 'Hit@5': +(h5 / n).toFixed(3), 'MRR@10': +(rr / n).toFixed(3), respondio: `${answered}/${n}` });
       }
-      const n = queries.length;
-      rows.push({ estrategia: s, 'Hit@1': +(h1 / n).toFixed(3), 'Hit@3': +(h3 / n).toFixed(3), 'Hit@5': +(h5 / n).toFixed(3), 'MRR@10': +(rr / n).toFixed(3), respondio: `${answered}/${n}` });
+      console.log(`\n  Consultas tipo "${kind}" (${set.length}):`);
+      console.table(rows);
+      report.push({ aula: aula.name, tipo: kind, consultas: set.length, perfiles, resultados: rows });
     }
-    console.table(rows);
-    report.push({ aula: aula.name, consultas: queries.length, perfiles, resultados: rows });
   }
 
   if (save && report.length) {
