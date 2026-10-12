@@ -9,7 +9,8 @@
 //   vector_legacy  embedding de la consulta SIN taskType y sin normalizar (como funcionaba antes), solo vector
 //   vector_typed   embedding RETRIEVAL_QUERY normalizado, solo vector
 //   text           solo texto completo en español (no usa embeddings: mide la red de seguridad)
-//   hybrid         vector + texto fusionados con RRF (lo que usa produccion)
+//   hybrid_wX      vector + texto fusionados con RRF; X = peso del texto (1.0 = el de la migracion 068; el actual de
+//                  produccion es RAG_TEXT_WEIGHT). Con --barrido prueba varios pesos (0, 0.1, 0.2, 0.3, 0.5, 1.0).
 //
 // Las preguntas se generan con la pasarela de IA (necesita al menos una llave de la cadena "analysis"). La muestra es
 // reproducible con --seed. Solo lectura: no escribe nada en la base.
@@ -17,12 +18,14 @@
 // Uso (en TU maquina, con TU .env.local):
 //   npx tsx --env-file=.env.local scripts/eval-retrieval.ts
 //   npx tsx --env-file=.env.local scripts/eval-retrieval.ts --classroom <id> --n 40 --seed 7 --guardar
+//   npx tsx --env-file=.env.local scripts/eval-retrieval.ts --barrido      (requiere la migracion 069)
 
 import fs from 'fs';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { embedWithGemini, embedQuery, LEGACY_EMBEDDING_PROFILE, QUERYABLE_PROFILES } from '../src/lib/embeddings/embed';
 import { routeText, describeAttempts } from '../src/lib/ai/gateway';
+import { RAG_TEXT_WEIGHT } from '../src/lib/rag/retrieve';
 
 const args = process.argv.slice(2);
 const arg = (name: string, def?: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : def);
@@ -42,8 +45,15 @@ function rng(a: number) {
   };
 }
 
-type Strategy = 'vector_legacy' | 'vector_typed' | 'text' | 'hybrid';
-const STRATEGIES: Strategy[] = ['vector_legacy', 'vector_typed', 'text', 'hybrid'];
+type Strat = { name: string; kind: 'vector_legacy' | 'vector_typed' | 'text' | 'hybrid'; tw?: number };
+const sweep = args.includes('--barrido');
+// Peso del texto en la fusion: 1.0 = el comportamiento de la migracion 068; RAG_TEXT_WEIGHT = el de produccion hoy.
+const STRATS: Strat[] = [
+  { name: 'vector_legacy', kind: 'vector_legacy' },
+  { name: 'vector_typed', kind: 'vector_typed' },
+  { name: 'text', kind: 'text' },
+  ...(sweep ? [0, 0.1, 0.2, 0.3, 0.5, 1.0] : [1.0, RAG_TEXT_WEIGHT]).filter((w, i, a) => a.indexOf(w) === i).map((w) => ({ name: `hybrid_w${w}`, kind: 'hybrid' as const, tw: w })),
+];
 
 async function main() {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Faltan variables de Supabase en .env.local');
@@ -115,42 +125,73 @@ ${c.content.slice(0, 1800)}`,
     if (queries.length / 2 < 15) console.log('  AVISO: muestra pequena (<15): las cifras de abajo NO son concluyentes.');
 
     // 2. Buscar con cada estrategia y ver en que puesto sale el fragmento correcto.
-    const search = async (s: Strategy, q: string): Promise<string[]> => {
+    // Los embeddings de consulta se calculan UNA vez por texto (el tipado se reutiliza en vector y en hibrido) y con reintentos:
+    // la API gratuita de Gemini rechaza rafagas (~100 por minuto). Una consulta cuyo embedding no se pudo obtener se OMITE de
+    // esa estrategia (no cuenta como fallo de la busqueda) y se informa cuantas se omitieron.
+    const cacheLegacy = new Map<string, number[] | null>();
+    const cacheTyped = new Map<string, number[] | null>();
+    const embedRetry = async (text: string, task: 'RETRIEVAL_QUERY' | null): Promise<number[] | null> => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        await new Promise((r) => setTimeout(r, 700)); // ritmo: < 100 por minuto
+        const e = await embedWithGemini(text, task, { normalize: task !== null });
+        if (e.ok) return e.values;
+        if (e.kind === 'quota' || e.kind === 'no_key' || e.kind === 'empty' || e.kind === 'bad_response') return null;
+        await new Promise((r) => setTimeout(r, 8000 * (attempt + 1)));
+      }
+      return null;
+    };
+    const embedCached = async (kind: 'legacy' | 'typed', text: string) => {
+      const cache = kind === 'legacy' ? cacheLegacy : cacheTyped;
+      if (!cache.has(text)) cache.set(text, await embedRetry(text, kind === 'typed' ? 'RETRIEVAL_QUERY' : null));
+      return cache.get(text)!;
+    };
+
+    // null = no se pudo preparar la consulta (embedding no disponible); [] = la busqueda no devolvio nada.
+    const search = async (s: Strat, q: string): Promise<string[] | null> => {
       let emb: number[] | null = null;
       let text: string | null = q;
       let models: string[] | null = QUERYABLE_PROFILES;
-      if (s === 'vector_legacy') {
-        const e = await embedWithGemini(q, null, { normalize: false });
-        emb = e.ok ? e.values : null;
+      if (s.kind === 'vector_legacy') {
+        emb = await embedCached('legacy', q);
         text = null;
         models = [LEGACY_EMBEDDING_PROFILE];
-      } else if (s === 'vector_typed') {
-        emb = await embedQuery(q);
+      } else if (s.kind === 'vector_typed') {
+        emb = await embedCached('typed', q);
         text = null;
-      } else if (s === 'hybrid') {
-        emb = await embedQuery(q);
+      } else if (s.kind === 'hybrid') {
+        emb = await embedCached('typed', q);
       }
-      if (s !== 'text' && !emb) return [];
-      const { data } = await supabase.rpc('match_material_chunks_hybrid', { query_embedding: emb, query_text: text, classroom_id_filter: aula.id, material_ids: null, match_count: 10, vector_models: models });
+      if (s.kind !== 'text' && !emb) return null;
+      const { data } = await supabase.rpc('match_material_chunks_hybrid', {
+        query_embedding: emb,
+        query_text: text,
+        classroom_id_filter: aula.id,
+        material_ids: null,
+        match_count: 10,
+        vector_models: models,
+        vector_weight: 1.0,
+        text_weight: s.tw ?? 1.0,
+      });
       return ((data ?? []) as any[]).map((x) => x.chunk_id);
     };
 
     for (const kind of ['pregunta', 'tema'] as const) {
       const set = queries.filter((x) => x.kind === kind);
       const rows: any[] = [];
-      for (const s of STRATEGIES) {
-        let h1 = 0, h3 = 0, h5 = 0, rr = 0, answered = 0;
+      for (const s of STRATS) {
+        let h1 = 0, h3 = 0, h5 = 0, rr = 0, valid = 0;
         for (const { chunk, text } of set) {
           const ranked = await search(s, text);
-          if (ranked.length) answered++;
+          if (ranked === null) continue; // omitida
+          valid++;
           const pos = ranked.indexOf(chunk);
           if (pos === 0) h1++;
           if (pos >= 0 && pos < 3) h3++;
           if (pos >= 0 && pos < 5) h5++;
           if (pos >= 0) rr += 1 / (pos + 1);
         }
-        const n = set.length;
-        rows.push({ estrategia: s, 'Hit@1': +(h1 / n).toFixed(3), 'Hit@3': +(h3 / n).toFixed(3), 'Hit@5': +(h5 / n).toFixed(3), 'MRR@10': +(rr / n).toFixed(3), respondio: `${answered}/${n}` });
+        const n = Math.max(valid, 1);
+        rows.push({ estrategia: s.name, 'Hit@1': +(h1 / n).toFixed(3), 'Hit@3': +(h3 / n).toFixed(3), 'Hit@5': +(h5 / n).toFixed(3), 'MRR@10': +(rr / n).toFixed(3), validas: `${valid}/${set.length}` });
       }
       console.log(`\n  Consultas tipo "${kind}" (${set.length}):`);
       console.table(rows);
