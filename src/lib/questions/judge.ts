@@ -18,7 +18,7 @@
 // se le dan a Gemini para JUZGARLOS: un solo punto de verdad, asi que ajustar
 // una regla cambia generacion y verificacion a la vez y no pueden divergir.
 import { MINIGAME_TYPE_RULES_TEXT } from '@/lib/questions/cohereGeneration';
-import { callOpenRouter, isOpenRouterConfigured } from '@/lib/ai/openrouter';
+import { routeText, describeAttempts, chainFor, sharedHealth } from '@/lib/ai/gateway';
 
 const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
@@ -134,6 +134,7 @@ let dailyQuotaExhaustedAt: number | null = null;
 
 export function resetQuotaBreaker(): void {
   dailyQuotaExhaustedAt = null;
+  sharedHealth.reset(); // tambien los cortacircuitos de la pasarela de IA
 }
 
 function quotaBreakerOpen(): boolean {
@@ -325,19 +326,25 @@ export function parseBatchResponse(text: string, expectedCount: number): (JudgeR
 // el camino individual ya lo maneja. Si el respaldo tampoco responde, el lote queda sin
 // veredicto y aguas arriba va a revision humana: NUNCA se aprueba por omision.
 async function judgeBatchViaFallback(batch: any[], sourceMaterial: string, why: string): Promise<(JudgeResult | null)[] | null> {
-  if (!isOpenRouterConfigured()) return null;
-  const call = await callOpenRouter(buildBatchPrompt(batch, sourceMaterial), { role: 'judge', maxTokens: 3000 });
-  if (!call.ok) {
-    console.warn(`[JUDGE_FALLBACK] OpenRouter tampoco pudo juzgar el lote de ${batch.length} (${call.reason}${call.status ? ` HTTP ${call.status}` : ''})`);
+  // Gemini ya fallo (es de donde venimos): el respaldo son los DEMAS proveedores configurados.
+  if (!chainFor('judge').some((c) => c.provider !== 'gemini')) return null;
+  const r = await routeText<(JudgeResult | null)[]>({
+    task: 'judge',
+    prompt: buildBatchPrompt(batch, sourceMaterial),
+    maxTokens: 3000,
+    json: true,
+    exclude: ['gemini'],
+    validate: (text) => {
+      const parsed = parseBatchResponse(text, batch.length);
+      return parsed ? { value: parsed, quality: 1 } : null;
+    },
+  });
+  if (!r.ok) {
+    console.warn(`[JUDGE_FALLBACK] el respaldo tampoco pudo juzgar el lote de ${batch.length} (${r.reason}): ${describeAttempts(r.attempts)}`);
     return null;
   }
-  const parsed = parseBatchResponse(call.text, batch.length);
-  if (!parsed) {
-    console.warn(`[JUDGE_FALLBACK] respuesta ilegible de ${call.model}; el lote queda sin veredicto`);
-    return null;
-  }
-  console.log(`[JUDGE_FALLBACK] lote de ${batch.length} juzgado por ${call.model} (Gemini: ${why})`);
-  return parsed;
+  console.log(`[JUDGE_FALLBACK] lote de ${batch.length} juzgado por ${r.provider}/${r.model} (Gemini: ${why})`);
+  return r.value;
 }
 
 // Juzga un lote (BATCH_SIZE preguntas) con UNA sola llamada a Gemini. El
