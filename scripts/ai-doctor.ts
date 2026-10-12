@@ -73,7 +73,7 @@ async function main() {
       let latency = '';
       if (ping) {
         const t0 = Date.now();
-        const r = await callCandidate(c, { task, prompt: 'Responde solo con la palabra OK.', maxTokens: 8, temperature: 0 });
+        const r = await callCandidate(c, { task, prompt: 'Responde solo con la palabra OK.', maxTokens: 256, temperature: 0 });
         latency = r.ok ? `  ok ${Date.now() - t0} ms` : `  FALLO ${r.kind}${r.status ? ' HTTP ' + r.status : ''}`;
       }
       console.log(`     ${c.provider.padEnd(11)} ${c.model.padEnd(44)} ${exists}${latency}`);
