@@ -157,6 +157,7 @@ export const DEFAULT_CHAINS: Record<AiTask, Candidate[]> = {
   generation: [
     { provider: 'cerebras', model: 'gpt-oss-120b' },
     { provider: 'groq', model: 'llama-3.3-70b-versatile' },
+    { provider: 'groq', model: 'openai/gpt-oss-120b' },
     { provider: 'mistral', model: 'mistral-small-latest' },
     { provider: 'github', model: 'openai/gpt-4.1-mini' },
     { provider: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
