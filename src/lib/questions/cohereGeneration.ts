@@ -5,6 +5,7 @@
 // formato JSON por tipo ni la normalizacion de minijuegos en dos lugares.
 
 import { generateEmbedding } from '@/lib/embeddings/generate';
+import { retrieveContext } from '@/lib/rag/retrieve';
 import { routeText, describeAttempts, hasProviderFor } from '@/lib/ai/gateway';
 import { protectLatexBackslashes, escapeInvalidJsonBackslashes } from '@/lib/json/latexJson';
 
@@ -72,9 +73,24 @@ export function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-// Busca el contexto mas relevante para el modulo: RAG real (embedding +
-// match_material_chunks) con fallback a los primeros chunks disponibles.
+// Busca el contexto mas relevante para el modulo. Primero la recuperacion HIBRIDA (vectores + texto completo en español,
+// varias consultas fusionadas; ver src/lib/rag/retrieve.ts). Si no esta disponible (funcion de la base ausente, sin
+// resultados), el camino de siempre: embedding + match_material_chunks con respaldo a los primeros chunks.
 export async function getRagContext(supabase: any, moduleId: string): Promise<string> {
+  try {
+    const hybrid = await retrieveContext(supabase, moduleId, { charLimit: RAG_CONTEXT_CHAR_LIMIT });
+    if (hybrid && hybrid.context) {
+      console.log(`[RAG] ${hybrid.mode}: ${hybrid.chunkIds.length} fragmentos, ${hybrid.variants} consultas${hybrid.scoped ? ", material vinculado" : ""}`);
+      return hybrid.context;
+    }
+  } catch (e) {
+    console.warn("[RAG_HYBRID_FAILED]", String((e as Error)?.message ?? e).slice(0, 200));
+  }
+  return getRagContextLegacy(supabase, moduleId);
+}
+
+// Camino anterior (vector puro con acotamiento y respaldos). Se conserva como red de seguridad.
+export async function getRagContextLegacy(supabase: any, moduleId: string): Promise<string> {
   const { data: moduleRow } = await supabase
     .from('content_modules')
     .select('title, description, classroom_id, source_material_ids')

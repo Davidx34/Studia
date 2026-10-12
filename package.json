@@ -10,7 +10,9 @@
     "test": "vitest run",
     "eval:context": "npx tsx --env-file=.env.local scripts/eval-context.ts",
     "eval:judge": "npx tsx --env-file=.env.local scripts/eval-judge.ts",
-    "ai:doctor": "npx tsx --env-file=.env.local scripts/ai-doctor.ts"
+    "ai:doctor": "npx tsx --env-file=.env.local scripts/ai-doctor.ts",
+    "eval:retrieval": "npx tsx --env-file=.env.local scripts/eval-retrieval.ts",
+    "reindex:embeddings": "npx tsx --env-file=.env.local scripts/reindex-embeddings.ts"
   },
   "dependencies": {
     "@serwist/next": "^9.5.7",
