@@ -162,7 +162,7 @@ ${c.content.slice(0, 1800)}`,
         emb = await embedCached('typed', q);
       }
       if (s.kind !== 'text' && !emb) return null;
-      const { data } = await supabase.rpc('match_material_chunks_hybrid', {
+      const { data, error } = await supabase.rpc('match_material_chunks_hybrid', {
         query_embedding: emb,
         query_text: text,
         classroom_id_filter: aula.id,
@@ -172,6 +172,11 @@ ${c.content.slice(0, 1800)}`,
         vector_weight: 1.0,
         text_weight: s.tw ?? 1.0,
       });
+      // Un error de la base NO es "sin resultados": contarlo como fallo de la busqueda daria una tabla de ceros engañosa (paso
+      // cuando se corrio el barrido antes de aplicar la migracion 069). Se detiene con el motivo.
+      if (error) {
+        throw new Error(`La busqueda fallo en la base (${error.message}). ¿Esta aplicada la migracion 069 (pesos de la busqueda hibrida)?`);
+      }
       return ((data ?? []) as any[]).map((x) => x.chunk_id);
     };
 
