@@ -152,12 +152,17 @@ export function resolveBaseUrl(p: ProviderDef, env: Env = process.env): string |
 // tiempo: se pueden reemplazar por variable de entorno AI_CHAIN_<TAREA> ("proveedor:modelo,proveedor:modelo") y
 // `npm run ai:doctor` comprueba cuales siguen existiendo.
 export const DEFAULT_CHAINS: Record<AiTask, Candidate[]> = {
+  // Modelos de Groq verificados con `npm run ai:doctor` en la cuenta del proyecto (2026-10-12): openai/gpt-oss-120b,
+  // openai/gpt-oss-20b, qwen/qwen3.8-27b y allam-2-7b. Los Llama 3.x YA NO estan en esa cuenta (aunque su documentacion
+  // publica aun los liste): no se usan aqui. Los de Cerebras, Mistral, GitHub, NVIDIA y Cloudflare son los identificadores
+  // habituales y NO estan verificados (aun sin llave): el doctor dira cuales existen.
+
   // Generar preguntas/fichas: salida JSON larga, buen espanol, instrucciones largas. Gemini NO entra aqui a proposito: su llave
   // ya sostiene embeddings, juez, lectura de PDF y deteccion de temas con una cuota gratuita pequena.
   generation: [
     { provider: 'cerebras', model: 'gpt-oss-120b' },
-    { provider: 'groq', model: 'llama-3.3-70b-versatile' },
     { provider: 'groq', model: 'openai/gpt-oss-120b' },
+    { provider: 'groq', model: 'qwen/qwen3.8-27b' },
     { provider: 'mistral', model: 'mistral-small-latest' },
     { provider: 'github', model: 'openai/gpt-4.1-mini' },
     { provider: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
@@ -166,13 +171,17 @@ export const DEFAULT_CHAINS: Record<AiTask, Candidate[]> = {
     { provider: 'openai', model: 'gpt-4.1-mini' },
     { provider: 'custom', model: 'default' },
   ],
-  // Juzgar: determinista y de OTRA familia que el generador (Aya/Cohere genera; aqui Llama, gpt-oss, Gemini, Mistral).
+  // Juzgar: determinista y de OTRA familia que el generador (Aya/Cohere genera; aqui Qwen, gpt-oss, Gemma, Gemini, Mistral).
+  // Empieza por Qwen (familia distinta de gpt-oss, que es lo que mas genera en la cadena de arriba).
   judge: [
-    { provider: 'groq', model: 'llama-3.3-70b-versatile' },
+    { provider: 'groq', model: 'qwen/qwen3.8-27b' },
+    { provider: 'groq', model: 'openai/gpt-oss-120b' },
     { provider: 'cerebras', model: 'gpt-oss-120b' },
     { provider: 'github', model: 'openai/gpt-4.1-mini' },
     { provider: 'mistral', model: 'mistral-small-latest' },
     { provider: 'gemini', model: 'gemini-2.5-flash' },
+    // Gemma se sirve por la misma llave de Gemini pero con su PROPIA cuota (por comprobar con `ai:doctor -- --ping`).
+    { provider: 'gemini', model: 'gemma-4-31b-it' },
     { provider: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
     { provider: 'cloudflare', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
     { provider: 'openrouter', model: 'auto' },
@@ -181,8 +190,9 @@ export const DEFAULT_CHAINS: Record<AiTask, Candidate[]> = {
   ],
   // Analizar (temas, dificultad, clasificar): tarea corta y barata, sirve un modelo pequeno y rapido.
   analysis: [
-    { provider: 'groq', model: 'llama-3.1-8b-instant' },
+    { provider: 'groq', model: 'openai/gpt-oss-20b' },
     { provider: 'gemini', model: 'gemini-2.5-flash-lite' },
+    { provider: 'gemini', model: 'gemini-3.1-flash-lite' },
     { provider: 'mistral', model: 'mistral-small-latest' },
     { provider: 'cerebras', model: 'gpt-oss-120b' },
     { provider: 'openrouter', model: 'auto' },
@@ -191,7 +201,8 @@ export const DEFAULT_CHAINS: Record<AiTask, Candidate[]> = {
   ],
   study: [
     { provider: 'cerebras', model: 'gpt-oss-120b' },
-    { provider: 'groq', model: 'llama-3.3-70b-versatile' },
+    { provider: 'groq', model: 'openai/gpt-oss-120b' },
+    { provider: 'groq', model: 'qwen/qwen3.8-27b' },
     { provider: 'mistral', model: 'mistral-small-latest' },
     { provider: 'openrouter', model: 'auto' },
     { provider: 'openai', model: 'gpt-4.1-mini' },
