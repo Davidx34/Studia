@@ -180,8 +180,6 @@ export const DEFAULT_CHAINS: Record<AiTask, Candidate[]> = {
     { provider: 'github', model: 'openai/gpt-4.1-mini' },
     { provider: 'mistral', model: 'mistral-small-latest' },
     { provider: 'gemini', model: 'gemini-2.5-flash' },
-    // Gemma se sirve por la misma llave de Gemini pero con su PROPIA cuota (por comprobar con `ai:doctor -- --ping`).
-    { provider: 'gemini', model: 'gemma-4-31b-it' },
     { provider: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
     { provider: 'cloudflare', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
     { provider: 'openrouter', model: 'auto' },

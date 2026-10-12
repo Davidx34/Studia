@@ -27,7 +27,16 @@ export function classifyFailure(status: number, body: string, retryAfter?: strin
 
 const DEFAULT_TIMEOUT_MS = 90_000;
 
-async function once(p: ProviderDef, base: string, model: string, req: CallRequest, env: Env, doFetch: typeof fetch, withJson: boolean): Promise<Response> {
+// Los modelos gpt-oss "piensan" antes de responder y ese razonamiento cuenta como salida: con pocos tokens la respuesta llega
+// VACIA (verificado con ai:doctor --ping). Groq y Cerebras aceptan reasoning_effort: bajo para juzgar y analizar (tareas
+// cortas y deterministas), medio para generar. Otros proveedores no reciben el parametro.
+export function reasoningEffortFor(providerId: string, model: string, task: CallRequest['task']): 'low' | 'medium' | null {
+  if (!/gpt-oss/i.test(model) || (providerId !== 'groq' && providerId !== 'cerebras')) return null;
+  return task === 'generation' || task === 'study' ? 'medium' : 'low';
+}
+
+async function once(p: ProviderDef, base: string, model: string, req: CallRequest, env: Env, doFetch: typeof fetch, withJson: boolean, withReasoning: boolean): Promise<Response> {
+  const effort = withReasoning ? reasoningEffortFor(p.id, model, req.task) : null;
   const messages = [
     ...(req.system ? [{ role: 'system', content: req.system }] : []),
     { role: 'user', content: req.prompt },
@@ -41,6 +50,7 @@ async function once(p: ProviderDef, base: string, model: string, req: CallReques
       max_tokens: req.maxTokens ?? 4096,
       temperature: req.temperature ?? (req.task === 'generation' || req.task === 'study' ? 0.7 : 0),
       ...(withJson ? { response_format: { type: 'json_object' } } : {}),
+      ...(effort ? { reasoning_effort: effort } : {}),
     }),
     signal: AbortSignal.timeout(req.timeoutMs ?? DEFAULT_TIMEOUT_MS),
   });
@@ -70,14 +80,15 @@ export async function callCandidate(c: Candidate, req: CallRequest, env: Env = p
 
   try {
     let withJson = !!req.json && p.jsonMode;
-    let res = await once(p, base, c.model, req, env, doFetch, withJson);
-    // Algunos modelos no aceptan el modo JSON: se reintenta UNA vez sin el.
-    if (res.status === 400 && withJson) {
+    let withReasoning = true;
+    let res = await once(p, base, c.model, req, env, doFetch, withJson, withReasoning);
+    // Algunos modelos no aceptan el modo JSON ni reasoning_effort: se reintenta sin el parametro rechazado (hasta 2 veces).
+    for (let i = 0; i < 2 && res.status === 400; i++) {
       const t = await res.clone().text();
-      if (/response_format|json_object|json mode|json_schema/i.test(t)) {
-        withJson = false;
-        res = await once(p, base, c.model, req, env, doFetch, false);
-      }
+      if (withJson && /response_format|json_object|json mode|json_schema/i.test(t)) withJson = false;
+      else if (withReasoning && /reasoning/i.test(t)) withReasoning = false;
+      else break;
+      res = await once(p, base, c.model, req, env, doFetch, withJson, withReasoning);
     }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
