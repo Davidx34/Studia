@@ -46,6 +46,11 @@ async function main() {
     const models = await listModels(p);
     listed.set(p.id, models);
     console.log(`  ✔  ${p.label.padEnd(44)} activo${models ? `, ${models.length} modelos` : ', (no se pudo listar modelos)'}  [${p.tier}]`);
+    // Los modelos REALES de tu cuenta (solo los de chat; se omiten voz, moderacion y embeddings).
+    if (models) {
+      const chat = models.filter((m) => !/whisper|orpheus|tts|guard|safeguard|embed|moderation|rerank|image/i.test(m)).sort();
+      console.log(`       modelos de chat: ${chat.map((m) => m.replace('models/', '')).join(', ')}`);
+    }
   }
 
   console.log('\n=== Cadenas por tarea (solo proveedores activos) ===');
@@ -54,7 +59,15 @@ async function main() {
     console.log(`\n  ${task}${chain.length === 0 ? '  -> SIN PROVEEDORES' : ''}`);
     for (const c of chain) {
       const models = listed.get(c.provider);
-      const exists = !models ? '?' : has(models, c.model) || c.model === 'auto' || c.model === 'default' ? 'existe' : 'NO EXISTE (cambia AI_CHAIN_' + task.toUpperCase() + ')';
+      let exists: string;
+      if (!models) exists = '?';
+      else if (has(models, c.model) || c.model === 'auto' || c.model === 'default') exists = 'existe';
+      else {
+        // Sugerencias: modelos del mismo proveedor con la misma familia (primera palabra del nombre).
+        const family = (c.model.split('/').pop() ?? c.model).split(/[-.:]/)[0]; // "llama", "gpt", "gemini", "mistral"...
+        const near = models.filter((m) => m.toLowerCase().includes(family.toLowerCase())).slice(0, 4);
+        exists = 'NO EXISTE' + (near.length ? `; parecidos: ${near.join(', ')}` : '') + ` (cambia AI_CHAIN_${task.toUpperCase()})`;
+      }
       let latency = '';
       if (ping) {
         const t0 = Date.now();
