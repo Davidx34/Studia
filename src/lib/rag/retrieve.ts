@@ -28,6 +28,16 @@ export interface RetrieveResult {
   scoped: boolean;
 }
 
+// Peso del ranking de TEXTO frente al vectorial en la fusion (RRF). Con peso 1 (igual) la medicion del 2026-10-12 mostro que el
+// texto, con las raices de toda la consulta unidas por OR, mete ruido y empeora el primer puesto frente al vector solo. El valor
+// inicial es PROVISIONAL (la medicion da la direccion, no la magnitud): se afina con `npm run eval:retrieval -- --barrido` y se
+// puede cambiar sin desplegar con la variable de entorno RAG_TEXT_WEIGHT (0 a 2).
+function readTextWeight(): number {
+  const n = Number(process.env.RAG_TEXT_WEIGHT);
+  return Number.isFinite(n) && n >= 0 && n <= 2 && process.env.RAG_TEXT_WEIGHT !== undefined && process.env.RAG_TEXT_WEIGHT !== '' ? n : 0.3;
+}
+export const RAG_TEXT_WEIGHT = readTextWeight();
+
 const DEFAULT_MAX_CHUNKS = 8;
 const DEFAULT_CANDIDATES = 12;
 
@@ -71,6 +81,8 @@ export async function retrieveContext(supabase: any, moduleId: string, opts: Ret
           material_ids: materialIds,
           match_count: candidates,
           vector_models: QUERYABLE_PROFILES,
+          vector_weight: 1.0,
+          text_weight: RAG_TEXT_WEIGHT,
         })
       )
     );
