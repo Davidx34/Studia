@@ -48,6 +48,32 @@ Hay además un **banco de evaluación** ya existente (`npm run eval:context`, `n
 **Estado (2026-10-11):** Fase 1 mergeada (#101). Fase 2 en curso: migración 068 (perfil de embedding por fragmento, texto completo en español, búsqueda híbrida), `taskType` + normalización, consultas múltiples fusionadas, respaldo al camino anterior, `npm run eval:retrieval` y `npm run reindex:embeddings`.
 
 **Fase 2 — Embeddings y recuperación.** `taskType` y normalización; columna `embedding_model` y re‑indexado; búsqueda híbrida (FTS español + vector, RRF); consultas múltiples; MMR y umbral; presupuesto de contexto según el modelo (Cohere 16 k caracteres vs. modelos de contexto largo). Medido con `eval:context` antes y después.
+**Fase 2b — Embeddings multi‑proveedor (SIGUIENTE; plan, sin código).**
+
+*Problema medido (2026‑10‑12).* El reindexado de los 197 fragmentos se cortó por cuota dos veces seguidas (65 y 74 fragmentos). Es decir, el nivel gratuito de embeddings de Gemini admite del orden de **~100 llamadas al día** (inferencia a partir de lo observado; las fuentes de terceros hablaban de ~1.000). Cada fragmento es una llamada (la API gratuita no admite lotes), así que un solo material de 200 fragmentos tarda ~2 días en indexarse y el evaluador no cabe en un día. Con profesores subiendo material, esto es un cuello de botella real.
+
+*Dos palancas, que se pueden combinar:*
+
+1. **Pagar la API de Gemini (palanca rápida).** El plan "Google AI Pro" de consumo **no** da cuota de API (es un producto aparte; sus beneficios de desarrollo valen solo dentro de la interfaz de AI Studio). Lo que sube los límites es **activar la facturación de la API** (AI Studio → Settings → Plan information → Cloud Billing): pasa a *Tier 1*. `gemini-embedding-001` cuesta **0,15 USD por millón de tokens**: indexar todo el material actual (~90.000 tokens) cuesta del orden de **1–2 centavos de dólar**. Límites reportados en foro (sin confirmar): ~3.000 peticiones/min y sin tope diario. Además sube el límite diario del juez (hoy ~20/día en 2.5‑flash). Precauciones: poner un **tope de gasto/alerta** en Cloud Billing; hay reportes de cuentas que siguen en cuota gratuita unas horas o días tras activar el pago; no pasa nada con los datos existentes. Lo decide y lo hace el dueño (es una acción financiera).
+2. **Más proveedores de embeddings (palanca de resiliencia).** Varios aceptan **arreglos de textos por petición** (Cloudflare Workers AI `bge-m3`, Voyage, Jina, Mistral, cualquier compatible con OpenAI): 197 fragmentos = 2 peticiones, no 197. Es lo que de verdad elimina el cuello de botella sin pagar.
+
+*Diseño.*
+- **Catálogo y enrutador de embeddings** (`src/lib/embeddings/providers.ts`), análogo al de la pasarela de texto: Gemini, Cloudflare `bge-m3` (1.024 dims, ~9 M de tokens/día en los 10.000 neurons gratuitos), Voyage (200 M de tokens gratuitos por cuenta; multilingüe), Jina v3 (10 M de tokens; **solo uso no comercial**; admite 768 dims), Mistral embed, Cohere embed (trial, solo no comercial) y `custom` (cualquier `/embeddings` compatible con OpenAI). Cada uno declara: perfil, dimensiones, mapeo de `taskType` (documento/consulta), si normaliza, tamaño máximo de lote. Reutiliza el cortacircuito (`HealthTracker`) y el registro de intentos de la pasarela.
+- **Almacenamiento por perfil.** Hoy `material_chunks.embedding` es `vector(768)` fijo. Se pasa a una tabla `material_chunk_embeddings(chunk_id, profile, embedding vector)` con la dimensión libre y un solo perfil por (fragmento, perfil); índices HNSW *parciales* por perfil cuando el corpus crezca (con cientos de fragmentos, una búsqueda exacta por clase ya es instantánea). Se rellena desde la columna actual (perfil `gemini-embedding-001:768:rt|legacy`) y la columna vieja se conserva hasta el corte.
+- **Indexación doble opcional.** Cada fragmento se indexa en un perfil primario y, si hay cuota, en un secundario. Así, si un proveedor se queda sin cuota **al consultar**, el otro responde; sin eso, un vector de otro modelo no se puede comparar (por eso hay que guardar el perfil).
+- **Consulta.** Elige el perfil mejor disponible *para el que el ámbito tenga fragmentos indexados*; si ninguno responde, texto completo (ya implementado). `match_material_chunks_hybrid` recibe `profile` y el vector de consulta en ese espacio.
+- **Reindexado generalizado.** `npm run reindex:embeddings -- --profile <id>`: por lotes (aprovecha el tamaño de lote del proveedor), reanudable, con ritmo y reintentos, sin tocar lo ya bueno.
+- **Decisión basada en datos.** `eval:retrieval` ya compara estrategias; se extiende para comparar **perfiles** (Gemini vs bge‑m3 vs Voyage…) sobre la misma muestra y elegir el primario con números, no por reputación (los benchmarks públicos no son específicos de español).
+
+*Orden de trabajo (un PR por paso, cada uno reversible).*
+1. Catálogo y enrutador de embeddings con pruebas (sin cambiar el comportamiento).
+2. Migración: `material_chunk_embeddings` + relleno + `profile` en la función híbrida (aditiva).
+3. Indexación con el enrutador (lotes) y reindexado generalizado.
+4. Consulta por perfil disponible + respaldo.
+5. Evaluación de perfiles y elección del primario; corte de la columna vieja.
+
+*Qué necesito del dueño:* (a) decidir si activa la facturación de Gemini con tope (cuesta céntimos y arregla hoy el cuello de botella); (b) crear las cuentas/llaves que quiera usar: Cloudflare (`CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`), Voyage (`VOYAGE_API_KEY`), Jina (`JINA_API_KEY`, ojo con el uso no comercial), Mistral. Yo no las creo ni las veo.
+
 **Fase 3 — Registro y presupuesto de IA.** Tabla `ai_usage_log` (proveedor, modelo, tarea, estado, latencia, tokens) → panel en `/dev`, contadores diarios por proveedor para apartar *antes* de agotar, y alertas.
 **Fase 4 — Revisión adaptativa.** Juez con **conjunto** (dos familias; si discrepan, escala a revisión humana), prechequeos deterministas (formato, anclaje léxico, claves de respuesta), y el banco `eval:judge` como puerta de calidad al cambiar de modelo.
 **Fase 5 — Escalar a pago sin tocar código.** Poner `OPENAI_API_KEY` (o la de un proveedor de pago/propio) y reordenar `AI_CHAIN_*`; el resto (cortacircuito, registro, evaluación) ya está.
