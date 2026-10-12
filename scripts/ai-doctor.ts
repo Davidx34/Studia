@@ -13,6 +13,8 @@
 import { PROVIDERS, chainFor, isProviderConfigured, resolveBaseUrl, type ProviderDef } from '../src/lib/ai/gateway/providers';
 import { callCandidate } from '../src/lib/ai/gateway/client';
 import type { AiTask } from '../src/lib/ai/gateway/types';
+import { EMBED_PROVIDERS, embedChain, isEmbedConfigured, resolveEmbedProvider } from '../src/lib/embeddings/providers';
+import { embedBatch } from '../src/lib/embeddings/client';
 
 const TASKS: AiTask[] = ['generation', 'judge', 'analysis', 'study'];
 const ping = process.argv.includes('--ping');
@@ -77,7 +79,29 @@ async function main() {
       console.log(`     ${c.provider.padEnd(11)} ${c.model.padEnd(44)} ${exists}${latency}`);
     }
   }
-  console.log('\nCambiar una cadena (Vercel > Environment Variables): AI_CHAIN_GENERATION="cerebras:gpt-oss-120b,groq:llama-3.3-70b-versatile"\n');
+  console.log('\n=== Embeddings ===');
+  for (const base of EMBED_PROVIDERS) {
+    if (!isEmbedConfigured(base)) {
+      console.log(`  ·  ${base.label.padEnd(44)} sin llave (${base.keyEnv}${(base.extraEnv ?? []).length ? ' + ' + base.extraEnv!.join(', ') : ''})  ->  ${base.signup}`);
+      continue;
+    }
+    const p = resolveEmbedProvider(base);
+    if (!p) {
+      console.log(`  !  ${base.label.padEnd(44)} con llave pero mal configurado (revisa sus variables)`);
+      continue;
+    }
+    let pingInfo = '';
+    if (ping) {
+      const t0 = Date.now();
+      const sample = ['El bienestar social en competencia perfecta.', 'La restriccion presupuestaria del consumidor.'].slice(0, Math.min(2, p.maxBatch));
+      const r = await embedBatch(p, sample, 'document');
+      pingInfo = r.ok ? `  ok ${Date.now() - t0} ms, ${r.vectors.length} vector(es) de ${r.vectors[0]?.length} dims` : `  FALLO ${r.kind}${r.status ? ' HTTP ' + r.status : ''}`;
+    }
+    console.log(`  ✔  ${p.label.padEnd(44)} activo  perfil ${p.profile}  lote ${p.maxBatch}${p.commercialOk ? '' : '  [SOLO USO NO COMERCIAL]'}${pingInfo}`);
+  }
+  console.log(`  Orden de uso: ${embedChain().map((p) => p.profile).join(' -> ') || '(ninguno)'}`);
+
+  console.log('\nCambiar una cadena (Vercel > Environment Variables): AI_CHAIN_GENERATION="cerebras:gpt-oss-120b,groq:openai/gpt-oss-120b"\n');
 }
 
 main().catch((e) => {

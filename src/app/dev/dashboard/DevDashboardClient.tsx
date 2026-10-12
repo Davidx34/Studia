@@ -52,6 +52,7 @@ interface SystemHealth {
     providers: { id: string; label: string; tier: string; configured: boolean; signup: string }[];
     chains: Record<string, string[]>;
     breakers: { key: string; available: boolean; reopensInSeconds: number; successRate: number; latencyMs: number; calls: number }[];
+    embeddings?: { providers: { id: string; label: string; configured: boolean; batch: number; commercialOk: boolean }[]; chain: string[] };
     flags: { serviceRoleKey: boolean; serverGrading: boolean };
   };
   database: { ok: boolean; latencyMs: number; error: string | null };
@@ -333,6 +334,23 @@ function HealthTab() {
               <p className="text-xs text-slate-200 mt-1 break-words">{chain.length ? chain.join('  →  ') : 'sin proveedores configurados'}</p>
             </div>
           ))}
+
+          {health.ai.embeddings && (
+            <>
+              <h3 className="text-sm font-semibold text-white pt-2">Embeddings</h3>
+              {health.ai.embeddings.providers.map((p) => (
+                <div key={p.id} className="flex items-center justify-between rounded-lg bg-slate-900 border border-slate-800 px-4 py-2.5">
+                  <span className="text-sm text-white">
+                    {p.label} <span className="text-xs text-slate-500">[lote {p.batch}{p.commercialOk ? '' : ' · no comercial'}]</span>
+                  </span>
+                  {p.configured ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-slate-600" />}
+                </div>
+              ))}
+              <p className="text-xs text-slate-300 break-words">
+                Orden de uso: {health.ai.embeddings.chain.length ? health.ai.embeddings.chain.join('  →  ') : 'sin proveedores configurados'}
+              </p>
+            </>
+          )}
 
           <h3 className="text-sm font-semibold text-white pt-2">Cortacircuitos (solo de esta instancia)</h3>
           {health.ai.breakers.length === 0 ? (
