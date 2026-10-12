@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireDevSession } from '@/lib/devAuth';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { buildAiStatus } from '@/lib/ai/gateway/status';
 
 // Solo expone booleans de configuracion (nunca los valores de las keys) y un
 // chequeo simple de conectividad a la base.
@@ -20,6 +21,8 @@ export async function GET() {
       devAuth: !!process.env.DEV_PASSWORD && !!process.env.DEV_SESSION_SECRET,
       supabase: !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     },
+    // Proveedores de IA activos EN PRODUCCION (nombres y booleanos), cadenas efectivas y cortacircuitos de esta instancia.
+    ai: buildAiStatus(),
     database: {
       ok: !dbError,
       latencyMs: dbLatencyMs,
