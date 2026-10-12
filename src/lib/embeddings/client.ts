@@ -1,4 +1,4 @@
-import { classifyFailure } from '@/lib/ai/gateway/client';
+import { classifyFailure, safeErrorMessage } from '@/lib/ai/gateway/client';
 import type { FailureKind } from '@/lib/ai/gateway/types';
 import { embedWithGemini, l2Normalize } from './embed';
 import { resolveEmbedBaseUrl, type EmbedProvider, type EmbedRole } from './providers';
@@ -7,7 +7,7 @@ type Env = Record<string, string | undefined>;
 
 export type EmbedBatchOutcome =
   | { ok: true; vectors: number[][] }
-  | { ok: false; kind: FailureKind; status?: number; retryAfterMs?: number };
+  | { ok: false; kind: FailureKind; status?: number; retryAfterMs?: number; message?: string };
 
 const TIMEOUT_MS = 60_000;
 
@@ -57,8 +57,9 @@ export async function embedBatch(p: EmbedProvider, texts: string[], role: EmbedR
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) {
-      const f = classifyFailure(res.status, await res.text().catch(() => ''), res.headers.get('retry-after'));
-      return { ok: false, kind: f.kind, status: res.status, retryAfterMs: f.retryAfterMs };
+      const body = await res.text().catch(() => '');
+      const f = classifyFailure(res.status, body, res.headers.get('retry-after'));
+      return { ok: false, kind: f.kind, status: res.status, retryAfterMs: f.retryAfterMs, message: safeErrorMessage(body) };
     }
     const json: any = await res.json();
     // OpenAI / Voyage / Jina: { data: [{ embedding, index }] }. Cloudflare a veces responde { result: { data: [[...]] } }.

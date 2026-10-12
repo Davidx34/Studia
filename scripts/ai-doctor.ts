@@ -74,7 +74,7 @@ async function main() {
       if (ping) {
         const t0 = Date.now();
         const r = await callCandidate(c, { task, prompt: 'Responde solo con la palabra OK.', maxTokens: 256, temperature: 0 });
-        latency = r.ok ? `  ok ${Date.now() - t0} ms` : `  FALLO ${r.kind}${r.status ? ' HTTP ' + r.status : ''}`;
+        latency = r.ok ? `  ok ${Date.now() - t0} ms` : `  FALLO ${r.kind}${r.status ? ' HTTP ' + r.status : ''}${r.message ? ' — ' + r.message : ''}`;
       }
       console.log(`     ${c.provider.padEnd(11)} ${c.model.padEnd(44)} ${exists}${latency}`);
     }
@@ -95,7 +95,7 @@ async function main() {
       const t0 = Date.now();
       const sample = ['El bienestar social en competencia perfecta.', 'La restriccion presupuestaria del consumidor.'].slice(0, Math.min(2, p.maxBatch));
       const r = await embedBatch(p, sample, 'document');
-      pingInfo = r.ok ? `  ok ${Date.now() - t0} ms, ${r.vectors.length} vector(es) de ${r.vectors[0]?.length} dims` : `  FALLO ${r.kind}${r.status ? ' HTTP ' + r.status : ''}`;
+      pingInfo = r.ok ? `  ok ${Date.now() - t0} ms, ${r.vectors.length} vector(es) de ${r.vectors[0]?.length} dims` : `  FALLO ${r.kind}${r.status ? ' HTTP ' + r.status : ''}${r.message ? ' — ' + r.message : ''}`;
     }
     console.log(`  ✔  ${p.label.padEnd(44)} activo  perfil ${p.profile}  lote ${p.maxBatch}${p.commercialOk ? '' : '  [SOLO USO NO COMERCIAL]'}${pingInfo}`);
   }

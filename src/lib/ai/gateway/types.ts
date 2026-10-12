@@ -37,7 +37,7 @@ export interface CallRequest {
 
 export type CallOutcome =
   | { ok: true; text: string; usage?: { prompt?: number; completion?: number } }
-  | { ok: false; kind: FailureKind; status?: number; retryAfterMs?: number };
+  | { ok: false; kind: FailureKind; status?: number; retryAfterMs?: number; message?: string };
 
 export interface Attempt {
   provider: string;
