@@ -25,6 +25,21 @@ export function classifyFailure(status: number, body: string, retryAfter?: strin
   return { kind: 'bad_request' };
 }
 
+// Motivo legible de un fallo HTTP, para diagnostico (ai:doctor): el mensaje que devuelve el proveedor ("Invalid API Token",
+// "model not found"...), recortado y con cualquier cadena larga tapada por si algun proveedor repitiera una credencial.
+export function safeErrorMessage(body: string): string | undefined {
+  if (!body) return undefined;
+  let msg = '';
+  try {
+    const j: any = JSON.parse(body);
+    msg = String(j?.errors?.[0]?.message ?? j?.error?.message ?? j?.message ?? (typeof j?.error === 'string' ? j.error : '') ?? '');
+  } catch {
+    msg = body;
+  }
+  msg = msg.replace(/\s+/g, ' ').replace(/[A-Za-z0-9_\-.]{28,}/g, '[…]').trim().slice(0, 140);
+  return msg || undefined;
+}
+
 const DEFAULT_TIMEOUT_MS = 90_000;
 
 // Los modelos gpt-oss "piensan" antes de responder y ese razonamiento cuenta como salida: con pocos tokens la respuesta llega
@@ -93,7 +108,7 @@ export async function callCandidate(c: Candidate, req: CallRequest, env: Env = p
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       const f = classifyFailure(res.status, body, res.headers.get('retry-after'));
-      return { ok: false, kind: f.kind, status: res.status, retryAfterMs: f.retryAfterMs };
+      return { ok: false, kind: f.kind, status: res.status, retryAfterMs: f.retryAfterMs, message: safeErrorMessage(body) };
     }
     const data: any = await res.json();
     if (data?.error) {
