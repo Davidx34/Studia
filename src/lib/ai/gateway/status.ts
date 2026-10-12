@@ -1,6 +1,7 @@
 import { PROVIDERS, chainFor, isProviderConfigured } from './providers';
 import { sharedHealth, type HealthTracker } from './health';
 import type { AiTask } from './types';
+import { EMBED_PROVIDERS, embedChain, isEmbedConfigured } from '@/lib/embeddings/providers';
 
 type Env = Record<string, string | undefined>;
 
@@ -21,6 +22,11 @@ export function buildAiStatus(env: Env = process.env, health: HealthTracker = sh
       latencyMs: Math.round(h.latencyEma),
       calls: h.calls,
     })),
+    // Embeddings: proveedores activos y el orden en que se usaran. Solo nombres, perfiles y booleanos.
+    embeddings: {
+      providers: EMBED_PROVIDERS.map((p) => ({ id: p.id, label: p.label, configured: isEmbedConfigured(p, env), batch: p.maxBatch, commercialOk: p.commercialOk })),
+      chain: embedChain(env).map((p) => p.profile),
+    },
     flags: {
       serviceRoleKey: !!env.SUPABASE_SERVICE_ROLE_KEY,
       serverGrading: env.SERVER_GRADING === 'on',
