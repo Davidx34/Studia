@@ -49,3 +49,13 @@ export function streakStatus(input: { streakDays: number | null | undefined; las
   if (daysSince === 2) return { state: 'grace', streak: stored, daysSince, hint: 'Día de gracia: estudia hoy para mantenerla' };
   return { state: 'lost', streak: 0, daysSince, hint: 'Se reinició: estudia hoy para empezar una nueva' };
 }
+
+// Racha real de un perfil (como lo devuelve profiles). Usa la zona horaria DEL ESTUDIANTE, igual que la base, para decidir que
+// dia es "hoy" para el. Es lo que deben mostrar TODAS las pantallas (estudiante y profesor): streak_days solo cambia cuando el
+// estudiante estudia, asi que sin esta correccion un estudiante que lleva dias sin entrar seguiria apareciendo con su racha vieja.
+export function profileStreak(
+  profile: { streak_days?: number | null; last_activity_date?: string | null; timezone?: string | null },
+  now: Date = new Date()
+): StreakStatus {
+  return streakStatus({ streakDays: profile.streak_days, lastActivityDate: profile.last_activity_date, today: localDate(now, profile.timezone) });
+}
