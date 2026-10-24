@@ -13,7 +13,8 @@
     "ai:doctor": "npx tsx --env-file=.env.local scripts/ai-doctor.ts",
     "eval:retrieval": "npx tsx --env-file=.env.local scripts/eval-retrieval.ts",
     "reindex:embeddings": "npx tsx --env-file=.env.local scripts/reindex-embeddings.ts",
-    "media:check": "npx tsx --env-file=.env.local scripts/media-check.ts"
+    "media:check": "npx tsx --env-file=.env.local scripts/media-check.ts",
+    "media:upload": "npx tsx --env-file=.env.local scripts/media-upload.ts"
   },
   "dependencies": {
     "@serwist/next": "^9.5.7",

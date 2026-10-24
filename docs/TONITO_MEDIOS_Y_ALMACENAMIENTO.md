@@ -59,14 +59,14 @@ cuota gratuita de cualquiera de los dos.
 
 ## 4. Proceso A: bucket público de Supabase
 
-> **Estado:** este PR deja construidas la **capa de URLs** (`mediaUrl`) y la **comprobación** (`media:check`). **A1 y A2 aún no existen**:
-> son los siguientes PR, y la migración solo se aplica cuando tú lo apruebes.
+> **Estado:** construido y verificado: la **capa de URLs** (`mediaUrl`), `media:check`, la **migración 072** (A1) y el **script de subida**
+> (A2). La migración se aplica **solo cuando tú lo apruebes**; hasta entonces el bucket no existe.
 
 | # | Paso | Quién | Verificación |
 |---|---|---|---|
 | A1 | **Migración** `072`: crea el bucket público `tonito-media` (solo `video/mp4`, `image/jpeg`, `image/webp`; tope 5 MB) **sin** políticas de escritura para `anon` ni `authenticated` | Yo (PR); tú mergeas y yo la aplico | Simulación en transacción revertida: `anon` **no** puede subir ni listar |
-| A2 | **Script de subida** `npm run media:upload`: lee la clave de servicio de `.env.local`, sube con `cacheControl: 31536000`, `upsert: false` y nombre versionado | Yo (PR) | Rechaza nombres sin versión y archivos que superan el tope |
-| A3 | Subir el clip y el poster | Tú ejecutas el script (la clave es tuya) | `npm run media:check -- --probe clips/<archivo>` debe dar ✔ |
+| A2 | **Script de subida** `npm run media:upload`: lee la clave de servicio de `.env.local`, sube con `cacheControl: 31536000`, `upsert: false` y nombre versionado | Yo (PR) | Valida **todo antes de subir nada**: nombre versionado, peso, que el contenido sea de verdad un MP4/JPEG/WebP, y que el MP4 tenga `faststart`. No sobrescribe |
+| A3 | Subir el clip y el poster: `npm run media:upload -- --file ./c.mp4 --path clips/c.v1.mp4 --file ./c.jpg --path clips/c.v1.jpg` (añade `--dry-run` para solo validar; `--list` para ver el bucket) | Tú ejecutas el script (la clave es tuya) | `npm run media:check -- --base <base> --probe clips/c.v1.mp4` debe dar ✔ |
 | A4 | En Vercel (Production): `NEXT_PUBLIC_TONITO_MEDIA_BASE_URL=https://roulrdmxsazjkczxkzax.supabase.co/storage/v1/object/public/tonito-media` y **redeploy** | Tú | La URL del video en la cinemática empieza por esa base |
 | A5 | Registrar el clip en `TONITO_CLIPS` | Yo (PR) | `npm run media:check` (sin `--probe`) da ✔ para todo lo registrado |
 
@@ -103,6 +103,7 @@ código 1 si algo falla.
 
 ## 7. Qué NO está resuelto
 
+- **La migración 072 aún no está aplicada** y **no se ha subido ningún archivo real** a Supabase: `media:check` contra Supabase se verá de punta a punta cuando se aplique y se suba el primero.
 - **Límites reales de tu plan de Supabase** y la **activación de R2** (tarjeta, dominio): sin verificar.
 - **Dominio propio:** `studia-theta.vercel.app` es un subdominio de Vercel; para R2 con dominio propio hace falta uno en Cloudflare.
 - **Términos de uso comercial** de lo generado con Flow y Gemini (pendiente de la ficha de arte).
