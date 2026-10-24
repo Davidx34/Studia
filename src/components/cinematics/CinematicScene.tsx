@@ -8,6 +8,8 @@
 
 import { useEffect, useState } from 'react';
 import { TonitoFullBody, type CinematicAnimation } from '@/components/tonito/TonitoFullBody';
+import { TonitoClip, useClipPlan } from '@/components/tonito/TonitoClip';
+import { TONITO_CLIPS, sceneUsesVideo } from '@/lib/tonito/clips';
 import type { TonitoMood } from '@/stores/useTonitoStore';
 import { useSoundFx } from '@/lib/sound/useSoundFx';
 
@@ -29,6 +31,8 @@ interface CinematicProps {
 
 interface SceneConfig {
   bg: string;
+  // Clip de video (src/lib/tonito/clips.ts) que reemplaza a la pose animada, si existe y el dispositivo lo permite.
+  clipId?: string;
   mood: TonitoMood;
   animation: CinematicAnimation;
   intensity: 'calm' | 'normal' | 'intense';
@@ -67,6 +71,7 @@ const SCENES: Record<CinematicType, SceneConfig> = {
   },
   module_complete_good: {
     bg: 'from-amber-600 via-orange-600 to-rose-600',
+    clipId: 'celebracion',
     mood: 'celebrating',
     animation: 'celebrationFull',
     intensity: 'intense',
@@ -105,6 +110,11 @@ export function CinematicScene(props: CinematicProps) {
   const [exiting, setExiting] = useState(false);
   const { play } = useSoundFx();
   const lines = scene.lines(props);
+  // Video de la escena: solo si hay clip registrado, el dispositivo lo permite y no fallo al cargar. Si no, lo de siempre.
+  const clip = scene.clipId ? TONITO_CLIPS[scene.clipId] : undefined;
+  const clipPlan = useClipPlan();
+  const [clipFailed, setClipFailed] = useState(false);
+  const video = sceneUsesVideo(clip, clipPlan, clipFailed);
 
   useEffect(() => {
     play(scene.sfx);
@@ -126,7 +136,7 @@ export function CinematicScene(props: CinematicProps) {
 
   return (
     <div
-      className={`fixed inset-0 z-[400] flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br ${scene.bg} ${
+      className={`fixed inset-0 z-[400] flex flex-col items-center ${video ? 'justify-end pb-12' : 'justify-center'} overflow-hidden bg-gradient-to-br ${scene.bg} ${
         exiting ? 'cinematic-fade-out' : 'cinematic-fade-in'
       }`}
       role="dialog"
@@ -139,14 +149,24 @@ export function CinematicScene(props: CinematicProps) {
         Saltar ✕
       </button>
 
+      {video && clip && (
+        <>
+          <TonitoClip clip={clip} className="absolute inset-0 h-full w-full" onFailed={() => setClipFailed(true)} />
+          {/* Velo inferior: el texto de la escena tiene que leerse sobre cualquier cuadro del video. */}
+          <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10" />
+        </>
+      )}
+
       {scene.confetti && <ConfettiBurst />}
 
-      <TonitoFullBody
-        mood={scene.mood}
-        animation={exiting ? 'exit' : scene.animation}
-        size="cinema"
-        intensity={exiting ? 'normal' : scene.intensity}
-      />
+      {!video && (
+        <TonitoFullBody
+          mood={scene.mood}
+          animation={exiting ? 'exit' : scene.animation}
+          size="cinema"
+          intensity={exiting ? 'normal' : scene.intensity}
+        />
+      )}
 
       <div className="mt-6 max-w-lg px-6 text-center space-y-2 min-h-[4.5rem]">
         {lines.slice(0, lineIdx).map((line, i) => (

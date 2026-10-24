@@ -96,6 +96,10 @@ Lienzo **único** para todas (512×512 px, personaje centrado, **pies siempre en
 
 ### 5.2 Clips (baja frecuencia: solo cinemáticas)
 
+> **Actualización tras la [prueba de concepto](TONITO_PRUEBA_DE_CONCEPTO.md) [medido]:** los clips son **opacos**. Traen su
+> **propio fondo**, generado con el color de la escena, y se reproducen como **H.264 en MP4** (un clip de 4 s pesó 214 KB, 19 veces menos
+> que el GIF original). **No llevan transparencia**: dos recortes automáticos del fondo fallaron y el HEVC con alfa no se puede producir.
+
 | ID | Clip | Escena | Tipo | Duración | Prioridad |
 |---|---|---|---|---|---|
 | V1 | Entrada épica | `welcome` | una vez, termina en P1 | 2–3 s | P1 |
@@ -119,20 +123,20 @@ Capa de efecto opcional: el **anillo de energía** de la referencia, como activo
 - **`prefers-reduced-motion`:** se muestra la pose fija, sin clip ni animación.
 - **Respaldo:** si el clip no carga o el formato no se soporta, se usa la pose fija.
 - **Dato real de referencia:** un **cuadro fijo** 480×270 pesa 60 KB. El peso de un clip de 3 s **no está medido**; la prueba de
-  concepto lo medirá.
+  concepto lo midió: **214 KB en H.264 para 4 s** [medido, con un GIF; un MP4 original de Flow debería pesar menos].
 
 ## 7. Especificación de entrega [propuesto]
 
 **Poses.** WebP con alfa (y PNG de respaldo), 512×512, mismo encuadre y línea de pies. Nombre: `public/tonito/{estado}.webp`.
 
-**Clips.** Transparencia por resolver; opciones a probar en la prueba de concepto:
-1. **WebM VP9 con alfa**: buena calidad; **compatibilidad en iPhone/Safari [sin verificar]**.
-2. **HEVC con alfa (.mov)** para Safari, más WebM para el resto: mantener dos archivos.
-3. **WebP animado o APNG**: más pesados, pero compatibles.
-4. **Fondo plano de un color que el personaje no tenga + recorte por canvas**: sencillo, con riesgo de halo.
+**Clips (decidido en la prueba de concepto).** **MP4 con H.264, sin transparencia**, con su propio fondo del color de la escena
+(`module_complete_good` hoy es ámbar/naranja, `welcome` violeta, `module_complete_low` azul, `streak` rojo/naranja). Resolución
+de partida 480×270 (o proporción 16:9); un 75 % de resolución pesó 78 KB. Descartado: WebM con alfa y HEVC con alfa (§ del informe).
+Los comandos exactos están en el informe.
 
-Al generar, usar un **fondo plano de un solo color** que no aparezca en el personaje. Propuesta: **magenta** (`#FF00FF`), porque el
-verde choca con el anillo ciano de energía y con la bata blanca (derrame de color). **[Sin verificar]: probar con un clip real.**
+**Poses con transparencia.** Sí la necesitan. Al generarlas, usar un **fondo plano de un solo color** que el personaje no tenga
+(propuesta: **magenta** `#FF00FF`; el verde choca con el anillo ciano de energía y con la bata blanca) y recortar **una sola vez por
+imagen**, revisando el resultado a mano. **[Sin verificar]: probar con una pose real.**
 
 Otros requisitos de los clips: 24 fps, **sin audio** (el sonido ya lo pone el código con `useSoundFx`), primer y último cuadro
 iguales en los bucles, misma cámara fija y misma línea de pies que las poses.
@@ -146,6 +150,9 @@ o como imagen de entrada en Gemini, para sostener la identidad:
 > gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón,
 > botas marrones. Encuadre completo de cuerpo, centrado, cámara fija, iluminación suave. Fondo plano de un solo color magenta.
 > Sin texto, sin marcas, sin otros personajes. Expresión amable, apta para niños.
+
+**Para los clips (V1 a V5)**, en el bloque base cambiar la línea del fondo por: «Fondo degradado suave de color {color de la escena},
+sin elementos que compitan con el personaje». Los clips no llevan transparencia.
 
 **Variaciones** (se añaden al bloque base):
 
@@ -177,7 +184,7 @@ o como imagen de entrada en Gemini, para sostener la identidad:
 ## 10. Plan de integración [propuesto]
 
 1. **Ficha de arte** (este documento).
-2. **Prueba de concepto técnica:** un reproductor de clips con **un** clip real, el procesado (transparencia, bucle, compresión) y
+2. **Prueba de concepto técnica (hecha: [informe](TONITO_PRUEBA_DE_CONCEPTO.md)):** un reproductor de clips con **un** clip real, el procesado (transparencia, bucle, compresión) y
    la medición de peso y rendimiento en móvil. Con esos números se decide el formato de §7.
 3. **Poses P1 a P8** y cambio de `TonitoCharacter` a un lienzo único, con respaldo al PNG actual.
 4. **Clips** y su conexión a `CinematicScene`, con `prefers-reduced-motion` y respaldo a pose fija.
