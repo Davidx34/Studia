@@ -13,6 +13,7 @@ import { Card, Badge } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { MathText } from '@/components/MathText';
 import { isDue, nextState, type Grade } from '@/lib/study/leitner';
+import { REVIEW_SESSION_SIZE } from '@/lib/study/constants';
 import { InfographicView } from '@/components/study/InfographicView';
 import type { Infographic } from '@/lib/study/infographics';
 
@@ -34,7 +35,7 @@ interface CardState {
   lapses: number;
 }
 
-const SESSION_SIZE = 20;
+const SESSION_SIZE = REVIEW_SESSION_SIZE;
 
 export interface StudyMaterial {
   id: string;

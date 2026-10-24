@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useTonitoStore } from '@/stores/useTonitoStore';
 import { BookOpen, Trophy, Target, Map, Sparkles, ArrowRight, CheckCircle2, Flame, ClipboardList } from 'lucide-react';
 import type { RemediationPlan } from '@/lib/actions/remediation-plans';
+import { ReviewTodayCard } from '@/components/student/ReviewTodayCard';
+import type { ReviewPlanForDashboard } from '@/lib/study/reviewPlanServer';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
 import { Card, Badge } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -19,6 +21,8 @@ interface Props {
   totalCompleted: number;
   weeklyProgress: { date: string; count: number }[];
   activePlan: RemediationPlan | null;
+  // Flashcards pendientes de repaso hoy (null si no hay o no se pudo calcular).
+  reviewPlan?: ReviewPlanForDashboard | null;
   // "Mis clases": se muestra DESPUES de la accion principal (continuar), no antes.
   classesSection?: React.ReactNode;
 }
@@ -32,6 +36,7 @@ export function DashboardClient({
   totalCompleted,
   weeklyProgress,
   activePlan,
+  reviewPlan,
   classesSection,
 }: Props) {
   const showMessage = useTonitoStore((s) => s.showMessage);
@@ -142,6 +147,8 @@ export function DashboardClient({
           </div>
         </div>
       </Link>
+
+      <ReviewTodayCard plan={reviewPlan ?? null} />
 
       {classesSection}
 
