@@ -107,12 +107,15 @@ async function main() {
       console.log(`  ✔ subido: ${base}/${j.rel}`);
     }
   }
-  if (failed) process.exit(1);
+  if (failed) {
+    process.exitCode = 1;
+    return;
+  }
   console.log(`\nValor para Vercel: NEXT_PUBLIC_TONITO_MEDIA_BASE_URL=${base}`);
   console.log(`Comprobar: npm run media:check -- --base ${base} --probe ${jobs[0].rel}`);
 }
 
 main().catch((e) => {
   console.error('FALLO:', redact(e instanceof Error ? e.message : String(e)));
-  process.exit(1);
+  process.exitCode = 1;
 });

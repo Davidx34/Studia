@@ -1,7 +1,11 @@
 // Comprueba que los medios de Toñito estan bien servidos desde el proveedor elegido (Supabase Storage o Cloudflare R2).
 //
-// Mira, por cada archivo: que responda 200, su tipo, su peso frente al tope, que admita rangos (para que el video avance y se
-// reanude) y que traiga una cache larga (los archivos son inmutables). Solo lee: hace HEAD y una peticion de 2 bytes.
+// Por archivo hace UNA peticion GET pidiendo solo 2 bytes (Range) y mira: que responda 206 (prueba de que admite rangos, necesario
+// para que el video avance y se reanude), su tipo, su peso total frente al tope y su Cache-Control (los archivos son inmutables).
+//
+// IMPORTANTE: se usa GET y no HEAD a proposito. Con Supabase (y Cloudflare en general) un HEAD NO pasa por la cache del CDN y devuelve
+// "Cache-Control: private, no-cache" aunque el archivo se sirva con "public, max-age=31536000" por GET. Juzgar con HEAD da falsos
+// negativos (medido con el bucket real, 2026-10-24).
 //
 // Uso (en TU maquina, con TU .env.local):
 //   npm run media:check                                   los clips registrados en src/lib/tonito/clips.ts
@@ -25,44 +29,28 @@ if (rawBase && base === LOCAL_MEDIA_BASE) {
 if (base === LOCAL_MEDIA_BASE) {
   console.log('La base es LOCAL (/tonito): los archivos viven en public/ del repo y los vigila `npm test`, no hay nada remoto que comprobar.');
   console.log('Para probar un proveedor, pon NEXT_PUBLIC_TONITO_MEDIA_BASE_URL en .env.local o pasa --base <url>.');
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 const kindOf = (rel: string): MediaKind => (rel.endsWith('.mp4') ? 'video' : 'poster');
-const targets: { rel: string; kind: MediaKind }[] = probes.length
-  ? probes.map((rel) => ({ rel, kind: kindOf(rel) }))
-  : Object.values(TONITO_CLIPS).flatMap((c) => [{ rel: c.src, kind: 'video' as const }, { rel: c.poster, kind: 'poster' as const }]);
-
-if (targets.length === 0) {
-  console.log('No hay clips registrados en TONITO_CLIPS. Usa --probe <ruta> para comprobar un archivo suelto.');
-  process.exit(0);
-}
-
 const lower = (h: Headers) => Object.fromEntries(Array.from(h.entries()).map(([k, v]) => [k.toLowerCase(), v]));
 
 async function check(rel: string, kind: MediaKind): Promise<boolean> {
   const url = mediaUrl(rel, base);
   console.log(`\n${url}`);
-  let head: Response;
+  let res: Response;
   try {
-    head = await fetch(url, { method: 'HEAD', redirect: 'manual' });
+    res = await fetch(url, { headers: { Range: 'bytes=0-1' }, redirect: 'manual' });
+    await res.arrayBuffer(); // se consume el cuerpo (2 bytes, o el archivo entero si el servidor ignora Range)
   } catch (e) {
     console.log(`  ✘ no se pudo conectar: ${e instanceof Error ? e.message : e}`);
     return false;
   }
-  const headers = lower(head.headers);
-  const v = judgeMediaResponse(kind, head.status, headers);
-  console.log(`  HTTP ${head.status} | ${headers['content-type'] ?? '?'} | ${headers['content-length'] ? (Number(headers['content-length']) / 1024).toFixed(0) + ' KB' : '? KB'} | cache-control: ${headers['cache-control'] ?? '(ninguno)'}`);
-  // Prueba real de rangos (mas fiable que leer la cabecera): pedir 2 bytes debe dar 206.
-  if (kind === 'video' && head.status === 200) {
-    try {
-      const r = await fetch(url, { headers: { Range: 'bytes=0-1' }, redirect: 'manual' });
-      if (r.status !== 206) v.warnings.push(`una peticion con Range respondio ${r.status} en vez de 206`);
-      await r.arrayBuffer();
-    } catch {
-      v.warnings.push('no se pudo probar la peticion con Range');
-    }
-  }
+  const headers = lower(res.headers);
+  const v = judgeMediaResponse(kind, res.status, headers);
+  const total = /\/(\d+)\s*$/.exec(headers['content-range'] ?? '')?.[1] ?? headers['content-length'];
+  const cdn = headers['cf-cache-status'] ? ` | CDN: ${headers['cf-cache-status']}` : '';
+  console.log(`  HTTP ${res.status} | ${headers['content-type'] ?? '?'} | ${total ? (Number(total) / 1024).toFixed(0) + ' KB' : '? KB'} | cache-control: ${headers['cache-control'] ?? '(ninguno)'}${cdn}`);
   for (const e of v.errors) console.log(`  ✘ ${e}`);
   for (const w of v.warnings) console.log(`  ! ${w}`);
   if (v.ok && v.warnings.length === 0) console.log('  ✔ bien servido');
@@ -70,10 +58,21 @@ async function check(rel: string, kind: MediaKind): Promise<boolean> {
   return v.ok;
 }
 
-(async () => {
+async function main() {
+  const targets: { rel: string; kind: MediaKind }[] = probes.length
+    ? probes.map((rel) => ({ rel, kind: kindOf(rel) }))
+    : Object.values(TONITO_CLIPS).flatMap((c) => [{ rel: c.src, kind: 'video' as const }, { rel: c.poster, kind: 'poster' as const }]);
+  if (targets.length === 0) {
+    console.log('No hay clips registrados en TONITO_CLIPS. Usa --probe <ruta> para comprobar un archivo suelto.');
+    return;
+  }
   console.log(`Base: ${base}`);
   let allOk = true;
   for (const t of targets) allOk = (await check(t.rel, t.kind)) && allOk;
   console.log(allOk ? '\nTodo en orden.' : '\nHay archivos con errores.');
-  process.exit(allOk ? 0 : 1);
-})();
+  // exitCode y no process.exit: en Windows, salir de golpe con conexiones abiertas provoca un aviso de Node.
+  process.exitCode = allOk ? 0 : 1;
+}
+
+// Al final: las funciones de arriba tienen que estar inicializadas antes de arrancar.
+if (base !== LOCAL_MEDIA_BASE) void main();

@@ -55,23 +55,27 @@ export interface MediaVerdict {
   warnings: string[];
 }
 
-// Juzga la respuesta HTTP de un archivo remoto (para `npm run media:check`). `headers` con nombres en minusculas.
+// Juzga la respuesta de UNA PETICION GET con Range: bytes=0-1 a un archivo remoto (para `npm run media:check`). `headers` con nombres
+// en minusculas. Se usa GET y no HEAD: un HEAD no pasa por la cache del CDN y devuelve "private, no-cache" aunque el archivo se sirva
+// con "public, max-age=31536000" por GET (medido con Supabase Storage).
 export function judgeMediaResponse(kind: MediaKind, status: number, headers: Record<string, string | undefined>): MediaVerdict {
   const errors: string[] = [];
   const warnings: string[] = [];
-  if (status !== 200) {
-    errors.push(`responde HTTP ${status}, se esperaba 200`);
+  if (status !== 200 && status !== 206) {
+    errors.push(`responde HTTP ${status}, se esperaba 200 o 206`);
     return { ok: false, errors, warnings };
   }
   const type = (headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
   if (kind === 'video' && type !== 'video/mp4') errors.push(`tipo "${type || 'ninguno'}", se esperaba video/mp4`);
   if (kind === 'poster' && !/^image\/(jpeg|webp)$/.test(type)) errors.push(`tipo "${type || 'ninguno'}", se esperaba image/jpeg o image/webp`);
 
-  const len = Number(headers['content-length']);
-  if (!Number.isFinite(len) || len <= 0) warnings.push('no informa content-length');
-  else if (len > MAX_BYTES[kind]) errors.push(`pesa ${(len / 1024).toFixed(0)} KB y el tope es ${MAX_BYTES[kind] / 1024} KB`);
+  // Peso TOTAL: en una respuesta 206 sale de content-range ("bytes 0-1/219071"; content-length solo mide los 2 bytes pedidos).
+  const total = status === 206 ? Number(/\/(\d+)\s*$/.exec(headers['content-range'] ?? '')?.[1]) : Number(headers['content-length']);
+  if (!Number.isFinite(total) || total <= 0) warnings.push('no informa el tamano total');
+  else if (total > MAX_BYTES[kind]) errors.push(`pesa ${(total / 1024).toFixed(0)} KB y el tope es ${MAX_BYTES[kind] / 1024} KB`);
 
-  if (kind === 'video' && !/bytes/i.test(headers['accept-ranges'] ?? '')) warnings.push('no declara accept-ranges: bytes (algunos navegadores no podran avanzar ni reanudar el video)');
+  // Rangos: la peticion pidio solo 2 bytes; un 206 prueba que el servidor los admite (necesario para que el video avance y se reanude).
+  if (kind === 'video' && status === 200) warnings.push('el servidor ignoro la peticion con Range y respondio el archivo completo: el video no podra avanzar ni reanudarse');
 
   const cc = headers['cache-control'] ?? '';
   const maxAge = Number(/(?:^|[ ,])max-age=(\d+)/i.exec(cc)?.[1]);
