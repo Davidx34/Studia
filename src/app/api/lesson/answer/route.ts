@@ -3,6 +3,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { gradeAnswer } from '@/lib/grading/gradeAnswer';
 import { buildReveal, isFinalTry, isServerGradedType, serverGradingEnabled, MAX_TRIES } from '@/lib/grading/serverGrading';
+import { findSourceHint } from '@/lib/grading/sourceHint';
 
 // Califica UNA respuesta de una leccion en el servidor. El navegador manda lo que respondio el estudiante; el servidor
 // compara con la clave, cuenta los intentos de la pregunta y, al cerrarla (acierto o ultimo intento), registra el
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
 
     const { data: question } = await admin
       .from('lesson_questions')
-      .select('id, type, ok, answers, pairs, keywords, exp, concept_tag')
+      .select('id, type, q, opts, ok, answers, pairs, keywords, exp, concept_tag')
       .eq('id', questionId)
       .maybeSingle();
     if (!question || !isServerGradedType(question.type)) return fail(404, 'Pregunta no encontrada');
@@ -56,7 +57,32 @@ export async function POST(req: NextRequest) {
       .eq('question_id', questionId)
       .maybeSingle();
 
-    const closed = (correct: boolean, tries: number, detail?: unknown) =>
+    // Modulo y clase del intento (una sola lectura: la usan la pista de fuente y el registro de metricas).
+    let modulePromise: Promise<{ classroom_id: string | null; source_material_ids: string[] | null } | null> | null = null;
+    const getModule = () =>
+      (modulePromise ??= Promise.resolve(admin.from('content_modules').select('classroom_id, source_material_ids').eq('id', attempt.module_id).maybeSingle()).then(
+        (r: any) => r?.data ?? null
+      ));
+
+    // Al cerrar una pregunta FALLADA se busca en el material de la clase el pasaje mas probable ("Repasa en tu material").
+    // Es una pista opcional: si algo falla o tarda, simplemente no se manda.
+    const sourceFor = async (correct: boolean) => {
+      if (correct) return null;
+      try {
+        const mod = await getModule();
+        if (!mod?.classroom_id) return null;
+        return await findSourceHint(admin, {
+          classroomId: mod.classroom_id,
+          materialIds: Array.isArray(mod.source_material_ids) ? mod.source_material_ids : [],
+          question,
+        });
+      } catch (e) {
+        console.warn('[lesson/answer] source hint:', e instanceof Error ? e.message : e);
+        return null;
+      }
+    };
+
+    const closed = async (correct: boolean, tries: number, detail?: unknown) =>
       NextResponse.json({
         correct,
         final: true,
@@ -64,10 +90,11 @@ export async function POST(req: NextRequest) {
         detail,
         reveal: buildReveal(question),
         explanation: question.exp ?? null,
+        source: await sourceFor(correct),
       });
 
     // Pregunta ya cerrada: repetir la respuesta no suma ni cambia nada, se devuelve el mismo resultado.
-    if (prev?.final) return closed(!!prev.correct, prev.tries);
+    if (prev?.final) return await closed(!!prev.correct, prev.tries);
 
     const graded = gradeAnswer(question, body.answer);
     if (graded.status !== 'graded') return fail(400, 'Respuesta invalida');
@@ -103,7 +130,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Cierre de la pregunta: queda registrada para las metricas del profesor, escrita por el servidor.
-    const { data: mod } = await admin.from('content_modules').select('classroom_id').eq('id', attempt.module_id).maybeSingle();
+    const mod = await getModule();
     if (mod?.classroom_id) {
       const { error } = await admin.from('question_attempts').insert({
         student_id: user.id,
@@ -118,7 +145,7 @@ export async function POST(req: NextRequest) {
       if (error) console.error('[LESSON_ANSWER_LOG_FAILED]', error.message);
     }
 
-    return closed(graded.correct, triesUsed, graded.detail);
+    return await closed(graded.correct, triesUsed, graded.detail);
   } catch (e) {
     console.error('[lesson/answer] error:', e);
     return fail(500, 'Error inesperado');

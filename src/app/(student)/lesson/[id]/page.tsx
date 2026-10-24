@@ -21,6 +21,8 @@ import { CinematicScene, type CinematicType } from '@/components/cinematics/Cine
 import { useSoundFx } from '@/lib/sound/useSoundFx';
 import { TonitoCharacter } from '@/components/tonito/TonitoCharacter';
 import { MathText } from '@/components/MathText';
+import { SourceHintBox } from '@/components/lesson/SourceHintBox';
+import type { SourceHint } from '@/lib/grading/sourceHint';
 import { isValidQuestion } from '@/lib/lesson/validateQuestion';
 import type { ContentModule } from '@/types/database';
 import { CheckCircle2 } from 'lucide-react';
@@ -51,6 +53,8 @@ type LessonPageQuestion = {
   type: string;
   q: string;
   exp?: string | null;
+  // Solo con calificacion en servidor y tras fallar: pasaje del material donde repasar lo que faltaba.
+  src?: SourceHint | null;
   concept_tag?: string | null;
   opts?: string[];
   ok?: number | boolean;
@@ -74,6 +78,7 @@ type ServerAnswer = {
   detail?: { matched?: number; total?: number; perTerm?: boolean[] };
   reveal?: { ok?: number | boolean; answers?: string[]; keywords?: string[]; defs?: string[] };
   explanation?: string | null;
+  source?: SourceHint | null;
 };
 
 const CHECK_ERROR = 'No pude comprobar tu respuesta. Revisa tu conexion e intenta de nuevo.';
@@ -298,7 +303,7 @@ export default function LessonPage() {
   const applyReveal = (index: number, r: ServerAnswer) => {
     const { ok, answers, keywords } = r.reveal ?? {};
     setQuestions((prev) =>
-      prev.map((x, i) => (i === index ? { ...x, ...(ok !== undefined ? { ok } : {}), ...(answers ? { answers } : {}), ...(keywords ? { keywords } : {}), exp: r.explanation ?? x.exp } : x))
+      prev.map((x, i) => (i === index ? { ...x, ...(ok !== undefined ? { ok } : {}), ...(answers ? { answers } : {}), ...(keywords ? { keywords } : {}), exp: r.explanation ?? x.exp, src: r.source ?? null } : x))
     );
   };
 
@@ -1061,6 +1066,8 @@ export default function LessonPage() {
             <p className="text-fg mt-1"><MathText content={q.exp} /></p>
           </div>
         )}
+
+        {answered && <SourceHintBox source={q.src} />}
       </Card>
 
       {answered && (
