@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
 import { getClassroomProgress } from '@/lib/actions/classroom-progress';
 import { getConceptGapData } from '@/lib/actions/concept-metrics';
+import { getClassMastery } from '@/lib/actions/class-mastery';
 import { createServerSupabase } from '@/lib/supabase/server';
 import ProgressClient from './ProgressClient';
 
@@ -26,11 +27,15 @@ export default async function ProgressPage({ params }: { params: { id: string } 
   // no tener datos aun; se pasa hasData para que la UI lo maneje sin bloquear
   // la tabla de progreso existente si esta vista falla.
   const conceptResult = await getConceptGapData(params.id);
+  // Dominio por modulo y objetivo: si falla, solo esa pestana muestra el error; el resto de la pagina sigue.
+  const masteryResult = await getClassMastery(params.id);
 
   return (
     <ProgressClient
       data={result.data}
       conceptGap={conceptResult.ok ? conceptResult.data ?? null : null}
+      mastery={masteryResult.ok ? masteryResult.data ?? null : null}
+      masteryError={masteryResult.ok ? null : masteryResult.error ?? null}
     />
   );
 }
