@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { BookOpen, BrainCircuit, CheckCircle2, Lock, Play } from 'lucide-react';
+import { BookOpen, BrainCircuit, CheckCircle2, Dumbbell, Lock, Play } from 'lucide-react';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { Card, Badge } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -55,6 +55,14 @@ export default async function StudentClassPage({ params }: { params: { id: strin
     }
   }
 
+  // Modo practica: solo se ofrece si ya respondio alguna pregunta de esta clase (la practica usa lo que ya respondio).
+  const { count: practiceable } = await supabase
+    .from('question_attempts')
+    .select('id', { count: 'exact', head: true })
+    .eq('student_id', user.id)
+    .eq('classroom_id', params.id)
+    .is('game_type', null);
+
   const teacher = (classroom as any).profiles;
   const completedCount = Array.from(progressMap.values()).filter((p: any) => p.status === 'completed').length;
   const total = modules?.length ?? 0;
@@ -72,6 +80,11 @@ export default async function StudentClassPage({ params }: { params: { id: strin
           <Link href={`/my-classes/${params.id}/study`} className={`${linkBase} bg-primary text-on-primary hover:brightness-110`}>
             <BrainCircuit aria-hidden="true" className="w-4 h-4" /> Estudiar
           </Link>
+          {(practiceable ?? 0) > 0 && (
+            <Link href={`/my-classes/${params.id}/practice`} className={`${linkBase} bg-surface-2 text-fg border border-line hover:border-line-strong`}>
+              <Dumbbell aria-hidden="true" className="w-4 h-4" /> Practicar sin presión
+            </Link>
+          )}
           <Link href={`/my-classes/${params.id}/library`} className={`${linkBase} bg-surface-2 text-fg border border-line hover:border-line-strong`}>
             <BookOpen aria-hidden="true" className="w-4 h-4" /> Biblioteca de clase
           </Link>
