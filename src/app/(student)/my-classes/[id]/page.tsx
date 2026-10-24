@@ -4,6 +4,10 @@ import { BookOpen, BrainCircuit, CheckCircle2, Dumbbell, Lock, Play } from 'luci
 import { createServerSupabase } from '@/lib/supabase/server';
 import { Card, Badge } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { loadModuleAttempts } from '@/lib/mastery/load';
+import { moduleMastery, type ModuleMastery } from '@/lib/mastery/mastery';
+import { MasteryBadge } from '@/components/student/MasteryBadge';
+import { MasterySummary } from '@/components/student/MasterySummary';
 
 const linkBase =
   'inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-xl font-semibold text-sm transition-[filter,background-color] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg';
@@ -55,6 +59,18 @@ export default async function StudentClassPage({ params }: { params: { id: strin
     }
   }
 
+  // Dominio por modulo (evidencia acumulada) y por objetivo. Un fallo aqui NUNCA debe impedir abrir la clase.
+  const masteryByModule = new Map<string, ModuleMastery>();
+  let objectives: { id: string; title: string }[] = [];
+  try {
+    const attempts = await loadModuleAttempts(supabase, { studentId: user.id, classroomId: params.id });
+    for (const id of moduleIds) masteryByModule.set(id, moduleMastery(attempts.get(id) ?? []));
+    const { data: objs } = await supabase.from('classroom_learning_objectives').select('id, title').eq('classroom_id', params.id).order('created_at');
+    objectives = (objs ?? []).map((o: any) => ({ id: o.id, title: o.title }));
+  } catch (e) {
+    console.warn('[mastery]', e instanceof Error ? e.message : e);
+  }
+
   // Modo practica: solo se ofrece si ya respondio alguna pregunta de esta clase (la practica usa lo que ya respondio).
   const { count: practiceable } = await supabase
     .from('question_attempts')
@@ -91,6 +107,13 @@ export default async function StudentClassPage({ params }: { params: { id: strin
         </div>
       </div>
 
+      {/* Dominio: que domina, que debe repasar y como va cada objetivo (solo si ya empezo algo) */}
+      <MasterySummary
+        modules={(modules || []).map((m: any) => ({ id: m.id, objectiveId: m.learning_objective_id ?? null, state: masteryByModule.get(m.id)?.state ?? 'not_started' }))}
+        objectives={objectives}
+        practiceHref={(practiceable ?? 0) > 0 ? `/my-classes/${params.id}/practice` : null}
+      />
+
       {/* Mapa de módulos generados */}
       {modules && modules.length > 0 ? (
         <section aria-labelledby="modulos-clase" className="space-y-4">
@@ -120,6 +143,7 @@ export default async function StudentClassPage({ params }: { params: { id: strin
                     </div>
                     <h3 className={`font-semibold ${isLocked ? 'text-fg-muted' : 'text-fg'}`}>{module.title}</h3>
                     {module.description && <p className="text-fg-muted text-sm mt-1">{module.description}</p>}
+                    {masteryByModule.get(module.id) && <MasteryBadge mastery={masteryByModule.get(module.id)!} />}
                     {isLocked && <p className="text-xs text-fg-muted mt-2">Completa el módulo anterior para desbloquearlo.</p>}
                     <div className="flex justify-between items-center mt-auto pt-3 border-t border-line">
                       <span className="text-xs text-fg-muted">{module.estimated_time_minutes} min</span>
