@@ -1,11 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { isAuthPage as isAuthPagePath, isPublicPage as isPublicPagePath } from "@/lib/auth/routes";
+import { isAuthPage as isAuthPagePath, isPublicPage as isPublicPagePath, isPublicAsset } from "@/lib/auth/routes";
 
 const TEACHER_ROUTES = ["/teacher"];
 const STUDENT_ROUTES = ["/dashboard", "/lesson", "/my-classes", "/achievements", "/map"];
 
 export async function middleware(request: NextRequest) {
+  // Manifest e iconos de la PWA (y Tonito): publicos, sin tocar Supabase.
+  if (isPublicAsset(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   try {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
