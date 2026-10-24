@@ -24,7 +24,26 @@ export interface TonitoClipDef {
 // (ver docs/TONITO_MEDIOS_Y_ALMACENAMIENTO.md).
 export const TONITO_CLIPS: Record<string, TonitoClipDef> = {};
 
-export type ClipPlanReason = 'ok' | 'reduced-motion' | 'save-data' | 'slow-network' | 'no-video-support';
+export type ClipPlanReason = 'ok' | 'reduced-motion' | 'save-data' | 'slow-network' | 'no-video-support' | 'orientation';
+
+// Con object-cover, un video se recorta para llenar la pantalla. Si la pantalla se parece poco a la proporcion del clip, se ve solo una
+// franja (medido con un clip 9:16: en una pantalla horizontal 16:9 se ve el ~32 % de la altura, torso y punos sin cabeza). Se exige
+// que se vea al menos esta fraccion del clip.
+export const MIN_VISIBLE_FRACTION = 0.7;
+
+export interface Size {
+  width: number;
+  height: number;
+}
+
+// Fraccion del clip que SE VE con object-cover en una pantalla: si la pantalla es mas estrecha que el clip se pierde ancho; si es mas
+// ancha, se pierde alto. 1 = se ve entero (misma proporcion).
+export function visibleFraction(clip: Size, viewport: Size): number {
+  if (!(clip.width > 0 && clip.height > 0 && viewport.width > 0 && viewport.height > 0)) return 1;
+  const clipAspect = clip.width / clip.height;
+  const viewAspect = viewport.width / viewport.height;
+  return viewAspect <= clipAspect ? viewAspect / clipAspect : clipAspect / viewAspect;
+}
 
 export interface ClipPlan {
   mode: 'video' | 'still';
@@ -40,17 +59,21 @@ export interface ClipEnvironment {
   effectiveType?: string;
   // El navegador dice poder reproducir H.264 en MP4. undefined = no se pudo comprobar (se intenta igual).
   canPlayMp4?: boolean;
+  // Tamano de la ventana, para saber si la pantalla se parece a la proporcion del clip.
+  viewport?: Size;
 }
 
 const SLOW = new Set(['slow-2g', '2g']);
 
 // Cuando NO se carga el video: movimiento reducido, ahorro de datos, conexion muy lenta o sin soporte. En esos casos la cinematica
 // usa lo de siempre (la pose fija con animacion CSS). El orden importa: el movimiento reducido manda sobre todo lo demas.
-export function planClip(env: ClipEnvironment): ClipPlan {
+export function planClip(env: ClipEnvironment, clip?: Size): ClipPlan {
   if (env.reducedMotion) return { mode: 'still', reason: 'reduced-motion' };
   if (env.saveData) return { mode: 'still', reason: 'save-data' };
   if (env.effectiveType && SLOW.has(env.effectiveType)) return { mode: 'still', reason: 'slow-network' };
   if (env.canPlayMp4 === false) return { mode: 'still', reason: 'no-video-support' };
+  // Pantalla con otra proporcion (p. ej. un clip vertical en un computador): se veria una franja y no a Tonito. Se usa lo de siempre.
+  if (clip && env.viewport && visibleFraction(clip, env.viewport) < MIN_VISIBLE_FRACTION) return { mode: 'still', reason: 'orientation' };
   return { mode: 'video', reason: 'ok' };
 }
 
@@ -76,5 +99,6 @@ export function readClipEnvironment(): ClipEnvironment {
     saveData: !!conn?.saveData,
     effectiveType: typeof conn?.effectiveType === 'string' ? conn.effectiveType : undefined,
     canPlayMp4,
+    viewport: typeof window !== 'undefined' && window.innerWidth > 0 ? { width: window.innerWidth, height: window.innerHeight } : undefined,
   };
 }
