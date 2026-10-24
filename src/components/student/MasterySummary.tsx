@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { Award, Circle, Dumbbell, RotateCcw, TrendingUp } from 'lucide-react';
+import { Dumbbell } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
-import { MASTERY_LABELS, objectiveState, rollupMastery, type MasteryCounts, type MasteryState } from '@/lib/mastery/mastery';
+import { MASTERY_LABELS, objectiveState, rollupMastery, type MasteryState } from '@/lib/mastery/mastery';
+import { MASTERY_ICON, MASTERY_ORDER, SegmentedBar } from '@/components/mastery/SegmentedBar';
 
 export interface SummaryModule {
   id: string;
@@ -14,31 +15,7 @@ export interface SummaryObjective {
   title: string;
 }
 
-const ORDER: MasteryState[] = ['mastered', 'needs_review', 'in_progress', 'not_started'];
-const SEGMENT: Record<MasteryState, string> = {
-  mastered: 'bg-success',
-  needs_review: 'bg-accent',
-  in_progress: 'bg-primary/50',
-  not_started: 'bg-surface-2',
-};
-const ICON = { mastered: Award, needs_review: RotateCcw, in_progress: TrendingUp, not_started: Circle } as const;
-
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
-function describe(c: MasteryCounts): string {
-  return ORDER.map((s) => `${c[s]} ${MASTERY_LABELS[s].toLowerCase()}`).join(', ');
-}
-
-// Barra segmentada. Para un lector de pantalla es UNA imagen con el conteo en texto; el color solo refuerza.
-function SegmentedBar({ counts, label }: { counts: MasteryCounts; label: string }) {
-  return (
-    <div role="img" aria-label={`${label}: ${describe(counts)}`} className="flex h-2.5 w-full overflow-hidden rounded-full border border-line bg-surface-2">
-      {ORDER.map((s) =>
-        counts[s] > 0 ? <div key={s} className={SEGMENT[s]} style={{ width: `${(counts[s] / counts.total) * 100}%` }} /> : null
-      )}
-    </div>
-  );
-}
 
 // "Tu dominio": cuantos modulos domina, cuales debe repasar y como va cada objetivo. Solo se muestra si ya empezo algo.
 export function MasterySummary({
@@ -75,8 +52,8 @@ export function MasterySummary({
       <div className="space-y-2">
         <SegmentedBar counts={counts} label="Dominio de los módulos de la clase" />
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-fg">
-          {ORDER.map((s) => {
-            const Icon = ICON[s];
+          {MASTERY_ORDER.map((s) => {
+            const Icon = MASTERY_ICON[s];
             return (
               <li key={s} className="inline-flex items-center gap-1.5">
                 <Icon aria-hidden="true" className="w-4 h-4 text-fg-muted" />

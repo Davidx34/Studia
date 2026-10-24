@@ -26,6 +26,8 @@ import {
 import type { ClassroomProgressData, StudentRow } from '@/lib/actions/classroom-progress';
 import type { ConceptGapData, ConceptMetric, StudentMetric, ConceptSeverity, StudentStatus } from '@/lib/actions/concept-metrics';
 import { downloadClassroomReportXlsx } from '@/lib/export/classroomReport';
+import type { ClassMasteryResult } from '@/lib/actions/class-mastery';
+import { ClassMasteryView } from '@/components/teacher/ClassMasteryView';
 import {
   createRemediationPlan,
   getActiveRemediationPlans,
@@ -47,10 +49,11 @@ const FILTER_LABELS: Record<FilterKey, string> = {
   at_risk: 'En riesgo',
 };
 
-type ProgressTab = 'resumen' | 'brecha' | 'estudiantes' | 'matriz';
+type ProgressTab = 'resumen' | 'dominio' | 'brecha' | 'estudiantes' | 'matriz';
 
 const TAB_LABELS: Record<ProgressTab, string> = {
   resumen: 'Resumen',
+  dominio: 'Dominio',
   brecha: 'Brecha de Conocimiento',
   estudiantes: 'Por Estudiante',
   matriz: 'Matriz Concepto-Estudiante',
@@ -59,9 +62,14 @@ const TAB_LABELS: Record<ProgressTab, string> = {
 export default function ProgressClient({
   data,
   conceptGap,
+  mastery,
+  masteryError = null,
 }: {
   data: ClassroomProgressData;
   conceptGap: ConceptGapData | null;
+  // Dominio por modulo y objetivo (null si no se pudo calcular; ver masteryError).
+  mastery: ClassMasteryResult | null;
+  masteryError?: string | null;
 }) {
   const [tab, setTab] = useState<ProgressTab>('resumen');
   const [search, setSearch] = useState('');
@@ -253,6 +261,7 @@ export default function ProgressClient({
         </>
       )}
 
+      {tab === 'dominio' && <ClassMasteryView mastery={mastery?.mastery ?? null} truncated={mastery?.truncated ?? false} error={masteryError} />}
       {tab === 'brecha' && <ConceptBreach conceptGap={conceptGap} />}
       {tab === 'estudiantes' && (
         <StudentPerformance conceptGap={conceptGap} classroomId={data.classroom.id} />
