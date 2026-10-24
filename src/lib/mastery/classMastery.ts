@@ -25,6 +25,8 @@ export interface ClassStudentIn {
 export interface ClassAttempt extends AttemptLite {
   module_id: string;
   student_id: string;
+  // Solo se lee cuando se pide (refuerzo dirigido); el dominio no lo necesita.
+  concept_tag?: string | null;
 }
 
 export interface StudentRef {

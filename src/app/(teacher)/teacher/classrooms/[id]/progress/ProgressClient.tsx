@@ -261,7 +261,7 @@ export default function ProgressClient({
         </>
       )}
 
-      {tab === 'dominio' && <ClassMasteryView mastery={mastery?.mastery ?? null} truncated={mastery?.truncated ?? false} error={masteryError} />}
+      {tab === 'dominio' && <ClassMasteryView mastery={mastery?.mastery ?? null} classroomId={data.classroom.id} truncated={mastery?.truncated ?? false} error={masteryError} />}
       {tab === 'brecha' && <ConceptBreach conceptGap={conceptGap} />}
       {tab === 'estudiantes' && (
         <StudentPerformance conceptGap={conceptGap} classroomId={data.classroom.id} />

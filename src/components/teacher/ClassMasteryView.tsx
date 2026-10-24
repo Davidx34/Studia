@@ -2,6 +2,7 @@ import { AlertCircle, Target } from 'lucide-react';
 import { MASTERY_LABELS, MASTERY_THRESHOLD, MIN_EVIDENCE, type MasteryCounts } from '@/lib/mastery/mastery';
 import type { ClassMastery, ModuleRollup } from '@/lib/mastery/classMastery';
 import { MASTERY_ICON, MASTERY_ORDER, SegmentedBar } from '@/components/mastery/SegmentedBar';
+import { ReinforcementAction } from '@/components/teacher/ReinforcementAction';
 
 const panel = 'rounded-2xl border border-line shadow-card bg-surface p-5';
 
@@ -57,7 +58,7 @@ function ModuleRow({ m }: { m: ModuleRollup }) {
   );
 }
 
-function Attention({ items }: { items: ModuleRollup[] }) {
+function Attention({ items, classroomId }: { items: ModuleRollup[]; classroomId: string }) {
   return (
     <section aria-labelledby="donde-intervenir" className={`${panel} border-accent/40`}>
       <h3 id="donde-intervenir" className="flex items-center gap-2 text-fg font-semibold">
@@ -75,6 +76,7 @@ function Attention({ items }: { items: ModuleRollup[] }) {
                   {m.title} <span className="font-normal text-fg-muted">· {studentsWord(m.counts.needs_review)} por repasar de {m.counts.total}</span>
                 </p>
                 <p className="text-xs text-fg-muted">{m.students.needs_review.map((s) => s.name).join(', ')}</p>
+                <ReinforcementAction classroomId={classroomId} moduleId={m.moduleId} moduleTitle={m.title} />
               </li>
             ))}
           </ol>
@@ -84,7 +86,7 @@ function Attention({ items }: { items: ModuleRollup[] }) {
   );
 }
 
-export function ClassMasteryView({ mastery, truncated = false, error = null }: { mastery: ClassMastery | null; truncated?: boolean; error?: string | null }) {
+export function ClassMasteryView({ mastery, classroomId, truncated = false, error = null }: { mastery: ClassMastery | null; classroomId: string; truncated?: boolean; error?: string | null }) {
   if (error || !mastery) {
     return (
       <div role="alert" className="rounded-2xl bg-danger/10 border border-danger/30 p-4 flex items-start gap-2 text-sm text-danger">
@@ -116,7 +118,7 @@ export function ClassMasteryView({ mastery, truncated = false, error = null }: {
         </p>
       )}
 
-      <Attention items={mastery.attention} />
+      <Attention items={mastery.attention} classroomId={classroomId} />
 
       {mastery.groups.map((g) => (
         <section key={g.objective?.id ?? 'sin-objetivo'} aria-labelledby={`dom-${g.objective?.id ?? 'sin-objetivo'}`} className={`${panel} space-y-4`}>
