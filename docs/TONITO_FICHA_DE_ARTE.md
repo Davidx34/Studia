@@ -134,6 +134,14 @@ Capa de efecto opcional: el **anillo de energía** de la referencia, como activo
 de partida 480×270 (o proporción 16:9); un 75 % de resolución pesó 78 KB. Descartado: WebM con alfa y HEVC con alfa (§ del informe).
 Los comandos exactos están en el informe.
 
+**Requisitos que salieron de probar un MP4 original de Flow [medido]** (detalle en el [informe](TONITO_PRUEBA_DE_CONCEPTO.md#10-segundo-clip-el-mp4-original-de-flow)):
+1. **Vertical 9:16, con Toñito centrado.** Un video 16:9 en un celular vertical, con `object-cover`, **solo muestra el ~26 % central del ancho**
+   (390×844 px): se cortó la cara y el texto del clip de prueba. Los estudiantes usan sobre todo el celular.
+2. **Sin texto, botones ni interfaz dibujados en el video.** La escena ya pone su diálogo, su puntaje y su botón «Continuar» (editables,
+   traducibles y accesibles); un botón pintado en el video parece pulsable y no lo es.
+3. **Fondo del color de la escena**, no blanco: el texto de las escenas es blanco y sobre un fondo blanco no se lee.
+4. **Sin pista de audio** (Flow la genera; se quita al codificar). Cámara fija, Toñito sin salir del encuadre.
+
 **Poses con transparencia.** Sí la necesitan. Al generarlas, usar un **fondo plano de un solo color** que el personaje no tenga
 (propuesta: **magenta** `#FF00FF`; el verde choca con el anillo ciano de energía y con la bata blanca) y recortar **una sola vez por
 imagen**, revisando el resultado a mano. **[Sin verificar]: probar con una pose real.**
@@ -179,6 +187,8 @@ sin elementos que compitan con el personaje». Los clips no llevan transparencia
 - [ ] **Bucle** sin salto visible (solo clips).
 - [ ] **Tono:** apto para niños; los fallos nunca regañan (E2, E3, E6, C4).
 - [ ] **Sin texto** incrustado ni marcas.
+- [ ] **Vertical 9:16** y Toñito **centrado** (visible con el recorte de un celular).
+- [ ] **Sin botones ni interfaz** dibujados en el video.
 - [ ] **Se ve bien a 72 px** (el widget flotante) y a 380 px (cinemática).
 
 ## 10. Plan de integración [propuesto]

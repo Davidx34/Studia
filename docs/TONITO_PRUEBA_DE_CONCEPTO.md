@@ -146,3 +146,37 @@ Los archivos fuente pesados (videos originales) **no** deben subirse al reposito
    color de la escena a juego.
 5. **Poses con transparencia** (P1–P8): sí necesitan fondo transparente, pero es un trabajo **de una sola vez por imagen** y revisable a
    mano, no un recorte cuadro a cuadro como el de un clip.
+
+## 10. Segundo clip: el MP4 original de Flow
+
+Se probó `Character_jumping_and_celebratin…_20261024140246.mp4` (el original que se pidió, en lugar del GIF).
+
+**Qué es [medido]:** H.264 (High), **1280×720, 24 fps, 4,01 s**, 2.811 kb/s de video más una pista de **audio AAC** estéreo; **1,44 MB**.
+Toñito sobre un **fondo blanco liso** salta y celebra con estrellas doradas.
+
+**Peso codificado, sin audio, H.264 con `faststart` [medido]:**
+
+| Versión | Peso |
+|---|---|
+| 480 px de ancho, crf 30 | **82 KB** |
+| 480 px, crf 26 | 129 KB |
+| 640 px, crf 30 | 120 KB |
+| 640 px, crf 26 | **189 KB** |
+| Solo los primeros 1,4 s, 480 px, crf 30 | 34 KB |
+
+A 480 px, 4 s pesan 82 KB frente a los 214 KB del clip anterior (el GIF), pero **no son comparables**: son clips distintos, con otro
+movimiento y un **fondo blanco liso sin tramado**, que se comprime mucho mejor. Un clip regenerado con fondo de color y degradado pesará
+**más** que este. Aun así hay **holgura** frente al tope de 400 KB: se puede subir la resolución o la calidad. **[Dato de un solo clip.]**
+
+**Por qué este clip NO se puede publicar tal cual [medido]:**
+
+1. **Trae texto y un botón dibujados**: «¡Buen trabajo! ¡Pulsa el botón para continuar!» y un botón naranja de *play*. El botón empieza a
+   crecer en 1,5 s y el texto aparece desde **1,75 s**, así que solo el tramo **0 a ~1,4 s** está limpio. La escena ya pone su propio diálogo y
+   su botón «Continuar»: habría dos textos distintos y un botón que parece pulsable y no lo es.
+2. **Es horizontal (16:9)**. En un celular de 390×844 con `object-cover` solo se ve el **26 % central del ancho**: se corta la cara en un
+   cuadro y en otro quedan a medias Toñito, el texto y el botón.
+3. **Fondo blanco**: el texto de las escenas es blanco y no se leería. Un fondo blanco liso tampoco permite recortar a Toñito, porque su
+   bata es blanca (mismo problema del §4).
+
+**Qué sí sirve:** la calidad del personaje y del movimiento, y las cifras de peso para un clip regenerado. **Qué hay que regenerar:** vertical
+9:16 con Toñito centrado, **sin texto ni botones**, con un fondo degradado del color de la escena y sin pista de audio (ver la ficha de arte, §7).
