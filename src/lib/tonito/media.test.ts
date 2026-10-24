@@ -66,37 +66,54 @@ describe('convencion de nombres versionados', () => {
   });
 });
 
-describe('judgeMediaResponse', () => {
-  const good = { 'content-type': 'video/mp4', 'content-length': String(214 * 1024), 'accept-ranges': 'bytes', 'cache-control': 'public, max-age=31536000, immutable' };
+describe('judgeMediaResponse (una peticion GET con Range: bytes=0-1)', () => {
+  // Respuesta tipica de un archivo bien servido: 206 y el peso total en content-range (content-length mide solo los 2 bytes pedidos).
+  const good = { 'content-type': 'video/mp4', 'content-range': 'bytes 0-1/' + String(214 * 1024), 'content-length': '2', 'cache-control': 'public, max-age=31536000' };
 
-  it('un video bien servido pasa sin avisos', () => {
-    expect(judgeMediaResponse('video', 200, good)).toEqual({ ok: true, errors: [], warnings: [] });
+  it('un video bien servido (206, tipo, peso total y cache larga) pasa sin avisos', () => {
+    expect(judgeMediaResponse('video', 206, good)).toEqual({ ok: true, errors: [], warnings: [] });
   });
 
-  it('un estado distinto de 200 es un error y no se revisa nada mas', () => {
+  it('el peso total sale de content-range en un 206, no del content-length de 2 bytes', () => {
+    expect(judgeMediaResponse('video', 206, { ...good, 'content-range': 'bytes 0-1/' + String(500 * 1024) }).errors[0]).toContain('tope');
+    expect(judgeMediaResponse('video', 206, { ...good, 'content-range': undefined }).warnings.join(' ')).toContain('tamano total');
+  });
+
+  it('un estado que no es 200 ni 206 es un error y no se revisa nada mas', () => {
     expect(judgeMediaResponse('video', 404, good)).toMatchObject({ ok: false, errors: [expect.stringContaining('404')] });
     expect(judgeMediaResponse('video', 403, {}).warnings).toEqual([]);
+    expect(judgeMediaResponse('video', 307, good).ok).toBe(false);
+  });
+
+  it('un video que responde 200 completo (ignora Range) funciona, pero avisa que no podra avanzar ni reanudarse', () => {
+    const v = judgeMediaResponse('video', 200, { 'content-type': 'video/mp4', 'content-length': String(214 * 1024), 'cache-control': 'public, max-age=31536000' });
+    expect(v.ok).toBe(true);
+    expect(v.warnings.join(' ')).toContain('Range');
+    // Para un poster, ignorar Range no importa.
+    expect(judgeMediaResponse('poster', 200, { 'content-type': 'image/jpeg', 'content-length': '5000', 'cache-control': 'public, max-age=31536000' })).toEqual({ ok: true, errors: [], warnings: [] });
   });
 
   it('tipo equivocado y peso por encima del tope son errores', () => {
-    expect(judgeMediaResponse('video', 200, { ...good, 'content-type': 'application/octet-stream' }).errors[0]).toContain('video/mp4');
-    expect(judgeMediaResponse('video', 200, { ...good, 'content-type': 'video/mp4; charset=binary' }).ok).toBe(true);
-    expect(judgeMediaResponse('video', 200, { ...good, 'content-length': String(500 * 1024) }).errors[0]).toContain('tope');
+    expect(judgeMediaResponse('video', 206, { ...good, 'content-type': 'application/octet-stream' }).errors[0]).toContain('video/mp4');
+    expect(judgeMediaResponse('video', 206, { ...good, 'content-type': 'video/mp4; charset=binary' }).ok).toBe(true);
     expect(judgeMediaResponse('poster', 200, { 'content-type': 'image/jpeg', 'content-length': String(70 * 1024), 'cache-control': 'max-age=31536000' }).errors[0]).toContain('60 KB');
     expect(judgeMediaResponse('poster', 200, { 'content-type': 'image/png', 'cache-control': 'max-age=31536000' }).errors[0]).toContain('image/jpeg');
   });
 
-  it('sin accept-ranges, o con cache corto o ausente, avisa pero no falla', () => {
-    const v = judgeMediaResponse('video', 200, { ...good, 'accept-ranges': undefined, 'cache-control': 'max-age=3600' });
+  it('cache corta o ausente avisa pero no falla', () => {
+    const v = judgeMediaResponse('video', 206, { ...good, 'cache-control': 'max-age=3600' });
     expect(v.ok).toBe(true);
-    expect(v.warnings.join(' ')).toContain('accept-ranges');
     expect(v.warnings.join(' ')).toContain('3600');
-    expect(judgeMediaResponse('video', 200, { ...good, 'cache-control': undefined }).warnings.join(' ')).toContain('sin cache-control');
+    expect(judgeMediaResponse('video', 206, { ...good, 'cache-control': undefined }).warnings.join(' ')).toContain('sin cache-control');
   });
 
   it('un cache-control que impide cachear es un error para un archivo inmutable', () => {
-    expect(judgeMediaResponse('video', 200, { ...good, 'cache-control': 'no-store' }).ok).toBe(false);
-    expect(judgeMediaResponse('video', 200, { ...good, 'cache-control': 'no-cache' }).ok).toBe(false);
+    expect(judgeMediaResponse('video', 206, { ...good, 'cache-control': 'no-store' }).ok).toBe(false);
+    expect(judgeMediaResponse('video', 206, { ...good, 'cache-control': 'private, no-cache' }).ok).toBe(false);
+  });
+
+  it('el caso real que enganaba al script: Supabase por GET dice public, max-age=31536000 (el "private, no-cache" era solo del HEAD)', () => {
+    expect(judgeMediaResponse('poster', 206, { 'content-type': 'image/jpeg', 'content-range': 'bytes 0-1/3691', 'content-length': '2', 'cache-control': 'public, max-age=31536000', 'cf-cache-status': 'HIT' })).toEqual({ ok: true, errors: [], warnings: [] });
   });
 });
 

@@ -26,6 +26,9 @@ URL con una **base** que sale de la variable `NEXT_PUBLIC_TONITO_MEDIA_BASE_URL`
    worker guarda las **imágenes** de cualquier origen 7 días (`CacheFirst`) y el CDN cachea mucho: sobrescribir serviría la versión vieja.
 2. Se suben con `Cache-Control: public, max-age=31536000, immutable`.
 3. **Solo activos de marca** en buckets públicos: cualquiera con la URL puede descargarlos. Nada de datos de estudiantes ni de profesores.
+   **Y borrar tarda unos minutos en surtir efecto:** el CDN siguió sirviendo la copia justo después de borrar y dejó de hacerlo pocos minutos
+   después (medido, §8). Además, **los navegadores que ya la descargaron la conservan hasta un año** (caché del usuario: no se puede purgar).
+   Lo que no deba ser público **no se sube nunca**.
 4. Las claves van en `.env.local` y en Vercel. **Nunca se pegan en el chat.**
 
 ## 2. Lo que ya hay en el proyecto [medido]
@@ -103,8 +106,39 @@ código 1 si algo falla.
 
 ## 7. Qué NO está resuelto
 
-- **La migración 072 aún no está aplicada** y **no se ha subido ningún archivo real** a Supabase: `media:check` contra Supabase se verá de punta a punta cuando se aplique y se suba el primero.
+- **El bucket de Supabase ya existe y se probó de punta a punta** con archivos de prueba que se borraron (§8). **Todavía no se ha subido ningún clip real.**
+- **El tiempo exacto que tarda el CDN en dejar de servir un archivo borrado:** una sola medición, entre ~1 y ~3 minutos. Los navegadores con copia propia no se purgan.
 - **Límites reales de tu plan de Supabase** y la **activación de R2** (tarjeta, dominio): sin verificar.
 - **Dominio propio:** `studia-theta.vercel.app` es un subdominio de Vercel; para R2 con dominio propio hace falta uno en Cloudflare.
 - **Términos de uso comercial** de lo generado con Flow y Gemini (pendiente de la ficha de arte).
 - Dónde guardar los **videos originales pesados**: fuera del repo, que es público (por ejemplo, Drive privado).
+
+## 8. Medido en vivo [medido, 2026-10-24]
+
+**Supabase Storage (bucket `tonito-media`, aplicado y probado con un MP4 y un JPEG diminutos, ya borrados):**
+
+| Prueba | Resultado |
+|---|---|
+| Subida con `media:upload` | ✔ las dos; el contenido se valida antes de subir |
+| `media:check` (GET con Range) | ✔ **206**, tipo correcto, `Cache-Control: public, max-age=31536000`, **CDN: HIT** |
+| Primer byte desde Colombia, 5 descargas | **0,26 a 0,38 s**; el nodo de Cloudflare que respondió fue el de **Bogotá** |
+| CORS | `Access-Control-Allow-Origin: *` (abierto; no hace falta para `<img>`/`<video>`) |
+| `anon` lista el bucket por la API | **[]** (vacío) |
+| `anon` sube por la API | **403** `new row violates row-level security policy` |
+| `anon` borra por la API | **403** `Access denied`; el archivo sigue ahí |
+| Volver a subir el mismo nombre | ✘ `already exists`: inmutable, hay que subir `.v2` |
+| **Borrar y volver a pedir la URL pública** | **Justo después: sigue 200** (HIT) desde el CDN, con el origen ya en 400. **Pocos minutos después: 400** (el CDN se invalida solo) |
+
+**Lecciones:**
+1. **HEAD engaña.** Con Supabase, un `HEAD` devuelve `Cache-Control: private, no-cache` y `CF-Cache-Status: DYNAMIC` aunque por `GET` el
+   archivo se sirva con `public, max-age=31536000` y `HIT`. La primera versión de `media:check` usaba `HEAD` y dio un **falso negativo**; ahora
+   juzga con un `GET` de 2 bytes.
+2. **Borrar tiene un retraso de unos minutos.** Ver la regla 3 de §1. El CDN se invalida solo, pero no al instante; y un navegador que ya bajó el
+   archivo lo conserva (caché de un año). Para retirar un archivo: sube una versión nueva, deja de referenciar la vieja y borra la vieja. Por eso
+   nada sensible va a este bucket.
+3. Para un archivo inexistente, Supabase responde **400**, no 404.
+
+**Cloudflare R2 (`r2.dev`), medido antes con un JPEG de prueba que ya se borró:** 200, `Accept-Ranges: bytes`, 206 en peticiones con Range, no lista
+el bucket, y el primer byte tardó **0,31 a 0,54 s** (parecido a Supabase). **Corrección:** una vez dije que `r2.dev` "no cachea en el CDN" porque no
+vi `Cache-Control` ni `cf-cache-status`; eso salió de peticiones `HEAD`, que como se vio engañan. **Queda sin verificar** si `r2.dev` cachea; habría que repetir
+la prueba con `GET` sobre un archivo real.
