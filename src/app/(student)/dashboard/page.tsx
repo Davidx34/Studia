@@ -4,6 +4,7 @@ import { DashboardClient } from './DashboardClient';
 import MyClassesSection, { type MyClassCard } from './MyClassesSection';
 import { getMyActiveRemediationPlan } from '@/lib/actions/remediation-plans';
 import { getReviewPlan } from '@/lib/study/reviewPlanServer';
+import { localDate, streakStatus } from '@/lib/streak/status';
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabase();
@@ -182,6 +183,12 @@ export default async function DashboardPage() {
 
   const activePlan = await getMyActiveRemediationPlan();
   const reviewPlan = await getReviewPlan(supabase, user.id, classroomIds);
+  // Racha real (la guardada puede estar vieja si lleva dias sin estudiar): mismas reglas que la base.
+  const streak = streakStatus({
+    streakDays: (profile as any)?.streak_days,
+    lastActivityDate: (profile as any)?.last_activity_date,
+    today: localDate(new Date(), (profile as any)?.timezone),
+  });
 
   return (
     <>
@@ -196,6 +203,7 @@ export default async function DashboardPage() {
         weeklyProgress={weeklyProgress}
         activePlan={activePlan}
         reviewPlan={reviewPlan}
+        streak={streak}
       />
     </>
   );
