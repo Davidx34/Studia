@@ -142,3 +142,32 @@ código 1 si algo falla.
 el bucket, y el primer byte tardó **0,31 a 0,54 s** (parecido a Supabase). **Corrección:** una vez dije que `r2.dev` "no cachea en el CDN" porque no
 vi `Cache-Control` ni `cf-cache-status`; eso salió de peticiones `HEAD`, que como se vio engañan. **Queda sin verificar** si `r2.dev` cachea; habría que repetir
 la prueba con `GET` sobre un archivo real.
+
+## 9. Estado de publicación [2026-10-24]
+
+**Subido al bucket `tonito-media` de Supabase** (con tu visto bueno y los términos de uso comercial confirmados por ti):
+
+| Archivo | Peso | Verificación en vivo |
+|---|---|---|
+| `clips/celebracion.v1.mp4` | 303 KB (vertical 720×1280, 4 s, H.264 sin audio) | `media:check`: **206**, `public, max-age=31536000`, tipo correcto |
+| `clips/celebracion.v1.jpg` | 44 KB (póster = primer cuadro) | ídem |
+
+**Registrado** en `TONITO_CLIPS` para la escena `module_complete_good` (celebración de módulo con buen puntaje). **Está dormido hasta que se
+configure la variable de Vercel**: con `CLIPS_HOSTING = 'remote'`, un clip solo se pide si hay base remota; sin la variable, la cinemática usa la
+pose de siempre y **no hace ninguna petición al video**.
+
+**Probado en el navegador (Chromium emulando 390×844) con el clip real servido por Supabase [medido]:** video y póster llegan desde
+`…supabase.co/storage/v1/object/public/tonito-media/`, el video cubre 390×844, reproduce 96 cuadros (24 fps × 4 s) con 1 perdido, termina en 4,00 s,
+y «Saltar», «Continuar» y el texto quedan encima. **Sin la variable** (base local): no hay video, **cero peticiones a los clips** y se ve la pose de siempre.
+Desde la máquina de pruebas, póster y video terminaron de llegar en ~0,67 s (el navegador oculta los tamaños de recursos de otro origen).
+
+### Activarlo en producción (lo haces tú)
+1. En Vercel → *Settings → Environment Variables* → agrega, para **Production**:
+   `NEXT_PUBLIC_TONITO_MEDIA_BASE_URL` = `https://roulrdmxsazjkczxkzax.supabase.co/storage/v1/object/public/tonito-media`
+   (es una URL pública, no un secreto; **sin** barra final).
+2. **Vuelve a desplegar** (Next inserta la variable al compilar: sin redespliegue no surte efecto).
+3. Comprueba: con una cuenta de estudiante en un celular, completa un módulo con buen puntaje y mira la cinemática.
+
+**Desactivarlo:** quita la variable y vuelve a desplegar: vuelve a la pose de siempre. No hay que tocar el código.
+
+**Qué no cubre esta prueba:** iPhone y Android reales, batería, red lenta, y qué hace Vercel Preview si no tiene la variable (usará la pose, por diseño).

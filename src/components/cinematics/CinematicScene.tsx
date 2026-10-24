@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import { TonitoFullBody, type CinematicAnimation } from '@/components/tonito/TonitoFullBody';
 import { TonitoClip, useClipPlan } from '@/components/tonito/TonitoClip';
-import { TONITO_CLIPS, sceneUsesVideo } from '@/lib/tonito/clips';
+import { TONITO_CLIPS, clipAvailable, sceneUsesVideo } from '@/lib/tonito/clips';
 import type { TonitoMood } from '@/stores/useTonitoStore';
 import { useSoundFx } from '@/lib/sound/useSoundFx';
 
@@ -111,7 +111,8 @@ export function CinematicScene(props: CinematicProps) {
   const { play } = useSoundFx();
   const lines = scene.lines(props);
   // Video de la escena: solo si hay clip registrado, el dispositivo lo permite y no fallo al cargar. Si no, lo de siempre.
-  const clip = scene.clipId ? TONITO_CLIPS[scene.clipId] : undefined;
+  const registered = scene.clipId ? TONITO_CLIPS[scene.clipId] : undefined;
+  const clip = clipAvailable(registered) ? registered : undefined;
   const clipPlan = useClipPlan(clip);
   const [clipFailed, setClipFailed] = useState(false);
   const video = sceneUsesVideo(clip, clipPlan, clipFailed);
