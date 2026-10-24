@@ -15,17 +15,22 @@ import { planClip, readClipEnvironment, type ClipPlan, type TonitoClipDef } from
 import { mediaUrl } from '@/lib/tonito/media';
 
 // null mientras no se ha montado (en el servidor no hay DOM): se trata como "todavia no" y se muestra la version de siempre.
-export function useClipPlan(): ClipPlan | null {
+// Con el clip, tambien decide si la proporcion de la pantalla lo permite (un clip vertical no se usa en un computador horizontal).
+export function useClipPlan(clip?: TonitoClipDef): ClipPlan | null {
   const [plan, setPlan] = useState<ClipPlan | null>(null);
   useEffect(() => {
-    setPlan(planClip(readClipEnvironment()));
+    setPlan(planClip(readClipEnvironment(), clip));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return plan;
 }
 
 export function TonitoClip({
   clip,
-  className = '',
+  // La POSICION la decide quien lo usa (p. ej. "absolute inset-0 h-full w-full" como fondo de pantalla completa). Antes el
+  // contenedor llevaba `relative` fijo y, al sumarse `absolute`, en Tailwind ganaba `relative`: el video entraba en el flujo de la
+  // pantalla, ocupaba ~73 % de la altura y tapaba el boton "Saltar". Por defecto `relative` (reserva su espacio por proporcion).
+  className = 'relative',
   onEnded,
   onFailed,
 }: {
@@ -65,7 +70,7 @@ export function TonitoClip({
   }, []);
 
   return (
-    <div className={`relative overflow-hidden ${className}`} role="presentation" style={{ aspectRatio: `${clip.width} / ${clip.height}` }}>
+    <div className={`overflow-hidden ${className}`} role="presentation" style={{ aspectRatio: `${clip.width} / ${clip.height}` }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={mediaUrl(clip.poster)} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
       <video

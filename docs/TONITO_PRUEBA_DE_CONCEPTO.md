@@ -180,3 +180,35 @@ movimiento y un **fondo blanco liso sin tramado**, que se comprime mucho mejor. 
 
 **Qué sí sirve:** la calidad del personaje y del movimiento, y las cifras de peso para un clip regenerado. **Qué hay que regenerar:** vertical
 9:16 con Toñito centrado, **sin texto ni botones**, con un fondo degradado del color de la escena y sin pista de audio (ver la ficha de arte, §7).
+
+## 11. Tercer clip (vertical, sin texto) y verificación en pantalla real
+
+Se probó `Amigurumi_doll_jumping_for_joy_20261024141554.mp4`, generado con el prompt de la ficha.
+
+**Cumple el pedido [medido]:** vertical **720×1280 (9:16)**, 24 fps, 4,01 s; **sin texto, botones ni íconos** en los 20 cuadros revisados (uno
+cada 0,2 s); cámara fija, sin cortes; Toñito centrado y siempre dentro del encuadre; **termina en una pose estable**. Trae audio (se quita al codificar).
+
+**No cumple del todo:** los **pies quedan al ~80 % de la altura**, donde va el texto de la escena (la primera línea cae sobre las botas; se lee bien
+sobre el velo, pero está recargado). Y el degradado es **más pálido** que el pedido: arriba `#EEBC73` (pedido `#D97706`), centro `#E7A96C`
+(`#EA580C`), abajo `#CC535D` (`#E11D48`). El texto blanco **solo** sobre ese fondo daría 1,7 a 4,2:1 de contraste; sobre el velo oscuro de la escena
+se lee bien a simple vista (**no medido numéricamente con el velo real**).
+
+**Codificado, sin audio, H.264 `faststart` [medido]:** 360×640 crf 28: 130 KB · 432×768 crf 28: 169 KB · 540×960 crf 28: 237 KB · **720×1280 crf 30: 303 KB**
+(elegido: resolución nativa; a 3× de ampliación es el más parecido al original). Póster = primer cuadro, JPEG de **44 KB**. Ambos pasan
+`media:upload --dry-run`. **Candidato listo; no se ha subido** (falta el visto bueno y los términos de uso comercial).
+
+### Verificación con el componente real en un navegador (Chromium emulando un celular de 390×844) [medido]
+
+Se hizo con una página y un registro **temporales** (ya revertidos). Encontró **dos errores de mi integración del PR #123**, que las pruebas de marcado
+no podían ver:
+
+1. **El video no cubría la pantalla** (`position: relative`, 612 px = **73 %** de la altura) y **tapaba el botón «Saltar ✕»**: el contenedor llevaba
+   `relative` fijo y, sumado el `absolute` de la escena, en Tailwind gana `relative`; además lo posicionado se pinta encima de lo que no lo está.
+   **Arreglo:** el reproductor deja de imponer su posición (la decide quien lo usa) y «Saltar», el texto y el botón llevan `z-20`/`z-10`.
+2. **Un clip vertical en una pantalla horizontal muestra solo una franja** (1280×720: torso y puños, **sin cabeza**). **Arreglo:** el clip solo se usa
+   si se ve al menos el **70 %** de su proporción (`visibleFraction`); celulares (82 %, 80 %, 100 %) e iPad vertical (75 %) sí; pantalla cuadrada (56 %),
+   iPad horizontal (42 %) y computadores (32 %) usan la pose de siempre.
+
+**Tras el arreglo:** en vertical, el video mide 390×844 (cubre), termina en 4,00 s, y «Saltar», «Continuar» y las 3 líneas están encima; en horizontal no
+se carga video y se ve la pose de siempre. **No verificado:** iPhone y Android reales, batería, red lenta, `prefers-reduced-motion` en el navegador (solo
+con pruebas unitarias) y el respaldo cuando el archivo no existe (solo con pruebas unitarias).

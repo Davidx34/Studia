@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { TONITO_CLIPS, planClip, readClipEnvironment, sceneUsesVideo, type TonitoClipDef } from './clips';
+import { MIN_VISIBLE_FRACTION, TONITO_CLIPS, planClip, readClipEnvironment, sceneUsesVideo, visibleFraction, type TonitoClipDef } from './clips';
 import { VERSIONED_POSTER, VERSIONED_VIDEO, MAX_BYTES, isExternalMediaBase } from './media';
 import { TonitoClip } from '@/components/tonito/TonitoClip';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
@@ -37,6 +37,58 @@ describe('planClip', () => {
   });
 });
 
+describe('proporcion de la pantalla (clip vertical 9:16)', () => {
+  const clip = { width: 720, height: 1280 };
+
+  it('visibleFraction: 1 con la misma proporcion; menos si la pantalla es mas estrecha o mas ancha', () => {
+    expect(visibleFraction(clip, { width: 360, height: 640 })).toBeCloseTo(1, 5);
+    expect(visibleFraction(clip, { width: 390, height: 844 })).toBeCloseTo(0.82, 2); // celular alto: se pierde algo de ancho
+    expect(visibleFraction(clip, { width: 1280, height: 720 })).toBeCloseTo(0.32, 2); // computador horizontal: solo una franja
+  });
+
+  it('datos invalidos no bloquean el video (se asume que se ve entero)', () => {
+    expect(visibleFraction(clip, { width: 0, height: 0 })).toBe(1);
+    expect(visibleFraction({ width: 0, height: 100 }, { width: 390, height: 844 })).toBe(1);
+  });
+
+  it('celulares y iPad vertical SI usan el video; pantallas cuadradas, horizontales y computadores NO', () => {
+    const quien = (w: number, h: number) => planClip({ reducedMotion: false, viewport: { width: w, height: h } }, clip);
+    for (const [w, h] of [[390, 844], [412, 915], [360, 640], [768, 1024]]) expect(quien(w, h), w + 'x' + h).toEqual({ mode: 'video', reason: 'ok' });
+    for (const [w, h] of [[800, 800], [1024, 768], [1280, 720], [1366, 768]]) expect(quien(w, h), w + 'x' + h).toEqual({ mode: 'still', reason: 'orientation' });
+    expect(MIN_VISIBLE_FRACTION).toBe(0.7);
+  });
+
+  it('sin clip o sin tamano de ventana no se aplica la regla; el movimiento reducido sigue mandando', () => {
+    expect(planClip({ reducedMotion: false, viewport: { width: 1280, height: 720 } })).toEqual({ mode: 'video', reason: 'ok' });
+    expect(planClip({ reducedMotion: false }, clip)).toEqual({ mode: 'video', reason: 'ok' });
+    expect(planClip({ reducedMotion: true, viewport: { width: 1280, height: 720 } }, clip).reason).toBe('reduced-motion');
+  });
+});
+
+describe('capas de la cinematica con video (regresion medida en el navegador)', () => {
+  // Medido en un navegador real: el contenedor llevaba `relative` fijo y, sumado el `absolute` de la escena, en Tailwind gana `relative`:
+  // el video entraba en el flujo, ocupaba el 73 % de la altura y TAPABA el boton "Saltar". Estas pruebas vigilan el contrato.
+  const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8').replace(/\r\n/g, '\n');
+
+  it('el reproductor no impone su posicion: la decide quien lo usa (por defecto, relative)', () => {
+    const conPosicion = renderToStaticMarkup(h(TonitoClip, { clip: CLIP, className: 'absolute inset-0 h-full w-full' }));
+    expect(conPosicion).toContain('class="overflow-hidden absolute inset-0 h-full w-full"');
+    expect(conPosicion).not.toContain('relative');
+    expect(renderToStaticMarkup(h(TonitoClip, { clip: CLIP }))).toContain('class="overflow-hidden relative"');
+  });
+
+  it('en la escena, "Saltar", el texto y el boton van POR ENCIMA del video (z-index)', () => {
+    const src = read('src/components/cinematics/CinematicScene.tsx');
+    expect(src).toMatch(/absolute top-4 right-4 z-20/); // Saltar
+    expect(src).toMatch(/relative z-10 mt-6 max-w-lg/); // bloque de texto
+    expect(src).toMatch(/cinematic-dialogue-in relative z-10 mt-8/); // boton Continuar
+  });
+
+  it('la escena pide el plan CON el clip (para decidir segun la proporcion de la pantalla)', () => {
+    expect(read('src/components/cinematics/CinematicScene.tsx')).toContain('useClipPlan(clip)');
+  });
+});
+
 describe('sceneUsesVideo', () => {
   it('solo con clip registrado, plan de video y sin fallo', () => {
     const video = planClip({ reducedMotion: false });
@@ -53,7 +105,7 @@ describe('readClipEnvironment', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   const stub = (opts: { reduce?: boolean; conn?: any; canPlay?: string; throwVideo?: boolean }) => {
-    vi.stubGlobal('window', { matchMedia: () => ({ matches: !!opts.reduce }) });
+    vi.stubGlobal('window', { matchMedia: () => ({ matches: !!opts.reduce }), innerWidth: 390, innerHeight: 844 });
     vi.stubGlobal('navigator', { connection: opts.conn });
     vi.stubGlobal('document', {
       createElement: () => {
@@ -65,12 +117,12 @@ describe('readClipEnvironment', () => {
 
   it('lee movimiento reducido, ahorro de datos, tipo de conexion y soporte de MP4', () => {
     stub({ reduce: true, conn: { saveData: true, effectiveType: '3g' }, canPlay: 'probably' });
-    expect(readClipEnvironment()).toEqual({ reducedMotion: true, saveData: true, effectiveType: '3g', canPlayMp4: true });
+    expect(readClipEnvironment()).toEqual({ reducedMotion: true, saveData: true, effectiveType: '3g', canPlayMp4: true, viewport: { width: 390, height: 844 } });
   });
 
   it('un navegador sin la API de conexion no rompe y "" significa que no puede reproducir', () => {
     stub({ canPlay: '' });
-    expect(readClipEnvironment()).toEqual({ reducedMotion: false, saveData: false, effectiveType: undefined, canPlayMp4: false });
+    expect(readClipEnvironment()).toEqual({ reducedMotion: false, saveData: false, effectiveType: undefined, canPlayMp4: false, viewport: { width: 390, height: 844 } });
   });
 
   it('si no se puede comprobar el soporte, queda sin definir (se intenta igual)', () => {

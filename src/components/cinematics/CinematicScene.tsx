@@ -112,7 +112,7 @@ export function CinematicScene(props: CinematicProps) {
   const lines = scene.lines(props);
   // Video de la escena: solo si hay clip registrado, el dispositivo lo permite y no fallo al cargar. Si no, lo de siempre.
   const clip = scene.clipId ? TONITO_CLIPS[scene.clipId] : undefined;
-  const clipPlan = useClipPlan();
+  const clipPlan = useClipPlan(clip);
   const [clipFailed, setClipFailed] = useState(false);
   const video = sceneUsesVideo(clip, clipPlan, clipFailed);
 
@@ -144,7 +144,7 @@ export function CinematicScene(props: CinematicProps) {
     >
       <button
         onClick={handleContinue}
-        className="absolute top-4 right-4 text-xs text-white/60 hover:text-white/90 px-3 py-1.5 rounded-full bg-black/20 transition"
+        className="absolute top-4 right-4 z-20 text-xs text-white/60 hover:text-white/90 px-3 py-1.5 rounded-full bg-black/20 transition"
       >
         Saltar ✕
       </button>
@@ -168,7 +168,7 @@ export function CinematicScene(props: CinematicProps) {
         />
       )}
 
-      <div className="mt-6 max-w-lg px-6 text-center space-y-2 min-h-[4.5rem]">
+      <div className="relative z-10 mt-6 max-w-lg px-6 text-center space-y-2 min-h-[4.5rem]">
         {lines.slice(0, lineIdx).map((line, i) => (
           <p
             key={i}
@@ -182,7 +182,7 @@ export function CinematicScene(props: CinematicProps) {
       {showCta && (
         <button
           onClick={handleContinue}
-          className="cinematic-dialogue-in mt-8 px-8 py-3 rounded-2xl bg-white text-slate-900 font-bold shadow-2xl hover:scale-105 active:scale-95 transition-transform"
+          className="cinematic-dialogue-in relative z-10 mt-8 px-8 py-3 rounded-2xl bg-white text-slate-900 font-bold shadow-2xl hover:scale-105 active:scale-95 transition-transform"
         >
           {scene.ctaLabel}
         </button>
