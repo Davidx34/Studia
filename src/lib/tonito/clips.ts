@@ -8,9 +8,11 @@
 
 export interface TonitoClipDef {
   id: string;
+  // RUTAS RELATIVAS y con version en el nombre ("clips/celebracion.v1.mp4"); la URL final la arma mediaUrl() segun el proveedor
+  // (carpeta public/, Supabase Storage o Cloudflare R2). Los archivos son inmutables: un cambio es una version nueva (.v2).
   // Video H.264 en MP4, sin audio (el sonido lo pone el codigo con useSoundFx). Peso objetivo: <= 400 KB.
   src: string;
-  // Imagen fija del clip: se ve mientras carga y si el video no se puede reproducir.
+  // Imagen fija del clip: se ve mientras carga y si el video no se puede reproducir. Peso objetivo: <= 60 KB.
   poster: string;
   width: number;
   height: number;
@@ -18,7 +20,8 @@ export interface TonitoClipDef {
 }
 
 // Vacio a proposito: los archivos reales todavia no se han aprobado para publicarse. Con el registro vacio las cinematicas
-// se comportan exactamente como antes. Cada entrada nueva necesita su MP4 y su poster en public/tonito/clips/.
+// se comportan exactamente como antes. Cada entrada nueva necesita su MP4 y su poster en el proveedor de medios elegido
+// (ver docs/TONITO_MEDIOS_Y_ALMACENAMIENTO.md).
 export const TONITO_CLIPS: Record<string, TonitoClipDef> = {};
 
 export type ClipPlanReason = 'ok' | 'reduced-motion' | 'save-data' | 'slow-network' | 'no-video-support';

@@ -4,10 +4,11 @@ import path from 'path';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TONITO_CLIPS, planClip, readClipEnvironment, sceneUsesVideo, type TonitoClipDef } from './clips';
+import { VERSIONED_POSTER, VERSIONED_VIDEO, MAX_BYTES, isExternalMediaBase } from './media';
 import { TonitoClip } from '@/components/tonito/TonitoClip';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
 
-const CLIP: TonitoClipDef = { id: 'prueba', src: '/tonito/clips/prueba.mp4', poster: '/tonito/clips/prueba.jpg', width: 480, height: 270, loop: false };
+const CLIP: TonitoClipDef = { id: 'prueba', src: 'clips/prueba.v1.mp4', poster: 'clips/prueba.v1.jpg', width: 480, height: 270, loop: false };
 
 describe('planClip', () => {
   it('con un entorno normal reproduce el video', () => {
@@ -90,8 +91,8 @@ describe('TonitoClip (marcado)', () => {
   });
 
   it('trae el poster debajo del video y el MP4 como fuente', () => {
-    expect(html).toContain('<img src="/tonito/clips/prueba.jpg" alt=""');
-    expect(html).toContain('<source src="/tonito/clips/prueba.mp4" type="video/mp4"');
+    expect(html).toContain('<img src="/tonito/clips/prueba.v1.jpg" alt=""');
+    expect(html).toContain('<source src="/tonito/clips/prueba.v1.mp4" type="video/mp4"');
   });
 
   it('empieza invisible hasta que el video puede reproducirse (sin parpadeos) y respeta movimiento reducido', () => {
@@ -118,36 +119,36 @@ describe('CinematicScene sin clips registrados', () => {
 });
 
 // Guardas de los activos reales (hoy no hay ninguno: se cumplen en vacio y empiezan a vigilar cuando se agregue el primero).
+// Con una base EXTERNA (Supabase o R2) los archivos no estan en el repo: los comprueba `npm run media:check` contra la URL real.
 describe('activos de clips', () => {
-  const publicPath = (url: string) => path.join(process.cwd(), 'public', url.replace(/^\//, ''));
+  const localFile = (rel: string) => path.join(process.cwd(), 'public', 'tonito', rel);
   const entries = Object.values(TONITO_CLIPS);
 
-  it('cada clip registrado esta bien formado y sus archivos existen (nunca un 404 en una cinematica)', () => {
+  it('cada clip registrado usa rutas relativas y VERSIONADAS (inmutables: sin sobrescribir)', () => {
     for (const c of entries) {
-      expect(c.src).toMatch(/^\/tonito\/clips\/[\w-]+\.mp4$/);
-      expect(c.poster).toMatch(/^\/tonito\/clips\/[\w-]+\.(jpg|webp)$/);
+      expect(c.src).toMatch(VERSIONED_VIDEO);
+      expect(c.poster).toMatch(VERSIONED_POSTER);
       expect(c.width).toBeGreaterThan(0);
       expect(c.height).toBeGreaterThan(0);
-      expect(fs.existsSync(publicPath(c.src))).toBe(true);
-      expect(fs.existsSync(publicPath(c.poster))).toBe(true);
     }
   });
 
-  it('respetan el presupuesto de la ficha de arte: clip <= 400 KB, poster <= 60 KB, todos los clips <= 2 MB', () => {
+  it.skipIf(isExternalMediaBase())('con base local, los archivos existen y respetan el presupuesto (clip <= 400 KB, poster <= 60 KB, total <= 2 MB)', () => {
     let total = 0;
     for (const c of entries) {
-      const mp4 = fs.statSync(publicPath(c.src)).size;
+      expect(fs.existsSync(localFile(c.src))).toBe(true);
+      expect(fs.existsSync(localFile(c.poster))).toBe(true);
+      const mp4 = fs.statSync(localFile(c.src)).size;
       total += mp4;
-      expect(mp4).toBeLessThanOrEqual(400 * 1024);
-      expect(fs.statSync(publicPath(c.poster)).size).toBeLessThanOrEqual(60 * 1024);
+      expect(mp4).toBeLessThanOrEqual(MAX_BYTES.video);
+      expect(fs.statSync(localFile(c.poster)).size).toBeLessThanOrEqual(MAX_BYTES.poster);
     }
     expect(total).toBeLessThanOrEqual(2 * 1024 * 1024);
   });
 
-  it('el registro y la carpeta coinciden: no hay MP4 huerfanos ni entradas sin archivo', () => {
+  it.skipIf(isExternalMediaBase())('con base local, el registro y la carpeta coinciden: no hay MP4 huerfanos', () => {
     const dir = path.join(process.cwd(), 'public', 'tonito', 'clips');
     const onDisk = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.mp4')) : [];
-    const registered = entries.map((c) => path.basename(c.src));
-    expect(onDisk.sort()).toEqual(registered.sort());
+    expect(onDisk.sort()).toEqual(entries.map((c) => path.basename(c.src)).sort());
   });
 });
