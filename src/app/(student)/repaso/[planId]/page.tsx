@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { advanceRemediationPlan, type RemediationPlan } from '@/lib/actions/remediation-plans';
+import { pickAnchorModule } from '@/lib/mastery/reinforcement';
 import { TonitoCharacter } from '@/components/tonito/TonitoCharacter';
 import { useTonitoStore } from '@/stores/useTonitoStore';
 import { ChoiceQuestion, AnswerFeedback, choiceResult, correctChoiceText, type ChoiceKind, type ChoiceValue } from '@/components/lesson/ChoiceQuestion';
@@ -74,12 +75,26 @@ export default function RepasoPlanPage() {
       .limit(1)
       .maybeSingle();
 
+    // Las preguntas se generan con el material del modulo DONDE ESTAN los conceptos del plan (classroom_concepts), no con el del
+    // primer modulo de la clase. Si ninguno los registra, se mantiene el comportamiento de antes (el primer modulo).
+    let conceptModuleId: string | null = null;
+    try {
+      const { data: conceptRows } = await (supabase as any)
+        .from('classroom_concepts')
+        .select('module_id, tag')
+        .eq('classroom_id', planData.classroom_id)
+        .in('tag', planData.target_concepts);
+      conceptModuleId = pickAnchorModule(planData.target_concepts, (conceptRows ?? []) as { module_id: string; tag: string }[]);
+    } catch {
+      conceptModuleId = null;
+    }
+
     try {
       const res = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          moduleId: anchorModule?.id ?? planData.classroom_id,
+          moduleId: conceptModuleId ?? anchorModule?.id ?? planData.classroom_id,
           moduleTitle: planData.title,
           remediationConcepts: planData.target_concepts,
         }),

@@ -151,7 +151,7 @@ describe('ClassMasteryView', () => {
   });
 
   it('muestra "Dónde intervenir" con los nombres, y el detalle por módulo y objetivo en texto', () => {
-    const html = renderToStaticMarkup(h(ClassMasteryView, { mastery: full }));
+    const html = renderToStaticMarkup(h(ClassMasteryView, { classroomId: 'c1', mastery: full }));
     expect(html).toContain('Dónde intervenir');
     expect(html).toContain('Oferta y demanda');
     expect(html).toContain('2 estudiantes por repasar de 3');
@@ -165,22 +165,22 @@ describe('ClassMasteryView', () => {
   });
 
   it('avisa cuando los datos pueden estar incompletos', () => {
-    expect(renderToStaticMarkup(h(ClassMasteryView, { mastery: full, truncated: true }))).toContain('pueden estar incompletos');
-    expect(renderToStaticMarkup(h(ClassMasteryView, { mastery: full }))).not.toContain('pueden estar incompletos');
+    expect(renderToStaticMarkup(h(ClassMasteryView, { classroomId: 'c1', mastery: full, truncated: true }))).toContain('pueden estar incompletos');
+    expect(renderToStaticMarkup(h(ClassMasteryView, { classroomId: 'c1', mastery: full }))).not.toContain('pueden estar incompletos');
   });
 
   it('estados vacíos claros: sin estudiantes, sin módulos, sin respuestas y con error', () => {
     const base = { objectives, modules };
-    expect(renderToStaticMarkup(h(ClassMasteryView, { mastery: buildClassMastery({ ...base, students: [], attempts: [] }) }))).toContain('Aún no hay estudiantes');
-    expect(renderToStaticMarkup(h(ClassMasteryView, { mastery: buildClassMastery({ modules: [], objectives, students, attempts: [] }) }))).toContain('aún no tiene módulos');
-    expect(renderToStaticMarkup(h(ClassMasteryView, { mastery: buildClassMastery({ ...base, students, attempts: [] }) }))).toContain('Aún no hay respuestas');
-    const err = renderToStaticMarkup(h(ClassMasteryView, { mastery: null, error: 'No se pudo calcular' }));
+    expect(renderToStaticMarkup(h(ClassMasteryView, { classroomId: 'c1', mastery: buildClassMastery({ ...base, students: [], attempts: [] }) }))).toContain('Aún no hay estudiantes');
+    expect(renderToStaticMarkup(h(ClassMasteryView, { classroomId: 'c1', mastery: buildClassMastery({ modules: [], objectives, students, attempts: [] }) }))).toContain('aún no tiene módulos');
+    expect(renderToStaticMarkup(h(ClassMasteryView, { classroomId: 'c1', mastery: buildClassMastery({ ...base, students, attempts: [] }) }))).toContain('Aún no hay respuestas');
+    const err = renderToStaticMarkup(h(ClassMasteryView, { classroomId: 'c1', mastery: null, error: 'No se pudo calcular' }));
     expect(err).toContain('role="alert"');
     expect(err).toContain('No se pudo calcular');
   });
 
   it('si nadie necesita repaso lo dice', () => {
     const ok = buildClassMastery({ modules, objectives, students, attempts: [...run('s1', 'm1', 5, 5), ...run('s2', 'm1', 5, 5)] });
-    expect(renderToStaticMarkup(h(ClassMasteryView, { mastery: ok }))).toContain('Ningún estudiante tiene módulos por repasar');
+    expect(renderToStaticMarkup(h(ClassMasteryView, { classroomId: 'c1', mastery: ok }))).toContain('Ningún estudiante tiene módulos por repasar');
   });
 });

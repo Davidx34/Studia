@@ -7,14 +7,17 @@ import type { ClassAttempt } from './classMastery';
 export const PAGE_SIZE = 1000;
 export const MAX_PAGES = 20;
 
-export async function fetchClassAttempts(db: any, classroomId: string): Promise<{ rows: ClassAttempt[]; truncated: boolean }> {
+export async function fetchClassAttempts(db: any, classroomId: string, opts: { moduleId?: string } = {}): Promise<{ rows: ClassAttempt[]; truncated: boolean }> {
   const rows: ClassAttempt[] = [];
   for (let page = 0; page < MAX_PAGES; page++) {
     const from = page * PAGE_SIZE;
-    const { data, error } = await db
+    let query = db
       .from('question_attempts')
-      .select('student_id, module_id, question_id, was_correct, attempted_at')
-      .eq('classroom_id', classroomId)
+      .select('student_id, module_id, question_id, was_correct, attempted_at, concept_tag')
+      .eq('classroom_id', classroomId);
+    // Un solo modulo (refuerzo dirigido): mucho menos que leer toda la clase.
+    if (opts.moduleId) query = query.eq('module_id', opts.moduleId);
+    const { data, error } = await query
       .order('attempted_at', { ascending: false })
       .order('id', { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
