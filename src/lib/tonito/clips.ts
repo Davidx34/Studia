@@ -6,6 +6,8 @@
 //
 // Funciones puras (sin DOM), para poder probarlas. El navegador las alimenta con readClipEnvironment().
 
+import { isExternalMediaBase } from './media';
+
 export interface TonitoClipDef {
   id: string;
   // RUTAS RELATIVAS y con version en el nombre ("clips/celebracion.v1.mp4"); la URL final la arma mediaUrl() segun el proveedor
@@ -19,10 +21,22 @@ export interface TonitoClipDef {
   loop: boolean;
 }
 
-// Vacio a proposito: los archivos reales todavia no se han aprobado para publicarse. Con el registro vacio las cinematicas
-// se comportan exactamente como antes. Cada entrada nueva necesita su MP4 y su poster en el proveedor de medios elegido
-// (ver docs/TONITO_MEDIOS_Y_ALMACENAMIENTO.md).
-export const TONITO_CLIPS: Record<string, TonitoClipDef> = {};
+// Donde viven los archivos de los clips: 'remote' = bucket publico de Supabase Storage `tonito-media` (se sirve desde la base que
+// pone NEXT_PUBLIC_TONITO_MEDIA_BASE_URL); 'local' = carpeta public/tonito del repo. Cada entrada nueva necesita su MP4 y su poster
+// subidos ahi (npm run media:upload) y comprobados (npm run media:check). Ver docs/TONITO_MEDIOS_Y_ALMACENAMIENTO.md.
+export const CLIPS_HOSTING: 'remote' | 'local' = 'remote';
+
+// Un clip alojado en remoto solo se pide si la base remota esta configurada: sin NEXT_PUBLIC_TONITO_MEDIA_BASE_URL (desarrollo, una vista
+// previa sin la variable) la URL caeria a /tonito/ y daria 404. En ese caso la cinematica usa la pose de siempre, sin peticiones fallidas.
+export function clipAvailable(clip: TonitoClipDef | undefined, externalBase: boolean = isExternalMediaBase()): boolean {
+  if (!clip) return false;
+  return CLIPS_HOSTING === 'local' || externalBase;
+}
+
+export const TONITO_CLIPS: Record<string, TonitoClipDef> = {
+  // Celebracion de modulo completado (escena module_complete_good). Vertical 9:16, 4 s, H.264 sin audio, 303 KB + poster de 44 KB.
+  celebracion: { id: 'celebracion', src: 'clips/celebracion.v1.mp4', poster: 'clips/celebracion.v1.jpg', width: 720, height: 1280, loop: false },
+};
 
 export type ClipPlanReason = 'ok' | 'reduced-motion' | 'save-data' | 'slow-network' | 'no-video-support' | 'orientation';
 

@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { MIN_VISIBLE_FRACTION, TONITO_CLIPS, planClip, readClipEnvironment, sceneUsesVideo, visibleFraction, type TonitoClipDef } from './clips';
+import { CLIPS_HOSTING, MIN_VISIBLE_FRACTION, TONITO_CLIPS, clipAvailable, planClip, readClipEnvironment, sceneUsesVideo, visibleFraction, type TonitoClipDef } from './clips';
 import { VERSIONED_POSTER, VERSIONED_VIDEO, MAX_BYTES, isExternalMediaBase } from './media';
 import { TonitoClip } from '@/components/tonito/TonitoClip';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
@@ -89,6 +89,37 @@ describe('capas de la cinematica con video (regresion medida en el navegador)', 
   });
 });
 
+describe('clip registrado: celebracion', () => {
+  it('es el clip vertical 9:16 de 4 s, sin bucle, con rutas versionadas', () => {
+    expect(TONITO_CLIPS.celebracion).toEqual({
+      id: 'celebracion',
+      src: 'clips/celebracion.v1.mp4',
+      poster: 'clips/celebracion.v1.jpg',
+      width: 720,
+      height: 1280,
+      loop: false,
+    });
+  });
+
+  it('los clips estan en el bucket remoto, no en public/', () => {
+    expect(CLIPS_HOSTING).toBe('remote');
+  });
+
+  it('con archivos remotos, un clip solo esta disponible si la base remota esta configurada (si no, la URL daria 404)', () => {
+    const clip = TONITO_CLIPS.celebracion;
+    expect(clipAvailable(clip, true)).toBe(true);
+    expect(clipAvailable(clip, false)).toBe(false);
+    expect(clipAvailable(undefined, true)).toBe(false);
+  });
+
+  it('cada clipId que usa una escena existe en el registro (un error de tipeo desactivaria el video sin avisar)', () => {
+    const src = fs.readFileSync(path.join(process.cwd(), 'src/components/cinematics/CinematicScene.tsx'), 'utf8');
+    const ids = Array.from(src.matchAll(/clipId: '([a-z-]+)'/g)).map((m) => m[1]);
+    expect(ids).toContain('celebracion');
+    for (const id of ids) expect(TONITO_CLIPS[id], id).toBeDefined();
+  });
+});
+
 describe('sceneUsesVideo', () => {
   it('solo con clip registrado, plan de video y sin fallo', () => {
     const video = planClip({ reducedMotion: false });
@@ -162,7 +193,7 @@ describe('TonitoClip (marcado)', () => {
   });
 });
 
-describe('CinematicScene sin clips registrados', () => {
+describe('CinematicScene en el servidor o en el primer render (aun sin plan de video)', () => {
   it('se comporta como siempre: muestra a Toñito animado y ningun video', () => {
     const out = renderToStaticMarkup(h(CinematicScene, { type: 'module_complete_good', score: 90, onComplete: () => {} }));
     expect(out).toContain('tonito-character');
@@ -185,7 +216,7 @@ describe('activos de clips', () => {
     }
   });
 
-  it.skipIf(isExternalMediaBase())('con base local, los archivos existen y respetan el presupuesto (clip <= 400 KB, poster <= 60 KB, total <= 2 MB)', () => {
+  it.skipIf(isExternalMediaBase() || CLIPS_HOSTING === 'remote')('con archivos locales, los archivos existen y respetan el presupuesto (clip <= 400 KB, poster <= 60 KB, total <= 2 MB)', () => {
     let total = 0;
     for (const c of entries) {
       expect(fs.existsSync(localFile(c.src))).toBe(true);
@@ -198,7 +229,7 @@ describe('activos de clips', () => {
     expect(total).toBeLessThanOrEqual(2 * 1024 * 1024);
   });
 
-  it.skipIf(isExternalMediaBase())('con base local, el registro y la carpeta coinciden: no hay MP4 huerfanos', () => {
+  it.skipIf(isExternalMediaBase() || CLIPS_HOSTING === 'remote')('con archivos locales, el registro y la carpeta coinciden: no hay MP4 huerfanos', () => {
     const dir = path.join(process.cwd(), 'public', 'tonito', 'clips');
     const onDisk = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.mp4')) : [];
     expect(onDisk.sort()).toEqual(entries.map((c) => path.basename(c.src)).sort());
