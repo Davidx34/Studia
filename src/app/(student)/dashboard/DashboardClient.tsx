@@ -7,6 +7,7 @@ import { BookOpen, Trophy, Target, Map, Sparkles, ArrowRight, CheckCircle2, Flam
 import type { RemediationPlan } from '@/lib/actions/remediation-plans';
 import { ReviewTodayCard } from '@/components/student/ReviewTodayCard';
 import type { ReviewPlanForDashboard } from '@/lib/study/reviewPlanServer';
+import type { StreakStatus } from '@/lib/streak/status';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
 import { Card, Badge } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -23,6 +24,8 @@ interface Props {
   activePlan: RemediationPlan | null;
   // Flashcards pendientes de repaso hoy (null si no hay o no se pudo calcular).
   reviewPlan?: ReviewPlanForDashboard | null;
+  // Racha real y su estado (a salvo / en riesgo / dia de gracia / perdida).
+  streak: StreakStatus;
   // "Mis clases": se muestra DESPUES de la accion principal (continuar), no antes.
   classesSection?: React.ReactNode;
 }
@@ -37,6 +40,7 @@ export function DashboardClient({
   weeklyProgress,
   activePlan,
   reviewPlan,
+  streak,
   classesSection,
 }: Props) {
   const showMessage = useTonitoStore((s) => s.showMessage);
@@ -62,10 +66,10 @@ export function DashboardClient({
     const name = profile?.full_name?.split(' ')[0] || profile?.username || 'estudiante';
 
     let message = '';
-    if (profile?.streak_days >= 7) {
-      message = `¡${timeGreeting}, ${name}! 🔥 ${profile.streak_days} días seguidos. ¡Eres imparable!`;
-    } else if (profile?.streak_days >= 3) {
-      message = `¡${timeGreeting}, ${name}! Llevas ${profile.streak_days} días. ¡Sigamos! 💪`;
+    if (streak.streak >= 7) {
+      message = `¡${timeGreeting}, ${name}! 🔥 ${streak.streak} días seguidos. ¡Eres imparable!`;
+    } else if (streak.streak >= 3) {
+      message = `¡${timeGreeting}, ${name}! Llevas ${streak.streak} días. ¡Sigamos! 💪`;
     } else if (inProgressModule) {
       message = `¡${timeGreeting}, ${name}! Tienes un módulo a medias. ¿Lo terminamos? 📚`;
     } else {
@@ -74,7 +78,7 @@ export function DashboardClient({
 
     const timer = setTimeout(() => showMessage(message, 6000), 800);
     return () => clearTimeout(timer);
-  }, [profile, inProgressModule, showMessage, showWelcome]);
+  }, [profile, inProgressModule, showMessage, showWelcome, streak.streak]);
 
   const completedMissions = missions.filter((m) => m.is_completed).length;
 
@@ -156,7 +160,7 @@ export function DashboardClient({
       <section aria-label="Tu resumen">
         <ul className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard icon={BookOpen} label="Módulos" value={totalCompleted} tone="primary" />
-          <StatCard icon={Flame} label="Racha" value={`${profile?.streak_days || 0}d`} tone="accent" />
+          <StatCard icon={Flame} label="Racha" value={`${streak.streak}d`} tone="accent" hint={streak.hint} />
           <StatCard icon={Trophy} label="Logros" value={recentAchievements.length} tone="primary" />
           <StatCard icon={Target} label="Misiones hoy" value={`${completedMissions}/${missions.length}`} tone="primary" />
         </ul>
@@ -288,11 +292,13 @@ function StatCard({
   label,
   value,
   tone,
+  hint,
 }: {
   icon: any;
   label: string;
   value: string | number;
   tone: 'primary' | 'accent';
+  hint?: string;
 }) {
   return (
     <li>
@@ -302,6 +308,7 @@ function StatCard({
         </div>
         <div className="text-2xl font-bold text-fg font-mono tabular-nums">{value}</div>
         <div className="text-xs text-fg-muted font-medium">{label}</div>
+        {hint && <div className="mt-1 text-[11px] leading-snug text-fg-muted">{hint}</div>}
       </Card>
     </li>
   );

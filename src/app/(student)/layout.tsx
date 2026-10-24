@@ -38,11 +38,10 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
       setUser(profile);
       setLoading(false);
 
-      // Actualizar racha diaria y evaluar logros (first_login, streak_days, etc.)
-      // en background, sin bloquear el render.
-      supabase.rpc('check_and_update_streak', { p_user_id: authUser.id }).then(() => {
-        evaluateAchievements();
-      });
+      // La racha ya NO se actualiza al abrir pantallas: la actualiza la base cuando el estudiante ESTUDIA (responde una
+      // pregunta o repasa una flashcard; migracion 071). Aqui solo se evaluan logros (first_login, etc.) en background,
+      // sin bloquear el render.
+      void evaluateAchievements();
     };
 
     checkAuth();
