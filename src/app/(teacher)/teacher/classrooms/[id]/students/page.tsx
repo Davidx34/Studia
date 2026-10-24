@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { Mail, UserPlus, Users as UsersIcon, Clock, CheckCircle2 } from 'lucide-react';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { profileStreak } from '@/lib/streak/status';
 import InviteStudentsForm from './InviteStudentsForm';
 import RemoveEnrollmentButton from './RemoveEnrollmentButton';
 import CancelPendingButton from './CancelPendingButton';
@@ -29,7 +30,7 @@ export default async function ClassroomStudentsPage({ params }: PageProps) {
     studentIds.length > 0
       ? await supabase
           .from('profiles')
-          .select('id, full_name, username, email, avatar_url, streak_days')
+          .select('id, full_name, username, email, avatar_url, streak_days, last_activity_date, timezone')
           .in('id', studentIds)
           .order('full_name', { ascending: true })
       : { data: [] };
@@ -73,7 +74,7 @@ export default async function ClassroomStudentsPage({ params }: PageProps) {
                 </div>
                 <div className="hidden sm:flex flex-col items-end text-xs text-fg-muted">
                   <span>
-                    <strong className="text-primary-text">{s.streak_days ?? 0}</strong> días de racha
+                    <strong className="text-primary-text">{profileStreak(s).streak}</strong> días de racha
                   </span>
                 </div>
                 <RemoveEnrollmentButton classroomId={params.id} studentId={s.id} />

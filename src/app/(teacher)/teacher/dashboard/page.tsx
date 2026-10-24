@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { profileStreak } from '@/lib/streak/status';
 import { Users, BookOpen, TrendingUp, AlertTriangle, ChevronRight, Plus } from 'lucide-react';
 
 export default async function TeacherDashboardPage() {
@@ -41,7 +42,7 @@ export default async function TeacherDashboardPage() {
   // Perfiles de los estudiantes
   const { data: students } = await supabase
     .from('profiles')
-    .select('id, full_name, username, streak_days, last_activity_date')
+    .select('id, full_name, username, streak_days, last_activity_date, timezone')
     .in('id', studentIds);
 
   // Módulos del profesor
@@ -79,9 +80,12 @@ export default async function TeacherDashboardPage() {
       return daysDiff >= 3;
     }) || [];
 
-  // Las 3 rachas mas largas
-  const topStudents = [...(students || [])]
-    .sort((a, b) => (b.streak_days ?? 0) - (a.streak_days ?? 0))
+  // Las 3 rachas mas largas ACTIVAS: se usa la racha real (la guardada queda vieja si el estudiante lleva dias sin estudiar) y
+  // quien ya no tiene racha no aparece en el podio.
+  const topStudents = (students || [])
+    .map((s) => ({ ...s, realStreak: profileStreak(s).streak }))
+    .filter((s) => s.realStreak > 0)
+    .sort((a, b) => b.realStreak - a.realStreak)
     .slice(0, 3);
 
   return (
@@ -158,7 +162,7 @@ export default async function TeacherDashboardPage() {
                     </div>
                     <div className="min-w-0">
                       <div className="font-semibold text-fg truncate">{s.full_name}</div>
-                      <div className="text-xs text-fg-muted">Racha de {s.streak_days} días</div>
+                      <div className="text-xs text-fg-muted">{profileStreak(s).streak > 0 ? `Racha de ${profileStreak(s).streak} días` : 'Sin racha activa'}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -186,6 +190,9 @@ export default async function TeacherDashboardPage() {
           </div>
 
           <div className="space-y-2">
+            {topStudents.length === 0 && (
+              <p className="rounded-xl border border-line bg-surface p-4 text-sm text-fg-muted">Aún nadie tiene una racha activa.</p>
+            )}
             {topStudents.map((s, idx) => {
               const medals = ['🥇', '🥈', '🥉'];
               return (
@@ -203,7 +210,7 @@ export default async function TeacherDashboardPage() {
                     <div className="text-xs text-fg-muted">@{s.username}</div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="font-bold text-primary-text">{s.streak_days}🔥</div>
+                    <div className="font-bold text-primary-text">{s.realStreak}🔥</div>
                     <div className="text-xs text-fg-muted">días seguidos</div>
                   </div>
                 </Link>

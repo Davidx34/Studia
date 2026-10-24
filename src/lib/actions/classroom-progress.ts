@@ -14,6 +14,7 @@
 
 import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { profileStreak } from '@/lib/streak/status';
 
 export interface StudentRow {
   studentId: string;
@@ -128,7 +129,7 @@ export async function getClassroomProgress(
       ? await supabase
           .from('profiles')
           .select(
-            'id, full_name, username, email, avatar_url, streak_days'
+            'id, full_name, username, email, avatar_url, streak_days, last_activity_date, timezone'
           )
           .in('id', studentIds)
       : { data: [] };
@@ -221,7 +222,8 @@ export async function getClassroomProgress(
       username: profile.username,
       email: profile.email,
       avatarUrl: profile.avatar_url,
-      streakDays: profile.streak_days ?? 0,
+      // Racha REAL (la guardada queda vieja si el estudiante lleva dias sin estudiar).
+      streakDays: profileStreak(profile).streak,
       modulesCompleted: completed.length,
       modulesTotal: totalModules,
       avgScore,
