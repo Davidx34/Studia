@@ -21,3 +21,20 @@ export function isAuthPage(pathname: string): boolean {
 export function isPublicPage(pathname: string): boolean {
   return PUBLIC_PAGES.includes(pathname);
 }
+
+// Archivos estaticos de public/ que el navegador debe poder leer SIN sesion.
+// El matcher del middleware no excluye public/, asi que sin esto el manifest y
+// los iconos de la PWA responden 307 -> /login y la instalacion desde la
+// pantalla de acceso falla (el navegador recibe HTML en vez del JSON/PNG).
+// Son solo assets de marca (sin datos de usuarios); no abre ninguna ruta de la
+// app ni de la API. sw.js y /_next/static ya estan excluidos en el matcher.
+const PUBLIC_ASSET_EXACT: readonly string[] = ['/manifest.json'];
+const PUBLIC_ASSET_PREFIXES: readonly string[] = ['/icons/', '/tonito/'];
+
+export function isPublicAsset(pathname: string): boolean {
+  if (pathname.includes('..')) return false;
+  return (
+    PUBLIC_ASSET_EXACT.includes(pathname) ||
+    PUBLIC_ASSET_PREFIXES.some((p) => pathname.startsWith(p) && pathname.length > p.length)
+  );
+}
