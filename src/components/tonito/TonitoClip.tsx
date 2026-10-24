@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { planClip, readClipEnvironment, type ClipPlan, type TonitoClipDef } from '@/lib/tonito/clips';
+import { mediaUrl } from '@/lib/tonito/media';
 
 // null mientras no se ha montado (en el servidor no hay DOM): se trata como "todavia no" y se muestra la version de siempre.
 export function useClipPlan(): ClipPlan | null {
@@ -66,7 +67,7 @@ export function TonitoClip({
   return (
     <div className={`relative overflow-hidden ${className}`} role="presentation" style={{ aspectRatio: `${clip.width} / ${clip.height}` }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={clip.poster} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
+      <img src={mediaUrl(clip.poster)} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
       <video
         ref={ref}
         muted
@@ -83,7 +84,7 @@ export function TonitoClip({
         onError={() => onFailed?.()}
       >
         {/* El error de un <source> no sube al <video>: se escucha aqui tambien. */}
-        <source src={clip.src} type="video/mp4" onError={() => onFailed?.()} />
+        <source src={mediaUrl(clip.src)} type="video/mp4" onError={() => onFailed?.()} />
       </video>
     </div>
   );
