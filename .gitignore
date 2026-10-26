@@ -52,3 +52,6 @@ FASE_*_BRIEF.docx
 
 .vercel
 .env*
+
+# Salida de npm run clip:prepare (videos convertidos, aun sin subir)
+clips-out/

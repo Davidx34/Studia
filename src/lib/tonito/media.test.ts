@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { LOCAL_MEDIA_BASE, VERSIONED_POSTER, VERSIONED_VIDEO, judgeMediaResponse, mediaUrl, resolveMediaBase, isExternalMediaBase } from './media';
+import { LOCAL_MEDIA_BASE, VERSIONED_POSTER, VERSIONED_VIDEO, judgeMediaResponse, mediaUrl, resolveMediaBase, isExternalMediaBase, pickMediaBase, defaultMediaBase } from './media';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TonitoClip } from '@/components/tonito/TonitoClip';
@@ -31,6 +31,23 @@ describe('resolveMediaBase', () => {
     expect(resolveMediaBase('https://user:pass@media.ejemplo.com')).toBe(LOCAL_MEDIA_BASE);
     expect(resolveMediaBase(R2 + '?token=abc')).toBe(LOCAL_MEDIA_BASE);
     expect(resolveMediaBase(R2 + '#x')).toBe(LOCAL_MEDIA_BASE);
+  });
+
+  it('sin variable, la base es el bucket del proyecto de Supabase (no hay que configurar nada)', () => {
+    expect(pickMediaBase(undefined, 'https://roulrdmxsazjkczxkzax.supabase.co')).toBe(SUPABASE);
+    expect(pickMediaBase('  ', 'https://roulrdmxsazjkczxkzax.supabase.co/')).toBe(SUPABASE);
+  });
+
+  it('sin Supabase https (local o ausente) cae a la carpeta local', () => {
+    expect(pickMediaBase(undefined, undefined)).toBe(LOCAL_MEDIA_BASE);
+    expect(pickMediaBase('', 'http://127.0.0.1:54321')).toBe(LOCAL_MEDIA_BASE);
+    expect(defaultMediaBase('no es una url')).toBe(LOCAL_MEDIA_BASE);
+    expect(defaultMediaBase('https://u:p@x.supabase.co')).toBe(LOCAL_MEDIA_BASE);
+  });
+
+  it('la variable manda sobre el bucket del proyecto, y `local` lo desactiva', () => {
+    expect(pickMediaBase(R2, 'https://roulrdmxsazjkczxkzax.supabase.co')).toBe(R2);
+    expect(pickMediaBase('local', 'https://roulrdmxsazjkczxkzax.supabase.co')).toBe(LOCAL_MEDIA_BASE);
   });
 
   it('isExternalMediaBase distingue local de externa', () => {

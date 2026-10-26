@@ -14,9 +14,13 @@ URL con una **base** que sale de la variable `NEXT_PUBLIC_TONITO_MEDIA_BASE_URL`
 
 | Valor de la variable | Dónde se sirve | URL resultante |
 |---|---|---|
-| *(sin definir)* | Carpeta `public/tonito/` del repo (Vercel) | `/tonito/clips/celebracion.v1.mp4` |
+| *(sin definir)* | **Desde la actualización de las cinemáticas: el bucket `tonito-media` del proyecto de Supabase de la app** (se deduce de `NEXT_PUBLIC_SUPABASE_URL`; con Supabase local en http, cae a la carpeta local). **No hay que configurar nada.** | `…/tonito-media/clips/celebracion.v1.mp4` |
+| `local` | Carpeta `public/tonito/` del repo (Vercel); desactiva los clips remotos | `/tonito/clips/celebracion.v1.mp4` |
 | `https://<ref>.supabase.co/storage/v1/object/public/tonito-media` | Supabase Storage | `…/tonito-media/clips/celebracion.v1.mp4` |
 | `https://media.<tu-dominio>` o `https://pub-xxxx.r2.dev` | Cloudflare R2 | `https://media.<tu-dominio>/clips/celebracion.v1.mp4` |
+
+> Los pasos A4 y de la sección 9 que piden crear la variable en Vercel **ya no hacen falta**: quedan como referencia histórica y para
+> usar otro proveedor. Cómo añadir cinemáticas nuevas: `docs/TONITO_CINEMATICAS.md`.
 
 **Cambiar de proveedor = cambiar esa variable en Vercel y volver a desplegar** (Next la inserta al compilar). Una base mal escrita
 (http, sin https, con credenciales o parámetros) **se ignora** y se usa la local: nunca deja a las cinemáticas sin archivos.
