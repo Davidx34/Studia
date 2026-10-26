@@ -102,6 +102,10 @@ const SCENES: Record<CinematicType, SceneConfig> = {
   },
 };
 
+// Para el visor del panel de desarrollo (/dev/cinematicas): que escenas hay y cual clip usa cada una.
+export const CINEMATIC_TYPES = Object.keys(SCENES) as CinematicType[];
+export const sceneClipId = (type: CinematicType): string | undefined => SCENES[type].clipId;
+
 export function CinematicScene(props: CinematicProps) {
   const { type, onComplete } = props;
   const scene = SCENES[type];

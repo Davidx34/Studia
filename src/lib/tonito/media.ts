@@ -1,13 +1,15 @@
 // Donde viven los archivos de medios de Tonito (clips y poster), sin atar el codigo a un proveedor.
 //
-// La app pide los archivos por una RUTA RELATIVA ("clips/celebracion.v1.mp4") y esta capa la convierte en URL con una base que se
-// elige con la variable NEXT_PUBLIC_TONITO_MEDIA_BASE_URL. Sin ella, la base es local (/tonito, la carpeta public/ del repo). Con ella,
-// puede ser un bucket publico de Supabase Storage o un bucket de Cloudflare R2: cambiar de proveedor es cambiar UNA variable.
+// La app pide los archivos por una RUTA RELATIVA ("clips/celebracion.v1.mp4") y esta capa la convierte en URL con una base. Por
+// defecto es el bucket publico `tonito-media` del MISMO proyecto de Supabase de la app (se deduce de NEXT_PUBLIC_SUPABASE_URL). Se
+// puede cambiar con NEXT_PUBLIC_TONITO_MEDIA_BASE_URL: otro bucket (Supabase o Cloudflare R2) o la palabra `local` (carpeta
+// public/tonito del repo). Cambiar de proveedor es cambiar UNA variable.
 // Ver docs/TONITO_MEDIOS_Y_ALMACENAMIENTO.md.
 //
 // Funciones puras (sin red ni DOM), para poder probarlas.
 
 export const LOCAL_MEDIA_BASE = '/tonito';
+export const TONITO_BUCKET = 'tonito-media';
 
 // Ruta relativa permitida: letras, numeros, punto, guion, guion bajo y barras; sin empezar por barra y sin "..".
 const REL_PATH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
@@ -26,8 +28,28 @@ export function resolveMediaBase(raw: string | undefined | null): string {
   return LOCAL_MEDIA_BASE;
 }
 
-// Next sustituye esta variable en la compilacion: cambiarla exige volver a desplegar.
-export const MEDIA_BASE = resolveMediaBase(process.env.NEXT_PUBLIC_TONITO_MEDIA_BASE_URL);
+// Base por defecto: el bucket publico `tonito-media` del proyecto de Supabase de la app (no hay que configurar nada). Solo vale con
+// https: un Supabase local en http no tiene el bucket en esta URL y se usa la carpeta local.
+export function defaultMediaBase(supabaseUrl: string | undefined | null): string {
+  const v = (supabaseUrl ?? '').trim().replace(/\/+$/, '');
+  if (!v) return LOCAL_MEDIA_BASE;
+  try {
+    const u = new URL(v);
+    if (u.protocol === 'https:' && !u.username && !u.password) return `${u.origin}/storage/v1/object/public/${TONITO_BUCKET}`;
+  } catch {
+    // URL invalida: se usa la local
+  }
+  return LOCAL_MEDIA_BASE;
+}
+
+// Variable vacia o ausente -> el bucket del proyecto. Con valor -> ese valor si es valido; si no (por ejemplo la palabra `local`), la
+// carpeta local.
+export function pickMediaBase(raw: string | undefined | null, supabaseUrl: string | undefined | null): string {
+  return (raw ?? '').trim() === '' ? defaultMediaBase(supabaseUrl) : resolveMediaBase(raw);
+}
+
+// Next sustituye estas variables en la compilacion: cambiarlas exige volver a desplegar.
+export const MEDIA_BASE = pickMediaBase(process.env.NEXT_PUBLIC_TONITO_MEDIA_BASE_URL, process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 export const isExternalMediaBase = (base: string = MEDIA_BASE): boolean => base !== LOCAL_MEDIA_BASE;
 

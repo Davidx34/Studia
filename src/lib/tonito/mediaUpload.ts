@@ -7,9 +7,9 @@
 //   - en los MP4, que el indice (`moov`) vaya ANTES de los datos (`mdat`): es lo que hace `-movflags +faststart`. Sin eso el
 //     navegador no puede empezar a reproducir hasta descargar el archivo entero.
 
-import { MAX_BYTES, VERSIONED_POSTER, VERSIONED_VIDEO, type MediaKind } from './media';
+import { MAX_BYTES, TONITO_BUCKET, VERSIONED_POSTER, VERSIONED_VIDEO, type MediaKind } from './media';
 
-export const TONITO_BUCKET = 'tonito-media';
+export { TONITO_BUCKET };
 // Un año, en segundos: los archivos son inmutables (version en el nombre), asi que pueden cachearse para siempre.
 export const CACHE_CONTROL_SECONDS = '31536000';
 

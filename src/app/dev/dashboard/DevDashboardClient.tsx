@@ -82,6 +82,9 @@ export default function DevDashboardClient() {
           <h1 className="text-lg font-semibold">Panel de desarrollador</h1>
           <p className="text-xs text-slate-500">catral.josedavid@gmail.com</p>
         </div>
+        <a href="/dev/cinematicas" className="ml-auto mr-2 px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          Cinemáticas
+        </a>
         <button
           onClick={handleLogout}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition"
