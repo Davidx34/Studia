@@ -73,6 +73,9 @@ export async function routeText<T = string>(opts: RouteOptions<T>): Promise<Rout
     }
 
     health.success(cand, ms);
+    // Con AI_LOG_USAGE=1 cada respuesta deja una linea en el log del servidor (tarea, modelo, tiempo y tokens; nunca el contenido):
+    // sirve para medir el costo real por modulo cuando se prueba un modelo de pago. Apagado por defecto.
+    if (env.AI_LOG_USAGE === '1') console.log(formatUsageLine(opts.task, cand, ms, out.usage));
     attempts.push({ provider: cand.provider, model: cand.model, ok: true, ms });
     const candidate = { value: checked.value, text: out.text, provider: cand.provider, model: cand.model, quality: checked.quality };
     if (!best || candidate.quality > best.quality) best = candidate;
@@ -81,6 +84,11 @@ export async function routeText<T = string>(opts: RouteOptions<T>): Promise<Rout
 
   if (best) return { ok: true, ...best, attempts };
   return { ok: false, reason: 'exhausted', attempts };
+}
+
+// Una linea de uso por llamada exitosa (ver AI_LOG_USAGE). Sin datos del usuario ni del material.
+export function formatUsageLine(task: string, cand: Candidate, ms: number, usage?: { prompt?: number; completion?: number }): string {
+  return `[AI_USAGE] task=${task} model=${cand.provider}/${cand.model} ms=${ms} in=${usage?.prompt ?? '?'} out=${usage?.completion ?? '?'}`;
 }
 
 // Resumen legible de lo ocurrido, para registrar en el log del servidor (sin datos del usuario ni llaves).

@@ -19,8 +19,10 @@
 // una regla cambia generacion y verificacion a la vez y no pueden divergir.
 import { MINIGAME_TYPE_RULES_TEXT } from '@/lib/questions/cohereGeneration';
 import { routeText, describeAttempts, chainFor, sharedHealth } from '@/lib/ai/gateway';
+import { geminiModel } from '@/lib/ai/geminiModels';
 
-const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
+// El modelo sale de src/lib/ai/geminiModels.ts (perfil AI_PROFILE o GEMINI_MODEL_JUDGE); por defecto sigue siendo gemini-2.5-flash.
+const GEMINI_FLASH_MODEL = geminiModel('judge');
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
 export type JudgeVerdict = 'pass' | 'fail' | 'review';

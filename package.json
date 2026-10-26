@@ -11,6 +11,7 @@
     "eval:context": "npx tsx --env-file=.env.local scripts/eval-context.ts",
     "eval:judge": "npx tsx --env-file=.env.local scripts/eval-judge.ts",
     "ai:doctor": "npx tsx --env-file=.env.local scripts/ai-doctor.ts",
+    "ai:probe": "npx tsx --env-file=.env.local scripts/gemini-probe.ts",
     "eval:retrieval": "npx tsx --env-file=.env.local scripts/eval-retrieval.ts",
     "reindex:embeddings": "npx tsx --env-file=.env.local scripts/reindex-embeddings.ts",
     "media:check": "npx tsx --env-file=.env.local scripts/media-check.ts",
