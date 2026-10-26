@@ -8,6 +8,7 @@
 // (~258 por pagina) y ~900 de salida.
 
 import { callOpenRouter, isOpenRouterConfigured } from '@/lib/ai/openrouter';
+import { DEFAULT_MODELS, geminiModels, thinkingConfigFor } from '@/lib/ai/geminiModels';
 
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 export type PdfVisionFailure = 'no_key' | 'quota' | 'rate_limited' | 'no_credit' | 'server' | 'bad_request' | 'timeout' | 'empty';
@@ -30,13 +31,9 @@ export function isGeminiDailyQuota(status: number, body: string): boolean {
 // Modelos de Gemini para leer PDFs, en orden. El primero tiene su PROPIA cuota: el juez usa
 // gemini-2.5-flash y su cuota gratuita (20 peticiones al dia) se agota con unas pocas conversiones,
 // porque cada tanda de un PDF consume una. Se puede cambiar con GEMINI_PDF_MODELS (lista con comas).
-export const DEFAULT_GEMINI_PDF_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+export const DEFAULT_GEMINI_PDF_MODELS = DEFAULT_MODELS.free.pdf;
 export function geminiPdfModels(): string[] {
-  const fromEnv = (process.env.GEMINI_PDF_MODELS ?? '')
-    .split(',')
-    .map((m) => m.trim())
-    .filter(Boolean);
-  return fromEnv.length > 0 ? fromEnv : DEFAULT_GEMINI_PDF_MODELS;
+  return geminiModels('pdf'); // GEMINI_MODEL_PDF o GEMINI_PDF_MODELS, o el perfil (AI_PROFILE)
 }
 
 async function callGeminiPdfModel(model: string, apiKey: string, base64: string, prompt: string, opts: PdfVisionOptions): Promise<PdfVisionCall> {
@@ -49,7 +46,7 @@ async function callGeminiPdfModel(model: string, apiKey: string, base64: string,
         contents: [{ parts: [{ inline_data: { mime_type: 'application/pdf', data: base64 } }, { text: prompt }] }],
         // temperature 0: es una transcripcion, no una redaccion. thinkingBudget 0: el "pensar" interno
         // se comeria el presupuesto de salida y truncaria el Markdown.
-        generationConfig: { temperature: 0, maxOutputTokens: opts.maxOutputTokens ?? 16000, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { temperature: 0, maxOutputTokens: opts.maxOutputTokens ?? 16000, ...thinkingConfigFor(model) },
       }),
       signal: AbortSignal.timeout(opts.timeoutMs ?? 120_000),
     });

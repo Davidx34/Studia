@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { geminiModel, thinkingConfigFor } from '@/lib/ai/geminiModels';
 
 // Sesion I, Fix 3: la Biblioteca de Clase mostraba el chunk crudo del
 // material (pared de texto larga) — este endpoint lo resume con Gemini en
@@ -9,6 +10,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 // ruta, que procesa TODOS los chunks pendientes de ese material de una vez.
 
 const CONCURRENCY = 4;
+const CHUNKS_MODEL = geminiModel('chunks');
 
 async function processChunkWithGemini(content: string): Promise<{ summary: string; key_points: string[]; main_concepts: string[] } | null> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -27,7 +29,7 @@ Responde con este formato exacto:
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${CHUNKS_MODEL}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -40,7 +42,7 @@ Responde con este formato exacto:
             // Mismo fix que tonito-chat (Sesion I, Fix 2): sin esto, el
             // "thinking" interno del modelo se come el token budget y la
             // respuesta llega truncada / sin cerrar el JSON.
-            thinkingConfig: { thinkingBudget: 0 },
+            ...thinkingConfigFor(CHUNKS_MODEL),
           },
         }),
       }

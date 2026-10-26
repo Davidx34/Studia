@@ -1,4 +1,5 @@
 import { isOpenRouterConfigured } from '@/lib/ai/openrouter';
+import { aiProfile } from '@/lib/ai/geminiModels';
 import type { AiTask, Candidate } from './types';
 
 // Catalogo de proveedores. Casi todos hablan la API "chat/completions" de OpenAI, asi que UN cliente generico los cubre;
@@ -116,6 +117,19 @@ export const PROVIDERS: ProviderDef[] = [
     signup: 'https://platform.openai.com',
   },
   {
+    // Kimi (Moonshot AI). API compatible con OpenAI. NO esta en las cadenas por defecto: su modelo se elige con AI_CHAIN_<TAREA>,
+    // por ejemplo AI_CHAIN_GENERATION="moonshot:<modelo>,gemini:gemini-3.5-flash-lite". Los nombres de modelo y el soporte de
+    // response_format NO estan verificados con una llave real: `npm run ai:doctor` lista los modelos de la cuenta.
+    id: 'moonshot',
+    label: 'Moonshot AI (Kimi, de pago)',
+    baseUrl: 'https://api.moonshot.ai/v1',
+    keyEnv: 'MOONSHOT_API_KEY',
+    jsonMode: true,
+    tier: 'paid',
+    free: 'sin nivel gratuito: se paga por tokens; pon la llave y elige el modelo con AI_CHAIN_<TAREA>',
+    signup: 'https://platform.moonshot.ai',
+  },
+  {
     id: 'custom',
     label: 'Compatible con OpenAI (propio)',
     baseUrl: '{AI_CUSTOM_BASE_URL}',
@@ -208,6 +222,28 @@ export const DEFAULT_CHAINS: Record<AiTask, Candidate[]> = {
   ],
 };
 
+// Perfil con presupuesto (AI_PROFILE=paid): estos candidatos van PRIMERO y el resto de la cadena por defecto queda de respaldo, asi
+// que si Gemini falla o no tiene llave, todo sigue como antes. Medido con la llave del proyecto el 2026-10-26: gemini-3.5-flash-lite y
+// gemini-3.5-flash existen y devuelven JSON valido. En el juez, el modelo de la rama directa de Gemini sale de geminiModels.ts.
+export const PAID_HEADS: Record<AiTask, Candidate[]> = {
+  generation: [{ provider: 'gemini', model: 'gemini-3.5-flash-lite' }],
+  judge: [{ provider: 'gemini', model: 'gemini-3.5-flash' }],
+  analysis: [{ provider: 'gemini', model: 'gemini-3.5-flash-lite' }],
+  study: [{ provider: 'gemini', model: 'gemini-3.5-flash-lite' }],
+};
+
+// Cadena por defecto de una tarea segun el perfil (sin duplicar candidatos).
+export function defaultChain(task: AiTask, env: Env = process.env): Candidate[] {
+  if (aiProfile(env) !== 'paid') return DEFAULT_CHAINS[task];
+  const seen = new Set<string>();
+  return [...PAID_HEADS[task], ...DEFAULT_CHAINS[task]].filter((c) => {
+    const k = `${c.provider}:${c.model}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 // "proveedor:modelo,proveedor:modelo" -> candidatos. Lo invalido se ignora.
 export function parseChain(raw: string | undefined): Candidate[] {
   if (!raw) return [];
@@ -225,7 +261,7 @@ export function parseChain(raw: string | undefined): Candidate[] {
 // Cadena efectiva de una tarea: la del entorno si existe, si no la de por defecto; y SOLO con proveedores activos.
 export function chainFor(task: AiTask, env: Env = process.env): Candidate[] {
   const fromEnv = parseChain(env[`AI_CHAIN_${task.toUpperCase()}`]);
-  const base = fromEnv.length > 0 ? fromEnv : DEFAULT_CHAINS[task];
+  const base = fromEnv.length > 0 ? fromEnv : defaultChain(task, env);
   return base.filter((c) => {
     const p = BY_ID.get(c.provider);
     return !!p && isProviderConfigured(p, env);
