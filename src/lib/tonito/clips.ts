@@ -6,7 +6,7 @@
 //
 // Funciones puras (sin DOM), para poder probarlas. El navegador las alimenta con readClipEnvironment().
 
-import { isExternalMediaBase } from './media';
+import { VERSIONED_POSTER, VERSIONED_VIDEO, isExternalMediaBase } from './media';
 
 export interface TonitoClipDef {
   id: string;
@@ -94,6 +94,41 @@ export function planClip(env: ClipEnvironment, clip?: Size): ClipPlan {
 // Decide que se muestra en una escena: el video solo si hay clip registrado, el plan lo permite y no fallo al cargar.
 export function sceneUsesVideo(clip: TonitoClipDef | undefined, plan: ClipPlan | null, failed: boolean): boolean {
   return !!clip && !failed && plan?.mode === 'video';
+}
+
+// Una fila de la tabla tonito_scene_clips (migracion 073): "esta escena usa este clip". Es lo que escribe `npm run clip:publish`.
+export interface SceneClipRow {
+  scene: string;
+  clip_id: string;
+  src: string;
+  poster: string;
+  width: number;
+  height: number;
+  loop: boolean;
+  active: boolean;
+}
+
+// Convierte una fila en clip, o null si no es valida (rutas fuera de clips/, medidas absurdas...). Una fila rota nunca debe romper
+// una cinematica: se ignora y se usa el clip del codigo, si lo hay.
+export function rowToClip(row: SceneClipRow): TonitoClipDef | null {
+  const ok =
+    VERSIONED_VIDEO.test(row.src) &&
+    VERSIONED_POSTER.test(row.poster) &&
+    /^[a-z0-9]+(-[a-z0-9]+)*$/.test(row.clip_id) &&
+    Number.isFinite(row.width) && row.width >= 64 && row.width <= 4096 &&
+    Number.isFinite(row.height) && row.height >= 64 && row.height <= 4096;
+  return ok ? { id: row.clip_id, src: row.src, poster: row.poster, width: row.width, height: row.height, loop: !!row.loop } : null;
+}
+
+// Que clip tiene una escena. La base manda sobre el codigo:
+//   - fila activa y valida -> ese clip;
+//   - fila con active = false -> ninguno (apagado a proposito, aunque el codigo traiga uno);
+//   - sin fila, fila invalida, o no se pudo leer la base (rows = null) -> el clip que trae el codigo, si lo hay.
+export function resolveSceneClip(scene: string, rows: SceneClipRow[] | null, codeDefault?: TonitoClipDef): TonitoClipDef | undefined {
+  const row = rows?.find((r) => r.scene === scene);
+  if (!row) return codeDefault;
+  if (!row.active) return undefined;
+  return rowToClip(row) ?? codeDefault;
 }
 
 // Lee el entorno del navegador. Solo se llama en el cliente (despues de montar): en el servidor no hay DOM.
