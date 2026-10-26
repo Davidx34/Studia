@@ -9,16 +9,14 @@
 import { useEffect, useState } from 'react';
 import { TonitoFullBody, type CinematicAnimation } from '@/components/tonito/TonitoFullBody';
 import { TonitoClip, useClipPlan } from '@/components/tonito/TonitoClip';
-import { TONITO_CLIPS, clipAvailable, sceneUsesVideo } from '@/lib/tonito/clips';
+import { TONITO_CLIPS, clipAvailable, resolveSceneClip, sceneUsesVideo, type TonitoClipDef } from '@/lib/tonito/clips';
+import { useSceneClips } from '@/lib/tonito/sceneClips';
+import { SCENE_DEFAULT_CLIP, type CinematicType } from '@/lib/tonito/scenes';
 import type { TonitoMood } from '@/stores/useTonitoStore';
 import { useSoundFx } from '@/lib/sound/useSoundFx';
 
-export type CinematicType =
-  | 'welcome'
-  | 'lesson_start'
-  | 'module_complete_good'
-  | 'module_complete_low'
-  | 'streak';
+export type { CinematicType } from '@/lib/tonito/scenes';
+export { CINEMATIC_TYPES } from '@/lib/tonito/scenes';
 
 interface CinematicProps {
   type: CinematicType;
@@ -31,8 +29,6 @@ interface CinematicProps {
 
 interface SceneConfig {
   bg: string;
-  // Clip de video (src/lib/tonito/clips.ts) que reemplaza a la pose animada, si existe y el dispositivo lo permite.
-  clipId?: string;
   mood: TonitoMood;
   animation: CinematicAnimation;
   intensity: 'calm' | 'normal' | 'intense';
@@ -71,7 +67,6 @@ const SCENES: Record<CinematicType, SceneConfig> = {
   },
   module_complete_good: {
     bg: 'from-amber-600 via-orange-600 to-rose-600',
-    clipId: 'celebracion',
     mood: 'celebrating',
     animation: 'celebrationFull',
     intensity: 'intense',
@@ -102,12 +97,30 @@ const SCENES: Record<CinematicType, SceneConfig> = {
   },
 };
 
-// Para el visor del panel de desarrollo (/dev/cinematicas): que escenas hay y cual clip usa cada una.
-export const CINEMATIC_TYPES = Object.keys(SCENES) as CinematicType[];
-export const sceneClipId = (type: CinematicType): string | undefined => SCENES[type].clipId;
+// Clip que trae el codigo para una escena: respaldo si la base no responde o no tiene fila (el visor /dev/cinematicas lo usa).
+export const sceneClipId = (type: CinematicType): string | undefined => SCENE_DEFAULT_CLIP[type];
 
+// Antes de mostrar la escena se sabe que clip tiene (la base manda sobre el codigo; ver resolveSceneClip). Mientras llega la
+// respuesta (casi siempre ya esta: se pide al entrar a la app) solo se ve el fondo de color de la escena, y como mucho 1,2 s.
 export function CinematicScene(props: CinematicProps) {
-  const { type, onComplete } = props;
+  const { ready, rows } = useSceneClips();
+  const scene = SCENES[props.type];
+  if (!ready) {
+    return (
+      <div
+        className={`fixed inset-0 z-[400] overflow-hidden bg-gradient-to-br ${scene.bg}`}
+        role="dialog"
+        aria-label="Escena animada de Toñito"
+        aria-busy="true"
+      />
+    );
+  }
+  const registered = resolveSceneClip(props.type, rows, sceneClipId(props.type) ? TONITO_CLIPS[sceneClipId(props.type)!] : undefined);
+  return <SceneBody {...props} registered={registered} />;
+}
+
+function SceneBody(props: CinematicProps & { registered: TonitoClipDef | undefined }) {
+  const { type, onComplete, registered } = props;
   const scene = SCENES[type];
   const [lineIdx, setLineIdx] = useState(0);
   const [showCta, setShowCta] = useState(false);
@@ -115,7 +128,6 @@ export function CinematicScene(props: CinematicProps) {
   const { play } = useSoundFx();
   const lines = scene.lines(props);
   // Video de la escena: solo si hay clip registrado, el dispositivo lo permite y no fallo al cargar. Si no, lo de siempre.
-  const registered = scene.clipId ? TONITO_CLIPS[scene.clipId] : undefined;
   const clip = clipAvailable(registered) ? registered : undefined;
   const clipPlan = useClipPlan(clip);
   const [clipFailed, setClipFailed] = useState(false);

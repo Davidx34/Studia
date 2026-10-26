@@ -8,6 +8,7 @@ import { AchievementUnlockModal } from '@/components/notifications/AchievementUn
 import { ToastContainer } from '@/components/notifications/ToastContainer';
 import { useNotificationBridge } from '@/hooks/useNotificationBridge';
 import { evaluateAchievements } from '@/lib/achievements/evaluate';
+import { loadSceneClips } from '@/lib/tonito/sceneClips';
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -42,6 +43,8 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
       // pregunta o repasa una flashcard; migracion 071). Aqui solo se evaluan logros (first_login, etc.) en background,
       // sin bloquear el render.
       void evaluateAchievements();
+      // Que clip usa cada cinematica (tabla tonito_scene_clips): se pide ya para que al llegar la primera escena este en cache.
+      void loadSceneClips();
     };
 
     checkAuth();

@@ -7,6 +7,7 @@ import { CLIPS_HOSTING, MIN_VISIBLE_FRACTION, TONITO_CLIPS, clipAvailable, planC
 import { VERSIONED_POSTER, VERSIONED_VIDEO, MAX_BYTES, isExternalMediaBase } from './media';
 import { TonitoClip } from '@/components/tonito/TonitoClip';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
+import { SCENE_DEFAULT_CLIP } from './scenes';
 
 const CLIP: TonitoClipDef = { id: 'prueba', src: 'clips/prueba.v1.mp4', poster: 'clips/prueba.v1.jpg', width: 480, height: 270, loop: false };
 
@@ -113,10 +114,8 @@ describe('clip registrado: celebracion', () => {
   });
 
   it('cada clipId que usa una escena existe en el registro (un error de tipeo desactivaria el video sin avisar)', () => {
-    const src = fs.readFileSync(path.join(process.cwd(), 'src/components/cinematics/CinematicScene.tsx'), 'utf8');
-    const ids = Array.from(src.matchAll(/clipId: '([a-z-]+)'/g)).map((m) => m[1]);
-    expect(ids).toContain('celebracion');
-    for (const id of ids) expect(TONITO_CLIPS[id], id).toBeDefined();
+    expect(Object.values(SCENE_DEFAULT_CLIP)).toContain('celebracion');
+    for (const id of Object.values(SCENE_DEFAULT_CLIP)) expect(TONITO_CLIPS[id!], id).toBeDefined();
   });
 });
 
@@ -193,11 +192,13 @@ describe('TonitoClip (marcado)', () => {
   });
 });
 
-describe('CinematicScene en el servidor o en el primer render (aun sin plan de video)', () => {
-  it('se comporta como siempre: muestra a Toñito animado y ningun video', () => {
+describe('CinematicScene en el servidor o en el primer render (aun sin respuesta de la base)', () => {
+  it('muestra solo el fondo de color de la escena (sin pose ni video) hasta saber que clip tiene', () => {
     const out = renderToStaticMarkup(h(CinematicScene, { type: 'module_complete_good', score: 90, onComplete: () => {} }));
-    expect(out).toContain('tonito-character');
+    expect(out).toContain('aria-busy="true"');
+    expect(out).toContain('from-amber-600');
     expect(out).not.toContain('<video');
+    expect(out).not.toContain('tonito-character');
   });
 });
 
