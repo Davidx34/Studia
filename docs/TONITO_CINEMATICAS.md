@@ -74,3 +74,15 @@ del clip; por defecto sale de la escena).
 
 Eso sí es código: se añade a `CINEMATIC_TYPES` (`src/lib/tonito/scenes.ts`) y a `SCENES` (`CinematicScene.tsx`) con sus textos y colores,
 y se dispara desde donde corresponda. Después sus clips se publican con el mismo comando.
+
+## Fondo a juego: que el clip no se distinga de los lados en el computador
+
+Un clip vertical en una pantalla ancha se muestra **entero y centrado**. Flow no clava el color de fondo que se le pide (el clip de celebración salió más pálido: arriba
+`#EDBB74` en vez de `#D97706`), así que la columna se distinguía de los lados. Ahora **se mide el clip** y la escena pinta de fondo lo que el clip trae en sus bordes.
+
+- **Al publicar** (`npm run clip:publish`) se miden 6 colores del primer cuadro: borde izquierdo y borde derecho, cada uno arriba, medio y abajo (el fondo suele ser un degradado
+  diagonal, por eso son dos lados), y se guardan en `tonito_scene_clips.bg_colors`. Se necesita ffmpeg, igual que para convertir.
+- **Para un clip ya publicado:** `npm run clip:colors -- --scene <escena>` los mide y los muestra; con `--aplicar` los guarda.
+- La escena usa esos colores solo cuando el clip está activo. Sin colores (clips anteriores, o la migración 074 sin aplicar) usa su degradado de siempre: **nada se rompe**.
+- Los colores se validan (6 valores `#rrggbb` en minúsculas) en la base y en la app: nunca se pinta CSS suelto.
+- En el celular el clip llena la pantalla y el fondo no se ve; la mejora es para el computador.

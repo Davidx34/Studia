@@ -106,3 +106,30 @@ describe('CinematicScene con la base ya leida', () => {
     vi.doUnmock('@/lib/tonito/sceneClips');
   });
 });
+
+// Colores de borde del clip (migracion 074): la escena los pinta de fondo para que el clip no se distinga de los lados en una pantalla ancha.
+describe('bg_colors (colores de borde del clip)', () => {
+  const COLORES = ['#edbb74', '#e8ac6e', '#dc8a64', '#e7a06a', '#d87c65', '#cd555e'];
+
+  it('una fila con 6 colores validos los pasa al clip', () => {
+    expect(rowToClip(row({ bg_colors: COLORES }))?.bgColors).toEqual(COLORES);
+    expect(resolveSceneClip('welcome', [row({ bg_colors: COLORES })])?.bgColors).toEqual(COLORES);
+  });
+
+  it('sin colores (null, ausente o la columna aun no existe) el clip vale igual, sin bgColors', () => {
+    expect(rowToClip(row())?.bgColors).toBeUndefined();
+    expect(rowToClip(row({ bg_colors: null }))?.bgColors).toBeUndefined();
+  });
+
+  it('colores mal formados se ignoran, y el clip sigue valiendo (nunca rompen la escena ni inyectan CSS)', () => {
+    for (const malos of [COLORES.slice(0, 5), [...COLORES.slice(0, 5), 'red'], [...COLORES.slice(0, 5), 'url(x)'], [...COLORES.slice(0, 5), '#EDBB74'], 'no-es-lista' as any]) {
+      const c = rowToClip(row({ bg_colors: malos }));
+      expect(c, JSON.stringify(malos)).not.toBeNull();
+      expect(c!.bgColors).toBeUndefined();
+    }
+  });
+
+  it('el clip de respaldo del codigo no trae colores (usa el degradado de siempre)', () => {
+    expect(TONITO_CLIPS.celebracion.bgColors).toBeUndefined();
+  });
+});

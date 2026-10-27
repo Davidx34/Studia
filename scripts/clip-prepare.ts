@@ -23,6 +23,7 @@ import { TONITO_CLIPS } from '../src/lib/tonito/clips';
 import { CINEMATIC_TYPES, isCinematicType } from '../src/lib/tonito/scenes';
 import { judgeMediaResponse, mediaUrl, TONITO_BUCKET, type MediaKind } from '../src/lib/tonito/media';
 import { supabasePublicBase } from '../src/lib/tonito/mediaUpload';
+import { measureEdgeColors } from './lib/measureEdgeColors';
 
 const args = process.argv.slice(2);
 const has = (f: string) => args.includes(f);
@@ -153,10 +154,21 @@ async function main() {
   }
 
   // 5) Publicar: apuntar la escena al clip nuevo. Desde aqui la app lo usa (en pocos minutos, por la cache).
-  const { error } = await (supabase as any).from('tonito_scene_clips').upsert(
-    { scene, clip_id: id, src: paths.video, poster: paths.poster, width: out.width, height: out.height, loop: has('--loop'), active: true, updated_at: new Date().toISOString() },
-    { onConflict: 'scene' },
-  );
+  // Antes se miden los colores de los bordes del clip: la escena los pinta de fondo para que, en una pantalla ancha, el clip no se distinga de los lados.
+  let bgColors: string[] | null = null;
+  try {
+    bgColors = measureEdgeColors(videoOut);
+    console.log(`  colores de borde medidos: ${bgColors.join(' ')}`);
+  } catch (e) {
+    console.log(`  ! no se pudieron medir los colores de borde (${e instanceof Error ? e.message : e}); la escena usara su degradado de siempre`);
+  }
+  const fila: Record<string, unknown> = { scene, clip_id: id, src: paths.video, poster: paths.poster, width: out.width, height: out.height, loop: has('--loop'), active: true, updated_at: new Date().toISOString() };
+  let { error } = await (supabase as any).from('tonito_scene_clips').upsert({ ...fila, bg_colors: bgColors }, { onConflict: 'scene' });
+  if (error && /bg_colors/.test(error.message)) {
+    // La migracion 074 aun no esta aplicada: se publica igual, sin colores (se pueden agregar despues con npm run clip:colors).
+    console.log('  ! la columna bg_colors no existe todavia (migracion 074): se publica sin colores de borde');
+    ({ error } = await (supabase as any).from('tonito_scene_clips').upsert(fila, { onConflict: 'scene' }));
+  }
   if (error) fail(`no se pudo publicar la escena: ${redact(error.message)}`);
   console.log(`\n✔ Publicado: la escena "${scene}" usa ahora "${id}" (v${version}). Los estudiantes lo ven en pocos minutos, sin redesplegar.`);
   console.log('  Para apagarlo:  npm run clip:off -- --scene ' + scene);
