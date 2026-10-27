@@ -38,7 +38,7 @@ export const TONITO_CLIPS: Record<string, TonitoClipDef> = {
   celebracion: { id: 'celebracion', src: 'clips/celebracion.v1.mp4', poster: 'clips/celebracion.v1.jpg', width: 720, height: 1280, loop: false },
 };
 
-export type ClipPlanReason = 'ok' | 'reduced-motion' | 'save-data' | 'slow-network' | 'no-video-support' | 'orientation';
+export type ClipPlanReason = 'ok' | 'reduced-motion' | 'save-data' | 'slow-network' | 'no-video-support';
 
 // Con object-cover, un video se recorta para llenar la pantalla. Si la pantalla se parece poco a la proporcion del clip, se ve solo una
 // franja (medido con un clip 9:16: en una pantalla horizontal 16:9 se ve el ~32 % de la altura, torso y punos sin cabeza). Se exige
@@ -57,6 +57,13 @@ export function visibleFraction(clip: Size, viewport: Size): number {
   const clipAspect = clip.width / clip.height;
   const viewAspect = viewport.width / viewport.height;
   return viewAspect <= clipAspect ? viewAspect / clipAspect : clipAspect / viewAspect;
+}
+
+// Como se acomoda el clip en la pantalla. 'cover' llena la pantalla (celulares y tablets verticales, donde se ve casi entero). 'contain' lo muestra ENTERO,
+// centrado y a toda la altura, con los bordes difuminados contra el color de la escena (pantallas anchas: sin esto se veria solo una franja del clip).
+export type ClipFit = 'cover' | 'contain';
+export function clipFit(clip: Size, viewport: Size): ClipFit {
+  return visibleFraction(clip, viewport) >= MIN_VISIBLE_FRACTION ? 'cover' : 'contain';
 }
 
 export interface ClipPlan {
@@ -81,13 +88,13 @@ const SLOW = new Set(['slow-2g', '2g']);
 
 // Cuando NO se carga el video: movimiento reducido, ahorro de datos, conexion muy lenta o sin soporte. En esos casos la cinematica
 // usa lo de siempre (la pose fija con animacion CSS). El orden importa: el movimiento reducido manda sobre todo lo demas.
-export function planClip(env: ClipEnvironment, clip?: Size): ClipPlan {
+export function planClip(env: ClipEnvironment, _clip?: Size): ClipPlan {
   if (env.reducedMotion) return { mode: 'still', reason: 'reduced-motion' };
   if (env.saveData) return { mode: 'still', reason: 'save-data' };
   if (env.effectiveType && SLOW.has(env.effectiveType)) return { mode: 'still', reason: 'slow-network' };
   if (env.canPlayMp4 === false) return { mode: 'still', reason: 'no-video-support' };
-  // Pantalla con otra proporcion (p. ej. un clip vertical en un computador): se veria una franja y no a Tonito. Se usa lo de siempre.
-  if (clip && env.viewport && visibleFraction(clip, env.viewport) < MIN_VISIBLE_FRACTION) return { mode: 'still', reason: 'orientation' };
+  // La proporcion de la pantalla YA NO descarta el video: en una pantalla ancha el clip vertical se muestra centrado (ver clipFit). Antes se usaba la pose
+  // de siempre, y quien probaba en un computador creia que la animacion 'no cargaba'.
   return { mode: 'video', reason: 'ok' };
 }
 

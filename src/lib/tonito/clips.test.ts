@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { CLIPS_HOSTING, MIN_VISIBLE_FRACTION, TONITO_CLIPS, clipAvailable, planClip, readClipEnvironment, sceneUsesVideo, visibleFraction, type TonitoClipDef } from './clips';
+import { CLIPS_HOSTING, MIN_VISIBLE_FRACTION, TONITO_CLIPS, clipAvailable, clipFit, planClip, readClipEnvironment, sceneUsesVideo, visibleFraction, type TonitoClipDef } from './clips';
 import { VERSIONED_POSTER, VERSIONED_VIDEO, MAX_BYTES, isExternalMediaBase } from './media';
 import { TonitoClip } from '@/components/tonito/TonitoClip';
 import { CinematicScene } from '@/components/cinematics/CinematicScene';
@@ -52,16 +52,22 @@ describe('proporcion de la pantalla (clip vertical 9:16)', () => {
     expect(visibleFraction({ width: 0, height: 100 }, { width: 390, height: 844 })).toBe(1);
   });
 
-  it('celulares y iPad vertical SI usan el video; pantallas cuadradas, horizontales y computadores NO', () => {
+  it('TODAS las pantallas usan el video (el plan ya no depende de la proporcion); solo cambia como se acomoda', () => {
     const quien = (w: number, h: number) => planClip({ reducedMotion: false, viewport: { width: w, height: h } }, clip);
-    for (const [w, h] of [[390, 844], [412, 915], [360, 640], [768, 1024]]) expect(quien(w, h), w + 'x' + h).toEqual({ mode: 'video', reason: 'ok' });
-    for (const [w, h] of [[800, 800], [1024, 768], [1280, 720], [1366, 768]]) expect(quien(w, h), w + 'x' + h).toEqual({ mode: 'still', reason: 'orientation' });
+    for (const [w, h] of [[390, 844], [412, 915], [360, 640], [768, 1024], [800, 800], [1024, 768], [1280, 720], [1366, 768], [1920, 1080]]) expect(quien(w, h), w + 'x' + h).toEqual({ mode: 'video', reason: 'ok' });
     expect(MIN_VISIBLE_FRACTION).toBe(0.7);
   });
 
-  it('sin clip o sin tamano de ventana no se aplica la regla; el movimiento reducido sigue mandando', () => {
-    expect(planClip({ reducedMotion: false, viewport: { width: 1280, height: 720 } })).toEqual({ mode: 'video', reason: 'ok' });
-    expect(planClip({ reducedMotion: false }, clip)).toEqual({ mode: 'video', reason: 'ok' });
+  it('clipFit: celulares y iPad vertical llenan la pantalla (cover); cuadradas y horizontales lo muestran entero y centrado (contain)', () => {
+    for (const [w, h] of [[390, 844], [412, 915], [360, 640], [768, 1024]]) expect(clipFit(clip, { width: w, height: h }), w + 'x' + h).toBe('cover');
+    for (const [w, h] of [[800, 800], [1024, 768], [1280, 720], [1366, 768], [1920, 1080]]) expect(clipFit(clip, { width: w, height: h }), w + 'x' + h).toBe('contain');
+  });
+
+  it('clipFit con datos invalidos asume que se ve entero (cover) y no rompe', () => {
+    expect(clipFit(clip, { width: 0, height: 0 })).toBe('cover');
+  });
+
+  it('el movimiento reducido sigue mandando sobre todo, tambien en pantallas anchas', () => {
     expect(planClip({ reducedMotion: true, viewport: { width: 1280, height: 720 } }, clip).reason).toBe('reduced-motion');
   });
 });

@@ -11,7 +11,7 @@
 //   su version de siempre. NUNCA debe dejar al estudiante con una pantalla en blanco.
 
 import { useEffect, useRef, useState } from 'react';
-import { planClip, readClipEnvironment, type ClipPlan, type TonitoClipDef } from '@/lib/tonito/clips';
+import { clipFit, planClip, readClipEnvironment, type ClipFit, type ClipPlan, type TonitoClipDef } from '@/lib/tonito/clips';
 import { mediaUrl } from '@/lib/tonito/media';
 
 // null mientras no se ha montado (en el servidor no hay DOM): se trata como "todavia no" y se muestra la version de siempre.
@@ -41,6 +41,20 @@ export function TonitoClip({
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(false);
+  // 'cover' llena la pantalla (celular); 'contain' lo muestra entero y centrado (pantalla ancha, donde 'cover' dejaria ver solo una franja).
+  const [fit, setFit] = useState<ClipFit>('cover');
+  useEffect(() => {
+    const update = () => setFit(clipFit(clip, { width: window.innerWidth, height: window.innerHeight }));
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [clip]);
+  // Con 'contain' quedan bandas a los lados: los bordes del clip se difuminan contra el color de la escena en vez de cortarse en seco.
+  const feather =
+    fit === 'contain'
+      ? { maskImage: 'linear-gradient(to right, transparent, #000 12%, #000 88%, transparent)', WebkitMaskImage: 'linear-gradient(to right, transparent, #000 12%, #000 88%, transparent)' }
+      : undefined;
+  const objectFit = fit === 'contain' ? 'object-contain' : 'object-cover';
 
   useEffect(() => {
     const v = ref.current;
@@ -72,7 +86,7 @@ export function TonitoClip({
   return (
     <div className={`overflow-hidden ${className}`} role="presentation" style={{ aspectRatio: `${clip.width} / ${clip.height}` }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={mediaUrl(clip.poster)} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
+      <img src={mediaUrl(clip.poster)} alt="" aria-hidden="true" className={`absolute inset-0 h-full w-full ${objectFit}`} style={feather} />
       <video
         ref={ref}
         muted
@@ -83,7 +97,8 @@ export function TonitoClip({
         disablePictureInPicture
         aria-hidden="true"
         tabIndex={-1}
-        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 motion-reduce:transition-none ${ready ? 'opacity-100' : 'opacity-0'}`}
+        style={feather}
+        className={`absolute inset-0 h-full w-full ${objectFit} transition-opacity duration-300 motion-reduce:transition-none ${ready ? 'opacity-100' : 'opacity-0'}`}
         onCanPlay={() => setReady(true)}
         onEnded={onEnded}
         onError={() => onFailed?.()}
