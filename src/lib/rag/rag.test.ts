@@ -155,6 +155,19 @@ describe('retrieveContext', () => {
     expect(r!.chunkIds.sort()).toEqual(['c1', 'c2']);
   });
 
+  it('consultas propias (evaluaciones): se usan EN LUGAR de las del modulo, conservando el aislamiento de la clase', async () => {
+    const { client, rpcCalls } = fakeSupabase({ moduleRow: MODULE, rpc: () => ({ data: [row('c1', 1)] }) });
+    const r = await retrieveContext(client, 'mod', { charLimit: 16000, embed: async () => [0.1], queries: ['derivada de x al cuadrado'] });
+    expect(rpcCalls).toHaveLength(1); // una sola consulta, no las 3 variantes del modulo
+    expect(rpcCalls[0].args.query_text).toBe('derivada de x al cuadrado');
+    expect(rpcCalls[0].args.classroom_id_filter).toBe('cls');
+    expect(r).toMatchObject({ variants: 1 });
+    // una lista vacia no cuenta: se vuelve a las consultas del modulo
+    const v = fakeSupabase({ moduleRow: MODULE, rpc: () => ({ data: [row('c1', 1)] }) });
+    await retrieveContext(v.client, 'mod', { charLimit: 16000, embed: async () => [0.1], queries: [] });
+    expect(v.rpcCalls).toHaveLength(3);
+  });
+
   it('sin embeddings (sin cuota o sin llave): sigue buscando por TEXTO en vez de caer a los primeros fragmentos', async () => {
     const { client, rpcCalls } = fakeSupabase({ moduleRow: MODULE, rpc: () => ({ data: [row('c1', 1)] }) });
     const r = await retrieveContext(client, 'mod', { charLimit: 16000, embed: async () => null });

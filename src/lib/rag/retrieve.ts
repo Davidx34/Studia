@@ -18,6 +18,9 @@ export interface RetrieveOptions {
   // Solo evaluaciones: fuerza una estrategia para compararlas.
   strategy?: Strategy;
   embed?: (text: string) => Promise<number[] | null>;
+  // Consultas propias EN LUGAR de las que se derivan del modulo (titulo, descripcion, palabras clave). Sirve para recuperar lo que
+  // respalda UNA pregunta concreta; el acotamiento a los materiales vinculados del modulo se mantiene.
+  queries?: string[];
 }
 
 export interface RetrieveResult {
@@ -62,7 +65,7 @@ export async function retrieveContext(supabase: any, moduleId: string, opts: Ret
     .single();
   if (!moduleRow?.classroom_id) return null;
 
-  const variants = buildQueryVariants({ title: moduleRow.title, description: moduleRow.description, keywords: moduleRow.topic_keywords });
+  const variants = opts.queries && opts.queries.length > 0 ? opts.queries : buildQueryVariants({ title: moduleRow.title, description: moduleRow.description, keywords: moduleRow.topic_keywords });
   if (variants.length === 0) return null;
 
   const embed = opts.embed ?? embedQuery;
