@@ -215,3 +215,78 @@ describe('cableado', () => {
     expect(read('src/lib/ai/openrouter.ts')).not.toContain('NEXT_PUBLIC_OPENROUTER');
   });
 });
+
+// GENERATION_PRIMARY=gateway: la pasarela (con AI_PROFILE=paid, Gemini 3.5 Flash-Lite) genera PRIMERO y Cohere queda de respaldo. Por defecto nada cambia.
+describe('generacion: quien va primero (GENERATION_PRIMARY)', () => {
+  const gemOk = (n: number) => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ questions: questions(n, 'gem') }) } }] }), { status: 200 });
+
+  beforeEach(() => {
+    process.env.AI_PROFILE = 'paid';
+  });
+  afterEach(() => {
+    delete process.env.GENERATION_PRIMARY;
+    delete process.env.AI_PROFILE;
+  });
+
+  it('por defecto (sin variable) Cohere va primero y la pasarela NO se llama', async () => {
+    const calls = stubFetch({ cohere: () => cohereOk(10), openrouter: () => orQuestions(10), gemini: () => gemOk(10) });
+    const r = await callCohere('prompt', 10);
+    expect(r![0].q).toMatch(/^cohere/);
+    expect(calls.gemini + calls.openrouter).toBe(0);
+  });
+
+  it('un valor desconocido tambien deja a Cohere primero', async () => {
+    process.env.GENERATION_PRIMARY = 'otra-cosa';
+    const calls = stubFetch({ cohere: () => cohereOk(10), openrouter: () => orQuestions(10), gemini: () => gemOk(10) });
+    expect((await callCohere('prompt', 10))![0].q).toMatch(/^cohere/);
+    expect(calls.gemini).toBe(0);
+  });
+
+  it('gateway: Gemini genera y Cohere NO se llama', async () => {
+    process.env.GENERATION_PRIMARY = 'gateway';
+    const calls = stubFetch({ cohere: () => cohereOk(10), openrouter: () => orQuestions(10), gemini: () => gemOk(10) });
+    const r = await callCohere('prompt', 10);
+    expect(r).toHaveLength(10);
+    expect(r![0].q).toMatch(/^gem/);
+    expect(calls.cohere).toBe(0);
+    expect(calls.openrouter).toBe(0);
+  });
+
+  it('gateway: pide a Gemini 3.5 Flash-Lite con razonamiento bajo', async () => {
+    process.env.GENERATION_PRIMARY = 'gateway';
+    stubFetch({ cohere: () => cohereOk(10), gemini: () => gemOk(10) });
+    await callCohere('prompt', 10);
+    const body = JSON.parse(((globalThis.fetch as any).mock.calls[0] as any)[1].body);
+    expect(body.model).toBe('gemini-3.5-flash-lite');
+    expect(body.reasoning_effort).toBe('low');
+  });
+
+  it('gateway: si la pasarela no da suficientes, Cohere responde de respaldo y se devuelve lo mejor', async () => {
+    process.env.GENERATION_PRIMARY = 'gateway';
+    const calls = stubFetch({ cohere: () => cohereOk(10), openrouter: () => orQuestions(2), gemini: () => gemOk(2) });
+    const r = await callCohere('prompt', 10);
+    expect(r).toHaveLength(10);
+    expect(r![0].q).toMatch(/^cohere/);
+    expect(calls.cohere).toBeGreaterThanOrEqual(1);
+  });
+
+  it('gateway: si la pasarela da pocas y no hay llave de Cohere, devuelve lo que dio (no falla)', async () => {
+    process.env.GENERATION_PRIMARY = 'gateway';
+    delete process.env.COHERE_API_KEY;
+    const calls = stubFetch({ openrouter: () => orQuestions(2), gemini: () => gemOk(2) });
+    const r = await callCohere('prompt', 10);
+    expect(r!.length).toBeGreaterThan(0);
+    expect(r!.length).toBeLessThan(10);
+    expect(calls.cohere).toBe(0);
+  });
+
+  it('gateway sin ningun proveedor en la pasarela: cae al camino de siempre (Cohere)', async () => {
+    process.env.GENERATION_PRIMARY = 'gateway';
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    const calls = stubFetch({ cohere: () => cohereOk(10) });
+    const r = await callCohere('prompt', 10);
+    expect(r![0].q).toMatch(/^cohere/);
+    expect(calls.cohere).toBe(1);
+  });
+});

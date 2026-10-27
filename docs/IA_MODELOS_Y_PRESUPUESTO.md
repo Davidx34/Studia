@@ -115,3 +115,20 @@ Las **funciones de Supabase** (`supabase/functions/process-material`, `generate-
 `gemini-tutor`) tienen el modelo escrito a mano (`gemini-2.5-flash`, y `gemini-1.5-flash` en una) y leen su propio secreto
 `GEMINI_API_KEY` de Supabase, distinto del de Vercel. Con una llave nueva en ese secreto, sus modelos 2.5 darían 404. Son código Deno
 aparte (se despliega con la CLI de Supabase) y no usan este módulo.
+
+## Quién genera las preguntas: `GENERATION_PRIMARY`
+
+Hasta ahora las preguntas las generaba **Cohere Aya Expanse 32B** (`callCohere` lo usa primero) y la pasarela de IA solo entraba de respaldo; por eso
+`AI_PROFILE=paid` no las tocaba. Con `GENERATION_PRIMARY=gateway` la pasarela va **primero** y Cohere queda de respaldo.
+
+| Variable | Efecto |
+|---|---|
+| *(sin definir)* | Como siempre: Cohere primero, la pasarela de respaldo |
+| `GENERATION_PRIMARY=gateway` | La pasarela primero. Con `AI_PROFILE=paid`: **Gemini 3.5 Flash-Lite**, luego el resto de la cadena. Si no da suficientes preguntas (menos del 70 %), prueba Cohere (si hay llave) |
+
+- Requiere `AI_PROFILE=paid` (o `AI_CHAIN_GENERATION=gemini:gemini-3.5-flash-lite`): sin eso la cadena empieza por proveedores gratuitos y el servidor lo avisa en el log.
+- Alcance: las preguntas de lecciones y el pool (`/api/generate-questions` y `regenerateModulePool`). Las **fichas de estudio** y la **taxonomía de conceptos** siguen con Cohere primero.
+- Para volver atrás: quitar la variable y redesplegar.
+
+Medido el 2026-10-27 (5 módulos de microeconomía, mismo juez con segunda opinión): Cohere 30 % de preguntas aprobadas a la primera; Gemini 3.5 Flash-Lite 86 %. Es la
+opinión de IAs; una lectura manual de 16 aprobadas encontró 2 con defectos. Ver `evals/README.md`.
