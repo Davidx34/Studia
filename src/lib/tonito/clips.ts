@@ -98,6 +98,26 @@ export function planClip(env: ClipEnvironment, _clip?: Size): ClipPlan {
   return { mode: 'video', reason: 'ok' };
 }
 
+// POR QUE una escena usa (o no) el video, en palabras: para el aviso de la consola del navegador ([tonito-clip]). Sin esto, cuando la animacion "no carga" no hay
+// forma de saber si fue el movimiento reducido del sistema, el ahorro de datos, una URL de medios mal formada o un archivo que no se pudo cargar. Funcion pura.
+const PLAN_REASON_TEXT: Record<ClipPlanReason, string> = {
+  ok: 'ok',
+  'reduced-motion': 'el sistema pide MENOS MOVIMIENTO (prefers-reduced-motion). En Windows: Configuracion > Accesibilidad > Efectos visuales > Efectos de animacion',
+  'save-data': 'el navegador tiene activado el AHORRO DE DATOS',
+  'slow-network': 'la conexion se detecta como 2G (muy lenta)',
+  'no-video-support': 'el navegador no reproduce video H.264/MP4',
+};
+
+export function explainClip(i: { hasDefinition: boolean; registered?: TonitoClipDef; available: boolean; plan: ClipPlan | null; failed: boolean }): { video: boolean; reason: string } {
+  if (!i.hasDefinition) return { video: false, reason: 'esta escena no tiene clip' };
+  if (!i.registered) return { video: false, reason: 'la escena no tiene clip ACTIVO en tonito_scene_clips (apagado, sin fila o fila invalida) ni de respaldo' };
+  if (!i.available) return { video: false, reason: 'SIN BASE REMOTA de medios: NEXT_PUBLIC_SUPABASE_URL (o NEXT_PUBLIC_TONITO_MEDIA_BASE_URL) no da una URL https valida en esta compilacion' };
+  if (!i.plan) return { video: false, reason: 'todavia decidiendo (se calcula en el navegador)' };
+  if (i.plan.mode !== 'video') return { video: false, reason: PLAN_REASON_TEXT[i.plan.reason] };
+  if (i.failed) return { video: false, reason: 'el archivo de video NO SE PUDO CARGAR o reproducir (URL, red o formato)' };
+  return { video: true, reason: 'ok' };
+}
+
 // Decide que se muestra en una escena: el video solo si hay clip registrado, el plan lo permite y no fallo al cargar.
 export function sceneUsesVideo(clip: TonitoClipDef | undefined, plan: ClipPlan | null, failed: boolean): boolean {
   return !!clip && !failed && plan?.mode === 'video';

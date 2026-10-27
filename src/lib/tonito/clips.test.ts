@@ -242,3 +242,47 @@ describe('activos de clips', () => {
     expect(onDisk.sort()).toEqual(entries.map((c) => path.basename(c.src)).sort());
   });
 });
+
+// Por que una escena usa o no el video (aviso de la consola del navegador): lo que se le dira a quien pruebe y vea la pose.
+import { explainClip } from './clips';
+
+describe('explainClip', () => {
+  const clip = TONITO_CLIPS.celebracion;
+  const video = { mode: 'video' as const, reason: 'ok' as const };
+  const base = { hasDefinition: true, registered: clip, available: true, plan: video, failed: false };
+
+  it('todo bien: usa el video', () => {
+    expect(explainClip(base)).toEqual({ video: true, reason: 'ok' });
+  });
+
+  it('escena sin clip: lo dice', () => {
+    expect(explainClip({ ...base, hasDefinition: false, registered: undefined })).toMatchObject({ video: false, reason: expect.stringMatching(/no tiene clip/) });
+  });
+
+  it('clip apagado o sin fila en la tabla: lo dice', () => {
+    expect(explainClip({ ...base, registered: undefined })).toMatchObject({ video: false, reason: expect.stringMatching(/tonito_scene_clips/) });
+  });
+
+  it('sin base remota de medios (URL de Supabase o variable invalida): lo dice con el nombre de la variable', () => {
+    expect(explainClip({ ...base, available: false })).toMatchObject({ video: false, reason: expect.stringMatching(/SIN BASE REMOTA.*NEXT_PUBLIC_SUPABASE_URL/) });
+  });
+
+  it('cada motivo del plan sale en palabras, con la pista de Windows para el movimiento reducido', () => {
+    const r = (reason: 'reduced-motion' | 'save-data' | 'slow-network' | 'no-video-support') => explainClip({ ...base, plan: { mode: 'still', reason } }).reason;
+    expect(r('reduced-motion')).toMatch(/MENOS MOVIMIENTO.*Efectos de animacion/);
+    expect(r('save-data')).toMatch(/AHORRO DE DATOS/);
+    expect(r('slow-network')).toMatch(/2G/);
+    expect(r('no-video-support')).toMatch(/H\.264/);
+  });
+
+  it('el archivo no cargo: lo dice; sin plan todavia: no afirma nada', () => {
+    expect(explainClip({ ...base, failed: true })).toMatchObject({ video: false, reason: expect.stringMatching(/NO SE PUDO CARGAR/) });
+    expect(explainClip({ ...base, plan: null })).toMatchObject({ video: false, reason: expect.stringMatching(/todavia decidiendo/) });
+  });
+
+  it('el orden manda: sin clip gana a todo; sin base gana al plan; el plan gana al fallo de carga', () => {
+    expect(explainClip({ ...base, registered: undefined, available: false, plan: { mode: 'still', reason: 'save-data' }, failed: true }).reason).toMatch(/tonito_scene_clips/);
+    expect(explainClip({ ...base, available: false, plan: { mode: 'still', reason: 'save-data' }, failed: true }).reason).toMatch(/SIN BASE REMOTA/);
+    expect(explainClip({ ...base, plan: { mode: 'still', reason: 'save-data' }, failed: true }).reason).toMatch(/AHORRO DE DATOS/);
+  });
+});

@@ -9,7 +9,8 @@
 import { useEffect, useState } from 'react';
 import { TonitoFullBody, type CinematicAnimation } from '@/components/tonito/TonitoFullBody';
 import { TonitoClip, useClipPlan } from '@/components/tonito/TonitoClip';
-import { TONITO_CLIPS, clipAvailable, resolveSceneClip, sceneUsesVideo, type TonitoClipDef } from '@/lib/tonito/clips';
+import { TONITO_CLIPS, clipAvailable, explainClip, resolveSceneClip, sceneUsesVideo, type TonitoClipDef } from '@/lib/tonito/clips';
+import { MEDIA_BASE } from '@/lib/tonito/media';
 import { useSceneClips } from '@/lib/tonito/sceneClips';
 import { SCENE_DEFAULT_CLIP, type CinematicType } from '@/lib/tonito/scenes';
 import type { TonitoMood } from '@/stores/useTonitoStore';
@@ -132,6 +133,19 @@ function SceneBody(props: CinematicProps & { registered: TonitoClipDef | undefin
   const clipPlan = useClipPlan(clip);
   const [clipFailed, setClipFailed] = useState(false);
   const video = sceneUsesVideo(clip, clipPlan, clipFailed);
+
+  // Aviso en la consola del navegador (F12): por que esta escena usa o no el video. Solo para escenas que deberian tener clip.
+  useEffect(() => {
+    const hasDefinition = !!registered || !!SCENE_DEFAULT_CLIP[type];
+    if (!hasDefinition || clipPlan === null) return;
+    const d = explainClip({ hasDefinition, registered, available: clipAvailable(registered), plan: clipPlan, failed: clipFailed });
+    console.info(`[tonito-clip] ${type}: ${d.video ? 'usando VIDEO' : 'SIN video'} -> ${d.reason}`, {
+      clip: registered?.src ?? null,
+      baseDeMedios: MEDIA_BASE,
+      ventana: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clipPlan, clipFailed]);
 
   useEffect(() => {
     play(scene.sfx);
