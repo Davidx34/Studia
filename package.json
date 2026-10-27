@@ -26,6 +26,7 @@
     "clip:on": "npx tsx --env-file=.env.local scripts/clip-scenes.ts on",
     "clip:off": "npx tsx --env-file=.env.local scripts/clip-scenes.ts off",
     "clip:colors": "npx tsx --env-file=.env.local scripts/clip-colors.ts",
+    "pose:prepare": "npx tsx scripts/pose-prepare.ts",
     "flow:prompts": "npx tsx scripts/flow-prompts.ts"
   },
   "dependencies": {
