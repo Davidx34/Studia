@@ -7,6 +7,7 @@
 // Funciones puras (sin DOM), para poder probarlas. El navegador las alimenta con readClipEnvironment().
 
 import { VERSIONED_POSTER, VERSIONED_VIDEO, isExternalMediaBase } from './media';
+import { isEdgeColors } from './clipColors';
 
 export interface TonitoClipDef {
   id: string;
@@ -19,6 +20,9 @@ export interface TonitoClipDef {
   width: number;
   height: number;
   loop: boolean;
+  // Colores de los bordes del clip (izquierda arriba/medio/abajo, derecha arriba/medio/abajo), medidos al publicar: la escena los pinta de fondo para que el clip
+  // no se distinga de los lados en una pantalla ancha (ver clipColors.ts). Sin ellos, la escena usa su degradado de siempre.
+  bgColors?: string[];
 }
 
 // Donde viven los archivos de los clips: 'remote' = bucket publico de Supabase Storage `tonito-media` (se sirve desde la base que
@@ -133,6 +137,7 @@ export interface SceneClipRow {
   height: number;
   loop: boolean;
   active: boolean;
+  bg_colors?: string[] | null; // migracion 074
 }
 
 // Convierte una fila en clip, o null si no es valida (rutas fuera de clips/, medidas absurdas...). Una fila rota nunca debe romper
@@ -144,7 +149,11 @@ export function rowToClip(row: SceneClipRow): TonitoClipDef | null {
     /^[a-z0-9]+(-[a-z0-9]+)*$/.test(row.clip_id) &&
     Number.isFinite(row.width) && row.width >= 64 && row.width <= 4096 &&
     Number.isFinite(row.height) && row.height >= 64 && row.height <= 4096;
-  return ok ? { id: row.clip_id, src: row.src, poster: row.poster, width: row.width, height: row.height, loop: !!row.loop } : null;
+  if (!ok) return null;
+  const clip: TonitoClipDef = { id: row.clip_id, src: row.src, poster: row.poster, width: row.width, height: row.height, loop: !!row.loop };
+  // Unos colores mal formados se ignoran (el clip sigue valiendo): nunca deben romper la escena ni inyectar CSS.
+  if (isEdgeColors(row.bg_colors)) clip.bgColors = row.bg_colors;
+  return clip;
 }
 
 // Que clip tiene una escena. La base manda sobre el codigo:

@@ -11,6 +11,7 @@ import { TonitoFullBody, type CinematicAnimation } from '@/components/tonito/Ton
 import { TonitoClip, useClipPlan } from '@/components/tonito/TonitoClip';
 import { TONITO_CLIPS, clipAvailable, explainClip, resolveSceneClip, sceneUsesVideo, type TonitoClipDef } from '@/lib/tonito/clips';
 import { MEDIA_BASE } from '@/lib/tonito/media';
+import { edgeBackgrounds } from '@/lib/tonito/clipColors';
 import { useSceneClips } from '@/lib/tonito/sceneClips';
 import { SCENE_DEFAULT_CLIP, type CinematicType } from '@/lib/tonito/scenes';
 import type { TonitoMood } from '@/stores/useTonitoStore';
@@ -165,9 +166,13 @@ function SceneBody(props: CinematicProps & { registered: TonitoClipDef | undefin
     setTimeout(onComplete, 350);
   };
 
+  // Con un clip que trae los colores de sus bordes, el fondo es ESE (a cada lado): en una pantalla ancha el clip vertical queda centrado y no se distingue de los
+  // lados. Sin colores (clips anteriores, o la migracion 074 sin aplicar) se usa el degradado de siempre.
+  const edge = video && clip ? edgeBackgrounds(clip.bgColors) : null;
+
   return (
     <div
-      className={`fixed inset-0 z-[400] flex flex-col items-center ${video ? 'justify-end pb-12' : 'justify-center'} overflow-hidden bg-gradient-to-br ${scene.bg} ${
+      className={`fixed inset-0 z-[400] flex flex-col items-center ${video ? 'justify-end pb-12' : 'justify-center'} overflow-hidden ${edge ? '' : `bg-gradient-to-br ${scene.bg}`} ${
         exiting ? 'cinematic-fade-out' : 'cinematic-fade-in'
       }`}
       role="dialog"
@@ -182,6 +187,12 @@ function SceneBody(props: CinematicProps & { registered: TonitoClipDef | undefin
 
       {video && clip && (
         <>
+          {edge && (
+            <>
+              <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1/2" style={{ background: edge.left }} />
+              <div aria-hidden="true" className="absolute inset-y-0 right-0 w-1/2" style={{ background: edge.right }} />
+            </>
+          )}
           <TonitoClip clip={clip} className="absolute inset-0 h-full w-full" onFailed={() => setClipFailed(true)} />
           {/* Velo inferior: el texto de la escena tiene que leerse sobre cualquier cuadro del video. */}
           <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10" />

@@ -26,7 +26,7 @@ export function loadSceneClips(): Promise<SceneClipRow[] | null> {
       // La tabla aun no esta en los tipos generados de la base.
       const { data, error } = await (createClient() as any)
         .from('tonito_scene_clips')
-        .select('scene, clip_id, src, poster, width, height, loop, active');
+        .select('*'); // todas las columnas: tolera que bg_colors (migracion 074) aun no exista
       if (error || !Array.isArray(data)) return cache;
       cache = data as SceneClipRow[];
       fetchedAt = Date.now();
