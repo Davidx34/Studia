@@ -28,10 +28,13 @@ import fs from 'fs';
 import path from 'path';
 import { judgeQuestionsBatch } from '../src/lib/questions/judge';
 import { getRagContext } from '../src/lib/questions/cohereGeneration';
+import { retrieveContext } from '../src/lib/rag/retrieve';
 
 const args = process.argv.slice(2);
 const limite = args.includes('--limit') ? Number(args[args.indexOf('--limit') + 1]) : Infinity;
 const guardar = args.includes('--guardar');
+// --por-pregunta: en vez del contexto del MODULO, cada pregunta se juzga con los fragmentos recuperados para ESA pregunta.
+const porPregunta = args.includes('--por-pregunta');
 
 type Fila = { humano: 'approved' | 'rejected'; juez: 'pass' | 'fail' | 'review' | null; familia: 'clasica' | 'minijuego'; tipo: string; razon: string };
 
@@ -80,8 +83,20 @@ Para crear la referencia:
 
   const filas: Fila[] = [];
   for (const [moduleId, preguntas] of Array.from(porModulo.entries())) {
-    const contexto = await getRagContext(supabase, moduleId);
-    const veredictos = await judgeQuestionsBatch(preguntas, contexto);
+    let veredictos: Map<string, { verdict: 'pass' | 'fail' | 'review'; reason: string } | null>;
+    if (porPregunta) {
+      veredictos = new Map();
+      for (const q of preguntas) {
+        const consulta = [q.q, ...(Array.isArray(q.opts) ? q.opts : []), ...(Array.isArray(q.answers) ? q.answers : [])].filter((x) => typeof x === 'string').join(' ').slice(0, 600);
+        const r = await retrieveContext(supabase, moduleId, { charLimit: 6000, queries: [consulta] }).catch(() => null);
+        const ctx = r?.context ?? (await getRagContext(supabase, moduleId));
+        const un = await judgeQuestionsBatch([q], ctx);
+        veredictos.set(q.id, un.get(q.id) ?? null);
+      }
+    } else {
+      const contexto = await getRagContext(supabase, moduleId);
+      veredictos = await judgeQuestionsBatch(preguntas, contexto);
+    }
     for (const q of preguntas) {
       const v = veredictos.get(q.id);
       filas.push({
@@ -123,6 +138,22 @@ FALSOS APROBADOS     ${falsosAprobados.length}  <- el peor error: llegan al estu
 Falsos rechazos      ${falsosRechazos.length}  (desperdician contenido bueno)
 `);
 
+  // El "acuerdo" por si solo ENGANA cuando las etiquetas no estan equilibradas: un juez que rechazara TODO acertaria tantas veces como
+  // rechazos haya puesto el profesor. Por eso se muestra tambien cuanto detecta de cada lado y la referencia "rechazar todo".
+  const humanoAprobo = conVeredicto.filter((f) => f.humano === 'approved');
+  const humanoRechazo = conVeredicto.filter((f) => f.humano === 'rejected');
+  const aprobadasQuePasan = humanoAprobo.filter((f) => f.juez === 'pass').length;
+  const rechazadasQueFallan = humanoRechazo.filter((f) => f.juez === 'fail').length;
+  console.log(`Preguntas que el profesor APROBO y el juez dejo pasar:   ${aprobadasQuePasan}/${humanoAprobo.length}`);
+  console.log(`Preguntas que el profesor RECHAZO y el juez rechazo:     ${rechazadasQueFallan}/${humanoRechazo.length}`);
+  if (conVeredicto.length > 0) {
+    console.log(
+      `Referencia: un juez que rechazara TODO acertaria ${humanoRechazo.length}/${conVeredicto.length} (${pct(humanoRechazo.length / conVeredicto.length)}); uno que aprobara todo, ${humanoAprobo.length}/${conVeredicto.length} (${pct(humanoAprobo.length / conVeredicto.length)}).`
+    );
+    if (humanoAprobo.length > 0 && aprobadasQuePasan === 0) console.log('! El juez NO dejo pasar ninguna de las que el profesor aprobo: su "acuerdo" es solo el porcentaje de rechazos. No discrimina.');
+  }
+  console.log('');
+
   for (const familia of ['clasica', 'minijuego'] as const) {
     const sub = decisivos.filter((f) => f.familia === familia);
     if (sub.length === 0) continue;
@@ -153,6 +184,11 @@ Falsos rechazos      ${falsosRechazos.length}  (desperdician contenido bueno)
           falsosAprobados: falsosAprobados.length,
           falsosRechazos: falsosRechazos.length,
           derivados: derivados.length,
+          aprobadasQuePasan,
+          aprobadasTotal: humanoAprobo.length,
+          rechazadasQueFallan,
+          rechazadasTotal: humanoRechazo.length,
+          porPregunta,
           filas,
         },
         null,

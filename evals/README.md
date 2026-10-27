@@ -107,3 +107,22 @@ Honestidad sobre los huecos, para que nadie lea de más en un número verde:
   apenas empezó a registrar (ver PR #54).
 - **Relevancia semántica del contexto.** `eval-context` mide cobertura y
   distinción, no si el chunk recuperado es *el mejor* para ese módulo.
+
+---
+
+### Nota sobre cómo leer el acuerdo del juez (2026-10-27)
+
+`eval-judge` ahora muestra, además del acuerdo, **cuántas preguntas aprobadas por el profesor deja pasar el juez y cuántas rechazadas
+detecta**, y la referencia "un juez que rechazara todo acertaría X %". El acuerdo solo ENGAÑA cuando las etiquetas no están equilibradas.
+
+Medido ese día sobre las 26 preguntas etiquetadas (5 módulos), con Gemini 3.5 Flash y 3.5 Flash-Lite, 3.8 Flash:
+- El juez rechazó **las 11 que el profesor aprobó (0/11 pasaron)** y detectó 14 de las 15 que el profesor rechazó. Su "acuerdo" (50-58 %) es
+  prácticamente el porcentaje de rechazos del profesor (15/26 = 57,7 %): **en esta muestra el juez no discrimina**.
+- 6 a 8 de esos 11 rechazos de más son por el criterio 1 (anclaje: "el concepto no aparece en el material fuente").
+- **No es el recorte del contexto:** subir el material que ve el juez de 6.000 a 16.000 caracteres dio exactamente el mismo resultado.
+- **Tampoco mejoró** al juzgar cada pregunta con los fragmentos recuperados para ESA pregunta (`--por-pregunta`): 14/26, mismos 11 rechazos.
+- Un modelo más potente (3.5 Flash, 3.8 Flash) dio el mismo resultado que el Flash-Lite.
+
+Lectura: la discrepancia parece ser de CRITERIO, no de potencia del modelo ni de recuperación. El juez exige que cada pregunta se verifique contra el
+material subido; el profesor aprueba preguntas correctas de la materia aunque su concepto no esté en lo subido. Decidir cuál de las dos cosas
+se quiere es una decisión de producto. La muestra es pequeña (26 preguntas, 5 módulos): hacen falta más etiquetas (30 dan señal, 60 buena).
