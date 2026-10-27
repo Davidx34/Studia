@@ -51,8 +51,9 @@ describe('integracion', () => {
     const path = await import('path');
     const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8').replace(/\r\n/g, '\n');
     const q = read('src/lib/questions/cohereGeneration.ts');
-    expect(q.indexOf('protectLatexBackslashes(jsonMatch[0])')).toBeGreaterThan(-1);
-    expect(q.indexOf('protectLatexBackslashes(jsonMatch[0])')).toBeLessThan(q.indexOf('JSON.parse(protectedJson)'));
+    // Todo texto pasa por parseLenient, que protege las formulas antes de parsear (objeto, lista o pregunta suelta).
+    expect(q.indexOf('protectLatexBackslashes(src)')).toBeGreaterThan(-1);
+    expect(q.indexOf('protectLatexBackslashes(src)')).toBeLessThan(q.indexOf('JSON.parse(protectedJson)'));
     expect(read('src/lib/study/validate.ts')).toContain('protectLatexBackslashes(m[0])');
   });
 });

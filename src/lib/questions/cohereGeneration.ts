@@ -320,30 +320,60 @@ export function normalizeGeneratedQuestion(q: any): any {
 // inicie una secuencia de escape valida, ANTES del parseo.
 // (La logica vive en src/lib/json/latexJson.ts, compartida con el generador de fichas.)
 
-// Extrae el JSON de la respuesta de Cohere de forma tolerante: a veces
-// envuelve la respuesta en fences de markdown (```json ... ```) o agrega
-// texto antes/despues del objeto. Antes esto usaba un regex simple que
-// fallaba en silencio (devolvia null) ante cualquiera de esos casos.
-function extractJsonQuestions(text: string): any[] | null {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fenced ? fenced[1] : text;
-  const jsonMatch = candidate.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
-  // Las formulas $...$ llevan barras simples (\frac, \beta, \times): se protegen ANTES de parsear, porque JSON.parse
-  // las convertiria en silencio en saltos de pagina / retrocesos / tabulaciones (ver latexJson.ts).
-  const protectedJson = protectLatexBackslashes(jsonMatch[0]);
+// Extrae las preguntas de la respuesta del modelo de forma tolerante. Acepta:
+//   - { "questions": [...] } (lo que pide el prompt) o { "preguntas": [...] };
+//   - una LISTA suelta [ {...}, {...} ];
+//   - UN SOLO objeto de pregunta { "type": ..., "q": ... }.
+// con o sin fences de markdown (```json ... ```) y con texto antes o despues.
+//
+// Por que las formas sueltas: medido el 2026-10-27 con Gemini 3.5 Flash-Lite, al pedir pocas preguntas (1 a 3) NO devuelve {"questions": [...]}: con 1 devuelve el
+// objeto de la pregunta y con 2 o 3 una lista. Antes eso daba null -> "respuesta ilegible" en 1-2 s -> la generacion caia al respaldo (Cohere, de menor calidad).
+// Con 8 preguntas respondia siempre con { "questions": [...] }.
+function parseLenient(src: string): unknown {
+  // Las formulas $...$ llevan barras simples (\frac, \beta, \times): se protegen ANTES de parsear, porque JSON.parse las convertiria en silencio en saltos de pagina /
+  // retrocesos / tabulaciones (ver latexJson.ts). Reintento con el resto de barras sueltas saneadas antes de rendirse.
+  const protectedJson = protectLatexBackslashes(src);
   try {
-    const parsed = JSON.parse(protectedJson);
-    return Array.isArray(parsed.questions) ? parsed.questions : null;
+    return JSON.parse(protectedJson);
   } catch {
-    // Reintento con el resto de barras sueltas saneadas antes de rendirse.
     try {
-      const parsed = JSON.parse(escapeInvalidJsonBackslashes(protectedJson));
-      return Array.isArray(parsed.questions) ? parsed.questions : null;
+      return JSON.parse(escapeInvalidJsonBackslashes(protectedJson));
     } catch {
-      return null;
+      return undefined;
     }
   }
+}
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+function questionsFrom(parsed: unknown): any[] | null {
+  if (Array.isArray(parsed)) return parsed.length > 0 && parsed.every(isPlainObject) ? parsed : parsed.length === 0 ? parsed : null;
+  if (!isPlainObject(parsed)) return null;
+  if (Array.isArray(parsed.questions)) return parsed.questions;
+  if (Array.isArray(parsed.preguntas)) return parsed.preguntas;
+  if (typeof parsed.type === 'string' && typeof parsed.q === 'string') return [parsed]; // una sola pregunta
+  return null;
+}
+
+export function extractJsonQuestions(text: string): any[] | null {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const candidate = (fenced ? fenced[1] : text).trim();
+  // 1) todo el texto es JSON (objeto o lista)
+  let found = questionsFrom(parseLenient(candidate));
+  if (found) return found;
+  // 2) un objeto dentro de texto con otras cosas alrededor
+  const obj = candidate.match(/\{[\s\S]*\}/);
+  if (obj) {
+    found = questionsFrom(parseLenient(obj[0]));
+    if (found) return found;
+  }
+  // 3) una lista dentro de texto con otras cosas alrededor
+  const arr = candidate.match(/\[[\s\S]*\]/);
+  if (arr) {
+    found = questionsFrom(parseLenient(arr[0]));
+    if (found) return found;
+  }
+  return null;
 }
 
 // Sin max_tokens explicito, Cohere usa un default que en la verificacion en
