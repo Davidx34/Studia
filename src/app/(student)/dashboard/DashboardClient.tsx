@@ -46,14 +46,19 @@ export function DashboardClient({
   const showMessage = useTonitoStore((s) => s.showMessage);
   const [showWelcome, setShowWelcome] = useState(false);
 
-  // Cinematica de bienvenida (Sesion F.1): solo la primera vez que el
-  // estudiante ve su dashboard, nunca mas (flag en localStorage por usuario).
+  // Cinematica de bienvenida: una vez cada vez que el estudiante ABRE la app (sesion del navegador), no en cada visita al dashboard.
+  // sessionStorage vive mientras la pestaña o la app instalada siguen abiertas y se borra al cerrarlas; al volver a abrirla, se muestra otra vez.
+  // Si el navegador lo bloquea, no se muestra: es mejor no repetirla en cada navegacion que repetirla sin parar.
   useEffect(() => {
     if (!profile?.id) return;
-    const key = `studia_welcome_shown_${profile.id}`;
-    if (!localStorage.getItem(key)) {
-      localStorage.setItem(key, '1');
-      setShowWelcome(true);
+    try {
+      const key = `studia_welcome_session_${profile.id}`;
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1');
+        setShowWelcome(true);
+      }
+    } catch {
+      /* sin sessionStorage: no se muestra */
     }
   }, [profile?.id]);
 
