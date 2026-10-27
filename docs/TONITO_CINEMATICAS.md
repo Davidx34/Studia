@@ -57,8 +57,11 @@ del clip; por defecto sale de la escena).
 - **Se comprueba antes de publicar:** nombre versionado, peso, tipo real del archivo y que el bucket lo sirva con caché y rangos.
 - **Los archivos no se sobrescriben.** Un video nuevo para la misma escena crea `…v2.mp4`; los viejos quedan en el bucket y se pueden reponer.
 - **Interruptor inmediato:** `clip:off` apaga una escena sin tocar código.
-- El video **no se usa** (se ve la pose) con movimiento reducido, ahorro de datos, 2G, sin soporte H.264, o si la pantalla tiene una
-  proporción muy distinta a la del clip (un clip vertical en un computador). Es a propósito.
+- El video **no se usa** (se ve la pose) con movimiento reducido ("Mostrar animaciones" desactivado en el sistema), ahorro de datos, 2G o sin
+  soporte H.264. Es a propósito.
+- **La forma de la pantalla ya no lo descarta.** En un celular el clip llena la pantalla; en una pantalla ancha (computador) se muestra **entero,
+  centrado y a toda la altura**, con los bordes difuminados contra el color de la escena. Antes, un clip vertical en un computador caía a la pose,
+  y quien probaba en un computador creía que la animación "no cargaba".
 
 ## Dónde vive cada cosa
 
