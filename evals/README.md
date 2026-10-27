@@ -145,3 +145,31 @@ verificado por un experto** (no por la IA, que es quien genera y juzga).
 Medido (26 preguntas, 5 modulos, perfil paid): criterio anclaje -> 0 pasan; criterio "subject" sin segunda opinion -> 9 pasan (de ellas ~3 discutibles segun
 una lectura manual, ninguna con error flagrante); **con segunda opinion -> 4 pasan, 3 a revision humana, 19 fallan**. Con la muestra y el metodo de
 arriba esto NO demuestra una tasa de acierto: solo que el juez nuevo es mas exigente con la correccion y que la segunda opinion recorta lo dudoso.
+
+---
+
+### Prueba de generacion: `npm run eval:generation` (2026-10-27)
+
+Solo lectura: genera preguntas con distintos generadores sobre los MISMOS modulos y el MISMO contexto, las juzga con el juez de correccion + segunda opinion
+de otra familia, y con `--reparar N` regenera las rechazadas diciendole al modelo cual fallo y por que (`src/lib/questions/repair.ts`).
+
+Hallazgo previo: las preguntas que fallaban hoy las genera **Cohere Aya Expanse 32B**, que `callCohere` usa PRIMERO; la cadena de la pasarela solo entra si Cohere no da
+suficientes. Por eso `AI_PROFILE=paid` nunca las toco.
+
+Medido (5 modulos de microeconomia, 57 preguntas pedidas por generador, 8 clasicas + minijuegos, llave de pago):
+
+| Generador | Pasan a la primera | Tras hasta 2 rondas de reparacion |
+|---|---|---|
+| Cohere Aya 32B (el de hoy) | 16 de 53 (30 %) | 31 de 57 (54 %) |
+| Gemini 3.5 Flash-Lite | 49 de 57 (86 %) | 56 de 57 (98 %) |
+| Gemini 3.5 Flash | 51 de 57 (89 %) | 57 de 57 (100 %) |
+
+**Como leer esto (importa mas que las cifras):**
+- "Pasan" = lo aprueba el juez (Gemini 3.5 Flash) Y una segunda opinion de otra familia (Qwen / gpt-oss). Es la opinion de IAs, no de una persona.
+- Lectura manual de 16 aprobadas al azar (8 por generador): 14 correctas; 2 con defectos que el juez dejo pasar (una pregunta que depende de una figura que el estudiante no
+  tiene; una derivacion con el simbolo LaTeX `\nRightarrow` en vez de `\Rightarrow`). Es decir, ~85-90 % realmente bien en esa muestra, no 98-100 %.
+- La reparacion usa los motivos DEL JUEZ como retroalimentacion: el generador aprende a satisfacer al juez (riesgo de optimizar para el juez, no para la verdad).
+- 5 modulos, una materia, una sola corrida por generador. Cohere se midio en una corrida distinta, con la segunda opinion agotada en parte: no es una comparacion
+  perfecta. Falta un conjunto de oro verificado por una persona experta para medir el acierto real.
+- Una version previa de la prueba dio resultados enganosos (0 de 57 para el 3.5 Flash) por un artefacto: la cadena de un solo candidato abria el cortacircuito de la
+  pasarela y los modulos siguientes se saltaban. Se corrigio (se reinicia y se reintenta una vez; los fallos se cuentan: Flash-Lite 1, Flash 0).
