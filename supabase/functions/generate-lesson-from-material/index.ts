@@ -18,8 +18,8 @@
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { generateContent } from '../_shared/geminiModels.ts';
 
-const GEMINI_CHAT_MODEL = 'gemini-1.5-flash';
 const GEMINI_EMBED_MODEL = 'text-embedding-004';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -245,7 +245,6 @@ async function callOutliner(
     questionCount: number;
   }
 ): Promise<OutlineResponse> {
-  const url = `${GEMINI_BASE_URL}/models/${GEMINI_CHAT_MODEL}:generateContent?key=${apiKey}`;
   const prompt = `Diseña el outline de una lección sobre "${input.moduleTitle}".
 Descripción: ${input.moduleDescription}
 Temas clave: ${input.topics.join(', ')}
@@ -296,13 +295,7 @@ Para cada pregunta:
     },
   };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`Outliner failed: ${res.status} ${await res.text()}`);
-  const json = await res.json();
+  const { json } = await generateContent(apiKey, body, undefined, 'Outliner');
   const raw = json.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!raw) throw new Error('Outliner: respuesta vacía');
   return JSON.parse(raw) as OutlineResponse;
@@ -321,8 +314,6 @@ async function writeQuestion(
     contextChunks: string;
   }
 ): Promise<MultipleChoiceQ | TrueFalseQ | FillBlankQ | null> {
-  const url = `${GEMINI_BASE_URL}/models/${GEMINI_CHAT_MODEL}:generateContent?key=${apiKey}`;
-
   const baseRules = `Estás generando UNA pregunta para una lección sobre "${input.moduleTitle}".
 Ángulo cognitivo: ${input.cognitiveAngle}.
 Genera la pregunta basándote ESTRICTAMENTE en los siguientes extractos del material del profesor.
@@ -403,16 +394,13 @@ REGLAS:
     },
   };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    console.warn(`Writer failed: ${res.status}`);
+  let json;
+  try {
+    ({ json } = await generateContent(apiKey, body, undefined, 'Writer'));
+  } catch (e) {
+    console.warn(e instanceof Error ? e.message : String(e));
     return null;
   }
-  const json = await res.json();
   const raw = json.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!raw) return null;
   try {

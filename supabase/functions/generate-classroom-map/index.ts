@@ -21,9 +21,8 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildMapPrompt } from './mapPrompt.ts';
+import { generateContent } from '../_shared/geminiModels.ts';
 
-const GEMINI_CHAT_MODEL = 'gemini-2.5-flash';
-const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -232,8 +231,6 @@ function clamp(n: number, min: number, max: number): number {
 }
 
 async function callMapDesigner(apiKey: string, prompt: string): Promise<DesignerResponse> {
-  const url = `${GEMINI_BASE_URL}/models/${GEMINI_CHAT_MODEL}:generateContent?key=${apiKey}`;
-
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: {
@@ -275,16 +272,7 @@ async function callMapDesigner(apiKey: string, prompt: string): Promise<Designer
     },
   };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Gemini Map Designer falló: ${res.status} ${t}`);
-  }
-  const json = await res.json();
+  const { json } = await generateContent(apiKey, body, undefined, 'Gemini Map Designer');
   const raw = json.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!raw) throw new Error('Map Designer respuesta vacía');
   return JSON.parse(raw) as DesignerResponse;
