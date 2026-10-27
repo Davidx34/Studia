@@ -22,7 +22,8 @@
     "clip:publish": "npx tsx --env-file=.env.local scripts/clip-prepare.ts --publish",
     "clip:list": "npx tsx --env-file=.env.local scripts/clip-scenes.ts list",
     "clip:on": "npx tsx --env-file=.env.local scripts/clip-scenes.ts on",
-    "clip:off": "npx tsx --env-file=.env.local scripts/clip-scenes.ts off"
+    "clip:off": "npx tsx --env-file=.env.local scripts/clip-scenes.ts off",
+    "flow:prompts": "npx tsx scripts/flow-prompts.ts"
   },
   "dependencies": {
     "@serwist/next": "^9.5.7",
