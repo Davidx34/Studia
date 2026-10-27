@@ -6,7 +6,7 @@
 
 import { generateEmbedding } from '@/lib/embeddings/generate';
 import { retrieveContext } from '@/lib/rag/retrieve';
-import { routeText, describeAttempts, hasProviderFor } from '@/lib/ai/gateway';
+import { routeText, describeAttempts, hasProviderFor, chainFor } from '@/lib/ai/gateway';
 import { protectLatexBackslashes, escapeInvalidJsonBackslashes } from '@/lib/json/latexJson';
 
 export const RAG_MATCH_COUNT = 5;
@@ -437,7 +437,42 @@ async function callFallbackQuestions(prompt: string, expectedCount?: number): Pr
 // Si Cohere no logra una respuesta suficiente y OpenRouter esta configurado, se
 // intenta con el respaldo. Con respaldo disponible Cohere reintenta menos (2
 // intentos en vez de 3): esperar mas a un proveedor caido cuesta mas que cambiar.
+// QUIEN GENERA PRIMERO. Por defecto Cohere (Aya Expanse 32B) y la pasarela de IA solo de respaldo. Con GENERATION_PRIMARY=gateway la pasarela va PRIMERO
+// (con AI_PROFILE=paid, Gemini 3.5 Flash-Lite) y Cohere queda de respaldo si la pasarela no da suficientes preguntas. Motivo (medido el 2026-10-27 sobre 5 modulos,
+// mismo juez con segunda opinion): las preguntas de Cohere pasaban el juez a la primera el 30 % de las veces (54 % tras reparar); las de Gemini 3.5 Flash-Lite, el 86 %
+// (98 % tras reparar). Ver evals/README.md y docs/IA_MODELOS_Y_PRESUPUESTO.md. Reversible: quitar la variable.
+export type GenerationPrimary = 'cohere' | 'gateway';
+export const generationPrimary = (env: Record<string, string | undefined> = process.env): GenerationPrimary =>
+  env.GENERATION_PRIMARY?.trim().toLowerCase() === 'gateway' ? 'gateway' : 'cohere';
+
+let warnedNotGemini = false;
+async function callGatewayFirst(prompt: string, expectedCount?: number): Promise<any[] | null> {
+  const first = chainFor('generation')[0];
+  if (first && first.provider !== 'gemini' && !warnedNotGemini) {
+    warnedNotGemini = true;
+    console.warn(`[GENERATION] GENERATION_PRIMARY=gateway, pero la cadena de generacion empieza por ${first.provider}/${first.model}, no por Gemini: pon AI_PROFILE=paid o AI_CHAIN_GENERATION=gemini:gemini-3.5-flash-lite`);
+  }
+  const enough = (n: number) => !expectedCount || n >= Math.ceil(expectedCount * 0.7);
+  const viaGateway = await callFallbackQuestions(prompt, expectedCount);
+  if (viaGateway && enough(viaGateway.length)) return viaGateway;
+
+  // La pasarela no dio lo suficiente: Cohere de respaldo (si hay llave), con un reintento.
+  const cohereKey = process.env.COHERE_API_KEY;
+  if (!cohereKey) return viaGateway;
+  console.warn(`[GENERATION] la pasarela dio ${viaGateway?.length ?? 0}/${expectedCount ?? '?'} preguntas; probando Cohere de respaldo`);
+  let best: any[] | null = viaGateway;
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    const { questions, httpError } = await callCohereOnce(prompt, cohereKey);
+    if (httpError) console.warn(`[callCohere] respaldo intento ${attempt + 1}/2 fallo HTTP: ${httpError}`);
+    if (questions && questions.length > 0 && (!best || questions.length > best.length)) best = questions;
+    if (best && enough(best.length)) break;
+    if (attempt < 1) await new Promise((r) => setTimeout(r, 1500));
+  }
+  return best;
+}
+
 export async function callCohere(prompt: string, expectedCount?: number): Promise<any[] | null> {
+  if (generationPrimary() === 'gateway' && hasProviderFor('generation')) return callGatewayFirst(prompt, expectedCount);
   const COHERE_API_KEY = process.env.COHERE_API_KEY;
   const fallbackAvailable = hasProviderFor('generation');
   if (!COHERE_API_KEY && !fallbackAvailable) return null;
