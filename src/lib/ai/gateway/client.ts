@@ -46,6 +46,10 @@ const DEFAULT_TIMEOUT_MS = 90_000;
 // VACIA (verificado con ai:doctor --ping). Groq y Cerebras aceptan reasoning_effort: bajo para juzgar y analizar (tareas
 // cortas y deterministas), medio para generar. Otros proveedores no reciben el parametro.
 export function reasoningEffortFor(providerId: string, model: string, task: CallRequest['task']): 'low' | 'medium' | null {
+  // Gemini 3.x (3.5 Flash, 3.8 Flash...) tambien "piensa" por defecto y esos tokens ocultos cuentan contra max_tokens: medido el 2026-10-27, el 3.5 Flash
+  // dejo SIN UNA SOLA pregunta valida (salida cortada, ilegible) al generar un modulo con minijuegos (max_tokens 6000), pero con las mismas
+  // preguntas clasicas respondio bien. 'low' lo evita sin dejarlo sin razonar. Los 2.5 no se tocan.
+  if (providerId === 'gemini' && /^gemini-3\./.test(model)) return 'low';
   if (!/gpt-oss/i.test(model) || (providerId !== 'groq' && providerId !== 'cerebras')) return null;
   return task === 'generation' || task === 'study' ? 'medium' : 'low';
 }

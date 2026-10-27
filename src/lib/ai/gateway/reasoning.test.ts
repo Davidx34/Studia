@@ -26,6 +26,29 @@ describe('esfuerzo de razonamiento de los modelos gpt-oss', () => {
     expect(reasoningEffortFor('github', 'openai/gpt-oss-120b', 'judge')).toBeNull(); // otro proveedor: no se manda
   });
 
+  it('Gemini 3.x (que piensa por defecto) recibe esfuerzo bajo; los 2.x y otros proveedores no', () => {
+    for (const task of ['generation', 'judge', 'analysis', 'study'] as const) {
+      expect(reasoningEffortFor('gemini', 'gemini-3.5-flash', task)).toBe('low');
+      expect(reasoningEffortFor('gemini', 'gemini-3.5-flash-lite', task)).toBe('low');
+      expect(reasoningEffortFor('gemini', 'gemini-3.8-flash', task)).toBe('low');
+    }
+    expect(reasoningEffortFor('gemini', 'gemini-2.5-flash', 'generation')).toBeNull();
+    expect(reasoningEffortFor('gemini', 'gemini-35-flash', 'generation')).toBeNull(); // el punto cuenta: no es un 3.x
+    expect(reasoningEffortFor('openrouter', 'gemini-3.5-flash', 'generation')).toBeNull();
+  });
+
+  it('se manda a Gemini 3.x, y si lo rechaza (400) se reintenta sin el', async () => {
+    const env = { GEMINI_API_KEY: 'k' };
+    const a = recorder(() => ok());
+    await callCandidate({ provider: 'gemini', model: 'gemini-3.5-flash' }, { task: 'generation', prompt: 'x' }, env, a.f);
+    expect(a.bodies[0].reasoning_effort).toBe('low');
+    const b = recorder((body) => (body.reasoning_effort ? err(400, 'Unsupported reasoning_effort') : ok()));
+    const r = await callCandidate({ provider: 'gemini', model: 'gemini-3.5-flash' }, { task: 'generation', prompt: 'x' }, env, b.f);
+    expect(r.ok).toBe(true);
+    expect(b.bodies).toHaveLength(2);
+    expect(b.bodies[1].reasoning_effort).toBeUndefined();
+  });
+
   it('se manda en la peticion a Groq/gpt-oss y NO a otros modelos', async () => {
     const env = { GROQ_API_KEY: 'g' };
     const a = recorder(() => ok());
