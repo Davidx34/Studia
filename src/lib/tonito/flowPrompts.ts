@@ -1,47 +1,56 @@
-// Prompts de Flow/Gemini para el arte de Toñito, YA ARMADOS (identidad + encuadre + fondo + accion + reglas). Es el catalogo de docs/TONITO_CATALOGO_ANIMACIONES.md en forma de
-// datos: asi cada prompt sale igual, sin armarlo a mano, y una prueba vigila que ninguno quede sin identidad, sin reglas o con marcadores sin reemplazar.
+// Prompts de Flow/Gemini para el arte de Toñito, YA ARMADOS, con el FORMATO QUE SI FUNCIONO: el de la celebracion (docs/TONITO_PRUEBA_DE_CONCEPTO.md §11), que salio perfecta.
+//
+// Una primera version en ingles con un bloque de identidad generico ("Amigurumi crochet 3D doll...") dio un personaje DISTINTO a Toñito. Lo que tiene el prompt probado y aquel no:
+//   1. empieza NOMBRANDO al personaje y a la imagen: "Mismo personaje de la imagen de referencia: Toñito, ...";
+//   2. "No cambies su diseño ni su ropa en ningun momento";
+//   3. la ACCION POR TIEMPOS (0 a 0,5 s, 0,5 a 2,5 s...), terminando en una pose estable;
+//   4. secciones: Accion, Encuadre, Fondo, Efectos y "Muy importante, evita";
+//   5. nada que contradiga el encuadre (sin suelo, sin entradas desde fuera del cuadro).
+// Es UN solo caso de exito contra UN fallo, asi que la causa exacta es una hipotesis; el formato probado es lo mas seguro que hay.
 //
 // Funciones puras (sin red ni disco). `npm run flow:prompts` los imprime o escribe docs/TONITO_FLOW_PROMPTS.md.
 
 export type Orientation = 'vertical' | 'horizontal';
-export type PromptKind = 'cinematic' | 'short' | 'pose';
 
-// Siempre igual: la identidad del personaje. Se adjunta ademas la imagen de referencia aprobada.
+// Siempre igual, al principio de TODO prompt. Se adjunta ademas la imagen de referencia aprobada.
 export const IDENTITY =
-  'Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, ' +
-  'a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do ' +
-  'not change the outfit or the face. Friendly, child-safe.';
+  'Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con ' +
+  'banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y ' +
+  'redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.';
 
-// Al final de TODOS los prompts de clip.
-export const CLIP_RULES =
-  'Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no ' +
-  'speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.';
+// Al final de todo prompt.
+export const AVOID =
+  'Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. ' +
+  'Sin música ni voz.';
 
-// Encuadre. El texto de la escena ocupa el tercio inferior: los pies van sobre el 60-65 % y el suelo queda vacio.
-export const FRAMING: Record<'cinematic' | 'short', Record<Orientation, string>> = {
-  cinematic: {
-    vertical:
-      'Vertical 9:16 frame. The character is centered horizontally, about 55-60% of the frame height, with his feet at about 62% of the frame height. The bottom 30% of the ' +
-      'frame is empty background.',
-    horizontal:
-      'Horizontal 16:9 frame. The character is centered, about 60% of the frame height and no wider than 30% of the frame width, with his feet at about 67% of the frame ' +
-      'height. Keep the left and right sides as wide empty background of the same gradient; nothing important within 20% of the left and right edges. The bottom 28% of the ' +
-      'frame is empty background. Sparkles and other small effects may spread across the full width of the frame.',
-  },
-  // Clips cortos: se recortan al cuadrado central dentro de una tarjeta de ~100 px.
-  short: {
-    vertical:
-      'Vertical 9:16 frame. The character is centered and fills the central square of the frame (about 60% of the frame width), full body visible. Keep the top and bottom of ' +
-      'the frame as plain empty background.',
-    horizontal: '', // los clips cortos solo se piden en vertical
-  },
-};
+const CAMERA = 'cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes.';
 
-export const POSE_FRAMING =
-  'Full body, centered, front view, soft even lighting, 1:1 square image, character about 80% of the image height with his feet on a fixed line near the bottom. Plain flat ' +
-  'solid magenta (#FF00FF) background with nothing else. No text, no logos, no shadows on the background.';
+// Encuadre. El texto de la escena ocupa el tercio inferior: los pies van sobre el 62-67 % y el suelo (el tercio de abajo) queda VACIO.
+export function framing(kind: 'cinematic' | 'short', orientation: Orientation): string {
+  if (kind === 'short') {
+    return (
+      `Encuadre: ${CAMERA} Toñito de cuerpo entero, centrado, ocupando el cuadrado central del cuadro (alrededor del 60 % del ancho). La parte de arriba y la de abajo del cuadro quedan ` +
+      'libres, de fondo liso. Nunca sale del encuadre.'
+    );
+  }
+  if (orientation === 'vertical') {
+    return (
+      `Encuadre: ${CAMERA} Toñito de cuerpo entero, centrado horizontalmente, y siempre dentro del 60 % central del ancho. Mide alrededor del 55-60 % de la altura del cuadro y sus pies ` +
+      'quedan a la altura del 62 % del cuadro: el cuerpo se mantiene en la mitad superior y media y el tercio inferior queda completamente libre, solo fondo. Nunca sale del encuadre.'
+    );
+  }
+  return (
+    `Encuadre: ${CAMERA} Toñito de cuerpo entero, centrado, de alrededor del 60 % de la altura del cuadro y no más ancho que el 30 % del ancho. Sus pies quedan a la altura del 67 % del ` +
+    'cuadro. Los lados izquierdo y derecho quedan como fondo amplio y vacío del mismo degradado: nada importante a menos del 20 % de los bordes. El tercio inferior queda libre, solo ' +
+    'fondo. Nunca sale del encuadre.'
+  );
+}
 
 export type Hex = `#${string}`;
+export interface ColorStop {
+  name: string;
+  hex: Hex;
+}
 
 export interface ClipSpec {
   id: string;
@@ -49,11 +58,12 @@ export interface ClipSpec {
   title: string;
   // Escena de CinematicScene (solo las cinematicas).
   scene?: string;
-  // Degradado diagonal de arriba-izquierda a abajo-derecha (los colores de CinematicScene.tsx), o dos colores en los clips cortos.
-  bg: readonly Hex[];
-  seconds: string;
+  // Degradado diagonal de arriba-izquierda a abajo-derecha (los colores de CinematicScene.tsx).
+  bg: readonly ColorStop[];
+  seconds: number;
+  // La accion POR TIEMPOS, terminando en una pose estable (en los bucles: primer y ultimo cuadro iguales).
   action: string;
-  // Clip en bucle: primer y ultimo cuadro iguales.
+  effects: string;
   loop?: boolean;
   orientations: readonly Orientation[];
   // Ya publicado (por orientacion).
@@ -67,88 +77,127 @@ export interface PoseSpec {
   pose: string;
 }
 
+const STREAK_BG: readonly ColorStop[] = [
+  { name: 'rojo', hex: '#B91C1C' },
+  { name: 'naranja', hex: '#EA580C' },
+  { name: 'ámbar', hex: '#F59E0B' },
+];
+const CARD_BG: readonly ColorStop[] = [
+  { name: 'violeta azulado', hex: '#6C5CE7' },
+  { name: 'turquesa', hex: '#00D2D3' },
+];
+
 export const CLIPS: readonly ClipSpec[] = [
   {
-    id: 'A1', kind: 'cinematic', scene: 'welcome', title: 'Entrada epica (primera vez que entra)',
-    bg: ['#6D28D9', '#7E22CE', '#3730A3'], seconds: '4 seconds', orientations: ['vertical', 'horizontal'],
+    id: 'A1', kind: 'cinematic', scene: 'welcome', title: 'Entrada épica (primera vez que entra)', seconds: 4, orientations: ['vertical', 'horizontal'],
+    bg: [{ name: 'violeta', hex: '#6D28D9' }, { name: 'púrpura', hex: '#7E22CE' }, { name: 'índigo', hex: '#3730A3' }],
     action:
-      'the character enters the frame with an energetic hop from just outside the frame, lands in the center with a small bounce, and finishes in a friendly welcoming pose: ' +
-      'one hand raised in a wave, a big warm smile. A soft cyan ring of energy glows briefly on the ground around his feet as he lands, then fades. A few tiny golden sparkles ' +
-      'float around him. He ends still in the welcoming pose.',
+      '0 a 0,6 s: Toñito aparece en el centro del cuadro con un salto enérgico hacia arriba. 0,6 a 1,6 s: aterriza en el centro con un pequeño rebote. 1,6 a 4 s: se queda en una pose de ' +
+      'bienvenida estable: una mano levantada saludando, sonrisa grande y cálida, casi quieto. El video termina en esa pose estable.',
+    effects:
+      'un anillo de energía ciano brilla un instante alrededor de sus pies cuando aterriza y se desvanece. Pocos destellos dorados muy pequeños flotan a su alrededor. Que no tapen su cara.',
   },
   {
-    id: 'A2', kind: 'cinematic', scene: 'lesson_start', title: 'Inicio de leccion (concentracion y entusiasmo)',
-    bg: ['#0F172A', '#1E1B4B', '#0F172A'], seconds: '3 to 4 seconds', orientations: ['vertical', 'horizontal'],
+    id: 'A2', kind: 'cinematic', scene: 'lesson_start', title: 'Inicio de lección (concentración y entusiasmo)', seconds: 4, orientations: ['vertical', 'horizontal'],
+    bg: [{ name: 'azul noche', hex: '#0F172A' }, { name: 'índigo muy oscuro', hex: '#1E1B4B' }, { name: 'azul noche', hex: '#0F172A' }],
     action:
-      'the character stands relaxed, pushes his glasses up with one finger with a confident smile, then rubs his hands together eagerly and gives a small excited hop, ready to ' +
-      'start. A few soft pale-blue sparkles drift upward behind him. He ends in a ready, smiling pose looking toward the viewer.',
+      '0 a 1 s: Toñito está de pie, relajado, y se sube las gafas con un dedo con una sonrisa segura. 1 a 2,6 s: se frota las manos con ganas y da un pequeño salto emocionado. 2,6 a 4 s: ' +
+      'se queda en una pose lista para empezar, sonriendo y mirando al frente, casi quieto. El video termina en esa pose estable.',
+    effects: 'pocos destellos azul pálido que suben suavemente detrás de él. Pequeños, que no tapen su cara.',
   },
   {
-    id: 'A3', kind: 'cinematic', scene: 'module_complete_good', title: 'Celebracion (modulo con 70 % o mas)',
-    bg: ['#D97706', '#EA580C', '#E11D48'], seconds: '4 seconds', orientations: ['vertical', 'horizontal'], done: ['vertical'],
+    id: 'A3', kind: 'cinematic', scene: 'module_complete_good', title: 'Celebración (módulo con 70 % o más)', seconds: 4, orientations: ['vertical', 'horizontal'], done: ['vertical'],
+    bg: [{ name: 'ámbar', hex: '#D97706' }, { name: 'naranja', hex: '#EA580C' }, { name: 'rosa frambuesa', hex: '#E11D48' }],
     action:
-      'the character jumps for joy with both arms raised high, lands, then jumps again with a happy spin, mouth open in a joyful smile. Golden stars and soft warm sparkles burst ' +
-      'and spread around him. He lands in a stable proud pose with a big smile, and the sparkles slowly settle.',
+      '0 a 0,5 s: Toñito está de pie, relajado y sonriente, en el centro del cuadro. 0,5 a 2,5 s: salta de alegría con los brazos en alto y cae. 2,5 a 4 s: se queda en una pose de celebración ' +
+      'estable, sonriendo, casi quieto, con los puños cerrados de alegría. El video termina en esa pose estable.',
+    effects: 'pocos destellos blancos y cremas y algunas estrellitas doradas muy claras alrededor de Toñito durante el salto. Pocos y pequeños, que no tapen su cara.',
   },
   {
-    id: 'A4', kind: 'cinematic', scene: 'module_complete_low', title: 'Reflexion calida (modulo con menos de 70 %)',
-    bg: ['#075985', '#155E75', '#1E293B'], seconds: '4 seconds, calm and warm', orientations: ['vertical', 'horizontal'],
+    id: 'A4', kind: 'cinematic', scene: 'module_complete_low', title: 'Reflexión cálida (módulo con menos de 70 %)', seconds: 4, orientations: ['vertical', 'horizontal'],
+    bg: [{ name: 'azul', hex: '#075985' }, { name: 'cian', hex: '#155E75' }, { name: 'pizarra', hex: '#1E293B' }],
     action:
-      'the character adjusts his glasses thoughtfully, gives a slow, gentle nod, then opens one hand toward the viewer in an encouraging, supportive gesture with a small kind ' +
-      'smile. Very slow, soft movement. No sadness, no disappointment, no scolding. He ends in a calm, warm, encouraging pose.',
+      '0 a 1,2 s: Toñito está de pie y se ajusta las gafas con calma, pensativo. 1,2 a 2,8 s: asiente despacio, con suavidad. 2,8 a 4 s: abre una mano hacia quien mira, en un gesto de apoyo y ' +
+      'ánimo, con una sonrisa pequeña y amable, casi quieto. Todos los movimientos son muy lentos y suaves. Sin tristeza, sin decepción y sin ningún gesto de regaño. El video termina en esa ' +
+      'pose estable, cálida y alentadora.',
+    effects: 'casi ninguno: como mucho unas pocas partículas de luz muy suaves y lentas, lejos de su cara.',
   },
   {
-    id: 'A5', kind: 'cinematic', scene: 'streak', title: 'Hito de racha (3, 5, 10... dias)',
-    bg: ['#B91C1C', '#EA580C', '#F59E0B'], seconds: '4 seconds', orientations: ['vertical', 'horizontal'],
+    id: 'A5', kind: 'cinematic', scene: 'streak', title: 'Hito de racha (3, 5, 10... días)', seconds: 4, orientations: ['vertical', 'horizontal'], bg: STREAK_BG,
     action:
-      'the character raises one fist in triumph and does an energetic victory jump, a ring of warm orange energy pulses on the ground and soft glowing ember-like sparkles rise ' +
-      'around him (stylized and gentle, not real fire, nothing scary). He lands in a powerful, proud pose with a confident grin.',
+      '0 a 0,6 s: Toñito está de pie, sonriente, en el centro del cuadro. 0,6 a 2,4 s: levanta un puño con orgullo y da un salto de victoria enérgico. 2,4 a 4 s: aterriza en una pose poderosa y ' +
+      'orgullosa, con una sonrisa de confianza, casi quieto. El video termina en esa pose estable.',
+    effects:
+      'un anillo de energía naranja cálida pulsa alrededor de sus pies cuando aterriza, y unos destellos suaves parecidos a brasas suben a su alrededor (estilizados y amables, no fuego real, nada que ' +
+      'asuste). Pocos y pequeños, que no tapen su cara.',
   },
   {
-    id: 'B1', kind: 'short', title: 'Pensando / esperando (la IA prepara las preguntas, refuerzo, chat)',
-    bg: ['#6C5CE7', '#00D2D3'], seconds: '3 seconds seamless loop', loop: true, orientations: ['vertical'],
+    id: 'B1', kind: 'short', title: 'Pensando / esperando (la IA prepara las preguntas, refuerzo, chat)', seconds: 3, loop: true, orientations: ['vertical'], bg: CARD_BG,
     action:
-      'the character stands thoughtfully with one hand on his chin, glances up and to the side, then back, with a slow gentle sway and a slow blink. Calm and curious, no stress.',
+      'Bucle perfecto de 3 s. 0 a 1 s: Toñito está de pie con una mano en la barbilla, pensativo. 1 a 2 s: mira hacia arriba y hacia un lado, y luego vuelve la mirada al frente, con un balanceo ' +
+      'suave y un parpadeo lento. 2 a 3 s: vuelve exactamente a la pose del principio. El primer cuadro y el último son idénticos para que el bucle no se note. Tranquilo y curioso, sin estrés.',
+    effects: 'ninguno.',
   },
   {
-    id: 'B2', kind: 'short', title: 'Triste suave (no se pudo preparar la leccion)',
-    bg: ['#6C5CE7', '#00D2D3'], seconds: '3 seconds', orientations: ['vertical'],
+    id: 'B2', kind: 'short', title: 'Triste suave (no se pudo preparar la lección)', seconds: 3, orientations: ['vertical'], bg: CARD_BG,
     action:
-      'the character lowers his gaze with a soft, tender, slightly apologetic expression, shrugs his shoulders gently, then looks up at the viewer with a small hopeful smile as if ' +
-      'saying "let\'s try again". Gentle and cute, never dramatic, no tears. He ends in a soft, hopeful pose.',
+      '0 a 1,2 s: Toñito baja la mirada con una expresión suave y tierna, un poco apenada. 1,2 a 2,2 s: se encoge de hombros con delicadeza. 2,2 a 3 s: levanta la mirada hacia quien mira con una ' +
+      'pequeña sonrisa esperanzada, como diciendo "intentémoslo otra vez", y queda casi quieto. Tierno y simpático, nunca dramático, sin lágrimas. El video termina en esa pose estable.',
+    effects: 'ninguno.',
   },
   {
-    id: 'B3', kind: 'short', title: 'Refuerzo completado',
-    bg: ['#6C5CE7', '#00D2D3'], seconds: '3 seconds', orientations: ['vertical'],
-    action: 'the character gives a happy fist pump and a small proud hop, golden sparkles pop around him, and he ends in a satisfied, smiling pose.',
+    id: 'B3', kind: 'short', title: 'Refuerzo completado', seconds: 3, orientations: ['vertical'], bg: CARD_BG,
+    action:
+      '0 a 0,5 s: Toñito está de pie, sonriente. 0,5 a 1,8 s: cierra el puño con alegría y da un pequeño salto orgulloso. 1,8 a 3 s: queda en una pose satisfecha, sonriendo, casi quieto. El video ' +
+      'termina en esa pose estable.',
+    effects: 'pocos destellos dorados pequeños que aparecen alrededor de él durante el salto. Que no tapen su cara.',
   },
 ];
 
 export const POSES: readonly PoseSpec[] = [
-  { id: 'P1', mood: 'happy (reposo)', priority: 'P0', pose: 'Standing relaxed with a calm gentle smile, hands in front.' },
-  { id: 'P2', mood: 'excited (acierto)', priority: 'P0', pose: 'Joyful, both arms up, eyes wide, lightly leaping.' },
-  { id: 'P3', mood: 'encouraging (error, animo)', priority: 'P0', pose: 'One hand extended forward in a supportive gesture, warm gaze, small smile. Never a gesture of reproach.' },
-  { id: 'P4', mood: 'thinking', priority: 'P0', pose: 'One hand on his chin, looking up, one eyebrow raised.' },
-  { id: 'P5', mood: 'sad', priority: 'P1', pose: 'Eyes lowered, shoulders slightly slumped, soft tender expression, not dramatic.' },
-  { id: 'P6', mood: 'surprised', priority: 'P1', pose: 'Eyes and mouth wide open, hands raised in surprise.' },
-  { id: 'P7', mood: 'celebrating (nueva)', priority: 'P1', pose: 'Celebrating with both arms high, mouth open with joy, small sparkles around him.' },
-  { id: 'P8', mood: 'sleeping (nueva)', priority: 'P1', pose: 'Asleep standing, eyes closed, calm breathing, a small sleep bubble.' },
+  { id: 'P1', mood: 'happy (reposo)', priority: 'P0', pose: 'De pie, relajado, con una sonrisa tranquila y amable, las manos al frente.' },
+  { id: 'P2', mood: 'excited (acierto)', priority: 'P0', pose: 'Alegre, con los dos brazos en alto, los ojos muy abiertos, dando un saltito.' },
+  { id: 'P3', mood: 'encouraging (error, ánimo)', priority: 'P0', pose: 'Una mano extendida hacia adelante en un gesto de apoyo, mirada cálida y una sonrisa pequeña. Nunca un gesto de reproche.' },
+  { id: 'P4', mood: 'thinking', priority: 'P0', pose: 'Una mano en la barbilla, mirando hacia arriba, con una ceja levantada.' },
+  { id: 'P5', mood: 'sad', priority: 'P1', pose: 'La mirada baja, los hombros un poco caídos, expresión suave y tierna, nada dramática.' },
+  { id: 'P6', mood: 'surprised', priority: 'P1', pose: 'Ojos y boca muy abiertos, las manos levantadas por la sorpresa.' },
+  { id: 'P7', mood: 'celebrating (nueva)', priority: 'P1', pose: 'Celebrando con los dos brazos en alto, la boca abierta de alegría, con pequeños destellos a su alrededor.' },
+  { id: 'P8', mood: 'sleeping (nueva)', priority: 'P1', pose: 'Dormido de pie, con los ojos cerrados y respiración tranquila, con una pequeña burbuja de sueño.' },
 ];
 
-// La linea del fondo: degradado diagonal con los colores de la escena (Flow no clava el color exacto: el arreglo del borde mide el clip real).
-export function backgroundLine(bg: readonly Hex[]): string {
-  if (bg.length === 3) return `Background: smooth diagonal gradient from ${bg[0]} (top-left) through ${bg[1]} to ${bg[2]} (bottom-right).`;
-  return `Background: smooth diagonal gradient from ${bg[0]} (top-left) to ${bg[bg.length - 1]} (bottom-right).`;
+// "De arriba a la izquierda a abajo a la derecha: ámbar (#D97706), naranja (#EA580C) y rosa frambuesa (#E11D48)." Los colores de la escena; Flow no clava el hex exacto (el clip real se mide al publicar).
+export function backgroundLine(bg: readonly ColorStop[]): string {
+  const stops = bg.map((c) => `${c.name} (${c.hex})`);
+  const lista = stops.length === 1 ? stops[0] : `${stops.slice(0, -1).join(', ')} y ${stops[stops.length - 1]}`;
+  return (
+    'Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: ' + lista + '.'
+  );
 }
+
+const orientationWord = (o: Orientation): string => (o === 'vertical' ? 'vertical 9:16' : 'horizontal 16:9');
 
 export function buildClipPrompt(spec: ClipSpec, orientation: Orientation): string {
   if (!spec.orientations.includes(orientation)) throw new Error(`${spec.id} no se pide en ${orientation}`);
-  const loop = spec.loop ? ' The first and last frames are identical so the loop is seamless.' : '';
-  return [IDENTITY, FRAMING[spec.kind][orientation], backgroundLine(spec.bg), `Action, ${spec.seconds}: ${spec.action}${loop}`, CLIP_RULES].join('\n\n');
+  return [
+    `Video ${orientationWord(orientation)} de ${spec.seconds} segundos. ${IDENTITY}`,
+    `Acción: ${spec.action}`,
+    framing(spec.kind, orientation),
+    backgroundLine(spec.bg),
+    `Efectos: ${spec.effects}`,
+    AVOID,
+  ].join('\n\n');
 }
 
+export const POSE_FRAMING =
+  'Imagen cuadrada 1:1, de cuerpo entero, centrado, de frente, con iluminación suave y pareja. Toñito ocupa alrededor del 80 % de la altura y sus pies quedan siempre sobre una misma línea ' +
+  'fija, cerca del borde inferior.';
+
+export const POSE_BACKGROUND = 'Fondo: color magenta plano y liso (#FF00FF), sin nada más: sin objetos, sin degradado y sin sombras sobre el fondo.';
+
+export const POSE_AVOID = 'Muy importante, evita: cualquier texto, letras, números, logotipos o elementos de interfaz. Sin otros personajes.';
+
 export function buildPosePrompt(spec: PoseSpec): string {
-  return [IDENTITY, `${POSE_FRAMING} ${spec.pose}`].join('\n\n');
+  return [`Imagen. ${IDENTITY}`, `Pose: ${spec.pose}`, `Encuadre: ${POSE_FRAMING}`, POSE_BACKGROUND, POSE_AVOID].join('\n\n');
 }
 
 export const clipById = (id: string): ClipSpec | undefined => CLIPS.find((c) => c.id.toLowerCase() === id.toLowerCase());
@@ -168,7 +217,15 @@ export function renderPromptsDoc(): string {
   out.push('> **Generado** por `npm run flow:prompts -- --escribir` desde `src/lib/tonito/flowPrompts.ts`. No se edita a mano: se cambia el catálogo y se vuelve a generar.');
   out.push('> Plan, orden de producción y reglas: [catálogo de animaciones](TONITO_CATALOGO_ANIMACIONES.md).');
   out.push('');
-  out.push('**Cada prompt es independiente: se pega completo.** En Flow adjunta siempre la **imagen de referencia aprobada** de Toñito como ingrediente.');
+  out.push('**Cada prompt es independiente: se pega completo, tal cual.** Están en el formato que **sí funcionó** con la celebración (en español, por secciones y con la acción por tiempos).');
+  out.push('');
+  out.push('**Antes de generar, siempre:**');
+  out.push('1. **Adjunta la imagen de referencia aprobada de Toñito** como ingrediente/referencia. Sin ella Flow inventa un personaje.');
+  out.push('2. **Genera primero UNA** (por ejemplo A1 vertical) y compárala con la referencia **antes de hacer las demás**.');
+  out.push('3. Revisa: ¿es Toñito (cara redonda de lana color durazno, mejillas rosadas, casco, gafas, moño, bata, pantalón escocés)? ¿los pies caen cerca del 62 % de la altura? ¿el tercio inferior está vacío?');
+  out.push('');
+  out.push('**Si el personaje no se parece:** no cambies el prompt a ciegas. Prueba (a) volver a adjuntar la referencia, (b) generar 2 o 3 variantes y quedarte con la mejor, (c) acortar la acción a menos movimientos.');
+  out.push('');
   out.push('Los clips se piden en **9:16 (celular)** y en **16:9 (computador)**; los clips cortos B y las poses, en **una sola proporción**.');
   const p = pendingCount();
   out.push(`Por generar: **${p.clips} clips + ${p.poses} poses = ${p.total}**.`);

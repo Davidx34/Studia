@@ -3,160 +3,188 @@
 > **Generado** por `npm run flow:prompts -- --escribir` desde `src/lib/tonito/flowPrompts.ts`. No se edita a mano: se cambia el catálogo y se vuelve a generar.
 > Plan, orden de producción y reglas: [catálogo de animaciones](TONITO_CATALOGO_ANIMACIONES.md).
 
-**Cada prompt es independiente: se pega completo.** En Flow adjunta siempre la **imagen de referencia aprobada** de Toñito como ingrediente.
+**Cada prompt es independiente: se pega completo, tal cual.** Están en el formato que **sí funcionó** con la celebración (en español, por secciones y con la acción por tiempos).
+
+**Antes de generar, siempre:**
+1. **Adjunta la imagen de referencia aprobada de Toñito** como ingrediente/referencia. Sin ella Flow inventa un personaje.
+2. **Genera primero UNA** (por ejemplo A1 vertical) y compárala con la referencia **antes de hacer las demás**.
+3. Revisa: ¿es Toñito (cara redonda de lana color durazno, mejillas rosadas, casco, gafas, moño, bata, pantalón escocés)? ¿los pies caen cerca del 62 % de la altura? ¿el tercio inferior está vacío?
+
+**Si el personaje no se parece:** no cambies el prompt a ciegas. Prueba (a) volver a adjuntar la referencia, (b) generar 2 o 3 variantes y quedarte con la mejor, (c) acortar la acción a menos movimientos.
+
 Los clips se piden en **9:16 (celular)** y en **16:9 (computador)**; los clips cortos B y las poses, en **una sola proporción**.
 Por generar: **12 clips + 8 poses = 20**.
 
 ## Cinemáticas (A) y clips cortos (B)
 
-### A1 · Entrada epica (primera vez que entra)  (`welcome`)
+### A1 · Entrada épica (primera vez que entra)  (`welcome`)
 
 **Celular, vertical 9:16** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video vertical 9:16 de 4 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Vertical 9:16 frame. The character is centered horizontally, about 55-60% of the frame height, with his feet at about 62% of the frame height. The bottom 30% of the frame is empty background.
+Acción: 0 a 0,6 s: Toñito aparece en el centro del cuadro con un salto enérgico hacia arriba. 0,6 a 1,6 s: aterriza en el centro con un pequeño rebote. 1,6 a 4 s: se queda en una pose de bienvenida estable: una mano levantada saludando, sonrisa grande y cálida, casi quieto. El video termina en esa pose estable.
 
-Background: smooth diagonal gradient from #6D28D9 (top-left) through #7E22CE to #3730A3 (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado horizontalmente, y siempre dentro del 60 % central del ancho. Mide alrededor del 55-60 % de la altura del cuadro y sus pies quedan a la altura del 62 % del cuadro: el cuerpo se mantiene en la mitad superior y media y el tercio inferior queda completamente libre, solo fondo. Nunca sale del encuadre.
 
-Action, 4 seconds: the character enters the frame with an energetic hop from just outside the frame, lands in the center with a small bounce, and finishes in a friendly welcoming pose: one hand raised in a wave, a big warm smile. A soft cyan ring of energy glows briefly on the ground around his feet as he lands, then fades. A few tiny golden sparkles float around him. He ends still in the welcoming pose.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: violeta (#6D28D9), púrpura (#7E22CE) y índigo (#3730A3).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: un anillo de energía ciano brilla un instante alrededor de sus pies cuando aterriza y se desvanece. Pocos destellos dorados muy pequeños flotan a su alrededor. Que no tapen su cara.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
 **Computador, horizontal 16:9** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video horizontal 16:9 de 4 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Horizontal 16:9 frame. The character is centered, about 60% of the frame height and no wider than 30% of the frame width, with his feet at about 67% of the frame height. Keep the left and right sides as wide empty background of the same gradient; nothing important within 20% of the left and right edges. The bottom 28% of the frame is empty background. Sparkles and other small effects may spread across the full width of the frame.
+Acción: 0 a 0,6 s: Toñito aparece en el centro del cuadro con un salto enérgico hacia arriba. 0,6 a 1,6 s: aterriza en el centro con un pequeño rebote. 1,6 a 4 s: se queda en una pose de bienvenida estable: una mano levantada saludando, sonrisa grande y cálida, casi quieto. El video termina en esa pose estable.
 
-Background: smooth diagonal gradient from #6D28D9 (top-left) through #7E22CE to #3730A3 (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado, de alrededor del 60 % de la altura del cuadro y no más ancho que el 30 % del ancho. Sus pies quedan a la altura del 67 % del cuadro. Los lados izquierdo y derecho quedan como fondo amplio y vacío del mismo degradado: nada importante a menos del 20 % de los bordes. El tercio inferior queda libre, solo fondo. Nunca sale del encuadre.
 
-Action, 4 seconds: the character enters the frame with an energetic hop from just outside the frame, lands in the center with a small bounce, and finishes in a friendly welcoming pose: one hand raised in a wave, a big warm smile. A soft cyan ring of energy glows briefly on the ground around his feet as he lands, then fades. A few tiny golden sparkles float around him. He ends still in the welcoming pose.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: violeta (#6D28D9), púrpura (#7E22CE) y índigo (#3730A3).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: un anillo de energía ciano brilla un instante alrededor de sus pies cuando aterriza y se desvanece. Pocos destellos dorados muy pequeños flotan a su alrededor. Que no tapen su cara.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
-### A2 · Inicio de leccion (concentracion y entusiasmo)  (`lesson_start`)
+### A2 · Inicio de lección (concentración y entusiasmo)  (`lesson_start`)
 
 **Celular, vertical 9:16** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video vertical 9:16 de 4 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Vertical 9:16 frame. The character is centered horizontally, about 55-60% of the frame height, with his feet at about 62% of the frame height. The bottom 30% of the frame is empty background.
+Acción: 0 a 1 s: Toñito está de pie, relajado, y se sube las gafas con un dedo con una sonrisa segura. 1 a 2,6 s: se frota las manos con ganas y da un pequeño salto emocionado. 2,6 a 4 s: se queda en una pose lista para empezar, sonriendo y mirando al frente, casi quieto. El video termina en esa pose estable.
 
-Background: smooth diagonal gradient from #0F172A (top-left) through #1E1B4B to #0F172A (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado horizontalmente, y siempre dentro del 60 % central del ancho. Mide alrededor del 55-60 % de la altura del cuadro y sus pies quedan a la altura del 62 % del cuadro: el cuerpo se mantiene en la mitad superior y media y el tercio inferior queda completamente libre, solo fondo. Nunca sale del encuadre.
 
-Action, 3 to 4 seconds: the character stands relaxed, pushes his glasses up with one finger with a confident smile, then rubs his hands together eagerly and gives a small excited hop, ready to start. A few soft pale-blue sparkles drift upward behind him. He ends in a ready, smiling pose looking toward the viewer.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: azul noche (#0F172A), índigo muy oscuro (#1E1B4B) y azul noche (#0F172A).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: pocos destellos azul pálido que suben suavemente detrás de él. Pequeños, que no tapen su cara.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
 **Computador, horizontal 16:9** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video horizontal 16:9 de 4 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Horizontal 16:9 frame. The character is centered, about 60% of the frame height and no wider than 30% of the frame width, with his feet at about 67% of the frame height. Keep the left and right sides as wide empty background of the same gradient; nothing important within 20% of the left and right edges. The bottom 28% of the frame is empty background. Sparkles and other small effects may spread across the full width of the frame.
+Acción: 0 a 1 s: Toñito está de pie, relajado, y se sube las gafas con un dedo con una sonrisa segura. 1 a 2,6 s: se frota las manos con ganas y da un pequeño salto emocionado. 2,6 a 4 s: se queda en una pose lista para empezar, sonriendo y mirando al frente, casi quieto. El video termina en esa pose estable.
 
-Background: smooth diagonal gradient from #0F172A (top-left) through #1E1B4B to #0F172A (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado, de alrededor del 60 % de la altura del cuadro y no más ancho que el 30 % del ancho. Sus pies quedan a la altura del 67 % del cuadro. Los lados izquierdo y derecho quedan como fondo amplio y vacío del mismo degradado: nada importante a menos del 20 % de los bordes. El tercio inferior queda libre, solo fondo. Nunca sale del encuadre.
 
-Action, 3 to 4 seconds: the character stands relaxed, pushes his glasses up with one finger with a confident smile, then rubs his hands together eagerly and gives a small excited hop, ready to start. A few soft pale-blue sparkles drift upward behind him. He ends in a ready, smiling pose looking toward the viewer.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: azul noche (#0F172A), índigo muy oscuro (#1E1B4B) y azul noche (#0F172A).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: pocos destellos azul pálido que suben suavemente detrás de él. Pequeños, que no tapen su cara.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
-### A3 · Celebracion (modulo con 70 % o mas)  (`module_complete_good`)
+### A3 · Celebración (módulo con 70 % o más)  (`module_complete_good`)
 
 **Celular, vertical 9:16** — ☑ ya publicado (se deja por si hay que rehacerlo)
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video vertical 9:16 de 4 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Vertical 9:16 frame. The character is centered horizontally, about 55-60% of the frame height, with his feet at about 62% of the frame height. The bottom 30% of the frame is empty background.
+Acción: 0 a 0,5 s: Toñito está de pie, relajado y sonriente, en el centro del cuadro. 0,5 a 2,5 s: salta de alegría con los brazos en alto y cae. 2,5 a 4 s: se queda en una pose de celebración estable, sonriendo, casi quieto, con los puños cerrados de alegría. El video termina en esa pose estable.
 
-Background: smooth diagonal gradient from #D97706 (top-left) through #EA580C to #E11D48 (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado horizontalmente, y siempre dentro del 60 % central del ancho. Mide alrededor del 55-60 % de la altura del cuadro y sus pies quedan a la altura del 62 % del cuadro: el cuerpo se mantiene en la mitad superior y media y el tercio inferior queda completamente libre, solo fondo. Nunca sale del encuadre.
 
-Action, 4 seconds: the character jumps for joy with both arms raised high, lands, then jumps again with a happy spin, mouth open in a joyful smile. Golden stars and soft warm sparkles burst and spread around him. He lands in a stable proud pose with a big smile, and the sparkles slowly settle.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: ámbar (#D97706), naranja (#EA580C) y rosa frambuesa (#E11D48).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: pocos destellos blancos y cremas y algunas estrellitas doradas muy claras alrededor de Toñito durante el salto. Pocos y pequeños, que no tapen su cara.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
 **Computador, horizontal 16:9** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video horizontal 16:9 de 4 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Horizontal 16:9 frame. The character is centered, about 60% of the frame height and no wider than 30% of the frame width, with his feet at about 67% of the frame height. Keep the left and right sides as wide empty background of the same gradient; nothing important within 20% of the left and right edges. The bottom 28% of the frame is empty background. Sparkles and other small effects may spread across the full width of the frame.
+Acción: 0 a 0,5 s: Toñito está de pie, relajado y sonriente, en el centro del cuadro. 0,5 a 2,5 s: salta de alegría con los brazos en alto y cae. 2,5 a 4 s: se queda en una pose de celebración estable, sonriendo, casi quieto, con los puños cerrados de alegría. El video termina en esa pose estable.
 
-Background: smooth diagonal gradient from #D97706 (top-left) through #EA580C to #E11D48 (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado, de alrededor del 60 % de la altura del cuadro y no más ancho que el 30 % del ancho. Sus pies quedan a la altura del 67 % del cuadro. Los lados izquierdo y derecho quedan como fondo amplio y vacío del mismo degradado: nada importante a menos del 20 % de los bordes. El tercio inferior queda libre, solo fondo. Nunca sale del encuadre.
 
-Action, 4 seconds: the character jumps for joy with both arms raised high, lands, then jumps again with a happy spin, mouth open in a joyful smile. Golden stars and soft warm sparkles burst and spread around him. He lands in a stable proud pose with a big smile, and the sparkles slowly settle.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: ámbar (#D97706), naranja (#EA580C) y rosa frambuesa (#E11D48).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: pocos destellos blancos y cremas y algunas estrellitas doradas muy claras alrededor de Toñito durante el salto. Pocos y pequeños, que no tapen su cara.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
-### A4 · Reflexion calida (modulo con menos de 70 %)  (`module_complete_low`)
+### A4 · Reflexión cálida (módulo con menos de 70 %)  (`module_complete_low`)
 
 **Celular, vertical 9:16** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video vertical 9:16 de 4 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Vertical 9:16 frame. The character is centered horizontally, about 55-60% of the frame height, with his feet at about 62% of the frame height. The bottom 30% of the frame is empty background.
+Acción: 0 a 1,2 s: Toñito está de pie y se ajusta las gafas con calma, pensativo. 1,2 a 2,8 s: asiente despacio, con suavidad. 2,8 a 4 s: abre una mano hacia quien mira, en un gesto de apoyo y ánimo, con una sonrisa pequeña y amable, casi quieto. Todos los movimientos son muy lentos y suaves. Sin tristeza, sin decepción y sin ningún gesto de regaño. El video termina en esa pose estable, cálida y alentadora.
 
-Background: smooth diagonal gradient from #075985 (top-left) through #155E75 to #1E293B (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado horizontalmente, y siempre dentro del 60 % central del ancho. Mide alrededor del 55-60 % de la altura del cuadro y sus pies quedan a la altura del 62 % del cuadro: el cuerpo se mantiene en la mitad superior y media y el tercio inferior queda completamente libre, solo fondo. Nunca sale del encuadre.
 
-Action, 4 seconds, calm and warm: the character adjusts his glasses thoughtfully, gives a slow, gentle nod, then opens one hand toward the viewer in an encouraging, supportive gesture with a small kind smile. Very slow, soft movement. No sadness, no disappointment, no scolding. He ends in a calm, warm, encouraging pose.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: azul (#075985), cian (#155E75) y pizarra (#1E293B).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: casi ninguno: como mucho unas pocas partículas de luz muy suaves y lentas, lejos de su cara.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
 **Computador, horizontal 16:9** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video horizontal 16:9 de 4 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Horizontal 16:9 frame. The character is centered, about 60% of the frame height and no wider than 30% of the frame width, with his feet at about 67% of the frame height. Keep the left and right sides as wide empty background of the same gradient; nothing important within 20% of the left and right edges. The bottom 28% of the frame is empty background. Sparkles and other small effects may spread across the full width of the frame.
+Acción: 0 a 1,2 s: Toñito está de pie y se ajusta las gafas con calma, pensativo. 1,2 a 2,8 s: asiente despacio, con suavidad. 2,8 a 4 s: abre una mano hacia quien mira, en un gesto de apoyo y ánimo, con una sonrisa pequeña y amable, casi quieto. Todos los movimientos son muy lentos y suaves. Sin tristeza, sin decepción y sin ningún gesto de regaño. El video termina en esa pose estable, cálida y alentadora.
 
-Background: smooth diagonal gradient from #075985 (top-left) through #155E75 to #1E293B (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado, de alrededor del 60 % de la altura del cuadro y no más ancho que el 30 % del ancho. Sus pies quedan a la altura del 67 % del cuadro. Los lados izquierdo y derecho quedan como fondo amplio y vacío del mismo degradado: nada importante a menos del 20 % de los bordes. El tercio inferior queda libre, solo fondo. Nunca sale del encuadre.
 
-Action, 4 seconds, calm and warm: the character adjusts his glasses thoughtfully, gives a slow, gentle nod, then opens one hand toward the viewer in an encouraging, supportive gesture with a small kind smile. Very slow, soft movement. No sadness, no disappointment, no scolding. He ends in a calm, warm, encouraging pose.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: azul (#075985), cian (#155E75) y pizarra (#1E293B).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: casi ninguno: como mucho unas pocas partículas de luz muy suaves y lentas, lejos de su cara.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
-### A5 · Hito de racha (3, 5, 10... dias)  (`streak`)
+### A5 · Hito de racha (3, 5, 10... días)  (`streak`)
 
 **Celular, vertical 9:16** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video vertical 9:16 de 4 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Vertical 9:16 frame. The character is centered horizontally, about 55-60% of the frame height, with his feet at about 62% of the frame height. The bottom 30% of the frame is empty background.
+Acción: 0 a 0,6 s: Toñito está de pie, sonriente, en el centro del cuadro. 0,6 a 2,4 s: levanta un puño con orgullo y da un salto de victoria enérgico. 2,4 a 4 s: aterriza en una pose poderosa y orgullosa, con una sonrisa de confianza, casi quieto. El video termina en esa pose estable.
 
-Background: smooth diagonal gradient from #B91C1C (top-left) through #EA580C to #F59E0B (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado horizontalmente, y siempre dentro del 60 % central del ancho. Mide alrededor del 55-60 % de la altura del cuadro y sus pies quedan a la altura del 62 % del cuadro: el cuerpo se mantiene en la mitad superior y media y el tercio inferior queda completamente libre, solo fondo. Nunca sale del encuadre.
 
-Action, 4 seconds: the character raises one fist in triumph and does an energetic victory jump, a ring of warm orange energy pulses on the ground and soft glowing ember-like sparkles rise around him (stylized and gentle, not real fire, nothing scary). He lands in a powerful, proud pose with a confident grin.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: rojo (#B91C1C), naranja (#EA580C) y ámbar (#F59E0B).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: un anillo de energía naranja cálida pulsa alrededor de sus pies cuando aterriza, y unos destellos suaves parecidos a brasas suben a su alrededor (estilizados y amables, no fuego real, nada que asuste). Pocos y pequeños, que no tapen su cara.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
 **Computador, horizontal 16:9** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video horizontal 16:9 de 4 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Horizontal 16:9 frame. The character is centered, about 60% of the frame height and no wider than 30% of the frame width, with his feet at about 67% of the frame height. Keep the left and right sides as wide empty background of the same gradient; nothing important within 20% of the left and right edges. The bottom 28% of the frame is empty background. Sparkles and other small effects may spread across the full width of the frame.
+Acción: 0 a 0,6 s: Toñito está de pie, sonriente, en el centro del cuadro. 0,6 a 2,4 s: levanta un puño con orgullo y da un salto de victoria enérgico. 2,4 a 4 s: aterriza en una pose poderosa y orgullosa, con una sonrisa de confianza, casi quieto. El video termina en esa pose estable.
 
-Background: smooth diagonal gradient from #B91C1C (top-left) through #EA580C to #F59E0B (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado, de alrededor del 60 % de la altura del cuadro y no más ancho que el 30 % del ancho. Sus pies quedan a la altura del 67 % del cuadro. Los lados izquierdo y derecho quedan como fondo amplio y vacío del mismo degradado: nada importante a menos del 20 % de los bordes. El tercio inferior queda libre, solo fondo. Nunca sale del encuadre.
 
-Action, 4 seconds: the character raises one fist in triumph and does an energetic victory jump, a ring of warm orange energy pulses on the ground and soft glowing ember-like sparkles rise around him (stylized and gentle, not real fire, nothing scary). He lands in a powerful, proud pose with a confident grin.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: rojo (#B91C1C), naranja (#EA580C) y ámbar (#F59E0B).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: un anillo de energía naranja cálida pulsa alrededor de sus pies cuando aterriza, y unos destellos suaves parecidos a brasas suben a su alrededor (estilizados y amables, no fuego real, nada que asuste). Pocos y pequeños, que no tapen su cara.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
 ### B1 · Pensando / esperando (la IA prepara las preguntas, refuerzo, chat)
@@ -164,31 +192,35 @@ Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numb
 **Celular, vertical 9:16** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video vertical 9:16 de 3 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Vertical 9:16 frame. The character is centered and fills the central square of the frame (about 60% of the frame width), full body visible. Keep the top and bottom of the frame as plain empty background.
+Acción: Bucle perfecto de 3 s. 0 a 1 s: Toñito está de pie con una mano en la barbilla, pensativo. 1 a 2 s: mira hacia arriba y hacia un lado, y luego vuelve la mirada al frente, con un balanceo suave y un parpadeo lento. 2 a 3 s: vuelve exactamente a la pose del principio. El primer cuadro y el último son idénticos para que el bucle no se note. Tranquilo y curioso, sin estrés.
 
-Background: smooth diagonal gradient from #6C5CE7 (top-left) to #00D2D3 (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado, ocupando el cuadrado central del cuadro (alrededor del 60 % del ancho). La parte de arriba y la de abajo del cuadro quedan libres, de fondo liso. Nunca sale del encuadre.
 
-Action, 3 seconds seamless loop: the character stands thoughtfully with one hand on his chin, glances up and to the side, then back, with a slow gentle sway and a slow blink. Calm and curious, no stress. The first and last frames are identical so the loop is seamless.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: violeta azulado (#6C5CE7) y turquesa (#00D2D3).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: ninguno.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
-### B2 · Triste suave (no se pudo preparar la leccion)
+### B2 · Triste suave (no se pudo preparar la lección)
 
 **Celular, vertical 9:16** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video vertical 9:16 de 3 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Vertical 9:16 frame. The character is centered and fills the central square of the frame (about 60% of the frame width), full body visible. Keep the top and bottom of the frame as plain empty background.
+Acción: 0 a 1,2 s: Toñito baja la mirada con una expresión suave y tierna, un poco apenada. 1,2 a 2,2 s: se encoge de hombros con delicadeza. 2,2 a 3 s: levanta la mirada hacia quien mira con una pequeña sonrisa esperanzada, como diciendo "intentémoslo otra vez", y queda casi quieto. Tierno y simpático, nunca dramático, sin lágrimas. El video termina en esa pose estable.
 
-Background: smooth diagonal gradient from #6C5CE7 (top-left) to #00D2D3 (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado, ocupando el cuadrado central del cuadro (alrededor del 60 % del ancho). La parte de arriba y la de abajo del cuadro quedan libres, de fondo liso. Nunca sale del encuadre.
 
-Action, 3 seconds: the character lowers his gaze with a soft, tender, slightly apologetic expression, shrugs his shoulders gently, then looks up at the viewer with a small hopeful smile as if saying "let's try again". Gentle and cute, never dramatic, no tears. He ends in a soft, hopeful pose.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: violeta azulado (#6C5CE7) y turquesa (#00D2D3).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: ninguno.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
 ### B3 · Refuerzo completado
@@ -196,15 +228,17 @@ Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numb
 **Celular, vertical 9:16** — ☐ por generar
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Video vertical 9:16 de 3 segundos. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Vertical 9:16 frame. The character is centered and fills the central square of the frame (about 60% of the frame width), full body visible. Keep the top and bottom of the frame as plain empty background.
+Acción: 0 a 0,5 s: Toñito está de pie, sonriente. 0,5 a 1,8 s: cierra el puño con alegría y da un pequeño salto orgulloso. 1,8 a 3 s: queda en una pose satisfecha, sonriendo, casi quieto. El video termina en esa pose estable.
 
-Background: smooth diagonal gradient from #6C5CE7 (top-left) to #00D2D3 (bottom-right).
+Encuadre: cámara completamente fija, sin zoom, sin movimiento de cámara y sin cortes. Toñito de cuerpo entero, centrado, ocupando el cuadrado central del cuadro (alrededor del 60 % del ancho). La parte de arriba y la de abajo del cuadro quedan libres, de fondo liso. Nunca sale del encuadre.
 
-Action, 3 seconds: the character gives a happy fist pump and a small proud hop, golden sparkles pop around him, and he ends in a satisfied, smiling pose.
+Fondo: degradado suave y mate en diagonal, sin objetos, sin suelo, sin horizonte y sin sombras marcadas. De arriba a la izquierda a abajo a la derecha: violeta azulado (#6C5CE7) y turquesa (#00D2D3).
 
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
+Efectos: pocos destellos dorados pequeños que aparecen alrededor de él durante el salto. Que no tapen su cara.
+
+Muy importante, evita: cualquier texto, letras, números, subtítulos, logotipos, botones, iconos de play, banners o elementos de interfaz. Sin otros personajes. Sin cambios de escena. Sin música ni voz.
 ```
 
 ## Poses fijas (imágenes 1:1)
@@ -212,63 +246,111 @@ Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numb
 ### P1 · happy (reposo) — P0
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Imagen. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Full body, centered, front view, soft even lighting, 1:1 square image, character about 80% of the image height with his feet on a fixed line near the bottom. Plain flat solid magenta (#FF00FF) background with nothing else. No text, no logos, no shadows on the background. Standing relaxed with a calm gentle smile, hands in front.
+Pose: De pie, relajado, con una sonrisa tranquila y amable, las manos al frente.
+
+Encuadre: Imagen cuadrada 1:1, de cuerpo entero, centrado, de frente, con iluminación suave y pareja. Toñito ocupa alrededor del 80 % de la altura y sus pies quedan siempre sobre una misma línea fija, cerca del borde inferior.
+
+Fondo: color magenta plano y liso (#FF00FF), sin nada más: sin objetos, sin degradado y sin sombras sobre el fondo.
+
+Muy importante, evita: cualquier texto, letras, números, logotipos o elementos de interfaz. Sin otros personajes.
 ```
 
 ### P2 · excited (acierto) — P0
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Imagen. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Full body, centered, front view, soft even lighting, 1:1 square image, character about 80% of the image height with his feet on a fixed line near the bottom. Plain flat solid magenta (#FF00FF) background with nothing else. No text, no logos, no shadows on the background. Joyful, both arms up, eyes wide, lightly leaping.
+Pose: Alegre, con los dos brazos en alto, los ojos muy abiertos, dando un saltito.
+
+Encuadre: Imagen cuadrada 1:1, de cuerpo entero, centrado, de frente, con iluminación suave y pareja. Toñito ocupa alrededor del 80 % de la altura y sus pies quedan siempre sobre una misma línea fija, cerca del borde inferior.
+
+Fondo: color magenta plano y liso (#FF00FF), sin nada más: sin objetos, sin degradado y sin sombras sobre el fondo.
+
+Muy importante, evita: cualquier texto, letras, números, logotipos o elementos de interfaz. Sin otros personajes.
 ```
 
-### P3 · encouraging (error, animo) — P0
+### P3 · encouraging (error, ánimo) — P0
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Imagen. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Full body, centered, front view, soft even lighting, 1:1 square image, character about 80% of the image height with his feet on a fixed line near the bottom. Plain flat solid magenta (#FF00FF) background with nothing else. No text, no logos, no shadows on the background. One hand extended forward in a supportive gesture, warm gaze, small smile. Never a gesture of reproach.
+Pose: Una mano extendida hacia adelante en un gesto de apoyo, mirada cálida y una sonrisa pequeña. Nunca un gesto de reproche.
+
+Encuadre: Imagen cuadrada 1:1, de cuerpo entero, centrado, de frente, con iluminación suave y pareja. Toñito ocupa alrededor del 80 % de la altura y sus pies quedan siempre sobre una misma línea fija, cerca del borde inferior.
+
+Fondo: color magenta plano y liso (#FF00FF), sin nada más: sin objetos, sin degradado y sin sombras sobre el fondo.
+
+Muy importante, evita: cualquier texto, letras, números, logotipos o elementos de interfaz. Sin otros personajes.
 ```
 
 ### P4 · thinking — P0
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Imagen. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Full body, centered, front view, soft even lighting, 1:1 square image, character about 80% of the image height with his feet on a fixed line near the bottom. Plain flat solid magenta (#FF00FF) background with nothing else. No text, no logos, no shadows on the background. One hand on his chin, looking up, one eyebrow raised.
+Pose: Una mano en la barbilla, mirando hacia arriba, con una ceja levantada.
+
+Encuadre: Imagen cuadrada 1:1, de cuerpo entero, centrado, de frente, con iluminación suave y pareja. Toñito ocupa alrededor del 80 % de la altura y sus pies quedan siempre sobre una misma línea fija, cerca del borde inferior.
+
+Fondo: color magenta plano y liso (#FF00FF), sin nada más: sin objetos, sin degradado y sin sombras sobre el fondo.
+
+Muy importante, evita: cualquier texto, letras, números, logotipos o elementos de interfaz. Sin otros personajes.
 ```
 
 ### P5 · sad — P1
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Imagen. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Full body, centered, front view, soft even lighting, 1:1 square image, character about 80% of the image height with his feet on a fixed line near the bottom. Plain flat solid magenta (#FF00FF) background with nothing else. No text, no logos, no shadows on the background. Eyes lowered, shoulders slightly slumped, soft tender expression, not dramatic.
+Pose: La mirada baja, los hombros un poco caídos, expresión suave y tierna, nada dramática.
+
+Encuadre: Imagen cuadrada 1:1, de cuerpo entero, centrado, de frente, con iluminación suave y pareja. Toñito ocupa alrededor del 80 % de la altura y sus pies quedan siempre sobre una misma línea fija, cerca del borde inferior.
+
+Fondo: color magenta plano y liso (#FF00FF), sin nada más: sin objetos, sin degradado y sin sombras sobre el fondo.
+
+Muy importante, evita: cualquier texto, letras, números, logotipos o elementos de interfaz. Sin otros personajes.
 ```
 
 ### P6 · surprised — P1
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Imagen. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Full body, centered, front view, soft even lighting, 1:1 square image, character about 80% of the image height with his feet on a fixed line near the bottom. Plain flat solid magenta (#FF00FF) background with nothing else. No text, no logos, no shadows on the background. Eyes and mouth wide open, hands raised in surprise.
+Pose: Ojos y boca muy abiertos, las manos levantadas por la sorpresa.
+
+Encuadre: Imagen cuadrada 1:1, de cuerpo entero, centrado, de frente, con iluminación suave y pareja. Toñito ocupa alrededor del 80 % de la altura y sus pies quedan siempre sobre una misma línea fija, cerca del borde inferior.
+
+Fondo: color magenta plano y liso (#FF00FF), sin nada más: sin objetos, sin degradado y sin sombras sobre el fondo.
+
+Muy importante, evita: cualquier texto, letras, números, logotipos o elementos de interfaz. Sin otros personajes.
 ```
 
 ### P7 · celebrating (nueva) — P1
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Imagen. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Full body, centered, front view, soft even lighting, 1:1 square image, character about 80% of the image height with his feet on a fixed line near the bottom. Plain flat solid magenta (#FF00FF) background with nothing else. No text, no logos, no shadows on the background. Celebrating with both arms high, mouth open with joy, small sparkles around him.
+Pose: Celebrando con los dos brazos en alto, la boca abierta de alegría, con pequeños destellos a su alrededor.
+
+Encuadre: Imagen cuadrada 1:1, de cuerpo entero, centrado, de frente, con iluminación suave y pareja. Toñito ocupa alrededor del 80 % de la altura y sus pies quedan siempre sobre una misma línea fija, cerca del borde inferior.
+
+Fondo: color magenta plano y liso (#FF00FF), sin nada más: sin objetos, sin degradado y sin sombras sobre el fondo.
+
+Muy importante, evita: cualquier texto, letras, números, logotipos o elementos de interfaz. Sin otros personajes.
 ```
 
 ### P8 · sleeping (nueva) — P1
 
 ```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact design; do not change the outfit or the face. Friendly, child-safe.
+Imagen. Mismo personaje de la imagen de referencia: Toñito, un muñeco amigurumi de crochet renderizado en 3D, con textura de lana visible y cabeza grande. Lleva casco de safari beige con banda, gafas redondas grandes de montura oscura, moño, bata blanca de laboratorio sobre chaleco marrón, pantalón escocés beige y marrón, y botas marrones. Su rostro es joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas. No cambies su diseño ni su ropa en ningún momento.
 
-Full body, centered, front view, soft even lighting, 1:1 square image, character about 80% of the image height with his feet on a fixed line near the bottom. Plain flat solid magenta (#FF00FF) background with nothing else. No text, no logos, no shadows on the background. Asleep standing, eyes closed, calm breathing, a small sleep bubble.
+Pose: Dormido de pie, con los ojos cerrados y respiración tranquila, con una pequeña burbuja de sueño.
+
+Encuadre: Imagen cuadrada 1:1, de cuerpo entero, centrado, de frente, con iluminación suave y pareja. Toñito ocupa alrededor del 80 % de la altura y sus pies quedan siempre sobre una misma línea fija, cerca del borde inferior.
+
+Fondo: color magenta plano y liso (#FF00FF), sin nada más: sin objetos, sin degradado y sin sombras sobre el fondo.
+
+Muy importante, evita: cualquier texto, letras, números, logotipos o elementos de interfaz. Sin otros personajes.
 ```
