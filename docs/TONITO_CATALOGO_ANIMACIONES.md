@@ -101,202 +101,93 @@ Estado: ☑ A3 vertical (publicado) · ☐ todo lo demás.
 | `streak` | `#B91C1C` · `#EA580C` · `#F59E0B` (rojo → naranja → ámbar) |
 | Clips cortos B | `#6C5CE7` → `#00D2D3` (los colores de la piel de Toñito en el código) |
 
-## 5. Celular y computador: cómo pedirle a Flow cada formato
+## 5. Cómo pedirle a Flow cada cosa (celular y computador)
 
 > **Los prompts ya vienen armados y listos para pegar:** [`TONITO_FLOW_PROMPTS.md`](TONITO_FLOW_PROMPTS.md) (los 13 clips y las 8 poses), o uno solo con
-> `npm run flow:prompts -- A1 vertical` / `npm run flow:prompts -- P2`. `npm run flow:prompts -- --lista` muestra qué falta. Los bloques de abajo explican **cómo
-> están construidos** (`{IDENTIDAD}`, `{ORIENTACION}`, `{FONDO}`, `{REGLAS}` son marcadores del catálogo, no texto que haya que reemplazar a mano). La fuente es
-> `src/lib/tonito/flowPrompts.ts`: si cambia un prompt, se cambia ahí y se regenera con `npm run flow:prompts -- --escribir`.
+> `npm run flow:prompts -- A1 vertical` / `npm run flow:prompts -- P2`. `npm run flow:prompts -- --lista` muestra qué falta. La fuente es `src/lib/tonito/flowPrompts.ts`: si
+> cambia un prompt, se cambia ahí y se regenera con `npm run flow:prompts -- --escribir`.
 
-Flow ofrece **dos proporciones: 9:16 (vertical) y 16:9 (horizontal)** **[verificar en Flow]**. Cada cinemática se genera **dos veces**, con los mismos ingredientes y la
-misma acción.
+### Lo que enseñó el primer intento [medido]
+Una primera versión de los prompts, **en inglés y con un bloque de identidad genérico** ("Amigurumi crochet 3D doll..."), produjo un personaje **distinto a Toñito** (rostro envejecido, cabello
+gris) y con los pies al ~75 % de la altura. El prompt de la **celebración**, que sí salió perfecto, tiene cinco cosas que el otro no tenía; los prompts de ahora las copian todas:
+
+1. **Empieza nombrando al personaje y a la imagen:** «Mismo personaje de la imagen de referencia: Toñito, ...».
+2. **«No cambies su diseño ni su ropa en ningún momento.»**
+3. **La acción por tiempos** (0 a 0,5 s: ...; 0,5 a 2,5 s: ...; 2,5 a 4 s: ...) que **termina en una pose estable**.
+4. **Español y por secciones:** Acción, Encuadre, Fondo, Efectos, «Muy importante, evita».
+5. **Nada que se contradiga:** sin suelo, sin entradas desde fuera del cuadro, sin anillos «en el suelo» (el tercio inferior es del texto de la escena).
+
+Además, ahora la identidad describe el rostro («joven y redondo, de lana color durazno con mejillas rosadas, sin cabello gris ni arrugas»).
+**Es un caso de éxito contra un fallo:** la causa exacta es una hipótesis. Por eso la regla es **generar UNA, compararla con la referencia y recién entonces hacer las demás**.
+Una prueba (`flowPrompts.test.ts`) comprueba que el prompt de la celebración probado siga apareciendo **tal cual** dentro de lo que genera la herramienta.
+
+### Celular y computador
+
+Flow ofrece **dos proporciones: 9:16 (vertical) y 16:9 (horizontal)** **[verificar en Flow]**. Cada cinemática se genera **dos veces**, con la misma acción.
 
 | | **Celular — vertical 9:16** | **Computador — horizontal 16:9** |
 |---|---|---|
 | Entrega | 720×1280 | 1280×720 |
-| Toñito | ~55–60 % de la **altura**, centrado | ~60 % de la **altura**, **ancho ≤ 30 % del cuadro**, centrado |
-| Pies | al 60–65 % de la altura | al 65–70 % de la altura |
-| Lados | no hay (el ancho es todo el cuadro) | **mucho fondo libre a izquierda y derecha**, del mismo degradado; **nada importante a menos del 20 % de los bordes** (por si el navegador recorta a 4:3) |
-| Suelo | 30 % inferior vacío (texto) | 25–30 % inferior vacío (texto) |
-| Efectos (destellos, confeti) | dentro del encuadre, cerca de Toñito | pueden **repartirse a lo ancho**; es donde el horizontal se siente "pantalla completa" |
+| Toñito | ~55–60 % de la **altura**, dentro del 60 % central del ancho | ~60 % de la **altura**, **ancho ≤ 30 % del cuadro**, centrado |
+| Pies | a la altura del 62 % del cuadro | a la altura del 67 % |
+| Lados | no hay (el ancho es todo el cuadro) | **fondo amplio y vacío** a izquierda y derecha, del mismo degradado; **nada importante a menos del 20 % de los bordes** (por si el navegador recorta a 4:3) |
+| Suelo | tercio inferior **completamente libre** (texto) | tercio inferior **libre** (texto) |
 
-**Bloque de identidad (igual en todos los prompts, en inglés porque Flow responde mejor):**
+**Colores del fondo** (los de `CinematicScene.tsx`; el degradado va **en diagonal**, de arriba-izquierda a abajo-derecha). Flow no clava el hex exacto: **no importa**, porque al publicar se mide el clip
+real (ver la [guía](TONITO_CINEMATICAS.md#fondo-a-juego-que-el-clip-no-se-distinga-de-los-lados-en-el-computador)).
 
-```
-Amigurumi crochet 3D doll character with a large head and visible yarn texture. He wears a beige safari pith helmet with a band, large round dark-framed
-glasses, a bow tie, a white lab coat over a brown knitted vest, beige-and-brown tartan trousers and brown boots. Use the attached reference image for the exact
-design; do not change the outfit or the face. Friendly, child-safe.
-```
-
-**Reglas que se pegan al final de TODOS los prompts de clip:**
-
-```
-Fixed camera, no cuts, no zoom, no camera movement. No text, no letters, no numbers, no buttons, no interface, no logos, no other characters. No audio, no
-music, no speech. Smooth plain gradient background only: no objects, no horizon, no floor texture, no shadows on the background.
-```
-
-En cada prompt, **`{ORIENTACION}`** se reemplaza por una de estas dos líneas:
-
-```
-VERTICAL — Vertical 9:16 frame. The character is centered horizontally, about 55-60% of the frame height, with his feet at about 62% of the frame height. The
-bottom 30% of the frame is empty background.
-```
-```
-HORIZONTAL — Horizontal 16:9 frame. The character is centered, about 60% of the frame height and no wider than 30% of the frame width, with his feet at about 67%
-of the frame height. Keep the left and right sides as wide empty background of the same gradient; nothing important within 20% of the left and right edges. The
-bottom 28% of the frame is empty background.
-```
-
-Y **`{FONDO}`** por la línea de color de la escena, por ejemplo para la celebración:
-`Background: smooth diagonal gradient from #D97706 (top-left) through #EA580C to #E11D48 (bottom-right).`
+| Escena | Estos colores (de arriba-izquierda a abajo-derecha) |
+|---|---|
+| `welcome` | violeta `#6D28D9` · púrpura `#7E22CE` · índigo `#3730A3` |
+| `lesson_start` | azul noche `#0F172A` · índigo muy oscuro `#1E1B4B` · azul noche `#0F172A` |
+| `module_complete_good` | ámbar `#D97706` · naranja `#EA580C` · rosa frambuesa `#E11D48` |
+| `module_complete_low` | azul `#075985` · cian `#155E75` · pizarra `#1E293B` |
+| `streak` | rojo `#B91C1C` · naranja `#EA580C` · ámbar `#F59E0B` |
+| Clips cortos B | violeta azulado `#6C5CE7` → turquesa `#00D2D3` (los colores de la piel de Toñito en el código) |
 
 ## 6. Cinemáticas a pantalla completa (A1 a A5)
 
-Duración **4 s** cada una (2–6 s). Terminan en una **pose estable** (sonrisa tranquila) porque la escena se queda ahí hasta que el estudiante pulsa «Continuar».
-Cada una: pegar **Identidad + {ORIENTACION} + {FONDO} + Acción + Reglas**.
+Duración **4 s**, con la acción por tiempos y terminando en una **pose estable** (la escena se queda ahí hasta que el estudiante pulsa «Continuar»). Prompts: `TONITO_FLOW_PROMPTS.md`.
 
-### A1 · `welcome` — Entrada épica (primera vez que entra)
-Estado: ☐ vertical · ☐ horizontal. Fondo: violeta → índigo.
-
-```
-{IDENTIDAD}
-{ORIENTACION}
-Background: smooth diagonal gradient from #6D28D9 (top-left) through #7E22CE to #3730A3 (bottom-right).
-Action, 4 seconds: the character enters the frame with an energetic hop from just outside the frame, lands in the center with a small bounce, and finishes in a
-friendly welcoming pose: one hand raised in a wave, a big warm smile. A soft cyan ring of energy glows briefly on the ground around his feet as he lands, then
-fades. A few tiny golden sparkles float around him. He ends still in the welcoming pose.
-{REGLAS}
-```
-
-### A2 · `lesson_start` — Inicio de lección (concentración y entusiasmo)
-Estado: ☐ vertical · ☐ horizontal. Fondo: azul noche (oscuro: el texto blanco se lee mejor).
-
-```
-{IDENTIDAD}
-{ORIENTACION}
-Background: smooth diagonal gradient from #0F172A (top-left) through #1E1B4B to #0F172A (bottom-right), very dark night blue.
-Action, 3 to 4 seconds: the character stands relaxed, pushes his glasses up with one finger with a confident smile, then rubs his hands together eagerly and gives
-a small excited hop, ready to start. A few soft pale-blue sparkles drift upward behind him. He ends in a ready, smiling pose looking toward the viewer.
-{REGLAS}
-```
-
-### A3 · `module_complete_good` — Celebración (≥ 70 %)
-Estado: ☑ vertical (publicado) · ☐ **horizontal** (prioridad P1: completa el único clip que ya existe).
-
-Vertical: ya hecho. **Horizontal**:
-
-```
-{IDENTIDAD}
-{ORIENTACION — HORIZONTAL}
-Background: smooth diagonal gradient from #D97706 (top-left) through #EA580C to #E11D48 (bottom-right).
-Action, 4 seconds: the character jumps for joy with both arms raised high, lands, then jumps again with a happy spin, mouth open in a joyful smile. Golden stars
-and soft warm sparkles burst and spread across the whole width of the frame. He lands in a stable proud pose with a big smile, and the sparkles slowly settle.
-{REGLAS}
-```
-
-### A4 · `module_complete_low` — Reflexión cálida (< 70 %)
-Estado: ☐ vertical · ☐ horizontal. Fondo: azul → pizarra. **Tono: nunca de reproche** (criterio de la ficha).
-
-```
-{IDENTIDAD}
-{ORIENTACION}
-Background: smooth diagonal gradient from #075985 (top-left) through #155E75 to #1E293B (bottom-right), calm blue.
-Action, 4 seconds, calm and warm: the character adjusts his glasses thoughtfully, gives a slow, gentle nod, then opens one hand toward the viewer in an
-encouraging, supportive gesture with a small kind smile. Very slow, soft movement. No sadness, no disappointment, no scolding. He ends in a calm, warm,
-encouraging pose.
-{REGLAS}
-```
-
-### A5 · `streak` — Hito de racha (3, 5, 10… días)
-Estado: ☐ vertical · ☐ horizontal. Fondo: rojo → naranja → ámbar.
-
-```
-{IDENTIDAD}
-{ORIENTACION}
-Background: smooth diagonal gradient from #B91C1C (top-left) through #EA580C to #F59E0B (bottom-right), warm fiery colors.
-Action, 4 seconds: the character raises one fist in triumph and does an energetic victory jump, a ring of warm orange energy pulses on the ground and soft glowing
-ember-like sparkles rise around him (stylized and gentle, not real fire, nothing scary). He lands in a powerful, proud pose with a confident grin.
-{REGLAS}
-```
+| ID | Escena | Qué pasa | Celular | Computador |
+|---|---|---|---|---|
+| **A1** | `welcome` | Aparece con un salto enérgico, aterriza, saluda con una mano. Anillo de energía ciano alrededor de sus pies | ☐ | ☐ |
+| **A2** | `lesson_start` | Se sube las gafas, se frota las manos, pequeño salto emocionado. Fondo muy oscuro (el texto blanco se lee mejor) | ☐ | ☐ |
+| **A3** | `module_complete_good` | Salta de alegría con los brazos en alto; puños cerrados al final | ☑ | ☐ **(P1: completa el único clip que ya existe)** |
+| **A4** | `module_complete_low` | Se ajusta las gafas, asiente, abre una mano en gesto de apoyo. **Nunca regaña ni dramatiza** | ☐ | ☐ |
+| **A5** | `streak` | Puño en alto y salto de victoria; anillo de energía naranja y destellos tipo brasas (no fuego real) | ☐ | ☐ |
 
 ## 7. Clips cortos en bucle (B1 a B3): esperas y estados
 
-Son para ~100 px dentro de una **tarjeta con su propio fondo** (no hay transparencia). **1 sola proporción**: **vertical 9:16 con Toñito dentro del cuadrado central**
-(la tarjeta recorta al centro). Duración **2–3 s**, bucle. Entrega **360×640**, ≤ 150 KB **[propuesto]**. Fondo: `#6C5CE7` → `#00D2D3`.
+Para ~100 px dentro de una **tarjeta con su propio fondo** (no hay transparencia). **Una sola proporción:** vertical 9:16 con Toñito dentro del cuadrado central (la tarjeta recorta al centro).
+Duración **3 s**; entrega **360×640**, ≤ 150 KB **[propuesto]**. Fondo `#6C5CE7` → `#00D2D3`.
 
-Para **B** el bloque `{ORIENTACION}` es otro:
+| ID | Cuándo se usa | Qué pasa |
+|---|---|---|
+| **B1** | La IA prepara las preguntas, refuerzo, chat | Bucle: mano en la barbilla, mira arriba y al lado, parpadeo lento. **Primer y último cuadro idénticos** |
+| **B2** | No se pudo preparar la lección | Mirada baja y apenada, se encoge de hombros, vuelve a mirar con una sonrisa esperanzada. **Tierno, nunca dramático** (la falla es del sistema) |
+| **B3** | Refuerzo completado | Puño cerrado y pequeño salto orgulloso |
 
-```
-Vertical 9:16 frame. The character is centered and fills the central square of the frame (about 60% of the frame width), full body visible. Keep the top and
-bottom of the frame as plain empty background.
-```
-
-### B1 · Pensando / esperando (la IA prepara las preguntas, refuerzo, chat)
-Estado: ☐. Bucle.
-
-```
-{IDENTIDAD}
-{ORIENTACION B}
-Background: smooth diagonal gradient from #6C5CE7 (top-left) to #00D2D3 (bottom-right).
-Action, 3 seconds seamless loop: the character stands thoughtfully with one hand on his chin, glances up and to the side, then back, with a slow gentle sway and a
-slow blink. Calm and curious, no stress. The first and last frames are identical so the loop is seamless.
-{REGLAS}
-```
-
-### B2 · Triste suave (no se pudo preparar la lección)
-Estado: ☐. **La falla es del sistema, no del estudiante: tono tierno, no dramático.**
-
-```
-{IDENTIDAD}
-{ORIENTACION B}
-Background: smooth diagonal gradient from #6C5CE7 (top-left) to #00D2D3 (bottom-right).
-Action, 3 seconds: the character lowers his gaze with a soft, tender, slightly apologetic expression, shrugs his shoulders gently, then looks up at the viewer with a
-small hopeful smile as if saying "let's try again". Gentle and cute, never dramatic, no tears. He ends in a soft, hopeful pose.
-{REGLAS}
-```
-
-### B3 · Refuerzo completado
-Estado: ☐.
-
-```
-{IDENTIDAD}
-{ORIENTACION B}
-Background: smooth diagonal gradient from #6C5CE7 (top-left) to #00D2D3 (bottom-right).
-Action, 3 seconds: the character gives a happy fist pump and a small proud hop, golden sparkles pop around him, and he ends in a satisfied, smiling pose.
-{REGLAS}
-```
-
-### Opcionales
-- **B4 · Durmiendo** (inactividad 2 min), bucle de 3 s: «the character sits or stands asleep with closed eyes, slow breathing, a soft sleep bubble that grows and shrinks».
-  Hoy las poses P8 lo cubren; el clip es un lujo.
-- **B5 · Sorpresa y saludo al volver**, 1,5 s: «eyes wide, a startled hop, then a happy wave». Lo cubre la pose P6.
+Opcionales, hoy cubiertos por poses: **B4** durmiendo (inactividad 2 min, bucle) y **B5** sorpresa y saludo al volver (1,5 s).
 
 ## 8. Poses fijas P1–P8 (imágenes, no video)
 
-Son las que reemplazan a los 6 PNG viejos en el widget, el chat, los minijuegos y la lección. Se generan como **imagen** (Flow o Gemini), no como video.
+Reemplazan a los 6 PNG viejos en el widget, el chat, los minijuegos y la lección. Se generan como **imagen** (Flow o Gemini).
 
-**Lienzo único** para todas: 512×512, personaje centrado y **pies siempre en la misma línea** (si no, al cambiar de emoción "salta").
-**Fondo plano magenta `#FF00FF`** (el verde choca con el anillo ciano y con la bata blanca) para recortarlo después. **[Sin verificar]: probar el recorte con una
-pose real**; los recortes automáticos del fondo fallaron en la prueba de concepto de los clips.
+**Lienzo único** para todas: 512×512, personaje centrado y **pies siempre en la misma línea** (si no, al cambiar de emoción "salta"). **Fondo plano magenta `#FF00FF`** (el verde choca
+con el anillo ciano y con la bata blanca) para recortarlo después. **[Sin verificar]:** probar el recorte con una pose real; los recortes automáticos del fondo fallaron en la prueba de concepto
+de los clips.
 
-Prompt (se repite el bloque de identidad y solo cambia la última línea):
-
-```
-{IDENTIDAD}
-Full body, centered, front view, soft even lighting, 1:1 square image, character about 80% of the image height with his feet on a fixed line near the bottom. Plain
-flat solid magenta (#FF00FF) background with nothing else. No text, no logos, no shadows on the background. {POSE}
-```
-
-| ID | Estado | `{POSE}` |
-|---|---|---|
-| **P1** | `happy` (reposo) — **P0** | `Standing relaxed with a calm gentle smile, hands in front.` |
-| **P2** | `excited` (acierto) — **P0** | `Joyful, both arms up, eyes wide, lightly leaping.` |
-| **P3** | `encouraging` (error, ánimo) — **P0** | `One hand extended forward in a supportive gesture, warm gaze, small smile. Never a gesture of reproach.` |
-| **P4** | `thinking` — **P0** | `One hand on his chin, looking up, one eyebrow raised.` |
-| P5 | `sad` — P1 | `Eyes lowered, shoulders slightly slumped, soft tender expression, not dramatic.` |
-| P6 | `surprised` — P1 | `Eyes and mouth wide open, hands raised in surprise.` |
-| P7 | `celebrating` (nueva) — P1 | `Celebrating with both arms high, mouth open with joy, small sparkles around him.` |
-| P8 | `sleeping` (nueva) — P1 | `Asleep standing, eyes closed, calm breathing, a small sleep bubble.` |
+| ID | Estado | Prioridad | Pose |
+|---|---|---|---|
+| **P1** | `happy` (reposo) | **P0** | De pie, relajado, sonrisa tranquila, manos al frente |
+| **P2** | `excited` (acierto) | **P0** | Alegre, brazos en alto, ojos muy abiertos, saltito |
+| **P3** | `encouraging` (error, ánimo) | **P0** | Una mano extendida en gesto de apoyo, mirada cálida. **Nunca un gesto de reproche** |
+| **P4** | `thinking` | **P0** | Mano en la barbilla, mirando hacia arriba |
+| P5 | `sad` | P1 | Mirada baja, hombros caídos, suave y tierno, nada dramático |
+| P6 | `surprised` | P1 | Ojos y boca muy abiertos, manos levantadas |
+| P7 | `celebrating` (nueva) | P1 | Brazos en alto, boca abierta de alegría, destellos |
+| P8 | `sleeping` (nueva) | P1 | Dormido de pie, ojos cerrados, burbuja de sueño |
 
 ## 9. Cómo revisar cada entrega (antes de publicar)
 
