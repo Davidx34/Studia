@@ -4,11 +4,12 @@
 //   npm run retire:questions                              (SIMULACRO: no escribe nada; muestra que haria)
 //   npm run retire:questions -- --aplicar                 (retira las que fallan en la ultima auditoria)
 //   npm run retire:questions -- --auditoria <archivo.json> --aplicar
+//   npm run retire:questions -- --auditoria <archivo.json> --estados pending,human_review --aplicar   (retirar de otros estados, p. ej. una auditoria de pendientes)
 //   npm run retire:questions -- --revertir evals/runs/retiro-<fecha>.json
 //
 // "Retirar" = lo mismo que hace el juez con un `fail`: review_status = 'rejected' e is_backup = true (una rechazada no se sirve jamas). NO borra filas: los
-// intentos de los estudiantes (question_attempts) siguen apuntando a ellas. Solo se tocan las que SIGUEN en 'approved' (si alguien las cambio desde la
-// auditoria, se respeta). Se retiran unicamente las de veredicto `fail`, no las de revision humana.
+// intentos de los estudiantes (question_attempts) siguen apuntando a ellas. Solo se tocan las que SIGUEN en el estado auditado (por defecto 'approved'; ver --estados): si alguien las cambio
+// desde la auditoria, se respeta. Se retiran unicamente las de veredicto `fail`, no las de revision humana.
 
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
@@ -18,6 +19,8 @@ const args = process.argv.slice(2);
 const val = (f: string) => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined);
 const aplicar = args.includes('--aplicar');
 const revertir = val('--revertir');
+// Estados DESDE los que se retira (por defecto solo 'approved'). Una auditoria de pendientes: --estados pending,human_review.
+const estadosOk = (val('--estados') ?? 'approved').split(',').map((x) => x.trim()).filter(Boolean);
 
 const dir = path.join(process.cwd(), 'evals', 'runs');
 const chunks = <T>(xs: T[], n: number): T[][] => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n));
@@ -53,9 +56,9 @@ async function main() {
     actuales.push(...(data ?? []));
   }
   const porId = new Map(actuales.map((r) => [r.id, r]));
-  const retirar = fallan.filter((f) => porId.get(f.id)?.review_status === 'approved');
-  const omitidas = fallan.filter((f) => porId.get(f.id)?.review_status !== 'approved');
-  console.log(`Siguen aprobadas (se retiran): ${retirar.length} | ya no estan aprobadas o no existen (se omiten): ${omitidas.length}`);
+  const retirar = fallan.filter((f) => estadosOk.includes(porId.get(f.id)?.review_status));
+  const omitidas = fallan.filter((f) => !estadosOk.includes(porId.get(f.id)?.review_status));
+  console.log(`Siguen en ${estadosOk.join(' / ')} (se retiran): ${retirar.length} | ya no estan en ese estado o no existen (se omiten): ${omitidas.length}`);
   const porModulo = new Map<string, number>();
   for (const f of retirar) porModulo.set(f.modulo, (porModulo.get(f.modulo) ?? 0) + 1);
   for (const [m, n] of Array.from(porModulo.entries()).sort()) console.log(`  ${String(n).padStart(3)}  ${m.slice(0, 60)}`);
@@ -89,7 +92,7 @@ async function main() {
           .from('lesson_questions')
           .update({ review_status: 'rejected', is_backup: true, reviewed_by: 'ai_judge', reviewed_at: ahora, review_reason: `Auditoria ${aud.fecha.slice(0, 10)}: ${f.motivo}`.slice(0, 500) })
           .eq('id', f.id)
-          .eq('review_status', 'approved') // por si cambio entre la lectura y la escritura
+          .eq('review_status', porId.get(f.id)!.review_status) // por si cambio entre la lectura y la escritura
           .select('id');
         if (error) throw new Error(`${f.id}: ${error.message}`);
         if (data?.length) hechas++;

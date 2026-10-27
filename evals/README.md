@@ -188,3 +188,12 @@ Tras `npm run audit:questions` (278 aprobadas: 114 pasan, 91 fallan, 73 a revisi
 4. Lectura manual de 10 nuevas aprobadas al azar: las 10 correctas. Son sobre todo preguntas de definicion/reconocimiento ancladas al material, no de calculo avanzado.
 
 **Pendiente:** el estudiante recibe TODAS las preguntas no rechazadas (`servableQuestions`), incluidas las pendientes y las de revision humana, que no pasaron por ninguna revision.
+
+### Segunda auditoria: preguntas pendientes y de revision humana (2026-10-27)
+
+`npm run audit:questions -- --estados pending,human_review` sobre las 233 que el estudiante recibia sin que nadie las hubiera revisado (el codigo sirve TODAS las no rechazadas): 136 pasan, **43 fallan**, 54 a
+revision humana (28 solo porque la segunda opinion estaba agotada). Lectura manual de 12 "fallan": 10-11 justificadas (4 son minijuegos con 4 pares/items cuando la especificacion pide 6 a 8).
+
+Por decision del dueño se **retiraron las 43** (`npm run retire:questions -- --auditoria <archivo> --estados pending,human_review --aplicar`; ahora la herramienta acepta `--estados`). Copia de seguridad en
+`retiro-<fecha>.json`. Estado resultante: aprobadas 297, pendientes 171, revision humana 19, rechazadas 250. **No se repusieron** (faltan unas 25 activas y 13 de reserva en 14 modulos; `npm run replenish:pools`
+con `--retiro <copia>` lo calcula sin escribir). Las 136 que pasan siguen en `pending` (se sirven igual): marcarlas `approved` no cambia lo que ve el estudiante.
