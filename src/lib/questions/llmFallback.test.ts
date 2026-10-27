@@ -41,6 +41,9 @@ beforeEach(() => {
   process.env.COHERE_API_KEY = 'c';
   process.env.OPENROUTER_API_KEY = 'o';
   process.env.GEMINI_API_KEY = 'g';
+  // Estas pruebas son de "Gemini primero, otros proveedores de respaldo" con UN modelo de Gemini; el respaldo entre modelos de Gemini
+  // se prueba en geminiDirect.test.ts.
+  process.env.GEMINI_MODEL_FALLBACKS = 'none';
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -48,6 +51,7 @@ afterEach(() => {
   delete process.env.COHERE_API_KEY;
   delete process.env.OPENROUTER_API_KEY;
   delete process.env.GEMINI_API_KEY;
+  delete process.env.GEMINI_MODEL_FALLBACKS;
 });
 
 describe('generacion: Cohere primero, OpenRouter de respaldo', () => {

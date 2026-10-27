@@ -8,7 +8,8 @@
 // (~258 por pagina) y ~900 de salida.
 
 import { callOpenRouter, isOpenRouterConfigured } from '@/lib/ai/openrouter';
-import { DEFAULT_MODELS, geminiModels, thinkingConfigFor } from '@/lib/ai/geminiModels';
+import { DEFAULT_MODELS, geminiModels } from '@/lib/ai/geminiModels';
+import { geminiGenerate } from '@/lib/ai/geminiDirect';
 
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 export type PdfVisionFailure = 'no_key' | 'quota' | 'rate_limited' | 'no_credit' | 'server' | 'bad_request' | 'timeout' | 'empty';
@@ -36,62 +37,34 @@ export function geminiPdfModels(): string[] {
   return geminiModels('pdf'); // GEMINI_MODEL_PDF o GEMINI_PDF_MODELS, o el perfil (AI_PROFILE)
 }
 
-async function callGeminiPdfModel(model: string, apiKey: string, base64: string, prompt: string, opts: PdfVisionOptions): Promise<PdfVisionCall> {
-  const doFetch = opts.fetchImpl ?? fetch;
-  try {
-    const res = await doFetch(`${GEMINI_BASE_URL}/models/${model}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ inline_data: { mime_type: 'application/pdf', data: base64 } }, { text: prompt }] }],
-        // temperature 0: es una transcripcion, no una redaccion. thinkingBudget 0: el "pensar" interno
-        // se comeria el presupuesto de salida y truncaria el Markdown.
-        generationConfig: { temperature: 0, maxOutputTokens: opts.maxOutputTokens ?? 16000, ...thinkingConfigFor(model) },
-      }),
-      signal: AbortSignal.timeout(opts.timeoutMs ?? 120_000),
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      if (isGeminiDailyQuota(res.status, body)) return { ok: false, reason: 'quota', status: 429 };
-      if (res.status === 429) return { ok: false, reason: 'rate_limited', status: 429 };
-      if (res.status >= 500) return { ok: false, reason: 'server', status: res.status };
-      return { ok: false, reason: 'bad_request', status: res.status };
-    }
-
-    const data: any = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? '').join('') ?? '';
-    if (!text.trim()) return { ok: false, reason: 'empty' };
-    return {
-      ok: true,
-      text,
-      provider: 'gemini',
-      model,
-      promptTokens: data?.usageMetadata?.promptTokenCount,
-      outputTokens: data?.usageMetadata?.candidatesTokenCount,
-    };
-  } catch (e: any) {
-    return { ok: false, reason: e?.name === 'TimeoutError' || e?.name === 'AbortError' ? 'timeout' : 'server' };
-  }
-}
-
-// Prueba los modelos de Gemini en orden. Si uno agota su cuota o falla, sigue con el siguiente. Un 4xx
-// propio de la peticion (PDF demasiado grande) no lo arregla otro modelo.
+// Lee el PDF con Gemini por geminiGenerate (src/lib/ai/geminiDirect.ts): prueba los modelos de PDF y, si uno no esta disponible (404),
+// sin cuota o saturado, el siguiente. Un 404 YA NO se toma por "peticion invalida": antes cortaba aqui y ni siquiera se probaba OpenRouter.
 export async function callGeminiPdf(base64: string, prompt: string, opts: PdfVisionOptions = {}): Promise<PdfVisionCall> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return { ok: false, reason: 'no_key' };
+  if (!process.env.GEMINI_API_KEY) return { ok: false, reason: 'no_key' };
 
-  let last: PdfVisionCall = { ok: false, reason: 'server' };
-  let transient: PdfVisionCall | null = null;
-  for (const model of geminiPdfModels()) {
-    const r = await callGeminiPdfModel(model, apiKey, base64, prompt, opts);
-    if (r.ok || r.reason === 'bad_request') return r;
-    last = r;
-    if (!transient && (r.reason === 'server' || r.reason === 'timeout' || r.reason === 'rate_limited')) transient = r;
+  const r = await geminiGenerate({
+    role: 'pdf',
+    parts: [{ inline_data: { mime_type: 'application/pdf', data: base64 } }, { text: prompt }],
+    // temperature 0: es una transcripcion, no una redaccion. El "pensar" interno se apaga (geminiGenerate lo hace por modelo): se
+    // comeria el presupuesto de salida y truncaria el Markdown.
+    generationConfig: { temperature: 0, maxOutputTokens: opts.maxOutputTokens ?? 16000 },
+    retries: 0,
+    maxBadRequestModels: 1, // un PDF demasiado grande no lo arregla otro modelo
+    timeoutMs: opts.timeoutMs ?? 120_000,
+    fetchImpl: opts.fetchImpl,
+  });
+  if (r.ok) return { ok: true, text: r.text, provider: 'gemini', model: r.model, promptTokens: r.usage.prompt, outputTokens: r.usage.output };
+
+  switch (r.reason) {
+    case 'quota_daily': return { ok: false, reason: 'quota', status: 429 };
+    case 'rate_limited': return { ok: false, reason: 'rate_limited', status: 429 };
+    case 'timeout': return { ok: false, reason: 'timeout' };
+    case 'bad_request': return { ok: false, reason: 'bad_request', status: r.status };
+    case 'empty': return { ok: false, reason: 'empty' };
+    case 'no_key':
+    case 'auth': return { ok: false, reason: 'no_key', status: r.status };
+    default: return { ok: false, reason: 'server', status: r.status }; // server y model_unavailable: callPdfVision sigue con OpenRouter
   }
-  // Si un modelo estaba SOBRECARGADO (reintentable) y el otro sin cuota, la causa que importa es la
-  // primera: reportar "sin cuota" haria que el llamador no reintentara algo que si puede funcionar.
-  return transient ?? last;
 }
 
 export async function callOpenRouterPdf(base64: string, prompt: string, opts: PdfVisionOptions = {}): Promise<PdfVisionCall> {

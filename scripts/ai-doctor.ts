@@ -15,6 +15,8 @@ import { callCandidate } from '../src/lib/ai/gateway/client';
 import type { AiTask } from '../src/lib/ai/gateway/types';
 import { EMBED_PROVIDERS, embedChain, isEmbedConfigured, resolveEmbedProvider } from '../src/lib/embeddings/providers';
 import { embedBatch } from '../src/lib/embeddings/client';
+import { modelChain, probeGeminiModel } from '../src/lib/ai/geminiDirect';
+import { aiProfile, type GeminiRole } from '../src/lib/ai/geminiModels';
 
 const TASKS: AiTask[] = ['generation', 'judge', 'analysis', 'study'];
 const ping = process.argv.includes('--ping');
@@ -63,7 +65,7 @@ async function main() {
       const models = listed.get(c.provider);
       let exists: string;
       if (!models) exists = '?';
-      else if (has(models, c.model) || c.model === 'auto' || c.model === 'default') exists = 'existe';
+      else if (has(models, c.model) || c.model === 'auto' || c.model === 'default') exists = 'en la lista';
       else {
         // Sugerencias: modelos del mismo proveedor con la misma familia (primera palabra del nombre).
         const family = (c.model.split('/').pop() ?? c.model).split(/[-.:]/)[0]; // "llama", "gpt", "gemini", "mistral"...
@@ -79,6 +81,29 @@ async function main() {
       console.log(`     ${c.provider.padEnd(11)} ${c.model.padEnd(44)} ${exists}${latency}`);
     }
   }
+  // Las piezas que llaman a Gemini DIRECTO (no por la pasarela): su cadena de modelos y, con --ping, una prueba REAL de cada modelo.
+  // La lista de modelos de arriba puede decir "en la lista" y la llamada dar 404 (caso real 2026-10-26: gemini-2.5-flash con una llave nueva).
+  console.log(`\n=== Gemini directo (perfil: ${aiProfile()}) ===`);
+  if (!process.env.GEMINI_API_KEY) console.log('  sin GEMINI_API_KEY');
+  else {
+    const probed = new Map<string, string>();
+    for (const role of ['judge', 'pdf', 'chunks', 'topics'] as GeminiRole[]) {
+      console.log(`\n  ${role}`);
+      for (const model of modelChain(role)) {
+        let state = '';
+        if (ping) {
+          if (!probed.has(model)) {
+            const r = await probeGeminiModel(model);
+            probed.set(model, r.ok ? `ok ${r.ms} ms` : `NO SIRVE (HTTP ${r.status}, ${r.kind})`);
+          }
+          state = '  ' + probed.get(model);
+        }
+        console.log(`     ${model.padEnd(28)}${state}`);
+      }
+    }
+    if (!ping) console.log('\n  (sin --ping no se prueba de verdad: un modelo puede figurar en la lista y dar 404 con tu llave)');
+  }
+
   console.log('\n=== Embeddings ===');
   for (const base of EMBED_PROVIDERS) {
     if (!isEmbedConfigured(base)) {
