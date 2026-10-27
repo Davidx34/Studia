@@ -512,3 +512,112 @@ describe('judge con un modelo de Gemini retirado (404)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3); // un intento por modelo, nada mas
   });
 });
+
+// ---------------------------------------------------------------------------------------------------------------------------------------
+// Criterio del juez (decision del dueño, 2026-10-27: opcion 2 = correccion y pertinencia, no anclaje literal al material subido)
+import { RUBRIC_SUBJECT, judgeCriterion, rubricFor, sourceHeader, consensusEnabled, applyConsensus } from './judge';
+
+describe('criterio del juez', () => {
+  it('por defecto es "subject" (correccion); JUDGE_CRITERION=material vuelve al anclaje', () => {
+    expect(judgeCriterion({})).toBe('subject');
+    expect(judgeCriterion({ JUDGE_CRITERION: 'material' })).toBe('material');
+    expect(judgeCriterion({ JUDGE_CRITERION: ' MATERIAL ' })).toBe('material');
+    expect(judgeCriterion({ JUDGE_CRITERION: 'otra cosa' })).toBe('subject');
+    expect(rubricFor('material')).toBe(RUBRIC);
+    expect(rubricFor('subject')).toBe(RUBRIC_SUBJECT);
+  });
+
+  it('la rubrica "subject": verifica la correccion por su cuenta y un concepto ausente del material NO es motivo de fail', () => {
+    expect(RUBRIC_SUBJECT).toContain('1. CORRECCION');
+    expect(RUBRIC_SUBJECT).toMatch(/Verificala TU de forma independiente/);
+    expect(RUBRIC_SUBJECT).toMatch(/NO aparezca en el material de referencia NO es motivo de "fail"/);
+    expect(RUBRIC_SUBJECT).toContain('3. AUTOCONTENIDA'); // un video o imagen que el estudiante no tiene
+    expect(RUBRIC_SUBJECT).not.toContain('1. ANCLAJE');
+    expect(RUBRIC).toContain('1. ANCLAJE'); // el criterio anterior no cambio
+  });
+
+  it('el contradecir al material SI falla (ante un conflicto manda el material del curso)', () => {
+    expect(RUBRIC_SUBJECT).toMatch(/CONTRADICE la respuesta marcada, la pregunta falla/);
+  });
+
+  it('la rubrica "subject" incluye las reglas de formato de TODOS los minijuegos', () => {
+    for (const tipo of ['cuarto_crisis', 'impostor_cognitivo', 'alquimia_conceptual', 'juicio_conocimiento']) expect(RUBRIC_SUBJECT).toContain(tipo);
+    expect(RUBRIC_SUBJECT).toContain('8. ESTRUCTURA DEL MINIJUEGO');
+  });
+
+  it('el encabezado del material cambia segun el criterio', () => {
+    expect(sourceHeader('material')).toBe('MATERIAL FUENTE:');
+    expect(sourceHeader('subject')).toMatch(/MATERIAL DE REFERENCIA/);
+  });
+});
+
+describe('segunda opinion del juez (consenso)', () => {
+  const q = (id: string) => ({ id, type: 'multiple_choice', q: `pregunta ${id}`, opts: ['A', 'B'], ok: 0 });
+  const pass = { verdict: 'pass' as const, reason: 'ok' };
+  const fail = { verdict: 'fail' as const, reason: 'mal' };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it('activo por defecto; JUDGE_CONSENSUS=0 lo apaga', () => {
+    expect(consensusEnabled({})).toBe(true);
+    expect(consensusEnabled({ JUDGE_CONSENSUS: '0' })).toBe(false);
+    expect(consensusEnabled({ JUDGE_CONSENSUS: '1' })).toBe(true);
+  });
+
+  it('sin ningun veredicto "pass" no gasta una sola llamada', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const out = await applyConsensus([q('a'), q('b')], [fail, null], 'material');
+    expect(out).toEqual([fail, null]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sin proveedor distinto de Gemini no hay con quien contrastar: se mantiene el veredicto', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'k');
+    for (const k of ['GROQ_API_KEY', 'CEREBRAS_API_KEY', 'MISTRAL_API_KEY', 'GITHUB_MODELS_TOKEN', 'NVIDIA_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'CLOUDFLARE_API_TOKEN']) vi.stubEnv(k, '');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const out = await applyConsensus([q('a')], [pass], 'material');
+    expect(out).toEqual([pass]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  const conGroq = () => {
+    vi.stubEnv('GROQ_API_KEY', 'g');
+    for (const k of ['CEREBRAS_API_KEY', 'MISTRAL_API_KEY', 'GITHUB_MODELS_TOKEN', 'NVIDIA_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'CLOUDFLARE_API_TOKEN', 'AI_CUSTOM_API_KEY', 'MOONSHOT_API_KEY']) vi.stubEnv(k, '');
+    vi.stubEnv('AI_CHAIN_JUDGE', 'groq:openai/gpt-oss-120b');
+  };
+  const groqResponde = (verdicts: { index: number; verdict: string; reason: string }[]) =>
+    new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ verdicts }) } }] }), { status: 200 });
+
+  it('el segundo juez coincide: se mantiene el pass. Discrepa: pasa a REVISION humana (nunca se aprueba)', async () => {
+    conGroq();
+    const fetchMock = vi.fn(async () => groqResponde([{ index: 1, verdict: 'pass', reason: 'ok' }, { index: 2, verdict: 'fail', reason: 'la respuesta marcada es falsa' }]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const out = await applyConsensus([q('a'), q('b'), q('c')], [pass, pass, fail], 'material');
+
+    expect(out[0]).toEqual(pass);
+    expect(out[1]).toMatchObject({ verdict: 'review' });
+    expect(out[1]!.reason).toMatch(/Segundo juez .* no coincide \(fail\): la respuesta marcada es falsa/);
+    expect(out[2]).toEqual(fail); // el fail del primero no se toca ni se manda a la segunda opinion
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const prompt = JSON.parse((fetchMock.mock.calls[0] as any)[1].body).messages[0].content as string;
+    expect(prompt).toContain('pregunta a');
+    expect(prompt).toContain('pregunta b');
+    expect(prompt).not.toContain('pregunta c'); // solo se le manda lo que paso
+  });
+
+  it('la segunda opinion no responde: las que pasaron van a REVISION humana, no se aprueban por omision', async () => {
+    conGroq();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })));
+    const out = await applyConsensus([q('a')], [pass], 'material');
+    expect(out[0]).toMatchObject({ verdict: 'review' });
+    expect(out[0]!.reason).toMatch(/segunda opinion/i);
+  });
+});
