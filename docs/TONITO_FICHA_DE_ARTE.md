@@ -67,7 +67,7 @@ Los clips de video solo se justifican en las cinemáticas (C1 a C5), que son rar
 
 ## 4. Biblia del personaje [propuesto]
 
-Basada en **un solo cuadro de referencia** (480×270, 60 KB, sin transparencia): hay que confirmarla con quien creó el personaje.
+Basada en **un solo cuadro de referencia** (480×270, 60 KB, sin transparencia). **Confirmado por el dueño del proyecto (2026-10-27):** el color oficial de la piel es el **durazno** (lana durazno, mejillas rosadas) y los 6 PNG actuales de la app (piel café, solo la cabeza) se reemplazan por las poses de cuerpo entero que genere Flow.
 
 - **Estilo:** muñeco tipo amigurumi (crochet) renderizado en 3D, con textura de lana visible, proporciones de cabeza grande.
 - **Elementos fijos (nunca cambian entre poses ni clips):** casco de safari beige con banda; gafas redondas grandes de montura oscura;
