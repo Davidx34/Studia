@@ -126,3 +126,22 @@ Medido ese día sobre las 26 preguntas etiquetadas (5 módulos), con Gemini 3.5 
 Lectura: la discrepancia parece ser de CRITERIO, no de potencia del modelo ni de recuperación. El juez exige que cada pregunta se verifique contra el
 material subido; el profesor aprueba preguntas correctas de la materia aunque su concepto no esté en lo subido. Decidir cuál de las dos cosas
 se quiere es una decisión de producto. La muestra es pequeña (26 preguntas, 5 módulos): hacen falta más etiquetas (30 dan señal, 60 buena).
+
+---
+
+### Criterio del juez: "subject" (correccion) en vez de anclaje al material (2026-10-27)
+
+Decision del dueño (opcion 2): el juez verifica que la pregunta sea **correcta y pertinente al curso**; que un concepto no aparezca literalmente en el
+material subido **ya no es motivo de rechazo**. `JUDGE_CRITERION=material` vuelve al criterio anterior. Ademas, las preguntas que PASAN reciben una
+**segunda opinion de otra familia de modelo** (`JUDGE_CONSENSUS=0` la apaga); si no coincide o no hay segunda opinion, van a revision humana.
+
+**Lo que se encontro al hacerlo (importa mas que las cifras):** las etiquetas del profesor NO son una verdad confiable sobre correccion.
+Leyendo las preguntas, varias APROBADAS por el profesor tienen contenido falso (un "bien de lujo" definido como insensible a la renta; pares
+sustituto/complementario cruzados; "los efectos ingreso y sustitucion se anulan en bienes normales"; en `U = x^0,5 y^0,5` duplicar el ingreso SI duplica la
+utilidad y la pregunta marca eso como "el impostor"), y alguna RECHAZADA es correcta (el Indice de Lerner mide poder de mercado). El juez nuevo detecto
+los errores que el profesor aprobo. Por eso el "acuerdo con el profesor" deja de ser una medida valida de correccion: **hace falta un conjunto de oro
+verificado por un experto** (no por la IA, que es quien genera y juzga).
+
+Medido (26 preguntas, 5 modulos, perfil paid): criterio anclaje -> 0 pasan; criterio "subject" sin segunda opinion -> 9 pasan (de ellas ~3 discutibles segun
+una lectura manual, ninguna con error flagrante); **con segunda opinion -> 4 pasan, 3 a revision humana, 19 fallan**. Con la muestra y el metodo de
+arriba esto NO demuestra una tasa de acierto: solo que el juez nuevo es mas exigente con la correccion y que la segunda opinion recorta lo dudoso.

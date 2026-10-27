@@ -57,6 +57,37 @@ Da un veredicto por pregunta:
 - "fail": viola el criterio 1, 2 o 6 (dato inventado, respuesta ambigua/incorrecta, o minijuego con datos incompletos/mal formados) -- estos son los mas graves, nunca deben llegar al estudiante.
 - "review": viola 3, 4 o 5 pero no 1/2/6 -- probablemente utilizable pero conviene que un humano lo confirme.`;
 
+// CRITERIO "SUBJECT" (por defecto desde 2026-10-27, decision del dueño: opcion 2): el juez verifica que la pregunta sea CORRECTA y util para el
+// curso, no que su concepto aparezca literalmente en el material subido. Motivo (medido con eval:judge sobre 26 preguntas etiquetadas por el
+// profesor): con el criterio de anclaje el juez rechazo las 11 preguntas que el profesor aprobo; 6 a 8 de esos rechazos eran "el concepto no
+// aparece en el material fuente" sobre preguntas correctas de la materia. El criterio anterior sigue disponible con JUDGE_CRITERION=material.
+export const RUBRIC_SUBJECT = `Evalua cada pregunta de evaluacion educativa contra estos criterios. El MATERIAL DE REFERENCIA es el material del curso, pero NO es la unica fuente valida: una pregunta puede evaluar un concepto correcto de la materia aunque ese concepto no aparezca literalmente en el material.
+
+1. CORRECCION (el criterio mas importante): la respuesta marcada como correcta ES verdadera segun el conocimiento establecido de la materia. Verificala TU de forma independiente (razona, calcula, comprueba cada opcion); no des por buena la explicacion que trae la propia pregunta. Si el material de referencia dice algo que CONTRADICE la respuesta marcada, la pregunta falla: ante un conflicto manda el material del curso.
+2. RESPUESTA UNICA: para multiple_choice/true_false, exactamente una opcion es correcta sin ambiguedad; para fill_blank/short_answer, la respuesta esperada es especifica y verificable.
+3. AUTOCONTENIDA: se puede responder solo con lo que la pregunta da y el conocimiento de la materia. Falla si depende de algo que el estudiante no tiene (un video, una imagen, "el texto anterior", un dato que no se da).
+4. PERTINENCIA: el tema es coherente con el material del curso (la misma materia y tema). NO hace falta que el concepto aparezca literalmente en el material: un concepto correcto y propio de la materia es valido. Solo es un problema si no tiene relacion alguna con el tema del material.
+5. SIN PISTAS ACCIDENTALES: los distractores (opciones incorrectas) son plausibles, no obviamente falsos por redaccion (ej: mucho mas largos/cortos que la correcta, o con errores gramaticales que los delatan).
+6. CLARIDAD: el enunciado es comprensible sin ambiguedad de interpretacion.
+7. NIVEL: la dificultad es razonable para el nivel declarado (no trivial, no imposible).
+8. ESTRUCTURA DEL MINIJUEGO (solo si la pregunta trae "Datos del minijuego"): esos datos cumplen las reglas de formato de su tipo, listadas abajo. Para un minijuego, los criterios 1 y 2 se evaluan sobre los datos del minijuego (escenarios, afirmaciones, items, pares), NO sobre el campo "Pregunta", que suele ser solo un titulo generico.
+
+REGLAS DE FORMATO POR TIPO DE MINIJUEGO (para el criterio 8):${MINIGAME_TYPE_RULES_TEXT}
+
+Da un veredicto por pregunta:
+- "pass": cumple todos los criterios que le apliquen, y TU verificaste que la respuesta marcada es correcta.
+- "fail": viola con seguridad el criterio 1, 2, 3 u 8 (respuesta marcada falsa o ambigua, depende de un recurso que el estudiante no tiene, o minijuego con datos incompletos o mal formados) -- estos son los mas graves, nunca deben llegar al estudiante.
+- "review": no puedes verificar con seguridad que la respuesta es correcta, o viola 4, 5, 6 o 7 -- un humano debe confirmarlo.
+Que un concepto NO aparezca en el material de referencia NO es motivo de "fail": si tu verificas que es correcto, es "pass"; si no estas seguro, "review".`;
+
+export type JudgeCriterion = 'subject' | 'material';
+// Por defecto 'subject'. JUDGE_CRITERION=material vuelve al criterio de anclaje al material subido.
+export const judgeCriterion = (env: Record<string, string | undefined> = process.env): JudgeCriterion =>
+  env.JUDGE_CRITERION?.trim().toLowerCase() === 'material' ? 'material' : 'subject';
+export const rubricFor = (c: JudgeCriterion = judgeCriterion()): string => (c === 'material' ? RUBRIC : RUBRIC_SUBJECT);
+export const sourceHeader = (c: JudgeCriterion = judgeCriterion()): string =>
+  c === 'material' ? 'MATERIAL FUENTE:' : 'MATERIAL DE REFERENCIA DEL CURSO (puede no contener todo lo que la pregunta evalua):';
+
 export function questionToText(q: any): string {
   const parts = [`Tipo: ${q.type}`, `Pregunta: ${q.q}`];
   if (q.opts) parts.push(`Opciones: ${JSON.stringify(q.opts)}`);
@@ -186,11 +217,12 @@ async function callGemini(prompt: string, retries: number): Promise<GeminiCall> 
 // falla al parsear (ver mas abajo), para no perder ese lote entero por un
 // problema de formato en la respuesta.
 export async function judgeQuestion(question: any, sourceMaterial: string, retries = 2): Promise<JudgeResult | null> {
-  const prompt = `${RUBRIC}
+  const criterio = judgeCriterion();
+  const prompt = `${rubricFor(criterio)}
 
 Responde SOLO con JSON: {"verdict":"pass|fail|review","reason":"una frase corta explicando el motivo"}
 
-MATERIAL FUENTE:
+${sourceHeader(criterio)}
 ${(sourceMaterial || '').substring(0, 4000)}
 
 PREGUNTA A EVALUAR:
@@ -266,13 +298,14 @@ function buildBatchPrompt(batch: any[], sourceMaterial: string): string {
   const numbered = batch
     .map((q, i) => `### PREGUNTA ${i + 1}\n${questionToText(q)}`)
     .join('\n\n');
-  return `${RUBRIC}
+  const criterio = judgeCriterion();
+  return `${rubricFor(criterio)}
 
 Vas a evaluar VARIAS preguntas en una sola pasada. Da un veredicto independiente para CADA una -- no dejes que el veredicto de una pregunta influya en el de otra.
 
 Responde SOLO con JSON: {"verdicts":[{"index":1,"verdict":"pass|fail|review","reason":"una frase corta"}, ...]} -- un objeto por cada pregunta, en el mismo orden, con "index" igual al numero de PREGUNTA (1-based). Debe haber EXACTAMENTE ${batch.length} objetos en el array.
 
-MATERIAL FUENTE:
+${sourceHeader(criterio)}
 ${(sourceMaterial || '').substring(0, 6000)}
 
 ${numbered}`;
@@ -370,6 +403,46 @@ async function judgeBatch(batch: any[], sourceMaterial: string): Promise<(JudgeR
   }
 }
 
+// SEGUNDA OPINION. Un veredicto "pass" aprueba la pregunta al instante (llega al estudiante), y un solo modelo puede dejar pasar un error sutil
+// (medido el 2026-10-27: de 9 preguntas que el juez aprobo, ~3 eran discutibles). Por eso, las que PASAN las revisa un segundo juez de OTRA
+// familia (los proveedores que no son Gemini de la cadena "judge"): si coincide, se aprueba; si no coincide, o no hay segunda opinion, va a
+// REVISION HUMANA (nunca se aprueba sin ella). Solo se gasta en las que pasan. Se apaga con JUDGE_CONSENSUS=0, y se omite si no hay ningun
+// proveedor distinto de Gemini configurado (no hay con quien contrastar).
+export const consensusEnabled = (env: Record<string, string | undefined> = process.env): boolean => env.JUDGE_CONSENSUS?.trim() !== '0';
+
+export async function applyConsensus(batch: any[], verdicts: (JudgeResult | null)[], sourceMaterial: string): Promise<(JudgeResult | null)[]> {
+  const passIdx = verdicts.map((v, i) => (v?.verdict === 'pass' ? i : -1)).filter((i) => i >= 0);
+  if (passIdx.length === 0) return verdicts;
+  if (!chainFor('judge').some((c) => c.provider !== 'gemini')) return verdicts; // sin segundo juez disponible: no hay con quien contrastar
+
+  const subset = passIdx.map((i) => batch[i]);
+  const r = await routeText<(JudgeResult | null)[]>({
+    task: 'judge',
+    prompt: buildBatchPrompt(subset, sourceMaterial),
+    maxTokens: 3000,
+    json: true,
+    exclude: ['gemini'],
+    validate: (text) => {
+      const parsed = parseBatchResponse(text, subset.length);
+      return parsed ? { value: parsed, quality: 1 } : null;
+    },
+  });
+  if (!r.ok) console.warn(`[JUDGE_CONSENSUS] no hubo segunda opinion para ${subset.length} pregunta(s) (${r.reason}): van a revision humana`);
+
+  const out = [...verdicts];
+  passIdx.forEach((batchIdx, k) => {
+    const second = r.ok ? r.value[k] : null;
+    if (second?.verdict === 'pass') return; // coinciden: se mantiene el pass
+    out[batchIdx] = {
+      verdict: 'review',
+      reason: second
+        ? `Segundo juez (${r.ok ? r.model : '?'}) no coincide (${second.verdict}): ${second.reason}`.slice(0, 500)
+        : 'No se pudo obtener una segunda opinion: un humano debe confirmar esta pregunta.',
+    };
+  });
+  return out;
+}
+
 export async function judgeQuestionsBatch(
   questions: any[],
   sourceMaterial: string
@@ -384,7 +457,8 @@ export async function judgeQuestionsBatch(
     while (idx < batches.length) {
       const i = idx++;
       const batch = batches[i];
-      const verdicts = await judgeBatch(batch, sourceMaterial);
+      const first = await judgeBatch(batch, sourceMaterial);
+      const verdicts = consensusEnabled() ? await applyConsensus(batch, first, sourceMaterial) : first;
       batch.forEach((q, j) => results.set(q.id, verdicts[j] ?? null));
     }
   }
