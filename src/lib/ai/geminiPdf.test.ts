@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { callGeminiPdf, callOpenRouterPdf, callPdfVision, geminiPdfModels, DEFAULT_GEMINI_PDF_MODELS, isGeminiDailyQuota } from './geminiPdf';
+import { resetGeminiHealth } from './geminiDirect';
 
 const geminiOk = (text = '[[PAGINA 1]]\nhola') =>
   new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }], usageMetadata: { promptTokenCount: 258, candidatesTokenCount: 10 } }), { status: 200 });
@@ -18,6 +19,11 @@ function fetchByModel(handlers: Record<string, () => Response>) {
 beforeEach(() => {
   process.env.GEMINI_API_KEY = 'g';
   delete process.env.GEMINI_PDF_MODELS;
+  delete process.env.GEMINI_MODEL_PDF;
+  delete process.env.AI_PROFILE;
+  // Estas pruebas son de la logica del PDF con SUS dos modelos; el respaldo entre modelos se prueba en geminiDirect.test.ts.
+  process.env.GEMINI_MODEL_FALLBACKS = 'none';
+  resetGeminiHealth();
   delete process.env.OPENROUTER_API_KEY;
   delete process.env.OPENROUTER_CONNECTOR;
 });
@@ -159,5 +165,32 @@ describe('callOpenRouterPdf y la cadena', () => {
     expect(r).toMatchObject({ ok: false, reason: 'bad_request' });
     expect((f.mock.calls as any[]).some((c) => String(c[0]).includes('openrouter'))).toBe(false);
     delete process.env.OPENROUTER_API_KEY;
+  });
+});
+
+// Caso real (2026-10-26): con una llave nueva los modelos 2.5 dan 404. Antes ese 404 se tomaba por "peticion invalida" y la lectura
+// se detenia ahi, sin probar el modelo siguiente ni OpenRouter.
+describe('callGeminiPdf con modelos retirados (404)', () => {
+  const retirado = () => new Response('{"error":{"message":"This model is no longer available to new users."}}', { status: 404 });
+
+  it('el primer modelo da 404: usa el segundo', async () => {
+    const { f, calls } = fetchByModel({ 'gemini-2.5-flash-lite': retirado, 'gemini-2.5-flash': () => geminiOk('del segundo') });
+    const r = await callGeminiPdf('QUJD', 'prompt', { fetchImpl: f });
+    expect(r).toMatchObject({ ok: true, model: 'gemini-2.5-flash', text: 'del segundo' });
+    expect(calls).toEqual(['gemini-2.5-flash-lite', 'gemini-2.5-flash']);
+  });
+
+  it('todos dan 404: se reporta "server" (NO "bad_request"), para que callPdfVision siga con otro proveedor', async () => {
+    const { f } = fetchByModel({ 'gemini-2.5-flash-lite': retirado, 'gemini-2.5-flash': retirado });
+    const r = await callGeminiPdf('QUJD', 'prompt', { fetchImpl: f });
+    expect(r).toMatchObject({ ok: false, reason: 'server' });
+  });
+
+  it('con el respaldo por defecto, una configuracion 2.5 desactualizada termina en un modelo 3.x que si responde', async () => {
+    delete process.env.GEMINI_MODEL_FALLBACKS;
+    const { f, calls } = fetchByModel({ 'gemini-2.5-flash-lite': retirado, 'gemini-2.5-flash': retirado, 'gemini-3.5-flash-lite': () => geminiOk('3.5') });
+    const r = await callGeminiPdf('QUJD', 'prompt', { fetchImpl: f });
+    expect(r).toMatchObject({ ok: true, model: 'gemini-3.5-flash-lite' });
+    expect(calls).toEqual(['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']);
   });
 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { geminiModel, thinkingConfigFor } from '@/lib/ai/geminiModels';
+import { geminiGenerate } from '@/lib/ai/geminiDirect';
 
 // Sesion I, Fix 3: la Biblioteca de Clase mostraba el chunk crudo del
 // material (pared de texto larga) — este endpoint lo resume con Gemini en
@@ -10,7 +10,6 @@ import { geminiModel, thinkingConfigFor } from '@/lib/ai/geminiModels';
 // ruta, que procesa TODOS los chunks pendientes de ese material de una vez.
 
 const CONCURRENCY = 4;
-const CHUNKS_MODEL = geminiModel('chunks');
 
 async function processChunkWithGemini(content: string): Promise<{ summary: string; key_points: string[]; main_concepts: string[] } | null> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -28,29 +27,17 @@ Responde con este formato exacto:
 {"summary":"...","key_points":["...","..."],"main_concepts":["...","..."]}`;
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${CHUNKS_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 700,
-            responseMimeType: 'application/json',
-            // Mismo fix que tonito-chat (Sesion I, Fix 2): sin esto, el
-            // "thinking" interno del modelo se come el token budget y la
-            // respuesta llega truncada / sin cerrar el JSON.
-            ...thinkingConfigFor(CHUNKS_MODEL),
-          },
-        }),
-      }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return null;
+    // geminiGenerate prueba el modelo de este papel y, si no esta disponible (404), sin cuota o saturado, los de respaldo; apaga el
+    // "pensar" con el ajuste que corresponde a cada modelo (sin eso el "pensar" se come el token budget y la respuesta llega truncada).
+    const r = await geminiGenerate({
+      role: 'chunks',
+      parts: [{ text: prompt }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: 700, responseMimeType: 'application/json' },
+      retries: 1,
+      timeoutMs: 60_000,
+    });
+    if (!r.ok) return null;
+    const text = r.text;
     const parsed = JSON.parse(text);
     if (!parsed.summary || !Array.isArray(parsed.key_points) || !Array.isArray(parsed.main_concepts)) return null;
     return { summary: parsed.summary, key_points: parsed.key_points, main_concepts: parsed.main_concepts };

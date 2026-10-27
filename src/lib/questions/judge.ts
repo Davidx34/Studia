@@ -19,11 +19,10 @@
 // una regla cambia generacion y verificacion a la vez y no pueden divergir.
 import { MINIGAME_TYPE_RULES_TEXT } from '@/lib/questions/cohereGeneration';
 import { routeText, describeAttempts, chainFor, sharedHealth } from '@/lib/ai/gateway';
-import { geminiModel } from '@/lib/ai/geminiModels';
+import { geminiGenerate, resetGeminiHealth } from '@/lib/ai/geminiDirect';
 
-// El modelo sale de src/lib/ai/geminiModels.ts (perfil AI_PROFILE o GEMINI_MODEL_JUDGE); por defecto sigue siendo gemini-2.5-flash.
-const GEMINI_FLASH_MODEL = geminiModel('judge');
-const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+// El modelo del juez sale de src/lib/ai/geminiModels.ts (perfil AI_PROFILE o GEMINI_MODEL_JUDGE); si no esta disponible, geminiGenerate
+// prueba los de respaldo (GEMINI_MODEL_FALLBACKS).
 
 export type JudgeVerdict = 'pass' | 'fail' | 'review';
 
@@ -137,6 +136,7 @@ let dailyQuotaExhaustedAt: number | null = null;
 export function resetQuotaBreaker(): void {
   dailyQuotaExhaustedAt = null;
   sharedHealth.reset(); // tambien los cortacircuitos de la pasarela de IA
+  resetGeminiHealth(); // y los modelos de Gemini descartados
 }
 
 function quotaBreakerOpen(): boolean {
@@ -148,54 +148,36 @@ export function backoffMs(attempt: number): number {
   return 2500 * (attempt + 1) + Math.floor(Math.random() * 500);
 }
 
+// Llama a Gemini por geminiGenerate (src/lib/ai/geminiDirect.ts): prueba el modelo del juez y, si no esta disponible (404), sin cuota o
+// saturado, los modelos de respaldo, antes de rendirse. Aqui solo se traduce su resultado a las causas que entiende judgeBatch.
 async function callGemini(prompt: string, retries: number): Promise<GeminiCall> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return { ok: false, reason: 'no_key' };
+  if (!process.env.GEMINI_API_KEY) return { ok: false, reason: 'no_key' };
   if (quotaBreakerOpen()) return { ok: false, reason: 'quota_daily' };
 
-  let lastFailure: GeminiCall = { ok: false, reason: 'server' };
+  const r = await geminiGenerate({
+    role: 'judge',
+    parts: [{ text: prompt }],
+    generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+    thinking: 'default', // el juez conserva el "pensar" por defecto del modelo (no se cambio al introducir el respaldo)
+    retries,
+  });
+  if (r.ok) return { ok: true, text: r.text };
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(`${GEMINI_BASE_URL}/models/${GEMINI_FLASH_MODEL}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0, responseMimeType: 'application/json' },
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        return { ok: true, text: data?.candidates?.[0]?.content?.parts?.[0]?.text || '' };
-      }
-
-      if (res.status === 429) {
-        const body = await res.text();
-        if (isDailyQuotaExhausted(res.status, body)) {
-          dailyQuotaExhaustedAt = Date.now();
-          return { ok: false, reason: 'quota_daily', status: 429 };
-        }
-        lastFailure = { ok: false, reason: 'rate_limited', status: 429 };
-      } else if (res.status >= 500) {
-        // 5xx (p.ej. 503 "model is overloaded") es transitorio por naturaleza.
-        // Antes se devolvia error de inmediato SIN reintentar, aunque el log
-        // decia "tras reintentos".
-        lastFailure = { ok: false, reason: 'server', status: res.status };
-      } else {
-        // 4xx distinto de 429: reintentar la misma peticion no cambia nada.
-        return { ok: false, reason: 'bad_request', status: res.status };
-      }
-    } catch {
-      lastFailure = { ok: false, reason: 'server' };
-    }
-
-    if (attempt < retries) {
-      await new Promise((r) => setTimeout(r, backoffMs(attempt)));
-    }
+  switch (r.reason) {
+    case 'quota_daily':
+      dailyQuotaExhaustedAt = Date.now(); // TODOS los modelos sin cuota: no insistir durante unos minutos
+      return { ok: false, reason: 'quota_daily', status: 429 };
+    case 'rate_limited':
+      return { ok: false, reason: 'rate_limited', status: r.status };
+    case 'bad_request':
+      return { ok: false, reason: 'bad_request', status: r.status };
+    case 'no_key':
+    case 'auth':
+      return { ok: false, reason: 'no_key', status: r.status };
+    default:
+      // server, timeout, empty, model_unavailable: ningun modelo de Gemini pudo responder -> el lote pasa al respaldo de otros proveedores.
+      return { ok: false, reason: 'server', status: r.status };
   }
-  return lastFailure;
 }
 
 // Juzga UNA pregunta con UNA llamada a Gemini. Se mantiene exportada para

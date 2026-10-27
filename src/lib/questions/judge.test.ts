@@ -278,6 +278,8 @@ describe('judgeQuestionsBatch con la cuota diaria agotada', () => {
   beforeEach(() => {
     resetQuotaBreaker();
     vi.stubEnv('GEMINI_API_KEY', 'clave-de-test');
+    vi.stubEnv('GEMINI_MODEL_JUDGE', 'gemini-2.5-flash');
+    vi.stubEnv('GEMINI_MODEL_FALLBACKS', 'none'); // estas pruebas son de la logica del juez con UN modelo; el respaldo entre modelos se prueba en geminiDirect.test.ts
   });
 
   afterEach(() => {
@@ -373,6 +375,8 @@ describe('judgeQuestionsBatch segun la causa del fallo', () => {
   beforeEach(() => {
     resetQuotaBreaker();
     vi.stubEnv('GEMINI_API_KEY', 'clave-de-test');
+    vi.stubEnv('GEMINI_MODEL_JUDGE', 'gemini-2.5-flash');
+    vi.stubEnv('GEMINI_MODEL_FALLBACKS', 'none'); // estas pruebas son de la logica del juez con UN modelo; el respaldo entre modelos se prueba en geminiDirect.test.ts
     vi.useFakeTimers();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -460,5 +464,51 @@ describe('judgeQuestionsBatch segun la causa del fallo', () => {
     expect(backoffMs(0)).toBeGreaterThanOrEqual(2500);
     expect(backoffMs(0)).toBeLessThan(3000);
     expect(backoffMs(2)).toBeGreaterThanOrEqual(7500);
+  });
+});
+
+// Caso real (2026-10-26): con una llave nueva, gemini-2.5-flash da 404 "ya no disponible para usuarios nuevos". El juez NO debe
+// quedarse sin servicio: prueba el siguiente modelo, y si ninguno responde no hace el fallback pregunta por pregunta (seria el mismo 404 x N).
+describe('judge con un modelo de Gemini retirado (404)', () => {
+  const preguntas1 = [{ id: 'a0', type: 'multiple_choice', q: 'pregunta', opts: ['A', 'B'], ok: 0 }];
+  const okLote = (n: number) =>
+    new Response(
+      JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ verdicts: Array.from({ length: n }, (_, i) => ({ index: i + 1, verdict: 'pass', reason: 'ok' })) }) }] } }] }),
+      { status: 200 },
+    );
+  const urlModel = (u: any) => /models\/([^:]+):/.exec(String(u))![1];
+
+  beforeEach(() => {
+    resetQuotaBreaker();
+    vi.stubEnv('GEMINI_API_KEY', 'clave-de-test');
+    vi.stubEnv('GEMINI_MODEL_JUDGE', 'gemini-2.5-flash');
+    vi.stubEnv('GEMINI_MODEL_FALLBACKS', 'gemini-3.5-flash-lite,gemini-3.5-flash');
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    resetQuotaBreaker();
+  });
+
+  it('el modelo del juez da 404: usa el siguiente y devuelve veredicto', async () => {
+    const fetchMock = vi.fn(async (u: any) => (urlModel(u) === 'gemini-2.5-flash' ? new Response('{}', { status: 404 }) : okLote(1)));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const r = await judgeQuestionsBatch(preguntas1, 'material');
+
+    expect(r.get('a0')?.verdict).toBe('pass');
+    expect(fetchMock.mock.calls.map((c) => urlModel(c[0]))).toEqual(['gemini-2.5-flash', 'gemini-3.5-flash-lite']);
+  });
+
+  it('todos los modelos dan 404: sin veredicto (nunca aprobado) y SIN llamadas pregunta por pregunta', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const r = await judgeQuestionsBatch(preguntas1, 'material');
+
+    expect(r.get('a0')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(3); // un intento por modelo, nada mas
   });
 });
