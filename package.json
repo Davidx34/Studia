@@ -11,6 +11,8 @@
     "eval:context": "npx tsx --env-file=.env.local scripts/eval-context.ts",
     "eval:judge": "npx tsx --env-file=.env.local scripts/eval-judge.ts",
     "eval:generation": "npx tsx --env-file=.env.local scripts/eval-generation.ts",
+    "retire:questions": "npx tsx --env-file=.env.local scripts/retire-questions.ts",
+    "replenish:pools": "npx tsx --env-file=.env.local scripts/replenish-pools.ts",
     "audit:questions": "npx tsx --env-file=.env.local scripts/audit-questions.ts",
     "ai:doctor": "npx tsx --env-file=.env.local scripts/ai-doctor.ts",
     "ai:probe": "npx tsx --env-file=.env.local scripts/gemini-probe.ts",
@@ -23,7 +25,8 @@
     "clip:list": "npx tsx --env-file=.env.local scripts/clip-scenes.ts list",
     "clip:on": "npx tsx --env-file=.env.local scripts/clip-scenes.ts on",
     "clip:off": "npx tsx --env-file=.env.local scripts/clip-scenes.ts off",
-    "clip:colors": "npx tsx --env-file=.env.local scripts/clip-colors.ts"
+    "clip:colors": "npx tsx --env-file=.env.local scripts/clip-colors.ts",
+    "flow:prompts": "npx tsx scripts/flow-prompts.ts"
   },
   "dependencies": {
     "@serwist/next": "^9.5.7",

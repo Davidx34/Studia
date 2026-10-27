@@ -173,3 +173,18 @@ Medido (5 modulos de microeconomia, 57 preguntas pedidas por generador, 8 clasic
   perfecta. Falta un conjunto de oro verificado por una persona experta para medir el acierto real.
 - Una version previa de la prueba dio resultados enganosos (0 de 57 para el 3.5 Flash) por un artefacto: la cadena de un solo candidato abria el cortacircuito de la
   pasarela y los modulos siguientes se saltaban. Se corrigio (se reinicia y se reintenta una vez; los fallos se cuentan: Flash-Lite 1, Flash 0).
+
+---
+
+### Retiro y reposicion de preguntas (2026-10-27)
+
+Tras `npm run audit:questions` (278 aprobadas: 114 pasan, 91 fallan, 73 a revision humana; 12 de 14 "fallan" verificadas a mano resultaron correctas), por decision del dueño:
+
+1. **Retiro** (`npm run retire:questions -- --aplicar`): las 91 de veredicto `fail` pasaron a `rejected` + `is_backup = true` (lo mismo que hace el juez). No se borro ninguna fila. Copia de
+   seguridad y reversion: `retiro-<fecha>.json` / `--revertir`. 10 de las 91 las habia aprobado el profesor; quedaron con `reviewed_by = 'ai_judge'` (el estado anterior esta en la copia).
+2. **Reposicion** (`npm run replenish:pools -- --aplicar`): para los 13 modulos afectados se genero lo que faltaba (modo `fill`, generador `GENERATION_PRIMARY=gateway`, Gemini 3.5 Flash-Lite) y se
+   juzgo SOLO lo nuevo. Resultado: **128 generadas, 110 aprobadas, 4 rechazadas, 14 a revision humana.**
+3. En 3 de 13 modulos la pasarela dio una respuesta ilegible muy rapido (2-4 s) y la generacion cayo al respaldo (Cohere); en esos modulos hubo mas rechazadas y revision humana.
+4. Lectura manual de 10 nuevas aprobadas al azar: las 10 correctas. Son sobre todo preguntas de definicion/reconocimiento ancladas al material, no de calculo avanzado.
+
+**Pendiente:** el estudiante recibe TODAS las preguntas no rechazadas (`servableQuestions`), incluidas las pendientes y las de revision humana, que no pasaron por ninguna revision.
