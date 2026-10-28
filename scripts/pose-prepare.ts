@@ -1,11 +1,12 @@
-// Convierte las poses de Toñito generadas en Flow (imagen cuadrada sobre fondo magenta #FF00FF) en PNG transparentes de 512x512 para la app.
+// Convierte las poses de Toñito generadas en Flow (imagen cuadrada sobre fondo magenta #FF00FF) en WebP transparentes de 512x512 para la app.
 //
 //   npm run pose:prepare -- --image ./P1.png --pose P1          (una pose; tambien --mood happy)
 //   npm run pose:prepare -- --dir ./mis-poses                    (todas: archivos que empiezan por P1..P8, por ejemplo P1.png, P2-saltando.png)
-//   npm run pose:prepare -- --dir ./mis-poses --apply            (ademas, copia los PNG a public/tonito/, que es lo que usa la app)
+//   npm run pose:prepare -- --dir ./mis-poses --apply            (ademas, copia los WebP a public/tonito/poses/, que es lo que usa la app)
 //
-// Sin --apply solo deja los PNG en ./poses-out/ para que los revises (no toca la app). Imprime, por pose, que tan grande es Toñito y donde caen
+// Sin --apply solo deja los WebP en ./poses-out/ para que los revises (no toca la app). Imprime, por pose, que tan grande es Toñito y donde caen
 // los pies, y avisa si una pose no calza con las demas (si los pies cambian de una a otra, al cambiar de emocion Toñito "salta").
+// Cuando la diferencia de los pies es pequeña (hasta 8 % del cuadro), la alinea sola: mueve la pose hacia arriba o abajo hasta la linea comun (la mediana).
 // Necesita ffmpeg: en el PATH o en FFMPEG_PATH. (Windows: `winget install Gyan.FFmpeg`.)
 
 import fs from 'fs';
@@ -13,7 +14,8 @@ import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import {
-  POSE_CANVAS, POSE_MOOD, consistencyWarnings, despillMagenta, moodForPose, poseStats, poseWarnings, type PoseStats,
+  POSE_CANVAS, POSE_EXT, POSE_MOOD, POSE_PUBLIC_DIR, consistencyWarnings, despillMagenta, feetShiftPx, median, moodForPose, poseStats, poseWarnings, shiftRows,
+  type PoseStats,
 } from '../src/lib/tonito/posePipeline';
 
 const args = process.argv.slice(2);
@@ -26,7 +28,7 @@ const val = (f: string) => {
 const ffmpeg = process.env.FFMPEG_PATH || 'ffmpeg';
 const WORK = 1024; // se quita el fondo a 1024 y luego se reduce a 512: los bordes quedan mas limpios
 const OUT_DIR = path.join(process.cwd(), 'poses-out');
-const APP_DIR = path.join(process.cwd(), 'public', 'tonito');
+const APP_DIR = path.join(process.cwd(), 'public', POSE_PUBLIC_DIR);
 
 function fail(msg: string): never {
   console.error(`✘ ${msg}`);
@@ -56,7 +58,8 @@ function writePng(rgba: Uint8Array, out: string) {
   fs.writeFileSync(tmp, rgba);
   const r = run([
     '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${WORK}x${WORK}`, '-i', tmp,
-    '-frames:v', '1', '-vf', `scale=${POSE_CANVAS}:${POSE_CANVAS}:flags=lanczos,format=rgba`, out,
+    '-frames:v', '1', '-vf', `scale=${POSE_CANVAS}:${POSE_CANVAS}:flags=lanczos,format=rgba`,
+    '-c:v', 'libwebp', '-quality', '90', '-compression_level', '6', '-pix_fmt', 'yuva420p', out,
   ]);
   fs.rmSync(tmp, { force: true });
   if (r.status !== 0) fail(`ffmpeg no pudo escribir ${out}: ${String(r.stderr).trim().split('\n').pop()}`);
@@ -93,24 +96,52 @@ function collectJobs(): Job[] {
 const jobs = collectJobs();
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
-const stats: Record<string, PoseStats> = {};
-let problems = 0;
-for (const { file, mood } of jobs) {
+interface Prepared { file: string; mood: string; rgba: Uint8Array; spilled: number; stats: PoseStats | null }
+
+// 1) quitar el fondo y limpiar bordes de todas
+const prepared: Prepared[] = jobs.map(({ file, mood }) => {
   const rgba = keyOut(file);
   const spilled = despillMagenta(rgba);
-  const s = poseStats(rgba, WORK, WORK);
+  return { file, mood, rgba, spilled, stats: poseStats(rgba, WORK, WORK) };
+});
+
+// 2) alinear los pies: la linea comun es la mediana. Una diferencia pequeña se corrige moviendo la pose; una grande solo se avisa (despues).
+const aligned: string[] = [];
+if (!has('--no-align') && prepared.filter((p) => p.stats).length > 1) {
+  const target = median(prepared.filter((p) => p.stats).map((p) => p.stats!.feetPct));
+  for (const p of prepared) {
+    if (!p.stats) continue;
+    const dy = feetShiftPx(p.stats.feetPct, target, WORK);
+    if (!dy) continue;
+    const moved = shiftRows(p.rgba, WORK, WORK, dy);
+    const after = poseStats(moved, WORK, WORK);
+    // si moverla la saca del cuadro (se perderian pixeles), se deja como estaba
+    if (after && after.opaquePct >= p.stats.opaquePct - 0.05) {
+      aligned.push(`${p.mood} (${dy > 0 ? 'bajó' : 'subió'} ${Math.abs(Math.round((dy / WORK) * 512))} px)`);
+      p.rgba = moved;
+      p.stats = after;
+    }
+  }
+}
+
+// 3) avisos y PNG
+const stats: Record<string, PoseStats> = {};
+let problems = 0;
+for (const { file, mood, rgba, spilled, stats: s } of prepared) {
   const warns = poseWarnings(s);
-  const out = path.join(OUT_DIR, `${mood}.png`);
+  const out = path.join(OUT_DIR, `${mood}.${POSE_EXT}`);
   if (s) {
     writePng(rgba, out);
     stats[mood] = s;
-    console.log(`${warns.length ? '⚠' : '✔'} ${mood.padEnd(12)} ${path.basename(file)} -> poses-out/${mood}.png   altura ${s.heightPct}%  pies ${s.feetPct}%  centro ${s.centroPct}%  (${spilled} bordes limpiados)`);
+    console.log(`${warns.length ? '⚠' : '✔'} ${mood.padEnd(12)} ${path.basename(file)} -> poses-out/${mood}.${POSE_EXT}   altura ${s.heightPct}%  pies ${s.feetPct}%  centro ${s.centroPct}%  (${spilled} bordes limpiados)`);
   } else {
     console.log(`✘ ${mood.padEnd(12)} ${path.basename(file)}`);
   }
   for (const w of warns) console.log(`    ⚠ ${w}`);
   if (warns.length) problems++;
 }
+if (aligned.length) console.log(`
+Pies alineados a una misma línea: ${aligned.join(', ')}`);
 
 const cons = consistencyWarnings(stats);
 if (cons.length) {
@@ -124,9 +155,8 @@ if (jobs.length > 1 && missing.length) console.log(`\nFaltan: ${missing.join(', 
 if (has('--apply')) {
   if (problems > 0) fail('hay poses con avisos: revisa poses-out/ y corrigelas antes de usar --apply (no se copio nada a la app)');
   fs.mkdirSync(APP_DIR, { recursive: true });
-  for (const mood of Object.keys(stats)) fs.copyFileSync(path.join(OUT_DIR, `${mood}.png`), path.join(APP_DIR, `${mood}.png`));
-  console.log(`\n✔ Copiadas a public/tonito/: ${Object.keys(stats).join(', ')}`);
-  console.log('  Ojo: la app solo usa celebrating y sleeping cuando TonitoCharacter apunta a esos archivos (hoy reutiliza excited y sad).');
+  for (const mood of Object.keys(stats)) fs.copyFileSync(path.join(OUT_DIR, `${mood}.${POSE_EXT}`), path.join(APP_DIR, `${mood}.${POSE_EXT}`));
+  console.log(`\n✔ Copiadas a public/${POSE_PUBLIC_DIR}/: ${Object.keys(stats).join(', ')}`);
 } else {
   console.log('\nRevisa los PNG en poses-out/. Para ponerlos en la app: el mismo comando con --apply.');
 }

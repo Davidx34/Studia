@@ -175,7 +175,7 @@ Opcionales, hoy cubiertos por poses: **B4** durmiendo (inactividad 2 min, bucle)
 Reemplazan a los 6 PNG viejos en el widget, el chat, los minijuegos y la lección. Se generan como **imagen** (Flow o Gemini).
 
 **Lienzo único** para todas: 512×512, personaje centrado y **pies siempre en la misma línea** (si no, al cambiar de emoción "salta"). **Fondo plano magenta `#FF00FF`** (el verde choca
-con el anillo ciano y con la bata blanca) para recortarlo después. **Recorte:** `npm run pose:prepare -- --dir <carpeta con P1.png … P8.png>` quita el magenta, limpia los bordes, deja PNG de 512×512 en `poses-out/` y avisa si los pies de una pose no calzan con las demás; con `--apply` los copia a `public/tonito/`. **[Sin verificar con una pose real de Flow]:** solo se probó con imágenes sintéticas; los recortes automáticos del fondo fallaron en la prueba de concepto
+con el anillo ciano y con la bata blanca) para recortarlo después. **Recorte:** `npm run pose:prepare -- --dir <carpeta con P1.png … P8.png>` quita el magenta, limpia los bordes, deja WebP transparentes de 512×512 (~30 KB cada uno) en `poses-out/`, alinea los pies a una misma línea y avisa si los pies de una pose no calzan con las demás; con `--apply` los copia a `public/tonito/poses/`. **[Sin verificar con una pose real de Flow]:** solo se probó con imágenes sintéticas; los recortes automáticos del fondo fallaron en la prueba de concepto
 de los clips.
 
 | ID | Estado | Prioridad | Pose |

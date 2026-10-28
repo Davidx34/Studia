@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import type { TonitoMood, TonitoAnimation } from '@/stores/useTonitoStore';
+import { bustoImgStyle, poseSrc, usesBusto } from '@/lib/tonito/poseCrop';
 
 interface TonitoCharacterProps {
   mood: TonitoMood;
@@ -10,17 +11,17 @@ interface TonitoCharacterProps {
   size?: number;
 }
 
-// Solo tenemos una expresion dibujada por mood (no hay variantes intermedias),
-// asi que celebrating/sleeping reutilizan la expresion mas cercana disponible.
+// Una pose de cuerpo entero por estado (public/tonito/poses/<estado>.webp, generadas con `npm run pose:prepare`). En tamaños pequeños se recorta al busto
+// con CSS (ver poseCrop.ts); en grandes se muestra el cuerpo entero.
 const moodImage: Record<TonitoMood, string> = {
-  happy: '/tonito/happy.png',
-  excited: '/tonito/excited.png',
-  celebrating: '/tonito/excited.png',
-  thinking: '/tonito/thinking.png',
-  sad: '/tonito/sad.png',
-  sleeping: '/tonito/sad.png',
-  surprised: '/tonito/surprised.png',
-  encouraging: '/tonito/encouraging.png',
+  happy: poseSrc('happy'),
+  excited: poseSrc('excited'),
+  celebrating: poseSrc('celebrating'),
+  thinking: poseSrc('thinking'),
+  sad: poseSrc('sad'),
+  sleeping: poseSrc('sleeping'),
+  surprised: poseSrc('surprised'),
+  encouraging: poseSrc('encouraging'),
 };
 
 const animClasses: Record<TonitoAnimation, string> = {
@@ -50,13 +51,19 @@ function TonitoCharacterBase({ mood, animation, gradient, size = 120 }: TonitoCh
         />
       )}
 
-      <img
-        src={moodImage[mood]}
-        alt="Toñito"
-        width={size}
-        height={size}
-        style={{ width: '100%', height: '100%', objectFit: 'contain', position: 'relative', zIndex: 1 }}
-      />
+      {usesBusto(size) ? (
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 1 }}>
+          <img src={moodImage[mood]} alt="Toñito" width={size} height={size} style={bustoImgStyle(size)} />
+        </div>
+      ) : (
+        <img
+          src={moodImage[mood]}
+          alt="Toñito"
+          width={size}
+          height={size}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', position: 'relative', zIndex: 1 }}
+        />
+      )}
 
       {(mood === 'celebrating' || mood === 'excited') && (
         <>
