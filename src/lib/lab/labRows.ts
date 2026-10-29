@@ -1,7 +1,7 @@
 // Filas de la tabla labs (migracion 078) y su conversion. Lo guardado NUNCA se usa tal cual: cada vez que se lee, la ficha se vuelve a validar y a recortar a los limites de la
 // plantilla (por si el catalogo cambio, o alguien escribio en la base por otro camino). Sin React ni red.
 
-import { buildLab } from './labSpec';
+import { buildLab, templateOfSpec } from './labSpec';
 import { getLabTemplate } from './labTemplates';
 import { LAB_AREA_LABEL, type LabArea, type LabSpec, type ResolvedLab } from './types';
 
@@ -38,10 +38,11 @@ export interface LabItem {
 
 // Una fila de la base -> lo que muestra el panel. Una ficha ilegible no rompe la lista: se marca y el profesor puede borrarla.
 export function rowToItem(row: LabRow): LabItem {
-  const tpl = getLabTemplate(row.template);
   // El id de la plantilla de la fila manda sobre lo que diga el spec guardado.
   const raw = row.spec && typeof row.spec === 'object' && !Array.isArray(row.spec) ? { ...(row.spec as Record<string, unknown>), template: row.template } : null;
   const built = raw ? buildLab(raw) : null;
+  // La plantilla fija del catalogo, o la que sale del modelo a la medida de la ficha.
+  const tpl = built && built.ok ? templateOfSpec(built.spec) : getLabTemplate(row.template);
   return {
     id: row.id,
     title: row.title,

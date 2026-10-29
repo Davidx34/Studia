@@ -350,9 +350,9 @@ describe('ayudantes del editor', () => {
   });
 
   it('limitHint dice el limite de la plantilla', () => {
-    expect(limitHint('trayectoria', 'v0')).toBe('Límite de la plantilla: de 1 a 60 m/s');
-    expect(limitHint('multiplicador', 'c')).toBe('Límite de la plantilla: de 0,3 a 0,95');
-    expect(limitHint('trayectoria', 'nada')).toBe('');
+    expect(limitHint({ template: 'trayectoria' }, 'v0')).toBe('Límite de la plantilla: de 1 a 60 m/s');
+    expect(limitHint({ template: 'multiplicador' }, 'c')).toBe('Límite de la plantilla: de 0,3 a 0,95');
+    expect(limitHint({ template: 'trayectoria' }, 'nada')).toBe('');
   });
 });
 

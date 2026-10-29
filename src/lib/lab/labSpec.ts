@@ -2,7 +2,9 @@
 // Todo se recorta a los limites de la plantilla, el texto se limpia (solo texto, sin etiquetas) y lo que sobra o no existe se descarta con un aviso. Sin React ni red.
 
 import { getLabTemplate } from './labTemplates';
-import type { LabMode, LabSpec, LabTemplateInfo, LabVariableOverride, ResolvedLab } from './types';
+import { sanitizeText } from './sanitize';
+import { templateFromModel, validateModel } from './model';
+import { MODEL_TEMPLATE_ID, type LabMode, type LabModel, type LabSpec, type LabTemplateInfo, type LabVariableOverride, type ResolvedLab } from './types';
 
 export const LIMITS = {
   title: 120,
@@ -17,16 +19,7 @@ export const LIMITS = {
 
 export const DEFAULT_HYPOTHESIS_PROMPT = 'Antes de empezar: ¿qué crees que va a pasar y por qué?';
 
-// Solo texto: sin etiquetas, sin caracteres de control y con los espacios normalizados. (Los laboratorios pintan con textContent; esto es una segunda barrera.)
-export function sanitizeText(v: unknown, max: number): string {
-  if (typeof v !== 'string') return '';
-  return v
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/[\u0000-\u001f\u007f]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, max);
-}
+export { sanitizeText };
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -54,10 +47,18 @@ export function defaultSpec(tpl: LabTemplateInfo): LabSpec {
 
 export function validateLabSpec(raw: unknown): SpecResult {
   if (!isObj(raw)) return { ok: false, errors: ['La ficha del experimento debe ser un objeto.'] };
-  const tpl = getLabTemplate(raw.template);
-  if (!tpl) return { ok: false, errors: [`La plantilla "${String(raw.template)}" no existe.`] };
-
   const warnings: string[] = [];
+  // Laboratorio a la medida: el modelo declarativo (validado numericamente) hace de plantilla.
+  let model: LabModel | undefined;
+  let tpl: LabTemplateInfo | undefined;
+  if (raw.template === MODEL_TEMPLATE_ID) {
+    const mv = validateModel(raw.model);
+    if (!mv.ok) return { ok: false, errors: mv.errors };
+    model = mv.model;
+    warnings.push(...mv.warnings);
+    tpl = templateFromModel(model);
+  } else tpl = getLabTemplate(raw.template) ?? undefined;
+  if (!tpl) return { ok: false, errors: [`La plantilla "${String(raw.template)}" no existe.`] };
   const base = defaultSpec(tpl);
 
   const title = sanitizeText(raw.title, LIMITS.title);
@@ -149,13 +150,19 @@ export function validateLabSpec(raw: unknown): SpecResult {
       minTrials,
       showModelCurve: raw.showModelCurve === true,
       questions,
+      ...(model ? { model } : {}),
     },
   };
 }
 
 // Combina la plantilla con la ficha (ya validada) y arma lo que recibe el laboratorio. En modo controlado, todas las variables menos la independiente quedan fijas.
+// La plantilla de una ficha: la del catalogo, o la que sale de su modelo a la medida.
+export function templateOfSpec(spec: Pick<LabSpec, 'template' | 'model'>): LabTemplateInfo | undefined {
+  return spec.model ? templateFromModel(spec.model) : (getLabTemplate(spec.template) ?? undefined);
+}
+
 export function resolveLab(spec: LabSpec): ResolvedLab | null {
-  const tpl = getLabTemplate(spec.template);
+  const tpl = templateOfSpec(spec);
   if (!tpl) return null;
   const independent = tpl.variables.some((v) => v.id === spec.independent) ? spec.independent : tpl.defaultIndependent;
 
@@ -195,6 +202,7 @@ export function resolveLab(spec: LabSpec): ResolvedLab | null {
     outputs: tpl.outputs,
     // La grafica empieza con la variable independiente en el eje X.
     chart: { x: xOk ? independent : tpl.defaultChart.x, y: tpl.defaultChart.y },
+    ...(spec.model ? { model: spec.model } : {}),
   };
 }
 

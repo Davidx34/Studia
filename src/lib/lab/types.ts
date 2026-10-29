@@ -63,6 +63,49 @@ export interface LabTemplateInfo {
   defaultQuestions: string[];
 }
 
+// ───────── Modelo declarativo (la IA lo escribe como DATOS) ─────────
+// En vez de elegir una plantilla fija, la IA puede describir el modelo del experimento: variables, constantes, pasos intermedios, salidas y una escena, todos con formulas de
+// texto ("x^a * y^(1-a)"). Un evaluador propio (public/labs/expr.js, sin eval) las interpreta. Se valida numericamente antes de mostrarse (model.ts).
+export const MODEL_TEMPLATE_ID = 'modelo';
+
+export interface ModelStep {
+  id: string;
+  expr: string;
+}
+
+export interface ModelOutput extends LabOutputDef {
+  expr: string;
+}
+
+export type ModelCurve =
+  // La salida `output` contra la variable independiente (las demas variables quedan en sus valores actuales).
+  | { kind: 'sweep'; label: string; dashed: boolean; output: string }
+  // Una curva paramétrica x(param), y(param) para param entre from y to (la recta presupuestal, una curva de indiferencia...).
+  | { kind: 'param'; label: string; dashed: boolean; x: string; y: string; from: string; to: string };
+
+export interface ModelScene {
+  xLabel: string;
+  yLabel: string;
+  curves: ModelCurve[];
+  // Puntos marcados (por ejemplo la canasta actual o el equilibrio).
+  points: { label: string; x: string; y: string }[];
+}
+
+export interface LabModel {
+  area: LabArea;
+  // Que concepto explora (una frase).
+  concept: string;
+  variables: LabVariableDef[];
+  constants: LabConstantDef[];
+  derived: ModelStep[];
+  outputs: ModelOutput[];
+  independent: string;
+  chart: { x: string; y: string };
+  scene: ModelScene | null;
+  // Nombres de los conceptos de la memoria de la clase en los que se apoya (para que el profesor vea de donde sale).
+  basis: string[];
+}
+
 // La ficha del experimento: lo unico que cambia entre un laboratorio y otro de la misma plantilla.
 export type LabMode = 'controlado' | 'libre';
 
@@ -88,6 +131,8 @@ export interface LabSpec {
   // Si se dibuja la curva teorica del modelo en la grafica (por defecto no: el estudiante la descubre con sus datos).
   showModelCurve: boolean;
   questions: string[];
+  // Solo en laboratorios a la medida (template = 'modelo').
+  model?: LabModel;
 }
 
 // Lo que recibe el laboratorio (el iframe): la plantilla ya combinada con la ficha, todo recortado a los limites de la plantilla.
@@ -112,6 +157,7 @@ export interface ResolvedLab {
   constants: { id: string; label: string; unit: string; value: number; decimals: number }[];
   outputs: LabOutputDef[];
   chart: { x: string; y: string };
+  model?: LabModel;
 }
 
 // Un ensayo registrado por el estudiante.

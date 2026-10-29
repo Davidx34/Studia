@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="es" data-lab-template="modelo">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Laboratorio a la medida</title>
+  <link rel="stylesheet" href="runtime.css">
+</head>
+<body>
+  <!-- Laboratorio A LA MEDIDA: el modelo (variables, formulas, escena) llega como DATOS desde la app, ya validado (src/lib/lab/model.ts).
+       Las formulas las interpreta expr.js, un evaluador propio sin eval; la interfaz la construye runtime.js; la escena la dibuja models/modelo.js. -->
+  <div id="lab"><p class="lab-empty">Cargando laboratorio…</p></div>
+  <noscript><p>Este laboratorio necesita JavaScript.</p></noscript>
+  <script src="runtime.js"></script>
+  <script src="expr.js"></script>
+  <script src="models/modelo.js"></script>
+</body>
+</html>

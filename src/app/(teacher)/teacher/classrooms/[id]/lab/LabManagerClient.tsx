@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { LAB_TEMPLATES } from '@/lib/lab/labTemplates';
 import { defaultSpec } from '@/lib/lab/labSpec';
+import { MODEL_EXAMPLES, exampleSpec } from '@/lib/lab/modelExamples';
 import { PROPOSAL_LIMITS } from '@/lib/lab/propose';
 import { STATUS_LABEL, sortItems, type LabItem } from '@/lib/lab/labRows';
 import { LAB_AREA_LABEL } from '@/lib/lab/types';
@@ -189,6 +190,26 @@ export default function LabManagerClient({ classroomId, teacherId, initialItems,
               </Button>
             </div>
           ))}
+        </div>
+      </Card>
+
+      <Card className="space-y-3 p-4 sm:p-5">
+        <div>
+          <h3 className="font-bold text-fg">Modelos a la medida (ejemplos)</h3>
+          <p className="mt-1 text-sm text-fg-muted">A diferencia de las plantillas, aquí las fórmulas del experimento están escritas como datos: se adaptan a cualquier materia numérica. Parte de un ejemplo y ajústalo.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {MODEL_EXAMPLES.map((e) => {
+            const spec = exampleSpec(e);
+            return (
+              <div key={e.id} className="flex flex-col justify-between gap-3 rounded-xl border border-line bg-surface p-3">
+                <p className="text-sm font-semibold text-fg">{e.title}</p>
+                <Button variant="secondary" disabled={!spec} onClick={() => spec && setEditing({ id: null, spec, status: 'draft', sourceMaterialId: null })}>
+                  Usar este ejemplo
+                </Button>
+              </div>
+            );
+          })}
         </div>
       </Card>
 
