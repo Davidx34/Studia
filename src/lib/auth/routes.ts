@@ -29,7 +29,7 @@ export function isPublicPage(pathname: string): boolean {
 // Son solo assets de marca (sin datos de usuarios); no abre ninguna ruta de la
 // app ni de la API. sw.js y /_next/static ya estan excluidos en el matcher.
 const PUBLIC_ASSET_EXACT: readonly string[] = ['/manifest.json'];
-const PUBLIC_ASSET_PREFIXES: readonly string[] = ['/icons/', '/tonito/'];
+const PUBLIC_ASSET_PREFIXES: readonly string[] = ['/icons/', '/tonito/', '/labs/'];
 
 export function isPublicAsset(pathname: string): boolean {
   if (pathname.includes('..')) return false;
