@@ -41,7 +41,7 @@ export default async function TeacherLabPage({ params }: { params: { id: string 
         classroomId={params.id}
         teacherId={user.id}
         initialItems={items}
-        materials={(materials ?? []).map((m) => ({ id: m.id, name: m.display_name ?? m.filename ?? 'Material' }))}
+        memoryReady={memory.status === 'ready' && (memory.stats?.concepts ?? 0) > 0}
         tableMissing={!!error}
       />
     </div>

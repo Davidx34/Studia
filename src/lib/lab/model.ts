@@ -64,7 +64,14 @@ function decimalsFor(step: number): number {
   return 4;
 }
 
-export type ModelResult = { ok: true; model: LabModel; warnings: string[] } | { ok: false; errors: string[] };
+// Un punto donde una salida deja de ser un numero razonable (para poder corregirlo).
+export interface ProbeFailure {
+  output: string;
+  values: Record<string, number>;
+  constants: Record<string, number>;
+}
+
+export type ModelResult = { ok: true; model: LabModel; warnings: string[] } | { ok: false; errors: string[]; failures?: ProbeFailure[] };
 
 const fmtN = (n: number) => String(Number(n.toPrecision(4)));
 
@@ -202,14 +209,71 @@ export function validateModel(raw: unknown): ModelResult {
   const compiled = Expr.compileModel({ variables, constants, derived, outputs, scene });
   if (!compiled.ok) return { ok: false, errors: compiled.errors };
 
+  // ───────── coherencia: todo lo declarado debe servir ─────────
+  const lints = lint(model);
+  if (lints.length) return { ok: false, errors: lints };
+
   // ───────── prueba numerica ─────────
-  const failures = probe(model, compiled);
-  if (failures.length) return { ok: false, errors: failures };
+  const probed = probe(model, compiled);
+  if (probed.errors.length) return { ok: false, errors: probed.errors, ...(probed.failures.length ? { failures: probed.failures } : {}) };
+  const flat = sensitivity(model, compiled);
+  if (flat) return { ok: false, errors: [flat] };
   return { ok: true, model, warnings };
 }
 
+// Coherencia: una variable, constante o paso que no influye en NINGUNA salida es una señal de que el modelo menciona algo (por ejemplo un presupuesto) pero no lo impone.
+// Sin este control un modelo puede ser numericamente valido y, aun asi, no representar la materia.
+function lint(model: LabModel): string[] {
+  const deps: Record<string, string[]> = Object.create(null);
+  [...model.derived, ...model.outputs].forEach((d) => {
+    const p = Expr.parse(d.expr);
+    deps[d.id] = p.ok ? p.idents : [];
+  });
+  const used: Record<string, true> = Object.create(null);
+  const stack = model.outputs.map((o) => o.id);
+  while (stack.length > 0) {
+    const id = stack.pop() as string;
+    if (used[id]) continue;
+    used[id] = true;
+    (deps[id] ?? []).forEach((n) => stack.push(n));
+  }
+  const errs: string[] = [];
+  const hint = ' Todo lo que declaras debe afectar lo que se mide: si es una restricción (un presupuesto, una conservación...), el modelo debe IMPONERLA con una fórmula (por ejemplo calcular una cantidad a partir de ella) y no solo mencionarla.';
+  model.variables.forEach((v) => {
+    if (!used[v.id]) errs.push(`La variable "${v.id}" no influye en ninguna salida.${hint}`);
+  });
+  model.constants.forEach((c) => {
+    if (!used[c.id]) errs.push(`La constante "${c.id}" no influye en ninguna salida.${hint}`);
+  });
+  model.derived.forEach((d) => {
+    if (!used[d.id]) errs.push(`El paso "${d.id}" no se usa en ninguna salida: quítalo o úsalo en una salida.`);
+  });
+  return errs;
+}
+
+// La salida de la grafica debe RESPONDER a la variable independiente (si no, el estudiante no ve ningun efecto al moverla).
+function sensitivity(model: LabModel, c: CompiledModel): string | null {
+  const ind = model.variables.find((v) => v.id === model.independent);
+  if (!ind) return null;
+  const k: Record<string, number> = {};
+  model.constants.forEach((x) => (k[x.id] = x.value));
+  const base: Record<string, number> = {};
+  model.variables.forEach((v) => (base[v.id] = v.default));
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let i = 0; i <= 20; i++) {
+    const v = { ...base, [ind.id]: ind.min + ((ind.max - ind.min) * i) / 20 };
+    const y = c.run(v, k)[model.chart.y];
+    if (!Number.isFinite(y)) continue;
+    lo = Math.min(lo, y);
+    hi = Math.max(hi, y);
+  }
+  if (hi - lo <= 1e-9 * (1 + Math.abs(hi))) return `La salida "${model.chart.y}" no cambia cuando mueves "${ind.id}": el estudiante no vería ningún efecto. Haz que "${model.chart.y}" dependa de "${ind.id}".`;
+  return null;
+}
+
 // Puntos de prueba: las esquinas y el medio de los rangos (con las constantes en su valor, en su minimo y en su maximo) y puntos pseudoaleatorios fijos.
-function probe(model: LabModel, c: CompiledModel): string[] {
+function probe(model: LabModel, c: CompiledModel): { errors: string[]; failures: ProbeFailure[] } {
   const vars = model.variables;
   const consts = model.constants;
   const samples: { v: Record<string, number>; k: Record<string, number> }[] = [];
@@ -250,12 +314,15 @@ function probe(model: LabModel, c: CompiledModel): string[] {
   }
 
   const bad: Record<string, string> = {};
+  const failures: ProbeFailure[] = [];
+  const exprOf: Record<string, string> = {};
+  model.outputs.forEach((o) => (exprOf[o.id] = o.expr));
   for (const s of samples.slice(0, MODEL_LIMITS.evals)) {
     let env: Record<string, number>;
     try {
       env = c.run(s.v, s.k);
     } catch {
-      return ['El modelo no se pudo evaluar.'];
+      return { errors: ['El modelo no se pudo evaluar.'], failures: [] };
     }
     for (const id of c.outputIds) {
       const y = env[id];
@@ -263,11 +330,12 @@ function probe(model: LabModel, c: CompiledModel): string[] {
       if (bad[id]) continue;
       const at = vars.map((x) => `${x.id} = ${fmtN(s.v[x.id])}`).join(', ');
       const ct = consts.length ? ` (constantes: ${consts.map((x) => `${x.id} = ${fmtN(s.k[x.id])}`).join(', ')})` : '';
-      bad[id] = `La salida "${id}" no es un número razonable (${Number.isNaN(y) ? 'NaN' : String(y)}) cuando ${at}${ct}. Ajusta los rangos o protege la fórmula (por ejemplo con max(...) o if(...)).`;
+      bad[id] = `La salida "${id}" (fórmula: ${exprOf[id]}) no es un número razonable (${Number.isNaN(y) ? 'NaN' : String(y)}) cuando ${at}${ct}. Ajusta los rangos o protege la fórmula (por ejemplo con max(...) o if(...)).`;
+      failures.push({ output: id, values: { ...s.v }, constants: { ...s.k } });
     }
   }
   const out = Object.keys(bad).map((k) => bad[k]);
-  if (out.length) return out;
+  if (out.length) return { errors: out, failures };
 
   // La escena, en el punto inicial: los puntos deben existir y cada curva debe dibujar algo.
   const v0: Record<string, number> = {};
@@ -292,7 +360,7 @@ function probe(model: LabModel, c: CompiledModel): string[] {
     }
     if (ok < 2) errs.push(`La curva ${i + 1} de la escena no dibuja nada con los valores iniciales.`);
   });
-  return errs;
+  return { errors: errs, failures: [] };
 }
 
 // Calcula las salidas de un modelo (para pruebas y para la vista previa en el servidor).

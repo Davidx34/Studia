@@ -1,27 +1,30 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { FlaskConical, Loader2, Sparkles, Trash2 } from 'lucide-react';
+import { AlertTriangle, FlaskConical, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { LAB_TEMPLATES } from '@/lib/lab/labTemplates';
 import { defaultSpec } from '@/lib/lab/labSpec';
 import { MODEL_EXAMPLES, exampleSpec } from '@/lib/lab/modelExamples';
-import { PROPOSAL_LIMITS } from '@/lib/lab/propose';
+import { DESIGN_LIMITS } from '@/lib/lab/design';
 import { STATUS_LABEL, sortItems, type LabItem } from '@/lib/lab/labRows';
 import { LAB_AREA_LABEL } from '@/lib/lab/types';
 import LabEditor, { type EditorStart } from './LabEditor';
 
-export interface MaterialOption {
-  id: string;
-  name: string;
-}
-
 const inputCls =
   'w-full min-h-[44px] rounded-xl border border-line-strong bg-surface-2 px-3 py-2 text-base text-fg placeholder:text-fg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
-export default function LabManagerClient({ classroomId, teacherId, initialItems, materials, tableMissing }: { classroomId: string; teacherId: string; initialItems: LabItem[]; materials: MaterialOption[]; tableMissing: boolean }) {
+// Por que la IA no pudo crear el laboratorio con lo que hay en la memoria de la clase (para mostrarlo con detalle).
+interface Gap {
+  reason: string;
+  message: string;
+  missing: string[];
+  weak: string[];
+}
+
+export default function LabManagerClient({ classroomId, teacherId, initialItems, memoryReady, tableMissing }: { classroomId: string; teacherId: string; initialItems: LabItem[]; memoryReady: boolean; tableMissing: boolean }) {
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState<LabItem[]>(initialItems);
   const [editing, setEditing] = useState<EditorStart | null>(null);
@@ -31,10 +34,9 @@ export default function LabManagerClient({ classroomId, teacherId, initialItems,
 
   // Propuesta con IA
   const [idea, setIdea] = useState('');
-  const [materialId, setMaterialId] = useState('');
-  const [template, setTemplate] = useState('auto');
   const [proposing, setProposing] = useState(false);
   const [proposeError, setProposeError] = useState<string | null>(null);
+  const [gap, setGap] = useState<Gap | null>(null);
 
   const db: any = supabase;
   const upsert = (item: LabItem) => setItems((list) => sortItems([...list.filter((i) => i.id !== item.id), item]));
@@ -50,21 +52,26 @@ export default function LabManagerClient({ classroomId, teacherId, initialItems,
     );
   }
 
-  const propose = async () => {
+  // La IA diseña el laboratorio a partir de la memoria de la clase. `force`: el profesor acepta seguir cuando los materiales cubren solo una parte.
+  const propose = async (force = false) => {
     setProposing(true);
     setProposeError(null);
+    setGap(null);
     try {
-      const res = await fetch('/api/lab/propose', {
+      const res = await fetch('/api/lab/design', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ classroomId, idea, materialId: materialId || undefined, template }),
+        body: JSON.stringify({ classroomId, idea, force }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setProposeError(typeof data?.error === 'string' ? data.error : 'No se pudo generar la propuesta. Inténtalo de nuevo.');
+        const msg = typeof data?.error === 'string' ? data.error : 'No se pudo diseñar el laboratorio. Inténtalo de nuevo.';
+        // Falta conocimiento en los materiales (o el tema no se puede modelar): se muestra el detalle de lo que falta.
+        if (res.status === 422) setGap({ reason: String(data?.reason ?? ''), message: msg, missing: data?.coverage?.missing ?? [], weak: data?.coverage?.weak ?? [] });
+        else setProposeError(msg);
         return;
       }
-      setEditing({ id: null, spec: data.spec, status: 'draft', sourceMaterialId: data.sourceMaterialId ?? null, warnings: data.warnings ?? [] });
+      setEditing({ id: null, spec: data.spec, status: 'draft', sourceMaterialId: data.sourceMaterialId ?? null, warnings: data.warnings ?? [], evidence: data.evidence ?? [] });
     } catch {
       setProposeError('No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.');
     } finally {
@@ -119,56 +126,83 @@ export default function LabManagerClient({ classroomId, teacherId, initialItems,
           <FlaskConical aria-hidden="true" className="h-5 w-5" /> Laboratorio
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-fg-muted">
-          Experimentos en un ambiente controlado: el estudiante cambia una variable, mide, grafica y concluye. La IA solo propone la ficha del experimento (títulos, rangos y preguntas); tú la revisas antes de publicarla.
+          Experimentos en un ambiente controlado: el estudiante cambia una variable, mide, grafica y concluye. La IA diseña el modelo a partir de lo que ya enseñaste en tus materiales; tú lo revisas con una vista previa antes de publicarlo.
         </p>
       </div>
 
       <Card className="space-y-4 p-4 sm:p-5">
-        <h3 className="flex items-center gap-2 font-bold text-fg">
-          <Sparkles aria-hidden="true" className="h-4 w-4" /> Nuevo laboratorio con IA
-        </h3>
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-fg-muted">¿Qué quieres que investiguen? (opcional si eliges un material)</span>
-          <textarea className={inputCls} rows={2} maxLength={PROPOSAL_LIMITS.idea} value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="Ej.: cómo cambia el alcance de un lanzamiento con el ángulo" />
-        </label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-fg-muted">Basarse en un material de la clase</span>
-            <select className={inputCls} value={materialId} onChange={(e) => setMaterialId(e.target.value)}>
-              <option value="">Ninguno</option>
-              {materials.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-fg-muted">Plantilla</span>
-            <select className={inputCls} value={template} onChange={(e) => setTemplate(e.target.value)}>
-              <option value="auto">Que la IA elija</option>
-              {LAB_TEMPLATES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {LAB_AREA_LABEL[t.area]} · {t.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div>
+          <h3 className="flex items-center gap-2 font-bold text-fg">
+            <Sparkles aria-hidden="true" className="h-4 w-4" /> Diseñar un laboratorio con IA
+          </h3>
+          <p className="mt-1 max-w-2xl text-sm text-fg-muted">
+            La IA usa la memoria de tu clase (lo que ya enseñaste en tus materiales) para escribir el modelo del experimento: sus variables, sus fórmulas y su gráfica. Si lo que cargaste no alcanza para crearlo, te dice qué falta en vez de inventarlo.
+          </p>
         </div>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-fg-muted">¿Qué quieres que investiguen?</span>
+          <textarea
+            className={inputCls}
+            rows={3}
+            maxLength={DESIGN_LIMITS.idea}
+            value={idea}
+            onChange={(e) => setIdea(e.target.value)}
+            disabled={!memoryReady}
+            placeholder="Ej.: cómo elige un consumidor cuánto comprar de cada bien para obtener la mayor utilidad con su presupuesto"
+          />
+        </label>
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={propose} loading={proposing} disabled={proposing || (!idea.trim() && !materialId)}>
-            Proponer experimento
+          <Button onClick={() => propose(false)} loading={proposing} disabled={proposing || !memoryReady || idea.trim().length < 10}>
+            Diseñar experimento
           </Button>
           <p role="status" aria-live="polite" className={`text-sm ${proposeError ? 'text-danger' : 'text-fg-muted'}`}>
             {proposing ? (
               <span className="inline-flex items-center gap-1">
-                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin motion-reduce:animate-none" /> La IA está preparando la ficha…
+                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin motion-reduce:animate-none" /> La IA está diseñando y probando el modelo… puede tardar un minuto.
               </span>
+            ) : !memoryReady ? (
+              'Primero construye la memoria de la clase (arriba): así la IA conoce tus materiales.'
             ) : (
-              (proposeError ?? 'Podrás ajustarla con una vista previa antes de guardar.')
+              (proposeError ?? 'Podrás ajustarlo con una vista previa antes de guardar.')
             )}
           </p>
         </div>
+
+        {gap && (
+          <div role="alert" className="space-y-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm text-fg">
+            <p className="flex items-start gap-2 font-semibold">
+              <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" /> {gap.message}
+            </p>
+            {gap.missing.length > 0 && (
+              <div>
+                <p className="font-semibold">Falta en tus materiales:</p>
+                <ul className="list-disc pl-6 text-fg-muted">
+                  {gap.missing.map((m, i) => (
+                    <li key={i}>{m}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {gap.weak.length > 0 && (
+              <div>
+                <p className="font-semibold">Está, pero flojo:</p>
+                <ul className="list-disc pl-6 text-fg-muted">
+                  {gap.weak.map((m, i) => (
+                    <li key={i}>{m}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {gap.reason === 'partial' && (
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <Button variant="secondary" size="sm" onClick={() => propose(true)} disabled={proposing}>
+                  Crear de todos modos
+                </Button>
+                <span className="text-fg-muted">La IA lo creará con lo que hay y te avisará; revísalo con cuidado.</span>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       <Card className="space-y-3 p-4 sm:p-5">
