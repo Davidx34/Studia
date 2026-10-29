@@ -212,7 +212,8 @@ describe('MapSections (una seccion por clase)', () => {
 });
 
 describe('el CSS del mapa no lleva colores propios (todo viene del tema)', () => {
-  const css = fs.readFileSync(path.join(process.cwd(), 'src/components/map/mapThemes.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  // Los saltos de linea se normalizan: segun la configuracion de Git el archivo puede venir con CRLF.
+  const css = fs.readFileSync(path.join(process.cwd(), 'src/components/map/mapThemes.css'), 'utf8').replace(/\r\n/g, '\n').replace(/\/\*[\s\S]*?\*\//g, '');
 
   it('sin hex, rgb(), hsl() ni nombres de color', () => {
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
