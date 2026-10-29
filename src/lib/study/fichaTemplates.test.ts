@@ -7,8 +7,8 @@ import { DEFAULT_FICHA_TEMPLATE, FICHA_TEMPLATES, SAMPLE_FICHAS, isFichaTemplate
 const ID_FORMAT = /^[a-z][a-z0-9-]{0,31}$/;
 
 describe('catalogo de plantillas de fichas', () => {
-  it('son 4, con ids unicos y la clasica primero (la de siempre)', () => {
-    expect(FICHA_TEMPLATES.map((t) => t.id)).toEqual(['clasica', 'tarjeta', 'cornell', 'compacta']);
+  it('las 4 funcionales van primero (la clasica, la de siempre) y los ids son unicos', () => {
+    expect(FICHA_TEMPLATES.slice(0, 4).map((t) => t.id)).toEqual(['clasica', 'tarjeta', 'cornell', 'compacta']);
     expect(new Set(FICHA_TEMPLATES.map((t) => t.id)).size).toBe(FICHA_TEMPLATES.length);
     expect(DEFAULT_FICHA_TEMPLATE).toBe('clasica');
   });
