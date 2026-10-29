@@ -9,7 +9,9 @@ import { CheckCircle2, Loader2, Palette } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { FICHA_TEMPLATES, SAMPLE_FICHAS, normalizeFichaTemplate, type FichaData, type FichaTemplateId } from '@/lib/study/fichaTemplates';
+import {
+  FICHA_CATEGORY_HINT, FICHA_CATEGORY_LABEL, FICHA_TEMPLATES, SAMPLE_FICHAS, normalizeFichaTemplate, type FichaCategory, type FichaData, type FichaTemplateId,
+} from '@/lib/study/fichaTemplates';
 import { FichaList } from './FichaViews';
 
 // La miniatura es solo para MIRAR: sin foco, sin clics y oculta a los lectores de pantalla (la descripcion de la plantilla ya la explica).
@@ -27,6 +29,8 @@ function Miniature({ fichas, template }: { fichas: FichaData[]; template: FichaT
     </div>
   );
 }
+
+const CATEGORIES: FichaCategory[] = ['funcional', 'infantil', 'area', 'estetica'];
 
 export function FichaTemplatePicker({
   classroomId,
@@ -73,48 +77,56 @@ export function FichaTemplatePicker({
         </p>
       </div>
 
-      <fieldset>
+      <fieldset className="space-y-6">
         <legend className="sr-only">Plantilla de las fichas</legend>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {FICHA_TEMPLATES.map((t) => {
-            const on = t.id === selected;
-            return (
-              <label key={t.id} className="relative block cursor-pointer">
-                <input
-                  type="radio"
-                  name="ficha-template"
-                  value={t.id}
-                  checked={on}
-                  onChange={() => {
-                    setSelected(t.id);
-                    setState('idle');
-                  }}
-                  className="peer sr-only"
-                />
-                <div
-                  className={`h-full space-y-2 rounded-xl border-2 p-3 transition motion-reduce:transition-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg ${
-                    on ? 'border-primary bg-primary/5' : 'border-line bg-surface hover:border-line-strong'
-                  }`}
-                >
-                  <Miniature fichas={fichas} template={t.id} />
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-fg">{t.name}</span>
-                    {on && (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary-text">
-                        <CheckCircle2 aria-hidden="true" className="h-4 w-4" /> Elegida
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-fg-muted">{t.description}</p>
-                  <p className="text-xs text-fg-muted">
-                    <span className="font-semibold text-fg">Ideal para: </span>
-                    {t.bestFor}
-                  </p>
-                </div>
-              </label>
-            );
-          })}
-        </div>
+        {CATEGORIES.map((cat) => (
+          <div key={cat}>
+            <div className="mb-2">
+              <h4 className="text-sm font-bold text-fg">{FICHA_CATEGORY_LABEL[cat]}</h4>
+              <p className="text-xs text-fg-muted">{FICHA_CATEGORY_HINT[cat]}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {FICHA_TEMPLATES.filter((t) => t.category === cat).map((t) => {
+                const on = t.id === selected;
+                return (
+                  <label key={t.id} className="relative block cursor-pointer">
+                    <input
+                      type="radio"
+                      name="ficha-template"
+                      value={t.id}
+                      checked={on}
+                      onChange={() => {
+                        setSelected(t.id);
+                        setState('idle');
+                      }}
+                      className="peer sr-only"
+                    />
+                    <div
+                      className={`h-full space-y-2 rounded-xl border-2 p-3 transition motion-reduce:transition-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg ${
+                        on ? 'border-primary bg-primary/5' : 'border-line bg-surface hover:border-line-strong'
+                      }`}
+                    >
+                      <Miniature fichas={fichas} template={t.id} />
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-fg">{t.name}</span>
+                        {on && (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary-text">
+                            <CheckCircle2 aria-hidden="true" className="h-4 w-4" /> Elegida
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-fg-muted">{t.description}</p>
+                      <p className="text-xs text-fg-muted">
+                        <span className="font-semibold text-fg">Ideal para: </span>
+                        {t.bestFor}
+                      </p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </fieldset>
 
       <div className="flex flex-wrap items-center gap-3">

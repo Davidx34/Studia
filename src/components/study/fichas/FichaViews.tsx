@@ -6,7 +6,8 @@
 
 import { Card } from '@/components/ui/Card';
 import { MathText } from '@/components/MathText';
-import { normalizeFichaTemplate, type FichaData, type FichaTemplateId } from '@/lib/study/fichaTemplates';
+import { FICHA_TEMPLATES, normalizeFichaTemplate, type FichaData, type FichaTemplateId } from '@/lib/study/fichaTemplates';
+import { ThemedFichas } from './ThemedLayouts';
 
 export interface FichasViewProps {
   fichas: FichaData[];
@@ -228,7 +229,8 @@ export function CompactaFichas({ fichas }: FichasViewProps) {
   );
 }
 
-const VIEWS: Record<FichaTemplateId, (p: FichasViewProps) => JSX.Element> = {
+// Las 4 funcionales (siguen los colores de la app). Las demas son estructura + tema (ThemedLayouts.tsx) y salen del catalogo.
+const FUNCTIONAL_VIEWS: Partial<Record<FichaTemplateId, (p: FichasViewProps) => JSX.Element>> = {
   clasica: ClasicaFichas,
   tarjeta: TarjetaFichas,
   cornell: CornellFichas,
@@ -238,6 +240,9 @@ const VIEWS: Record<FichaTemplateId, (p: FichasViewProps) => JSX.Element> = {
 // Lo que usa la app: la lista de fichas pintada con la plantilla de la clase (o la de siempre si el id no se conoce).
 export function FichaList({ fichas, template }: { fichas: FichaData[]; template?: string | null }) {
   if (fichas.length === 0) return <p className="text-fg-muted">Este material no produjo fichas de lectura.</p>;
-  const View = VIEWS[normalizeFichaTemplate(template)];
+  const id = normalizeFichaTemplate(template);
+  const info = FICHA_TEMPLATES.find((t) => t.id === id)!;
+  if (info.layout && info.theme) return <ThemedFichas fichas={fichas} layout={info.layout} themeId={info.theme} />;
+  const View = FUNCTIONAL_VIEWS[id] ?? ClasicaFichas;
   return <View fichas={fichas} />;
 }
