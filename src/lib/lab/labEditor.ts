@@ -1,8 +1,7 @@
 // Ayudantes del editor de la ficha del experimento (sin React, para poder probarlos). El formulario trabaja con una ficha "en borrador" que puede estar a medias; lo que se
 // previsualiza y se guarda siempre es la version VALIDADA (validateLabSpec), asi nada fuera de los limites de la plantilla llega a un estudiante.
 
-import { LIMITS, buildLab, validateLabSpec } from './labSpec';
-import { getLabTemplate } from './labTemplates';
+import { LIMITS, buildLab, templateOfSpec, validateLabSpec } from './labSpec';
 import type { LabMode, LabSpec, LabVariableOverride, ResolvedLab } from './types';
 
 export function withVariable(spec: LabSpec, id: string, patch: LabVariableOverride): LabSpec {
@@ -52,8 +51,8 @@ export function normalizeDraft(spec: LabSpec): { spec: LabSpec; warnings: string
 }
 
 // Una pista del limite de cada variable para el formulario ("de 1 a 60 m/s").
-export function limitHint(templateId: string, variableId: string): string {
-  const t = getLabTemplate(templateId);
+export function limitHint(spec: Pick<LabSpec, 'template' | 'model'>, variableId: string): string {
+  const t = templateOfSpec(spec);
   const v = t?.variables.find((x) => x.id === variableId);
   if (!v) return '';
   return `Límite de la plantilla: de ${String(v.min).replace('.', ',')} a ${String(v.max).replace('.', ',')}${v.unit ? ' ' + v.unit : ''}`;

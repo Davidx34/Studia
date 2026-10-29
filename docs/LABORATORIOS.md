@@ -89,8 +89,24 @@ El PR2 (pestaña del profesor) solo llenaba números de 2 plantillas cerradas: u
 - **Migración 079**: `class_memory` (grafo + estado) y `class_memory_material` (extracción + hash). Solo el profesor dueño **lee**; nadie escribe desde el navegador (lo escribe el servidor con la llave de servicio tras comprobar al dueño); los estudiantes no tienen acceso.
 - Ruta `POST /api/memory/build` y panel **Memoria de la clase** en la pestaña Laboratorio.
 
+## Motor declarativo (laboratorios a la medida)
+
+Una plantilla fija solo sirve para el tema para el que se escribió. Con el motor declarativo, la IA (o el profesor) **describe el modelo como datos** y el laboratorio se adapta a cualquier materia numérica. La IA **sigue sin escribir código**.
+
+**El modelo** (`LabModel`, `src/lib/lab/types.ts`): variables (con rango y paso), constantes (con rango), **pasos intermedios**, **salidas** y una **escena**; todos los cálculos son fórmulas de texto (`x^a * y^(1-a)`). La ficha usa `template: "modelo"` y lleva el modelo dentro (`spec.model`). Ejemplos: `src/lib/lab/modelExamples.ts` (consumidor con restricción presupuestal, impuesto en un mercado, crecimiento logístico).
+
+**El evaluador** (`public/labs/expr.js`): un parser recursivo propio que convierte la fórmula en funciones ya escritas ahí. **No hay `eval` ni `new Function`.** Solo números, nombres declarados, operadores (`+ - * / ^ %`, comparaciones, `&& || !`) y una lista cerrada de funciones (`sqrt, abs, exp, ln, log10, sin, cos, min, max, pow, clamp, if…`). Sin bucles ni acceso a objetos o a la página. Topes: 240 caracteres, 150 elementos, 24 niveles de anidación. Los nombres se buscan en tablas sin prototipo (un nombre como `constructor` no existe). La multiplicación implícita (`2x`) y la coma decimal son errores con mensaje claro. Es **el mismo archivo** en el servidor (valida) y en el iframe (calcula).
+
+**Validación numérica** (`model.ts`, `validateModel`): además de revisar sintaxis y nombres, evalúa el modelo en una rejilla (extremos y medio de cada rango, constantes en su valor y en sus extremos, y 60 puntos pseudoaleatorios fijos). Si **cualquier salida** da NaN, infinito o pasa de mil millones, el modelo se rechaza **diciendo en qué punto falla** (por ejemplo: «la salida "y" no es un número razonable (Infinity) cuando x = 0 … protege la fórmula con max(...) o if(...)»). Así el estudiante nunca ve un NaN, y en el PR de generación ese mensaje se le devuelve a la IA para que se corrija.
+
+**Escena**: curvas `sweep` (una salida contra la variable independiente) y `param` (curvas paramétricas `x(param), y(param)` con `from`/`to`: recta presupuestal, curva de indiferencia, oferta y demanda…), y puntos marcados. El marco lo definen la primera curva y las marcas.
+
+**Runtime**: `public/labs/modelo.html` + `models/modelo.js` (implementa `prepare(lab)`, un gancho nuevo de `runtime.js`). Mismo iframe aislado, mismo protocolo.
+
+**No requiere migración**: el modelo va dentro de `labs.spec` (jsonb). El panel del profesor ya permite partir de un ejemplo y ajustarlo.
+
 ## Lo que falta (siguientes PR)
 
-1. **Motor declarativo** y **generación desde la memoria** (arriba, PR2 y PR3 de esta dirección). Las 2 plantillas actuales pasan a ser ejemplos/familias de dibujo.
+1. **Generación desde la memoria de la clase:** la IA diseña el modelo apoyándose en la memoria (PR de memoria), con el prompt incluyendo los ejemplos; los errores de la validación numérica se le devuelven para que corrija; antes de generar se usa la **prueba de suficiencia** y, si lo cargado no alcanza, se dice qué falta; cada propuesta cita en qué conceptos se apoya (`model.basis`).
 2. **Guardar y revisar:** tabla `lab_attempts` (migración + RLS), el estudiante abre el laboratorio publicado y su informe se guarda; el profesor lo revisa.
 3. Límite de uso por profesor en `/api/lab/propose` y `/api/memory/build`.

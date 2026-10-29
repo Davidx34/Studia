@@ -580,6 +580,8 @@
   function init(msg) {
     var lab = msg.lab;
     var model = models[lab.template];
+    // Laboratorios a la medida: el modelo se prepara con los datos que manda la app (formulas ya validadas).
+    if (model && typeof model.prepare === 'function') model = model.prepare(lab);
     var root = document.getElementById('lab');
     if (!model) { root.textContent = 'Este laboratorio no se pudo cargar.'; return; }
     applyTheme(msg.theme);

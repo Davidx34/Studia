@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { LabFrame } from '@/components/lab/LabFrame';
 import { buildLab } from '@/lib/lab/labSpec';
 import { LAB_TEMPLATES } from '@/lib/lab/labTemplates';
+import { MODEL_EXAMPLES } from '@/lib/lab/modelExamples';
 import { LAB_AREA_LABEL, type LabAttemptState } from '@/lib/lab/types';
 
 export default function LaboratoriosClient() {
@@ -16,8 +17,13 @@ export default function LaboratoriosClient() {
   const [log, setLog] = useState<string[]>([]);
   const [state, setState] = useState<LabAttemptState | null>(null);
 
-  const built = useMemo(() => buildLab({ template, mode, showModelCurve: curve }), [template, mode, curve]);
-  const info = LAB_TEMPLATES.find((t) => t.id === template)!;
+  // 'modelo:<id>' = un laboratorio a la medida (modelo declarativo de ejemplo); lo demas, una plantilla fija.
+  const example = template.startsWith('modelo:') ? MODEL_EXAMPLES.find((e) => `modelo:${e.id}` === template) : undefined;
+  const built = useMemo(
+    () => (example ? buildLab({ template: 'modelo', title: example.title, model: example.raw, mode, showModelCurve: curve }) : buildLab({ template, mode, showModelCurve: curve })),
+    [template, example, mode, curve]
+  );
+  const info = LAB_TEMPLATES.find((t) => t.id === template) ?? LAB_TEMPLATES[0];
   const push = (s: string) => setLog((l) => [`${new Date().toLocaleTimeString()} ${s}`, ...l].slice(0, 8));
 
   return (
@@ -34,6 +40,9 @@ export default function LaboratoriosClient() {
             {LAB_TEMPLATES.map((t) => (
               <option key={t.id} value={t.id}>{LAB_AREA_LABEL[t.area]} · {t.name}</option>
             ))}
+            {MODEL_EXAMPLES.map((e) => (
+              <option key={e.id} value={`modelo:${e.id}`}>A la medida · {e.title}</option>
+            ))}
           </select>
         </label>
         <label className="grid gap-1 text-sm font-semibold">
@@ -48,7 +57,7 @@ export default function LaboratoriosClient() {
         </label>
       </div>
 
-      <p className="text-sm text-fg-muted"><strong className="text-fg">{info.concept}</strong> {info.bestFor}</p>
+      <p className="text-sm text-fg-muted"><strong className="text-fg">{example ? (built.ok ? built.lab.model?.concept : '') : info.concept}</strong> {example ? 'Modelo declarativo: las fórmulas las interpreta un evaluador propio, sin código de la IA.' : info.bestFor}</p>
 
       {built.ok ? (
         <LabFrame

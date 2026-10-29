@@ -9,8 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { LabFrame } from '@/components/lab/LabFrame';
-import { LIMITS } from '@/lib/lab/labSpec';
-import { getLabTemplate } from '@/lib/lab/labTemplates';
+import { LIMITS, templateOfSpec } from '@/lib/lab/labSpec';
 import { cleanQuestions, effectiveVariable, limitHint, normalizeDraft, questionError, withConstant, withIndependent, withMode, withVariable } from '@/lib/lab/labEditor';
 import { rowToItem, specToFields, type LabItem, type LabRow, type LabStatus } from '@/lib/lab/labRows';
 import type { LabSpec, LabVariableOverride } from '@/lib/lab/types';
@@ -62,7 +61,7 @@ export default function LabEditor({ classroomId, teacherId, start, onClose, onSa
   const [busy, setBusy] = useState<'draft' | 'publish' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const tpl = getLabTemplate(draft.template);
+  const tpl = templateOfSpec(draft);
   const full = useMemo(() => normalizeDraft({ ...draft, questions: cleanQuestions(questions) }), [draft, questions]);
 
   // La vista previa se recarga con una pausa: el laboratorio recibe su estado una vez al abrirse.
@@ -226,7 +225,7 @@ export default function LabEditor({ classroomId, teacherId, start, onClose, onSa
                       <NumField label={isInd ? 'Valor inicial' : 'Valor fijo'} value={eff.default} decimals={v.decimals + 1} onCommit={(n) => commitVar({ default: n }, v.id, 'default')} />
                       {showRange && <NumField label="Máximo" value={eff.max} decimals={v.decimals + 1} onCommit={(n) => commitVar({ max: n }, v.id, 'max')} />}
                     </div>
-                    <p className="mt-1 text-xs text-fg-muted">{limitHint(draft.template, v.id)}</p>
+                    <p className="mt-1 text-xs text-fg-muted">{limitHint(draft, v.id)}</p>
                   </div>
                 );
               })}
