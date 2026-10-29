@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import StudyGeneratorClient, { type MaterialRow } from './StudyGeneratorClient';
 import type { FichaData } from '@/lib/study/fichaTemplates';
+import type { InfographicItem } from '@/lib/study/infographicTemplates';
+import { INFOGRAPHIC_LABEL } from '@/lib/study/infographics';
 import { previewNodes, type PreviewModule } from '@/lib/map/mapSamples';
 
 // La generacion corre en segundo plano (waitUntil) y puede tardar minutos: la ruta que la dispara declara su propio
@@ -49,6 +51,16 @@ export default async function TeacherStudyPage({ params }: { params: { id: strin
   const mapTemplate: string | null = mapTplRow.error ? null : (mapTplRow.data?.map_template ?? null);
   const mapPreview = previewNodes((modRows.data ?? []) as PreviewModule[]);
 
+  // Plantilla de las infografías (migración 077: sin la columna, la consulta falla y se usa la de siempre) y hasta 4 infografías reales para la vista previa.
+  const [igTplRow, igCardRows] = await Promise.all([
+    db.from('classrooms').select('infographic_template').eq('id', params.id).maybeSingle(),
+    ids.length ? db.from('study_cards').select('id, section, front, extra').in('material_id', ids).eq('kind', 'infografia').order('position').limit(4) : Promise.resolve({ data: [] }),
+  ]);
+  const infographicTemplate: string | null = igTplRow.error ? null : (igTplRow.data?.infographic_template ?? null);
+  const previewInfographics: InfographicItem[] = ((igCardRows.data ?? []) as { id: string; section: string | null; front: string; extra: any }[])
+    .filter((c) => c.extra && typeof c.extra.tipo === 'string' && c.extra.tipo in INFOGRAPHIC_LABEL)
+    .map((c) => ({ id: c.id, title: c.front, section: c.section, data: c.extra }));
+
   const previewFichas: FichaData[] = ((previewRows.data ?? []) as FichaData[]).map((f) => ({ id: f.id, section: f.section, front: f.front, back: f.back, extra: f.extra }));
 
   const [cardRows, genRows, igRows] = ids.length
@@ -74,5 +86,5 @@ export default async function TeacherStudyPage({ params }: { params: { id: strin
     ig: find(igRows.data, m.id),
   }));
 
-  return <StudyGeneratorClient classroomId={params.id} initialRows={rows} fichaTemplate={fichaTemplate} previewFichas={previewFichas} mapTemplate={mapTemplate} mapPreviewNodes={mapPreview.nodes} mapPreviewReal={mapPreview.real} />;
+  return <StudyGeneratorClient classroomId={params.id} initialRows={rows} fichaTemplate={fichaTemplate} previewFichas={previewFichas} mapTemplate={mapTemplate} mapPreviewNodes={mapPreview.nodes} mapPreviewReal={mapPreview.real} infographicTemplate={infographicTemplate} previewInfographics={previewInfographics} />;
 }

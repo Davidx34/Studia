@@ -29,6 +29,8 @@ import { FichaTemplatePicker } from '@/components/study/fichas/FichaTemplatePick
 import type { FichaData } from '@/lib/study/fichaTemplates';
 import { MapTemplatePicker } from '@/components/map/MapTemplatePicker';
 import type { MapNode } from '@/lib/map/types';
+import { InfographicTemplatePicker } from '@/components/study/infographics/InfographicTemplatePicker';
+import type { InfographicItem } from '@/lib/study/infographicTemplates';
 import {
   buildQueue,
   chipState,
@@ -72,6 +74,8 @@ export default function StudyGeneratorClient({
   mapTemplate,
   mapPreviewNodes,
   mapPreviewReal,
+  infographicTemplate,
+  previewInfographics,
 }: {
   classroomId: string;
   initialRows: MaterialRow[];
@@ -80,6 +84,8 @@ export default function StudyGeneratorClient({
   mapTemplate: string | null;
   mapPreviewNodes: MapNode[];
   mapPreviewReal: boolean;
+  infographicTemplate: string | null;
+  previewInfographics: InfographicItem[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [rows, setRows] = useState<MaterialRow[]>(initialRows);
@@ -312,6 +318,8 @@ export default function StudyGeneratorClient({
       <FichaTemplatePicker classroomId={classroomId} initialTemplate={fichaTemplate} previewFichas={previewFichas} />
 
       <MapTemplatePicker classroomId={classroomId} initialTemplate={mapTemplate} nodes={mapPreviewNodes} real={mapPreviewReal} />
+
+      <InfographicTemplatePicker classroomId={classroomId} initialTemplate={infographicTemplate} previewItems={previewInfographics} />
 
       {total === 0 ? (
         <Card className="p-10 text-center">

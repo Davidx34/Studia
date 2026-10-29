@@ -5,8 +5,13 @@
 import { Card, Badge } from '@/components/ui/Card';
 import { MathText } from '@/components/MathText';
 import { INFOGRAPHIC_LABEL, type Infographic } from '@/lib/study/infographics';
+import { getInfographicTemplate } from '@/lib/study/infographicTemplates';
+import { ThemedInfographic } from './infographics/ThemedInfographic';
 
-export function InfographicView({ title, section, data }: { title: string; section: string | null; data: Infographic }) {
+// `template` es la plantilla que eligio el profesor de la clase (null o desconocida = la clasica de siempre, que sigue los colores de la app).
+export function InfographicView({ title, section, data, template }: { title: string; section: string | null; data: Infographic; template?: string | null }) {
+  const info = getInfographicTemplate(template ?? '');
+  if (info.theme) return <ThemedInfographic title={title} section={section} data={data} themeId={info.theme} />;
   const label = INFOGRAPHIC_LABEL[data.tipo] ?? 'Infografía';
   return (
     <Card className="p-5 sm:p-6">
