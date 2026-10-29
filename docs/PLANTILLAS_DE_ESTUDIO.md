@@ -14,7 +14,7 @@ El **profesor** elige cómo se muestra el material de estudio de su clase. La IA
 | Superficie | Plantillas | Dónde se elige | Estado |
 |---|---|---|---|
 | **Fichas de lectura** | 16 en 4 categorías (abajo) | Panel del profesor → *Material de estudio* → *Plantilla de las fichas de lectura* | Hecho |
-| **Mapa de módulos** | — | — | Pendiente: el mapa pasa a ser **una sección por clase**, cada una con la plantilla de su profesor |
+| **Mapa de módulos** | 14 en 4 categorías (abajo) | Panel del profesor → *Material de estudio* → *Plantilla del mapa de aprendizaje* | Hecho: una **sección por clase** |
 | **Infografías** | 4 tipos fijos | — | Pendiente |
 
 ## Las 16 plantillas de fichas
@@ -84,7 +84,33 @@ classrooms.ficha_template (migración 075) ┘   (id desconocido o ausente → "
 
 Se quita del catálogo. Las clases que la tenían guardada la ven con la **Clásica** (un id desconocido nunca rompe la pantalla).
 
+## Mapa de aprendizaje por clase
+
+El mapa del estudiante ya no es un solo lienzo con todo: tiene **una sección por clase** (pestañas, si son varias), y cada una se pinta con la plantilla que eligió **el profesor de esa clase**. Los módulos sin clase van en *Módulos generales* con el mapa de islas de siempre; ningún módulo desaparece.
+
+```
+content_modules (classroom_id) ──► buildNodes ──► buildMapSections ──► MapSections (pestañas) ──► MapView(template)
+                                                          ▲                                            ├─ islas   → LearningMap (el de siempre)
+classrooms.map_template (migración 076) ─────────────────┘                                            └─ otras   → ThemedMap = estructura + tema
+```
+
+**4 estructuras** (no dependen de las posiciones que dejó la IA: recorren los módulos en un orden que respeta los prerrequisitos, así se ven bien aunque esas posiciones sean malas):
+
+| Estructura | Qué es |
+|---|---|
+| `islas` | el mapa de siempre (lienzo con una isla por tema y las posiciones de la IA) |
+| `camino` | camino que serpentea por filas (3 / 4 / 5 columnas según el ancho), recorre un tema completo antes del siguiente |
+| `metro` | una línea por tema y una estación por módulo, con lo que cada uno requiere |
+| `tablero` | tarjetas agrupadas por tema, con estado, dificultad y mejor puntaje |
+
+**14 plantillas** = estructura + tema (los mismos 12 temas de las fichas, más `app`, que sigue los colores de la app en claro y oscuro): *Mapa de islas* y *Tablero* (funcionales); *Camino de aventura* y *Camino arcoíris* (infantiles); *Sendero del bosque*, *Laboratorio*, *Cuaderno cuadriculado*, *Línea técnica*, *Ruta del tiempo* y *Biblioteca* (por área); *Metro neón*, *Tablero neobrutalista*, *Camino de aurora* y *Metro editorial* (estéticas).
+
+- `src/lib/map/` — **lógica pura**: `mapTemplates.ts` (catálogo), `mapLayouts.ts` (orden topológico, camino que serpentea, agrupación por tema), `mapSections.ts` (estado de cada módulo y reparto por clase), `mapThemes.ts` (los temas), `mapSamples.ts` (ejemplos para la vista previa).
+- `src/components/map/ThemedMap.tsx` + `mapThemes.css` — las plantillas con tema. El CSS **no tiene colores propios** (una prueba lo exige).
+- `src/components/map/MapTemplatePicker.tsx` — el selector del profesor, con la miniatura real de cada plantilla y vista previa completa **con los módulos de su clase** (con un avance simulado para ver todos los estados) o de ejemplo.
+- `classrooms.map_template` — solo guarda el id; el CHECK valida la forma, **agregar una plantilla no necesita migración**. Un id desconocido o ausente usa `islas`.
+- **Accesibilidad:** cada módulo es un botón con su estado en texto (`aria-label` y etiqueta visible); los bloqueados siguen siendo enfocables (`aria-disabled`) y Toñito explica por qué; pestañas con roles ARIA y flechas del teclado; foco visible; `prefers-reduced-motion`; sin emojis como iconos.
+
 ## Lo que falta (siguientes PR)
 
-- **Mapa por clase:** hoy las posiciones (`map_position_x/y`) son del módulo y el mapa muestra los módulos de *todas* las clases del estudiante. Pasa a ser **una sección por clase**, cada una con la plantilla que eligió su profesor (migración `map_template`).
 - **Datos extra para plantillas nuevas:** si una plantilla necesita algo que hoy no se genera (por ejemplo, un ejemplo o pistas propias), se amplía **una vez** el JSON que pide `buildStudyPrompt` con campos *opcionales y validados*; las plantillas lo muestran si existe y lo omiten si no.

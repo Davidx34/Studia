@@ -1,0 +1,86 @@
+/* Estilos de las plantillas del mapa (camino, metro, tablero). Igual que fichaThemes.css: aqui NO hay colores propios; todo sale de las variables --f-* del tema
+   (una prueba lo exige). Reusa las clases base .fk* de fichaThemes.css. El movimiento solo se activa si el sistema lo permite. */
+
+.fm { padding: clamp(14px, 3vw, 28px); }
+.fm-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0.75rem 1.25rem; margin-bottom: 1.1rem; }
+.fm-title { font-size: clamp(1.3rem, 3.6vw, 1.85rem); line-height: 1.1; text-wrap: balance; }
+.fm-sub { color: var(--f-muted); font-size: 0.88rem; margin-top: 0.25rem; }
+.fm-progress { height: 0.55rem; margin-top: 0.55rem; background: var(--f-highlight); border: 1px solid var(--f-line); border-radius: 9999px; overflow: hidden; max-width: 22rem; }
+.fm-progress > span { display: block; height: 100%; background: var(--f-accent); border-radius: inherit; }
+.fm-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.78rem; color: var(--f-muted); }
+.fm-legend li { display: inline-flex; align-items: center; gap: 0.35rem; }
+.fm-legend .fm-dot { --dot: 1.25rem; border-width: 2px; box-shadow: none; }
+.fm-legend .fm-dot svg { width: 60%; height: 60%; }
+
+/* Boton base de un modulo */
+.fm-btn { appearance: none; border: 0; background: none; padding: 0; margin: 0; font: inherit; color: inherit; text-align: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fm-btn[aria-disabled='true'] { cursor: not-allowed; }
+.fm-btn:focus-visible { outline: 3px solid var(--f-fg); outline-offset: 4px; border-radius: var(--f-radius-sm); }
+
+/* El circulo del modulo: el estado se dice con icono, forma de borde y texto, no solo con color */
+.fm-dot {
+  display: grid; place-items: center; flex: none; width: var(--dot, 4.4rem); height: var(--dot, 4.4rem); border-radius: var(--f-badge-radius);
+  font-family: var(--f-font-head); font-weight: var(--f-head-weight); font-size: 1.25rem; line-height: 1;
+  background: var(--f-card); color: var(--f-fg); border: 3px solid var(--f-accent); box-shadow: var(--f-shadow);
+}
+.fm-dot svg { width: 46%; height: 46%; }
+.fm-s-completed .fm-dot { background: var(--f-accent); color: var(--f-on-accent); }
+.fm-s-in_progress .fm-dot, .fm-s-current .fm-dot { color: var(--f-accent-text); box-shadow: 0 0 0 6px var(--f-highlight), var(--f-shadow); }
+.fm-s-locked .fm-dot { background: var(--f-highlight); color: var(--f-muted); border: 2px dashed var(--f-line); box-shadow: none; }
+.fm-status { font-family: var(--f-font-label); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--f-muted); }
+.fm-s-in_progress .fm-status, .fm-s-current .fm-status, .fm-s-completed .fm-status { color: var(--f-accent-text); }
+.fm-label { font-size: 0.82rem; line-height: 1.2; font-weight: 600; text-align: center; background: var(--f-card); color: var(--f-fg); border: 1px solid var(--f-line); border-radius: var(--f-radius-sm); padding: 0.22rem 0.55rem; max-width: 100%; }
+.fm-stars { display: inline-flex; gap: 2px; }
+.fm-stars svg { width: 0.9rem; height: 0.9rem; color: var(--f-line); }
+.fm-stars svg.on { color: var(--f-accent-text); fill: var(--f-accent-text); }
+
+/* ── Camino que serpentea ── */
+.fm-camino { position: relative; width: 100%; }
+.fm-road { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.fm-road path { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.fm-road-done { stroke: var(--f-accent); stroke-width: var(--f-path-w); }
+.fm-road-todo { stroke: var(--f-line); stroke-width: var(--f-path-w); }
+.fm-path-dotted .fm-road-todo { stroke-dasharray: 0.1 12; stroke-width: 6px; }
+.fm-path-dashed .fm-road-todo { stroke-dasharray: 10 8; }
+.fm-pos { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 0.35rem; width: 8.6rem; max-width: 30%; }
+.fm-pos .fm-btn { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; width: 100%; }
+
+/* ── Metro: una linea por tema, una estacion por modulo ── */
+.fm-metro { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17.5rem), 1fr)); align-items: start; }
+.fm-line { overflow: hidden; }
+.fm-line-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; padding: 0.85rem 1rem; }
+.fm-line-head h3, .fm-line-head .fk-label { color: inherit; }
+.fm-line-head h3 { font-size: 1.05rem; }
+.fk .fm-stations { position: relative; display: grid; gap: 1.05rem; padding: 1.1rem 1rem 1.1rem 3.1rem; }
+.fk .fm-stations::before { content: ''; position: absolute; left: calc(1.75rem - var(--f-path-w) / 2); top: 1.7rem; bottom: 1.7rem; border-left: var(--f-path-w) solid var(--lc); }
+.fm-station { position: relative; display: block; width: 100%; }
+.fm-station .fm-btn { display: block; width: 100%; }
+.fm-station .fm-dot { --dot: 2.3rem; font-size: 0.95rem; position: absolute; left: -2.5rem; top: 0.1rem; border-color: var(--lc); }
+.fm-s-completed.fm-station .fm-dot { background: var(--lc); color: var(--lfg); }
+.fm-s-locked.fm-station .fm-dot { border-color: var(--f-line); }
+.fm-station-title { font-weight: 600; line-height: 1.25; }
+.fm-req { font-size: 0.78rem; color: var(--f-muted); margin-top: 0.1rem; }
+
+/* ── Tablero ── */
+.fm-board { display: grid; gap: 1.5rem; }
+.fm-group-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 0.65rem; }
+.fm-group-head h3 { font-size: 1.1rem; }
+.fm-cards { display: grid; gap: 0.8rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14.5rem), 1fr)); }
+.fm-card-btn { display: grid; gap: 0.55rem; width: 100%; padding: 0.95rem 1rem; background: var(--f-card); color: var(--f-fg); border: var(--f-border-w) solid var(--f-line); border-radius: var(--f-radius-sm); box-shadow: var(--f-shadow); -webkit-backdrop-filter: blur(var(--f-blur)); backdrop-filter: blur(var(--f-blur)); }
+.fm-card-top { display: flex; align-items: center; gap: 0.7rem; }
+.fm-card-top .fm-dot { --dot: 2.6rem; font-size: 1rem; }
+.fm-card-title { font-weight: 700; line-height: 1.2; }
+.fm-meta { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--f-muted); }
+.fm-s-completed.fm-card-btn { border-color: var(--f-accent); }
+.fm-s-locked.fm-card-btn { border-style: dashed; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .fm-s-in_progress .fm-dot, .fm-s-current .fm-dot { animation: fm-bob 2.2s ease-in-out infinite; }
+  .fm-card-btn, .fm-btn .fm-dot { transition: transform 160ms ease-out; }
+  .fm-card-btn:hover:not([aria-disabled='true']) { transform: translateY(-2px); }
+  .fm-btn:hover:not([aria-disabled='true']) .fm-dot { transform: scale(1.06); }
+  @keyframes fm-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+}
+@media print {
+  .fm-card-btn, .fm-line { break-inside: avoid; box-shadow: none; }
+}

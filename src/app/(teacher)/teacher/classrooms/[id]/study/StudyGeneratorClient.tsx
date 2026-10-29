@@ -27,6 +27,8 @@ import { Card, Badge } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { FichaTemplatePicker } from '@/components/study/fichas/FichaTemplatePicker';
 import type { FichaData } from '@/lib/study/fichaTemplates';
+import { MapTemplatePicker } from '@/components/map/MapTemplatePicker';
+import type { MapNode } from '@/lib/map/types';
 import {
   buildQueue,
   chipState,
@@ -67,11 +69,17 @@ export default function StudyGeneratorClient({
   initialRows,
   fichaTemplate,
   previewFichas,
+  mapTemplate,
+  mapPreviewNodes,
+  mapPreviewReal,
 }: {
   classroomId: string;
   initialRows: MaterialRow[];
   fichaTemplate: string | null;
   previewFichas: FichaData[];
+  mapTemplate: string | null;
+  mapPreviewNodes: MapNode[];
+  mapPreviewReal: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [rows, setRows] = useState<MaterialRow[]>(initialRows);
@@ -302,6 +310,8 @@ export default function StudyGeneratorClient({
       </header>
 
       <FichaTemplatePicker classroomId={classroomId} initialTemplate={fichaTemplate} previewFichas={previewFichas} />
+
+      <MapTemplatePicker classroomId={classroomId} initialTemplate={mapTemplate} nodes={mapPreviewNodes} real={mapPreviewReal} />
 
       {total === 0 ? (
         <Card className="p-10 text-center">

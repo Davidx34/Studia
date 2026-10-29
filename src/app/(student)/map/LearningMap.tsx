@@ -4,34 +4,29 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useTonitoStore } from '@/stores/useTonitoStore';
 import { Lock, Star, Sparkles, ChevronDown, X } from 'lucide-react';
-import type { MapNode, NodeStatus } from './page';
+import { NODE_STATUS_TEXT, type CategoryMeta, type MapNode } from '@/lib/map/types';
 
-interface Meta {
-  label: string;
-  color: string;
-  emoji: string;
-  gradient: [string, string];
-}
+type Meta = CategoryMeta;
 
 interface Props {
   nodes: MapNode[];
   categoryMeta: Record<string, Meta>;
   stats: { total: number; completed: number };
+  // Titulo y nivel del encabezado: por defecto el del mapa unico de siempre (h1). Con una seccion por clase, el titulo es el de la clase y el nivel es h2.
+  title?: string;
+  headingLevel?: 'h1' | 'h2';
+  // Sin el saludo de Toñito: para las miniaturas del selector del profesor.
+  quiet?: boolean;
 }
 
 const VIEWBOX_W = 1000;
 const VIEWBOX_H = 1600;
 
-// El estado de un nodo nunca se comunica solo con color: lleva icono (candado, estrella, emoji) Y este texto para lectores de pantalla.
-export const NODE_STATUS_TEXT: Record<NodeStatus, string> = {
-  completed: 'completado',
-  in_progress: 'en curso',
-  current: 'en curso',
-  available: 'disponible',
-  locked: 'bloqueado',
-};
+// El texto del estado de cada nodo (no solo color) vive en lib/map/types.ts, compartido con las demas plantillas del mapa.
+export { NODE_STATUS_TEXT };
 
-export function LearningMap({ nodes, categoryMeta, stats }: Props) {
+export function LearningMap({ nodes, categoryMeta, stats, title = 'Mapa de Aprendizaje', headingLevel = 'h1', quiet = false }: Props) {
+  const Heading = headingLevel;
   const [selectedNode, setSelectedNode] = useState<MapNode | null>(null);
   const showMessage = useTonitoStore((s) => s.showMessage);
   const setMood = useTonitoStore((s) => s.setMood);
@@ -49,6 +44,7 @@ export function LearningMap({ nodes, categoryMeta, stats }: Props) {
 
   // Saludo de Toñito al entrar al mapa
   useEffect(() => {
+    if (quiet) return;
     const timer = setTimeout(() => {
       const next = nodes.find((n) => n.status === 'in_progress' || n.status === 'available');
       if (next) {
@@ -58,7 +54,7 @@ export function LearningMap({ nodes, categoryMeta, stats }: Props) {
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [nodes, showMessage]);
+  }, [nodes, showMessage, quiet]);
 
   // Parallax sutil con el mouse (se desactiva con "reducir movimiento")
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -113,12 +109,14 @@ export function LearningMap({ nodes, categoryMeta, stats }: Props) {
 
   return (
     <div className="theme-scope space-y-4">
+      {!quiet && (
+        <>
       {/* Header del mapa */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-fg flex items-center gap-2">
-            <Sparkles aria-hidden="true" className="w-6 h-6 text-accent-text" /> Mapa de Aprendizaje
-          </h1>
+          <Heading className="text-2xl font-bold text-fg flex items-center gap-2">
+            <Sparkles aria-hidden="true" className="w-6 h-6 text-accent-text" /> {title}
+          </Heading>
           <p className="text-sm text-fg-muted mt-1">
             {stats.completed} de {stats.total} módulos completados
           </p>
@@ -144,6 +142,9 @@ export function LearningMap({ nodes, categoryMeta, stats }: Props) {
         <ChevronDown aria-hidden="true" className="w-4 h-4 animate-bounce motion-reduce:animate-none" />
         Desplázate para explorar todas las islas
       </div>
+
+        </>
+      )}
 
       {/* Container del mapa */}
       <div
@@ -358,7 +359,7 @@ function MapNodeButton({
 }
 
 // ── Modal de detalle ──
-function NodeDetailModal({ node, meta, onClose }: { node: MapNode; meta: Meta; onClose: () => void }) {
+export function NodeDetailModal({ node, meta, onClose }: { node: MapNode; meta: Meta; onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   // onClose cambia en cada render del mapa (el parallax lo renderiza al mover el mouse): se guarda en un ref para que el
   // efecto corra UNA sola vez y no le robe el foco al usuario.

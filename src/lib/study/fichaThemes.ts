@@ -206,6 +206,8 @@ function build(id: string, t: FichaThemeTokens): FichaTheme {
     ['texto secundario sobre la tarjeta', t.muted, worst],
     ['acento como texto sobre la tarjeta', t.accentText, worst],
     ['texto sobre la idea destacada', t.fg, t.highlight.startsWith('rgba') ? worst : t.highlight],
+    // Los modulos bloqueados del mapa dibujan su icono y su texto secundario sobre este fondo.
+    ['texto secundario sobre la idea destacada', t.muted, t.highlight.startsWith('rgba') ? worst : t.highlight],
     ['texto sobre el acento', t.onAccent, t.accent],
     ['texto sobre el fondo', t.fg, t.bg],
     ['nota adhesiva', t.sticky.fg, t.sticky.bg],
