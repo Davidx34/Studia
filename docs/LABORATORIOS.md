@@ -59,8 +59,17 @@ Modo **controlado** (por defecto): solo la independiente se mueve. Modo **libre*
 
 **Regla de oro:** si el modelo puede dar `NaN` o infinito dentro de los límites del catálogo, ajusta los límites (por ejemplo, el multiplicador acota `c ≤ 0,95` para que no explote).
 
+## Pestaña Laboratorio del profesor (PR2)
+
+`/teacher/classrooms/[id]/lab`. Dos caminos para crear: **con IA** (una idea y/o un material de la clase; la IA elige la plantilla o se le fija una) o **desde una plantilla**. En ambos casos se abre el editor: título, pregunta de investigación, escenario, hipótesis, modo, variable independiente, rango y valor de cada variable, constantes del ambiente, ensayos mínimos, curva teórica y preguntas guía, con la **vista previa real** (el laboratorio en su iframe aislado) a un lado. Se guarda como **borrador** o se **publica**; también se puede despublicar, editar y eliminar (con confirmación).
+
+- **La IA no escribe código.** `POST /api/lab/propose` devuelve solo la ficha (`LabSpec`), ya validada y recortada a los límites de la plantilla (`propose.ts`). Si el tema no se presta a ninguna plantilla, responde 422 con el motivo. El material se envía como dato entre delimitadores. Solo el dueño de la clase (y del material) puede llamarla.
+- **Lo guardado se revalida al leer** (`labRows.ts`): una plantilla retirada o un dato corrupto no rompe la lista.
+- **Migración 078** (`labs`): el profesor gestiona solo lo suyo; el estudiante solo **lee** los publicados de sus clases; un laboratorio solo puede vincularse a un material propio. Sin la migración, la pestaña lo explica en vez de romperse.
+- Los números se confirman al salir del campo y el campo muestra el valor ya recortado.
+
 ## Lo que falta (siguientes PR)
 
 1. **Más plantillas:** química (gases / titulación), biología (poblaciones / enzimas), matemáticas (explorador de funciones, con un evaluador de expresiones seguro), estadística (muestreo / teorema del límite central), oferta y demanda, circuitos.
-2. **Crear laboratorios desde el panel del profesor:** pestaña *Laboratorio*, elegir plantilla, la IA propone la ficha a partir de un material o de una idea, el profesor la ajusta con vista previa y publica.
-3. **Guardar y revisar:** tablas `labs` y `lab_attempts` (migración + RLS), el estudiante abre el laboratorio desde su clase y su informe se guarda; el profesor lo revisa.
+2. **Guardar y revisar:** tabla `lab_attempts` (migración + RLS), el estudiante abre el laboratorio publicado desde su clase y su informe se guarda; el profesor lo revisa.
+3. Límite de uso por profesor en `/api/lab/propose` (hoy no hay).
