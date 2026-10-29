@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import StudyGeneratorClient, { type MaterialRow } from './StudyGeneratorClient';
 import type { FichaData } from '@/lib/study/fichaTemplates';
+import { previewNodes, type PreviewModule } from '@/lib/map/mapSamples';
 
 // La generacion corre en segundo plano (waitUntil) y puede tardar minutos: la ruta que la dispara declara su propio
 // maxDuration; esta pagina solo lee.
@@ -34,6 +35,20 @@ export default async function TeacherStudyPage({ params }: { params: { id: strin
       : Promise.resolve({ data: [] }),
   ]);
   const fichaTemplate: string | null = tplRow.error ? null : (tplRow.data?.ficha_template ?? null);
+  // Plantilla del mapa de la clase (migración 076: sin la columna, la consulta falla y se usa la de siempre) y sus módulos para la vista previa.
+  const [mapTplRow, modRows] = await Promise.all([
+    db.from('classrooms').select('map_template').eq('id', params.id).maybeSingle(),
+    db
+      .from('content_modules')
+      .select('id, title, category, difficulty_level, order_index, map_position_x, map_position_y, prerequisites')
+      .eq('classroom_id', params.id)
+      .eq('is_active', true)
+      .order('order_index')
+      .limit(30),
+  ]);
+  const mapTemplate: string | null = mapTplRow.error ? null : (mapTplRow.data?.map_template ?? null);
+  const mapPreview = previewNodes((modRows.data ?? []) as PreviewModule[]);
+
   const previewFichas: FichaData[] = ((previewRows.data ?? []) as FichaData[]).map((f) => ({ id: f.id, section: f.section, front: f.front, back: f.back, extra: f.extra }));
 
   const [cardRows, genRows, igRows] = ids.length
@@ -59,5 +74,5 @@ export default async function TeacherStudyPage({ params }: { params: { id: strin
     ig: find(igRows.data, m.id),
   }));
 
-  return <StudyGeneratorClient classroomId={params.id} initialRows={rows} fichaTemplate={fichaTemplate} previewFichas={previewFichas} />;
+  return <StudyGeneratorClient classroomId={params.id} initialRows={rows} fichaTemplate={fichaTemplate} previewFichas={previewFichas} mapTemplate={mapTemplate} mapPreviewNodes={mapPreview.nodes} mapPreviewReal={mapPreview.real} />;
 }
