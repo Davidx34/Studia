@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import StudyGeneratorClient, { type MaterialRow } from './StudyGeneratorClient';
+import type { FichaData } from '@/lib/study/fichaTemplates';
 
 // La generacion corre en segundo plano (waitUntil) y puede tardar minutos: la ruta que la dispara declara su propio
 // maxDuration; esta pagina solo lee.
@@ -24,6 +25,17 @@ export default async function TeacherStudyPage({ params }: { params: { id: strin
   const ids = (materials ?? []).map((m) => m.id);
   // Las tablas nuevas aun no estan en los tipos generados de Supabase.
   const db: any = supabase;
+  // Plantilla de las fichas elegida para la clase (columna de la migracion 075: si aun no existe, la consulta falla y se usa la de siempre) y hasta 2 fichas
+  // reales para la vista previa de las plantillas.
+  const [tplRow, previewRows] = await Promise.all([
+    db.from('classrooms').select('ficha_template').eq('id', params.id).maybeSingle(),
+    ids.length
+      ? db.from('study_cards').select('id, section, front, back, extra').in('material_id', ids).eq('kind', 'ficha').order('position').limit(2)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const fichaTemplate: string | null = tplRow.error ? null : (tplRow.data?.ficha_template ?? null);
+  const previewFichas: FichaData[] = ((previewRows.data ?? []) as FichaData[]).map((f) => ({ id: f.id, section: f.section, front: f.front, back: f.back, extra: f.extra }));
+
   const [cardRows, genRows, igRows] = ids.length
     ? await Promise.all([
         db.from('study_cards').select('material_id, kind').in('material_id', ids),
@@ -47,5 +59,5 @@ export default async function TeacherStudyPage({ params }: { params: { id: strin
     ig: find(igRows.data, m.id),
   }));
 
-  return <StudyGeneratorClient classroomId={params.id} initialRows={rows} />;
+  return <StudyGeneratorClient classroomId={params.id} initialRows={rows} fichaTemplate={fichaTemplate} previewFichas={previewFichas} />;
 }

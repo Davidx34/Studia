@@ -15,6 +15,8 @@ import { MathText } from '@/components/MathText';
 import { isDue, nextState, type Grade } from '@/lib/study/leitner';
 import { REVIEW_SESSION_SIZE } from '@/lib/study/constants';
 import { InfographicView } from '@/components/study/InfographicView';
+import { FichaList } from '@/components/study/fichas/FichaViews';
+import type { FichaData } from '@/lib/study/fichaTemplates';
 import type { Infographic } from '@/lib/study/infographics';
 
 interface StudyCard {
@@ -50,12 +52,15 @@ export function StudyClient({
   userId,
   classroomId,
   classroomName,
+  fichaTemplate,
   materials,
   initialMaterialId,
 }: {
   userId: string;
   classroomId: string;
   classroomName: string;
+  // Plantilla con que el profesor eligio mostrar las fichas (null = la de siempre).
+  fichaTemplate: string | null;
   materials: StudyMaterial[];
   initialMaterialId: string | null;
 }) {
@@ -194,7 +199,7 @@ export function StudyClient({
           ) : (
             <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
               {tab === 'fichas' ? (
-                <Fichas fichas={fichas} />
+                <FichaList fichas={fichas as unknown as FichaData[]} template={fichaTemplate} />
               ) : tab === 'flashcards' ? (
                 <Flashcards cards={flash} states={states} userId={userId} supabase={supabase} onState={(s) => setStates((prev) => new Map(prev).set(s.card_id, s))} />
               ) : (
@@ -231,61 +236,6 @@ function TabButton({ selected, onClick, id, icon, children }: { selected: boolea
       {icon}
       {children}
     </button>
-  );
-}
-
-function Fichas({ fichas }: { fichas: StudyCard[] }) {
-  if (fichas.length === 0) return <p className="text-fg-muted">Este material no produjo fichas de lectura.</p>;
-  return (
-    <ul className="space-y-3">
-      {fichas.map((f, i) => (
-        <li key={f.id}>
-          <Card className="overflow-hidden">
-            <details open={i === 0} className="group">
-              <summary className="cursor-pointer list-none p-4 min-h-[44px] flex items-start justify-between gap-3">
-                <span>
-                  {f.section && <span className="block text-xs text-fg-muted mb-0.5">{f.section}</span>}
-                  <span className="font-bold text-fg"><MathText content={f.front} /></span>
-                </span>
-                <span aria-hidden="true" className="text-fg-muted transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span>
-              </summary>
-              <div className="px-4 pb-4 space-y-4 border-t border-line pt-4">
-                <p className="text-fg"><MathText content={f.back} /></p>
-                {!!f.extra?.puntos_clave?.length && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-primary-text mb-1">Puntos clave</h3>
-                    <ul className="list-disc pl-5 space-y-1 text-fg text-sm">
-                      {f.extra.puntos_clave.map((p, k) => (
-                        <li key={k}><MathText content={p} /></li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {!!f.extra?.terminos?.length && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-primary-text mb-1">Términos</h3>
-                    <dl className="space-y-1 text-sm">
-                      {f.extra.terminos.map((t, k) => (
-                        <div key={k}>
-                          <dt className="inline font-semibold text-fg"><MathText content={t.termino} />: </dt>
-                          <dd className="inline text-fg-muted"><MathText content={t.definicion} /></dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </div>
-                )}
-                {f.extra?.reflexion && (
-                  <p className="text-sm bg-surface-2 border border-line rounded-xl p-3 text-fg">
-                    <span className="font-semibold">Para pensar: </span>
-                    <MathText content={f.extra.reflexion} />
-                  </p>
-                )}
-              </div>
-            </details>
-          </Card>
-        </li>
-      ))}
-    </ul>
   );
 }
 
