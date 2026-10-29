@@ -68,8 +68,29 @@ Modo **controlado** (por defecto): solo la independiente se mueve. Modo **libre*
 - **Migración 078** (`labs`): el profesor gestiona solo lo suyo; el estudiante solo **lee** los publicados de sus clases; un laboratorio solo puede vincularse a un material propio. Sin la migración, la pestaña lo explica en vez de romperse.
 - Los números se confirman al salir del campo y el campo muestra el valor ya recortado.
 
+## Nueva dirección: memoria de la clase + modelo declarativo
+
+El PR2 (pestaña del profesor) solo llenaba números de 2 plantillas cerradas: un tema como microeconomía (utilidad máxima con restricción presupuestal) no encajaba en ninguna y casi nada cambiaba. Las plantillas eran **ejemplos** para que la IA adaptara, no un catálogo. El plan, en tres PR:
+
+1. **Memoria de la clase (este PR).** `src/lib/memory/`. La IA lee cada material y extrae conceptos, variables, fórmulas, leyes y objetivos con sus relaciones; todo se fusiona en un **grafo por clase**.
+2. **Motor declarativo.** La IA escribe ecuaciones, variables y gráficas en un lenguaje seguro que interpreta nuestro motor (sin JavaScript de la IA); se valida numéricamente antes de mostrarse.
+3. **Generación desde la memoria.** La IA diseña el laboratorio apoyándose en la memoria, cita en qué se basa y **se niega si lo cargado no alcanza** (dice qué falta).
+
+### Memoria de la clase: cómo funciona
+
+- **Extracción** (`extract.ts`): por bloques de texto, con el material como DATO entre delimitadores. Cada concepto debe **apoyarse en el texto** (las palabras de su nombre deben estar en el bloque): lo que la IA inventa se descarta y se cuenta.
+- **Estructuras y algoritmos** (`graph.ts`, `merge.ts`, `text.ts`):
+  - Grafo con relaciones `requiere` / `se_calcula_con` / `parte_de` / `relacionado`.
+  - Orden de estudio por **Kahn** (estable), **rotura de ciclos** quitando la arista más débil, cierre transitivo de prerrequisitos.
+  - **Índice invertido con idf** para buscar conceptos (el nombre pesa más que la definición).
+  - **Fusión con union-find**: el mismo concepto en dos materiales es un nodo con las fuentes de ambos. La similitud es **palabra por palabra** (tolera un error de tipeo, pero "primera ley" ≠ "segunda ley" y "tema 1" ≠ "tema 2").
+- **Incremental** (`build.ts`): cada material guarda el **hash** de su contenido; si no cambió, no se vuelve a llamar a la IA. Borrar un material solo obliga a fusionar de nuevo. La memoria tiene **versión**, reclamo atómico (dos peticiones no construyen a la vez) y presupuesto de tiempo.
+- **Prueba de suficiencia** (`sufficiency.ts`): dados los requisitos de lo que se quiere crear (esenciales o deseables, con o sin fórmula), da `sufficient | partial | insufficient`, lo que falta y lo débil (nombrado pero sin definición, prerrequisitos sin explicar). Se usará en el PR3.
+- **Migración 079**: `class_memory` (grafo + estado) y `class_memory_material` (extracción + hash). Solo el profesor dueño **lee**; nadie escribe desde el navegador (lo escribe el servidor con la llave de servicio tras comprobar al dueño); los estudiantes no tienen acceso.
+- Ruta `POST /api/memory/build` y panel **Memoria de la clase** en la pestaña Laboratorio.
+
 ## Lo que falta (siguientes PR)
 
-1. **Más plantillas:** química (gases / titulación), biología (poblaciones / enzimas), matemáticas (explorador de funciones, con un evaluador de expresiones seguro), estadística (muestreo / teorema del límite central), oferta y demanda, circuitos.
-2. **Guardar y revisar:** tabla `lab_attempts` (migración + RLS), el estudiante abre el laboratorio publicado desde su clase y su informe se guarda; el profesor lo revisa.
-3. Límite de uso por profesor en `/api/lab/propose` (hoy no hay).
+1. **Motor declarativo** y **generación desde la memoria** (arriba, PR2 y PR3 de esta dirección). Las 2 plantillas actuales pasan a ser ejemplos/familias de dibujo.
+2. **Guardar y revisar:** tabla `lab_attempts` (migración + RLS), el estudiante abre el laboratorio publicado y su informe se guarda; el profesor lo revisa.
+3. Límite de uso por profesor en `/api/lab/propose` y `/api/memory/build`.
