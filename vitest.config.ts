@@ -11,6 +11,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // next/font/google solo funciona dentro del compilador de Next: en las pruebas se usa un sustituto.
+      'next/font/google': path.resolve(__dirname, './src/test/nextFontGoogleStub.ts'),
     },
   },
   // Vite 8 transforma con oxc: JSX automatico para probar componentes con react-dom/server (sin jsdom).
