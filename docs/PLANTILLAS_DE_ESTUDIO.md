@@ -15,7 +15,7 @@ El **profesor** elige cómo se muestra el material de estudio de su clase. La IA
 |---|---|---|---|
 | **Fichas de lectura** | 16 en 4 categorías (abajo) | Panel del profesor → *Material de estudio* → *Plantilla de las fichas de lectura* | Hecho |
 | **Mapa de módulos** | 14 en 4 categorías (abajo) | Panel del profesor → *Material de estudio* → *Plantilla del mapa de aprendizaje* | Hecho: una **sección por clase** |
-| **Infografías** | 4 tipos fijos | — | Pendiente |
+| **Infografías** | 13 en 4 categorías (abajo) | Panel del profesor → *Material de estudio* → *Plantilla de las infografías* | Hecho: el tema se aplica a los 4 tipos |
 
 ## Las 16 plantillas de fichas
 
@@ -110,6 +110,25 @@ classrooms.map_template (migración 076) ─────────────
 - `src/components/map/MapTemplatePicker.tsx` — el selector del profesor, con la miniatura real de cada plantilla y vista previa completa **con los módulos de su clase** (con un avance simulado para ver todos los estados) o de ejemplo.
 - `classrooms.map_template` — solo guarda el id; el CHECK valida la forma, **agregar una plantilla no necesita migración**. Un id desconocido o ausente usa `islas`.
 - **Accesibilidad:** cada módulo es un botón con su estado en texto (`aria-label` y etiqueta visible); los bloqueados siguen siendo enfocables (`aria-disabled`) y Toñito explica por qué; pestañas con roles ARIA y flechas del teclado; foco visible; `prefers-reduced-motion`; sin emojis como iconos.
+
+## Infografías
+
+La IA genera cada infografía como **datos** de uno de 4 tipos fijos (ver `infographics.ts`); la plantilla es un **tema** que se aplica a los cuatro, y cada tipo tiene su estructura:
+
+| Tipo | Estructura con tema |
+|---|---|
+| **Línea de tiempo** | lista con una línea vertical (punteada, discontinua o sólida según el tema), nodos y fechas en etiquetas de color |
+| **Comparativa** | **tabla real** (encabezados `scope`, `caption`), con una columna de color por concepto y filas alternas |
+| **Proceso** | pasos numerados en tarjetas unidos por un conector; los lectores de pantalla oyen "Paso n" |
+| **Cifras clave** | bloques grandes de colores rotativos con el número en la tipografía del tema |
+
+**13 plantillas:** *Clásica* (la de siempre, sigue los colores de la app) y los **12 temas** de las fichas: *Aventura*, *Arcoíris* (infantiles); *Naturaleza*, *Laboratorio*, *Cuaderno cuadriculado*, *Plano técnico*, *Archivo histórico*, *Libro* (por área); *Editorial minimal*, *Neón*, *Neobrutalista*, *Aurora de cristal* (estéticas).
+
+- `src/lib/study/infographicTemplates.ts` — catálogo, ejemplos (uno de cada tipo) y `normalizeInfographicTemplate` (lo desconocido → `clasica`).
+- `src/components/study/infographics/ThemedInfographic.tsx` + `infographicThemes.css` — los 4 tipos con tema. El CSS **no tiene colores propios** (una prueba lo exige) y no tiene animaciones.
+- `src/components/study/InfographicView.tsx` — recibe `template`; sin plantilla, o con la clásica, se pinta exactamente igual que antes.
+- `src/components/study/TemplatePicker.tsx` — selector **genérico** (galería por categoría, miniatura real, vista previa, Guardar) usado por las infografías. Los selectores de fichas y del mapa siguen con su propia versión; migrarlos a este es una limpieza pendiente.
+- `classrooms.infographic_template` (migración 077) — solo guarda el id; el CHECK valida la forma, **agregar una plantilla no necesita migración**.
 
 ## Lo que falta (siguientes PR)
 

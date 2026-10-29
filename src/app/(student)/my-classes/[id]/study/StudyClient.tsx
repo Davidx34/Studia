@@ -53,6 +53,7 @@ export function StudyClient({
   classroomId,
   classroomName,
   fichaTemplate,
+  infographicTemplate,
   materials,
   initialMaterialId,
 }: {
@@ -61,6 +62,8 @@ export function StudyClient({
   classroomName: string;
   // Plantilla con que el profesor eligio mostrar las fichas (null = la de siempre).
   fichaTemplate: string | null;
+  // Plantilla con que el profesor eligio mostrar las infografias (null = la de siempre).
+  infographicTemplate: string | null;
   materials: StudyMaterial[];
   initialMaterialId: string | null;
 }) {
@@ -206,7 +209,7 @@ export function StudyClient({
                 <ul className="space-y-6">
                   {infographics.map((c) => (
                     <li key={c.id}>
-                      <InfographicView title={c.front} section={c.section} data={c.extra as unknown as Infographic} />
+                      <InfographicView title={c.front} section={c.section} data={c.extra as unknown as Infographic} template={infographicTemplate} />
                     </li>
                   ))}
                 </ul>
