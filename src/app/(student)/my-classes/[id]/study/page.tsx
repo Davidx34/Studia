@@ -20,6 +20,10 @@ export default async function StudyPage({ params, searchParams }: { params: { id
   const { data: classroom } = await supabase.from('classrooms').select('name').eq('id', params.id).single();
   if (!classroom) redirect('/dashboard');
 
+  // Plantilla de las fichas que eligio el profesor (migracion 075). Si la columna aun no existe, la consulta falla y se usa la de siempre.
+  const tpl = await (supabase as any).from('classrooms').select('ficha_template').eq('id', params.id).maybeSingle();
+  const fichaTemplate: string | null = tpl.error ? null : (tpl.data?.ficha_template ?? null);
+
   const { data: materials } = await supabase
     .from('teaching_materials')
     .select('id, display_name')
@@ -47,6 +51,7 @@ export default async function StudyPage({ params, searchParams }: { params: { id
       userId={user.id}
       classroomId={params.id}
       classroomName={classroom.name}
+      fichaTemplate={fichaTemplate}
       materials={withContent}
       initialMaterialId={searchParams.m ?? null}
     />

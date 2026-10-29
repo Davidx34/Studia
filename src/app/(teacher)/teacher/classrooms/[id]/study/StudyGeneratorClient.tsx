@@ -25,6 +25,8 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Card, Badge } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { FichaTemplatePicker } from '@/components/study/fichas/FichaTemplatePicker';
+import type { FichaData } from '@/lib/study/fichaTemplates';
 import {
   buildQueue,
   chipState,
@@ -60,7 +62,17 @@ const POLL_MS = 5000;
 const MAX_CONSECUTIVE_FAILURES = 4;
 const SOURCE_LABEL: Record<string, string> = { file: 'Archivo', link: 'Enlace', notebooklm: 'NotebookLM' };
 
-export default function StudyGeneratorClient({ classroomId, initialRows }: { classroomId: string; initialRows: MaterialRow[] }) {
+export default function StudyGeneratorClient({
+  classroomId,
+  initialRows,
+  fichaTemplate,
+  previewFichas,
+}: {
+  classroomId: string;
+  initialRows: MaterialRow[];
+  fichaTemplate: string | null;
+  previewFichas: FichaData[];
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [rows, setRows] = useState<MaterialRow[]>(initialRows);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -288,6 +300,8 @@ export default function StudyGeneratorClient({ classroomId, initialRows }: { cla
         </div>
         {total > 0 && <ProgressBar value={(withContent / total) * 100} label="Materiales con material de estudio listo" tone="success" />}
       </header>
+
+      <FichaTemplatePicker classroomId={classroomId} initialTemplate={fichaTemplate} previewFichas={previewFichas} />
 
       {total === 0 ? (
         <Card className="p-10 text-center">
