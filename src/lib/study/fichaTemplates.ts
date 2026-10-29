@@ -19,39 +19,93 @@ export interface FichaData {
   extra: FichaExtra | null;
 }
 
+// Estructuras con tema (ThemedLayouts.tsx). Las 4 plantillas "funcionales" no usan layout ni tema: siguen los colores de la app.
+export type FichaLayout = 'tarjeta' | 'mosaico' | 'ruta' | 'cuaderno' | 'revista' | 'cornell' | 'acordeon';
+
+export type FichaCategory = 'funcional' | 'infantil' | 'area' | 'estetica';
+
+export const FICHA_CATEGORY_LABEL: Record<FichaCategory, string> = {
+  funcional: 'Funcionales',
+  infantil: 'Infantiles',
+  area: 'Por área',
+  estetica: 'Estéticas',
+};
+
+export const FICHA_CATEGORY_HINT: Record<FichaCategory, string> = {
+  funcional: 'Siguen los colores de la app (claro y oscuro). Sobrias y rápidas de leer.',
+  infantil: 'Colores vivos, formas redondas y letras amigables. Para los más pequeños.',
+  area: 'Pensadas para el ambiente de cada materia.',
+  estetica: 'Un estilo por sí mismo, sin importar la materia.',
+};
+
 export interface FichaTemplateInfo {
   id: string;
   name: string;
   description: string;
   // Para que tipo de uso queda mejor: ayuda al profesor a elegir.
   bestFor: string;
+  category: FichaCategory;
+  layout: FichaLayout | null;
+  // Id del tema en fichaThemes.ts (null = sigue los colores de la app).
+  theme: string | null;
 }
 
 export const FICHA_TEMPLATES = [
-  {
-    id: 'clasica',
-    name: 'Clásica',
+  // ── Funcionales ──
+  { id: 'clasica', name: 'Clásica', category: 'funcional', layout: null, theme: null,
     description: 'Lista desplegable: cada ficha se abre para ver su contenido.',
-    bestFor: 'Muchas fichas por material; el estudiante abre solo la que necesita.',
-  },
-  {
-    id: 'tarjeta',
-    name: 'Tarjeta visual',
+    bestFor: 'Muchas fichas por material; el estudiante abre solo la que necesita.' },
+  { id: 'tarjeta', name: 'Tarjeta visual', category: 'funcional', layout: null, theme: null,
     description: 'Cada ficha completa a la vista, con la idea destacada, los puntos numerados y los términos como etiquetas.',
-    bestFor: 'Pocas fichas y un estudio más visual, sin tener que abrir nada.',
-  },
-  {
-    id: 'cornell',
-    name: 'Cornell',
+    bestFor: 'Pocas fichas y un estudio más visual, sin tener que abrir nada.' },
+  { id: 'cornell', name: 'Cornell', category: 'funcional', layout: null, theme: null,
     description: 'Columna de pistas (términos y pregunta), notas con los puntos clave y un resumen al pie.',
-    bestFor: 'Estudio con método: repasar tapando las notas y recordando desde las pistas.',
-  },
-  {
-    id: 'compacta',
-    name: 'Compacta',
+    bestFor: 'Estudio con método: repasar tapando las notas y recordando desde las pistas.' },
+  { id: 'compacta', name: 'Compacta', category: 'funcional', layout: null, theme: null,
     description: 'Todo en un bloque denso y fácil de recorrer, pensado para repasar rápido o imprimir.',
-    bestFor: 'Repaso antes de una evaluación y material para imprimir.',
-  },
+    bestFor: 'Repaso antes de una evaluación y material para imprimir.' },
+
+  // ── Infantiles ──
+  { id: 'aventura', name: 'Aventura', category: 'infantil', layout: 'ruta', theme: 'aventura',
+    description: 'Un camino de paradas con burbujas de colores, bordes gruesos y letras redondas.',
+    bestFor: 'Primaria: cada punto clave es una parada del camino hasta la meta.' },
+  { id: 'arcoiris', name: 'Arcoíris', category: 'infantil', layout: 'mosaico', theme: 'arcoiris',
+    description: 'Mosaico de bloques pastel con la inicial de cada palabra bien grande.',
+    bestFor: 'Los más pequeños: bloques cortos y coloridos, fáciles de recorrer.' },
+
+  // ── Por area ──
+  { id: 'naturaleza', name: 'Naturaleza', category: 'area', layout: 'tarjeta', theme: 'naturaleza',
+    description: 'Verdes y tierra, formas orgánicas y números en forma de hoja.',
+    bestFor: 'Biología, ciencias naturales y medio ambiente.' },
+  { id: 'laboratorio', name: 'Laboratorio', category: 'area', layout: 'mosaico', theme: 'laboratorio',
+    description: 'Mosaico turquesa con fondo de hexágonos y los términos como casillas de la tabla periódica.',
+    bestFor: 'Química y ciencias experimentales.' },
+  { id: 'cuadriculado', name: 'Cuaderno cuadriculado', category: 'area', layout: 'cuaderno', theme: 'cuadriculado',
+    description: 'Hoja con renglones y margen, título subrayado con marcador y los términos en notas adhesivas.',
+    bestFor: 'Matemáticas y todo lo que lleva fórmulas y procedimientos.' },
+  { id: 'plano', name: 'Plano técnico', category: 'area', layout: 'cornell', theme: 'plano',
+    description: 'Azul de plano con rejilla y letra técnica, con pistas, notas y resumen como una ficha de ingeniería.',
+    bestFor: 'Física, tecnología e ingeniería.' },
+  { id: 'archivo', name: 'Archivo histórico', category: 'area', layout: 'ruta', theme: 'archivo',
+    description: 'Pergamino sepia y un camino de paradas con sellos, como una línea de tiempo.',
+    bestFor: 'Ciencias sociales, historia y geografía.' },
+  { id: 'libro', name: 'Libro', category: 'area', layout: 'revista', theme: 'libro',
+    description: 'Página de libro: titular en serif, capitular, dos columnas y una cita final.',
+    bestFor: 'Lenguaje, literatura y lectura crítica.' },
+
+  // ── Esteticas ──
+  { id: 'editorial', name: 'Editorial minimal', category: 'estetica', layout: 'revista', theme: 'editorial',
+    description: 'Blanco y negro de revista: titulares enormes, líneas finas y mucho aire.',
+    bestFor: 'Cualquier materia, con un aire sobrio y elegante.' },
+  { id: 'neon', name: 'Neón', category: 'estetica', layout: 'mosaico', theme: 'neon',
+    description: 'Fondo oscuro con bloques de neón cian, rosa y violeta.',
+    bestFor: 'Secundaria y media: un estilo moderno para tecnología o ciencias.' },
+  { id: 'brutalista', name: 'Neobrutalista', category: 'estetica', layout: 'acordeon', theme: 'brutalista',
+    description: 'Bordes negros gruesos, sombras duras y colores planos y vivos, en acordeón.',
+    bestFor: 'Cualquier materia, con personalidad fuerte y muy legible.' },
+  { id: 'aurora', name: 'Aurora de cristal', category: 'estetica', layout: 'tarjeta', theme: 'aurora',
+    description: 'Tarjetas de vidrio esmerilado sobre un fondo de aurora violeta y turquesa.',
+    bestFor: 'Cualquier materia, con un aire moderno y suave.' },
 ] as const satisfies readonly FichaTemplateInfo[];
 
 export type FichaTemplateId = (typeof FICHA_TEMPLATES)[number]['id'];
