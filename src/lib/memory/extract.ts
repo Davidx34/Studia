@@ -4,6 +4,7 @@
 import { extractJsonObject } from '@/lib/study/validate';
 import { groupChunks, type ChunkGroup, type ChunkInput } from '@/lib/study/grouping';
 import { sanitizeText } from '@/lib/lab/labSpec';
+import { findEquation } from './equations';
 import { mergeGraphs } from './merge';
 import { groundedFraction, normalizeKey } from './text';
 import { CONCEPT_KINDS, MEMORY_LIMITS, RELATIONS, type Concept, type ConceptKind, type Edge, type MaterialExtraction, type Relation } from './types';
@@ -26,13 +27,14 @@ ${text}
 TEXTO>>>
 
 Devuelve:
-- "conceptos": hasta ${MEMORY_LIMITS.conceptsPerGroup}. Cada uno con "nombre" (corto, como lo llama el texto), "tipo" (${CONCEPT_KINDS.join(' | ')}), "definicion" (una o dos frases con lo que dice el texto; vacío si el texto no lo define), "formula" (texto plano, por ejemplo "U = x^a * y^(1-a)"; vacío si no hay), "unidad" (vacío si no hay) e "importancia" (1 a 5: 5 si es central en este fragmento).
+- "conceptos": hasta ${MEMORY_LIMITS.conceptsPerGroup}. Cada uno con "nombre" (corto, como lo llama el texto), "tipo" (${CONCEPT_KINDS.join(' | ')}), "definicion" (una o dos frases con lo que dice el texto; vacío si el texto no lo define), "formula" (la ecuación EXACTA que el texto escribe para ese concepto, copiada tal cual en texto plano, por ejemplo "U = x^a * y^(1-a)"; vacío solo si el texto no la escribe), "unidad" (vacío si no hay) e "importancia" (1 a 5: 5 si es central en este fragmento).
 - "relaciones": cómo se conectan, usando los MISMOS nombres. "tipo": ${RELATIONS.join(' | ')}. "requiere": "de" necesita saber "a" antes. "se_calcula_con": "de" se calcula a partir de "a".
 
 REGLAS
 - NO inventes: si el texto no lo menciona, no lo incluyas. No agregues conocimiento externo.
 - Todo es texto plano: sin HTML, sin Markdown, sin LaTeX.
 - Prefiere pocos conceptos bien definidos a muchos vagos.
+- Toda ecuación que aparezca en el texto (con un signo =) debe quedar registrada en el campo "formula" del concepto del que habla, o como un concepto de tipo "formula".
 
 Responde SOLO con un JSON válido:
 {"conceptos":[{"nombre":"","tipo":"concepto","definicion":"","formula":"","unidad":"","importancia":3}],"relaciones":[{"de":"","a":"","tipo":"requiere"}]}`;
@@ -74,12 +76,15 @@ export function parseExtraction(text: string, group: ChunkGroup, materialId: str
     const kind: ConceptKind = (CONCEPT_KINDS as readonly string[]).indexOf(String(raw.tipo)) >= 0 ? (raw.tipo as ConceptKind) : 'concepto';
     const imp = typeof raw.importancia === 'number' && Number.isFinite(raw.importancia) ? Math.round(raw.importancia) : 3;
     byKey[key] = true;
+    let formula = sanitizeText(raw.formula, MEMORY_LIMITS.formula);
+    // Red de seguridad: si el texto trae la ecuacion de este concepto y la IA no la copio, se toma literal del texto.
+    if (!formula) formula = sanitizeText(findEquation(group.text, name) ?? '', MEMORY_LIMITS.formula);
     concepts.push({
       key,
       name,
       kind,
       definition: sanitizeText(raw.definicion, MEMORY_LIMITS.definition),
-      formula: sanitizeText(raw.formula, MEMORY_LIMITS.formula),
+      formula,
       unit: sanitizeText(raw.unidad, MEMORY_LIMITS.unit),
       importance: Math.min(5, Math.max(1, imp)),
       mentions: 1,

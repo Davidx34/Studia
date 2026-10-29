@@ -12,6 +12,8 @@ import { LabFrame } from '@/components/lab/LabFrame';
 import { LIMITS, templateOfSpec } from '@/lib/lab/labSpec';
 import { cleanQuestions, effectiveVariable, limitHint, normalizeDraft, questionError, withConstant, withIndependent, withMode, withVariable } from '@/lib/lab/labEditor';
 import { rowToItem, specToFields, type LabItem, type LabRow, type LabStatus } from '@/lib/lab/labRows';
+import type { Evidence } from '@/lib/lab/design';
+import { KIND_LABEL } from '@/lib/memory/types';
 import type { LabSpec, LabVariableOverride } from '@/lib/lab/types';
 
 const inputCls =
@@ -52,6 +54,8 @@ export interface EditorStart {
   sourceMaterialId: string | null;
   // Avisos de la propuesta de la IA (lo que se ajusto a los limites).
   warnings?: string[];
+  // Los conceptos de la memoria de la clase en los que se apoya el modelo (si lo diseño la IA).
+  evidence?: Evidence[];
 }
 
 export default function LabEditor({ classroomId, teacherId, start, onClose, onSaved }: { classroomId: string; teacherId: string; start: EditorStart; onClose: () => void; onSaved: (item: LabItem) => void }) {
@@ -141,7 +145,7 @@ export default function LabEditor({ classroomId, teacherId, start, onClose, onSa
       {warnings.length > 0 && (
         <div role="status" className="rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm text-fg">
           <p className="flex items-center gap-2 font-semibold">
-            <AlertTriangle aria-hidden="true" className="h-4 w-4" /> Se ajustaron algunos valores a los límites de la plantilla
+            <AlertTriangle aria-hidden="true" className="h-4 w-4" /> Revisa esto antes de publicar
           </p>
           <ul className="mt-1 list-disc space-y-0.5 pl-6 text-fg-muted">
             {warnings.map((w, i) => (
@@ -149,6 +153,24 @@ export default function LabEditor({ classroomId, teacherId, start, onClose, onSa
             ))}
           </ul>
         </div>
+      )}
+
+      {(start.evidence?.length ?? 0) > 0 && (
+        <Card className="space-y-2 p-4">
+          <h4 className="font-bold text-fg">Se apoya en lo que enseñaste</h4>
+          <p className="text-xs text-fg-muted">Estos son los conceptos de tus materiales que usó la IA. Compara las fórmulas del modelo (abajo) con las de tus apuntes antes de publicar.</p>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {(start.evidence ?? []).map((e) => (
+              <li key={e.key} className="rounded-lg border border-line bg-surface p-2.5 text-sm">
+                <p className="font-semibold text-fg [overflow-wrap:anywhere]">
+                  {e.name} <span className="font-normal text-fg-muted">· {KIND_LABEL[e.kind]}</span>
+                </p>
+                {e.definition && <p className="text-fg-muted [overflow-wrap:anywhere]">{e.definition}</p>}
+                {e.formula && <p className="mt-0.5 font-mono text-xs text-fg [overflow-wrap:anywhere]">{e.formula}</p>}
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -249,6 +271,20 @@ export default function LabEditor({ classroomId, teacherId, start, onClose, onSa
               </div>
             )}
           </Card>
+
+          {draft.model && (
+            <Card className="space-y-2 p-4">
+              <h4 className="font-bold text-fg">Fórmulas del modelo</h4>
+              <p className="text-xs text-fg-muted">Solo lectura. Si algo no coincide con tus apuntes, no lo publiques y pide otro diseño.</p>
+              <ul className="space-y-1 font-mono text-xs text-fg">
+                {[...draft.model.derived, ...draft.model.outputs].map((f) => (
+                  <li key={f.id} className="[overflow-wrap:anywhere]">
+                    <span className="text-fg-muted">{f.id} =</span> {f.expr}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           <Card className="space-y-3 p-4">
             <h4 className="font-bold text-fg">Informe del estudiante</h4>

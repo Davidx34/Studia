@@ -105,8 +105,25 @@ Una plantilla fija solo sirve para el tema para el que se escribió. Con el moto
 
 **No requiere migración**: el modelo va dentro de `labs.spec` (jsonb). El panel del profesor ya permite partir de un ejemplo y ajustarlo.
 
+## Diseño desde la memoria de la clase (PR 3)
+
+Pestaña Laboratorio → **Diseñar un laboratorio con IA**. El profesor escribe qué quiere que investiguen; `POST /api/lab/design` (`src/lib/lab/design.ts`) hace:
+
+1. **Requisitos.** La IA ve la lista de conceptos de la memoria y dice **qué conceptos hacen falta** (esenciales o deseables, con o sin fórmula). Si hace falta algo que la lista no tiene, lo escribe igual: así se detecta.
+2. **Prueba de suficiencia** (`memory/sufficiency.ts`). `suficiente` sigue; **`insuficiente`** (un concepto esencial que no está en los materiales) **no crea nada** y dice qué falta (HTTP 422, una sola llamada a la IA); **`parcial`** (todo lo esencial aparece, pero flojo: sin definición o sin fórmula) pregunta, y con «Crear de todos modos» sigue dejando un aviso. «Forzar» nunca salta lo insuficiente.
+3. **Diseño.** El prompt lleva los conceptos relevantes de la memoria **con sus fórmulas** (y sus prerrequisitos), el formato del modelo, 2 ejemplos y las reglas. Hasta 3 intentos: si el modelo no pasa la validación, **el error exacto vuelve a la IA** (con la fórmula y el punto donde falla).
+4. **Ajuste mecánico** (`repair.ts`). Si el fallo está solo en el borde de un rango (dividir por 0 con `x` desde 0), se acorta ese extremo un paso y se avisa; no gasta un reintento.
+5. **Coherencia** (`model.ts`, `lint`). Un modelo puede ser numéricamente válido y aun así no representar la materia (lo vimos con un modelo real: el presupuesto aparecía pero ninguna salida lo usaba). Por eso todo lo declarado debe **influir en alguna salida** (si una restricción no se impone, falla con una pista) y la salida de la gráfica debe **responder a la variable independiente**.
+6. **Evidencia.** Se registra en qué conceptos de la memoria se apoya (las citas de la IA se reemplazan por los nombres canónicos de la memoria; las inventadas se descartan). El editor los muestra junto con las **fórmulas del modelo** para compararlas con los apuntes antes de publicar.
+
+**Mejora de la memoria (descubierta al probar con un modelo real):** la extracción a veces olvidaba copiar una fórmula que el texto sí trae. Ahora un buscador **determinista** (`memory/equations.ts`) toma la ecuación literal del texto si pertenece a la propia frase del concepto (una fórmula equivocada es peor que ninguna), y el prompt de extracción lo pide explícitamente.
+
+Lo que **no** resuelve: que la fórmula que escribió la IA sea la que traen los apuntes (se muestra al profesor para que la compare) ni que el modelo sea pedagógicamente óptimo.
+
+`/api/lab/propose` (plantillas fijas) quedó sin uso en la interfaz.
+
 ## Lo que falta (siguientes PR)
 
-1. **Generación desde la memoria de la clase:** la IA diseña el modelo apoyándose en la memoria (PR de memoria), con el prompt incluyendo los ejemplos; los errores de la validación numérica se le devuelven para que corrija; antes de generar se usa la **prueba de suficiencia** y, si lo cargado no alcanza, se dice qué falta; cada propuesta cita en qué conceptos se apoya (`model.basis`).
-2. **Guardar y revisar:** tabla `lab_attempts` (migración + RLS), el estudiante abre el laboratorio publicado y su informe se guarda; el profesor lo revisa.
-3. Límite de uso por profesor en `/api/lab/propose` y `/api/memory/build`.
+1. **Guardar y revisar:** tabla `lab_attempts` (migración + RLS), el estudiante abre el laboratorio publicado y su informe se guarda; el profesor lo revisa.
+2. Límite de uso por profesor en `/api/lab/design`, `/api/lab/propose` y `/api/memory/build`.
+3. Borrar `/api/lab/propose` y `src/lib/lab/propose.ts` si no se vuelven a usar.

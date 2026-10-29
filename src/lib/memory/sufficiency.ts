@@ -65,6 +65,11 @@ function best(concepts: Concept[], index: ReturnType<typeof buildIndex>, term: s
   return top;
 }
 
+// ¿El concepto trae su ecuacion? En su campo, o escrita dentro de la definicion ("... es p*x + q*y = M").
+function hasFormula(c: Concept): boolean {
+  return !!c.formula || /[A-Za-z0-9)]\s*=\s*[A-Za-z0-9(]/.test(c.definition);
+}
+
 export function assessCoverage(requirements: Requirement[], graph: Graph): Coverage {
   const index = buildIndex(graph.concepts);
   const items: CoverageItem[] = requirements.map((r) => {
@@ -73,7 +78,7 @@ export function assessCoverage(requirements: Requirement[], graph: Graph): Cover
       return { term: r.term, essential: r.essential, covered: false, note: 'no-encontrado', key: null, name: null, score: hit?.score ?? 0 };
     }
     const c = hit.concept;
-    const note: CoverageNote = r.needsFormula && !c.formula ? 'sin-formula' : !c.definition && !c.formula ? 'sin-definicion' : 'ok';
+    const note: CoverageNote = r.needsFormula && !hasFormula(c) ? 'sin-formula' : !c.definition && !c.formula ? 'sin-definicion' : 'ok';
     return { term: r.term, essential: r.essential, covered: note === 'ok', note, key: c.key, name: c.name, score: hit.score };
   });
 
@@ -103,11 +108,13 @@ export function assessCoverage(requirements: Requirement[], graph: Graph): Cover
     }
   }
 
+  // Un concepto esencial que NO esta en los materiales no se puede suplir: es "insuficiente" (nada a medias). "Parcial" es cuando todo lo esencial aparece pero algo esta flojo
+  // (sin definicion o sin su formula) o falta bastante de lo deseable: el profesor decide si sigue.
+  const notFound = items.some((i) => i.essential && i.note === 'no-encontrado');
   let verdict: Verdict;
-  if (essentials.length > 0 && essentialCovered === essentials.length && ratio >= 0.75) verdict = 'sufficient';
-  else if (essentials.length === 0 ? ratio >= 0.75 : essentialCovered / essentials.length >= 0.5) verdict = ratio >= 0.5 ? 'partial' : 'insufficient';
-  else verdict = 'insufficient';
-  if (requirements.length === 0) verdict = 'insufficient';
+  if (requirements.length === 0 || notFound) verdict = 'insufficient';
+  else if (essentialCovered === essentials.length && ratio >= 0.75) verdict = 'sufficient';
+  else verdict = ratio >= 0.5 ? 'partial' : 'insufficient';
 
   return { verdict, ratio, items, missing, weak };
 }

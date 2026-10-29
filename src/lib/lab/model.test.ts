@@ -212,7 +212,7 @@ describe('validateModel', () => {
   it('rechaza una salida que se indefine en el rango (division por cero) y dice DONDE', () => {
     const e = errs(ok({ variables: [{ id: 'x', min: 0, max: 10 }], outputs: [{ id: 'y', expr: '1/x' }] }));
     expect(e).toHaveLength(1);
-    expect(e[0]).toMatch(/"y" no es un número razonable/);
+    expect(e[0]).toMatch(/"y" \(fórmula: 1\/x\) no es un número razonable/);
     expect(e[0]).toContain('x = 0');
     expect(e[0]).toMatch(/max\(\.\.\.\) o if\(\.\.\.\)/);
   });

@@ -261,10 +261,22 @@ describe('assessCoverage', () => {
     expect(explainCoverage(c)).toMatch(/no alcanzan/);
   });
 
-  it('parcial: cubre la mitad de lo esencial', () => {
-    const c = assessCoverage([{ term: 'utilidad marginal', essential: true }, { term: 'elasticidad cruzada', essential: true }], graph);
-    expect(c.verdict).toBe('partial');
+  it('insuficiente si UN concepto esencial no esta en los materiales, aunque otros si (nada a medias)', () => {
+    const c = assessCoverage([{ term: 'utilidad marginal', essential: true }, { term: 'equilibrio del consumidor', essential: true }, { term: 'elasticidad cruzada', essential: true }], graph);
+    expect(c.verdict).toBe('insufficient');
     expect(c.missing).toHaveLength(1);
+    expect(c.missing[0]).toContain('elasticidad cruzada');
+  });
+
+  it('parcial: todo lo esencial aparece pero algo esta flojo (sin definicion); el profesor decide', () => {
+    const c = assessCoverage([{ term: 'utilidad marginal', essential: true }, { term: 'curva de indiferencia', essential: true }], graph);
+    expect(c.verdict).toBe('partial');
+    expect(c.missing[0]).toContain('sin una definición');
+  });
+
+  it('una ecuacion escrita dentro de la definicion cuenta como formula', () => {
+    const g: Graph = { concepts: [concept('Restricción presupuestal', { definition: 'Limita el gasto: p_x * x + p_y * y = M.' })], edges: [] };
+    expect(assessCoverage([{ term: 'restricción presupuestal', essential: true, needsFormula: true }], g).verdict).toBe('sufficient');
   });
 
   it('pide la formula cuando hace falta simular: un concepto sin ecuacion no basta', () => {
