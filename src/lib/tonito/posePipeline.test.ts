@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { POSES } from './flowPrompts';
-import { POSE_IDS, POSE_MOOD, alphaBounds, consistencyWarnings, despillMagenta, moodForPose, poseStats, poseWarnings } from './posePipeline';
+import {
+  POSE_IDS, POSE_MOOD, alphaBounds, consistencyWarnings, despillMagenta, feetShiftPx, median, moodForPose, poseStats, poseWarnings, shiftRows,
+} from './posePipeline';
 
 // Imagen de w x h con un rectangulo opaco (x0..x1, y0..y1) del color dado; el resto, transparente.
 function img(w: number, h: number, rect: [number, number, number, number], rgb: [number, number, number] = [200, 150, 120]) {
@@ -102,4 +104,41 @@ describe('consistencia entre poses', () => {
     expect(w[0]).toMatch(/^excited: ocupa 60%/);
   });
   it('con una sola pose no hay con que comparar', () => expect(consistencyWarnings({ happy: base })).toEqual([]));
+});
+
+describe('alineacion de los pies', () => {
+  it('cuanto bajar o subir una pose para llegar a la linea comun', () => {
+    expect(feetShiftPx(92.2, 95.5, 1024)).toBe(34); // baja 34 px
+    expect(feetShiftPx(97, 95, 1024)).toBe(-20); // sube 20 px
+    expect(feetShiftPx(95.5, 95.5, 1024)).toBe(0);
+  });
+
+  it('una diferencia grande no se corrige: es otra pose, no un desajuste', () => {
+    expect(feetShiftPx(80, 95.5, 1024)).toBeNull();
+    expect(feetShiftPx(95.5, 80, 1024)).toBeNull();
+  });
+
+  it('shiftRows desplaza hacia abajo y deja transparente lo que queda libre', () => {
+    const a = img(4, 4, [1, 0, 2, 1]); // filas 0 y 1 opacas
+    const b = shiftRows(a, 4, 4, 2);
+    expect(alphaBounds(b, 4, 4, 0)).toEqual({ x0: 1, y0: 2, x1: 2, y1: 3 });
+    expect(Array.from(b.slice(0, 4 * 4 * 2)).every((v) => v === 0)).toBe(true); // las 2 primeras filas, vacias
+  });
+
+  it('shiftRows hacia arriba pierde lo que sale del cuadro, sin tocar el resto', () => {
+    const a = img(4, 4, [0, 2, 3, 3]); // filas 2 y 3
+    const b = shiftRows(a, 4, 4, -2);
+    expect(alphaBounds(b, 4, 4, 0)).toEqual({ x0: 0, y0: 0, x1: 3, y1: 1 });
+  });
+
+  it('shiftRows con 0 deja la imagen igual (y no es la misma referencia)', () => {
+    const a = img(4, 4, [0, 0, 3, 3]);
+    const b = shiftRows(a, 4, 4, 0);
+    expect(b).not.toBe(a);
+    expect(Array.from(b)).toEqual(Array.from(a));
+  });
+
+  it('median toma el valor del medio', () => {
+    expect(median([95.5, 92.2, 94.7, 96.1, 93.8])).toBe(94.7);
+  });
 });

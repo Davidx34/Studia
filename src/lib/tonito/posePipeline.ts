@@ -2,6 +2,7 @@
 // El script scripts/pose-prepare.ts los une con ffmpeg. Ver docs/TONITO_CATALOGO_ANIMACIONES.md (poses).
 
 import { POSES } from './flowPrompts';
+import { POSE_DIR, POSE_EXT } from './poseCrop';
 
 // Cada pose del catalogo (P1-P8) es el PNG de un estado de TonitoCharacter: public/tonito/<estado>.png.
 export const POSE_MOOD: Readonly<Record<string, string>> = {
@@ -91,7 +92,6 @@ export function poseWarnings(s: PoseStats | null): string[] {
 export function consistencyWarnings(all: Record<string, PoseStats>): string[] {
   const entries = Object.entries(all);
   if (entries.length < 2) return [];
-  const median = (v: number[]) => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)];
   const feet = median(entries.map(([, s]) => s.feetPct));
   const height = median(entries.map(([, s]) => s.heightPct));
   const out: string[] = [];
@@ -104,3 +104,35 @@ export function consistencyWarnings(all: Record<string, PoseStats>): string[] {
 }
 
 export const POSE_IDS: readonly string[] = POSES.map((p) => p.id);
+
+// Carpeta de la app donde van las poses (ruta bajo public/). Es una carpeta NUEVA, distinta de la de los PNG viejos (public/tonito/*.png): el service worker
+// guarda las imagenes por nombre de archivo, y con el mismo nombre algunos estudiantes seguirian viendo la cabeza vieja hasta una semana.
+export const POSE_PUBLIC_DIR = POSE_DIR.slice(1); // sin la barra inicial: 'tonito/poses'
+
+// Cuantos pixeles hay que bajar (positivo) o subir (negativo) una pose para que sus pies caigan en la linea comun. null si la diferencia es mayor que maxPct:
+// ahi no es un desajuste pequeño de Flow sino otra pose (un salto, por ejemplo), y moverla la dejaria mal.
+export function feetShiftPx(feetPct: number, targetPct: number, size: number, maxPct = 8): number | null {
+  const diff = targetPct - feetPct;
+  if (Math.abs(diff) > maxPct) return null;
+  return Math.round((diff / 100) * size);
+}
+
+// Copia la imagen desplazada dy filas (positivo = hacia abajo). Lo que queda libre es transparente y lo que sale del cuadro se pierde.
+export function shiftRows(rgba: Uint8Array, w: number, h: number, dy: number): Uint8Array {
+  const out = new Uint8Array(rgba.length);
+  const rowBytes = w * 4;
+  for (let y = 0; y < h; y++) {
+    const ny = y + dy;
+    if (ny < 0 || ny >= h) continue;
+    out.set(rgba.subarray(y * rowBytes, (y + 1) * rowBytes), ny * rowBytes);
+  }
+  return out;
+}
+
+export function median(values: number[]): number {
+  const s = [...values].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+}
+
+// Formato de salida: WebP con transparencia, ~27 KB por pose frente a ~325 KB en PNG (8 poses = 2,5 MB en PNG, demasiado para avatares de 42 px en celular).
+export { POSE_EXT };

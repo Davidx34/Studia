@@ -1,7 +1,7 @@
 'use client';
 
-// Sesion F.2: version "cinematica" de Toñito. Reusa las mismas imagenes de
-// TonitoCharacter (no hay poses full-body dibujadas todavia) pero las
+// Sesion F.2: version "cinematica" de Toñito. Reusa las poses de
+// TonitoCharacter (de cuerpo entero a partir de 120 px) y las
 // muestra grandes con animaciones de entrada/salida/celebracion pensadas
 // para pantalla completa. Facil de swapear despues por arte real sin tocar
 // los llamadores.
