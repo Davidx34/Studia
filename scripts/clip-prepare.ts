@@ -4,7 +4,7 @@
 //   npm run clip:publish -- --video ./mi-video.mp4 --scene welcome        (convierte, sube, comprueba y publica)
 //   npm run clip:prepare -- --video ./mi-video.mp4 --id mi-clip            (solo convierte: deja los archivos en ./clips-out/)
 //
-// Opciones: --scene <escena> (con --publish), --id <nombre> (por defecto, el de la escena), --poster-at <segundos>, --loop.
+// Opciones: --scene <escena> (con --publish), --id <nombre> (por defecto, el de la escena), --poster-at <segundos>, --loop (los espacios de espera, como wait_thinking, ya van en bucle por defecto).
 //
 // Necesita ffmpeg: en el PATH, o la ruta en la variable FFMPEG_PATH. (Windows: `winget install Gyan.FFmpeg`.)
 // Para publicar necesita .env.local con SUPABASE_SERVICE_ROLE_KEY (nunca se imprime) y la migracion 073 aplicada.
@@ -20,7 +20,7 @@ import {
   validClipId, videoArgs,
 } from '../src/lib/tonito/clipPipeline';
 import { TONITO_CLIPS } from '../src/lib/tonito/clips';
-import { CINEMATIC_TYPES, isCinematicType } from '../src/lib/tonito/scenes';
+import { CLIP_SCENES, isClipScene, sceneLoopsByDefault } from '../src/lib/tonito/scenes';
 import { judgeMediaResponse, mediaUrl, TONITO_BUCKET, type MediaKind } from '../src/lib/tonito/media';
 import { supabasePublicBase } from '../src/lib/tonito/mediaUpload';
 import { measureEdgeColors } from './lib/measureEdgeColors';
@@ -51,12 +51,12 @@ async function main() {
   if (!input || (!publish && !val('--id')) || (publish && !scene)) {
     console.log(
       publish
-        ? `Uso: npm run clip:publish -- --video <archivo> --scene <escena> [--id <nombre>] [--poster-at 1.5] [--loop]\nEscenas: ${CINEMATIC_TYPES.join(', ')}`
+        ? `Uso: npm run clip:publish -- --video <archivo> --scene <escena> [--id <nombre>] [--poster-at 1.5] [--loop]\nEscenas: ${CLIP_SCENES.join(', ')}`
         : 'Uso: npm run clip:prepare -- --video <archivo> --id <nombre-en-minusculas> [--poster-at 1.5] [--loop]',
     );
     process.exit(1);
   }
-  if (scene && !isCinematicType(scene)) fail(`la escena "${scene}" no existe. Escenas: ${CINEMATIC_TYPES.join(', ')}`);
+  if (scene && !isClipScene(scene)) fail(`la escena "${scene}" no existe. Escenas: ${CLIP_SCENES.join(', ')}`);
   const id = val('--id') ?? scene!.replace(/_/g, '-');
   if (!validClipId(id)) fail(`el id "${id}" no vale: minusculas, numeros y guiones sueltos (por ejemplo "exito-total")`);
   if (!fs.existsSync(input) || !fs.statSync(input).isFile()) fail(`no existe el video: ${input}`);
@@ -162,7 +162,7 @@ async function main() {
   } catch (e) {
     console.log(`  ! no se pudieron medir los colores de borde (${e instanceof Error ? e.message : e}); la escena usara su degradado de siempre`);
   }
-  const fila: Record<string, unknown> = { scene, clip_id: id, src: paths.video, poster: paths.poster, width: out.width, height: out.height, loop: has('--loop'), active: true, updated_at: new Date().toISOString() };
+  const fila: Record<string, unknown> = { scene, clip_id: id, src: paths.video, poster: paths.poster, width: out.width, height: out.height, loop: has('--loop') || sceneLoopsByDefault(scene!), active: true, updated_at: new Date().toISOString() };
   let { error } = await (supabase as any).from('tonito_scene_clips').upsert({ ...fila, bg_colors: bgColors }, { onConflict: 'scene' });
   if (error && /bg_colors/.test(error.message)) {
     // La migracion 074 aun no esta aplicada: se publica igual, sin colores (se pueden agregar despues con npm run clip:colors).

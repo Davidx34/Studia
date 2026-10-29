@@ -10,7 +10,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { advanceRemediationPlan, type RemediationPlan } from '@/lib/actions/remediation-plans';
 import { pickAnchorModule } from '@/lib/mastery/reinforcement';
-import { TonitoCharacter } from '@/components/tonito/TonitoCharacter';
+import { TonitoStateClip } from '@/components/tonito/TonitoStateClip';
 import { useTonitoStore } from '@/stores/useTonitoStore';
 import { ChoiceQuestion, AnswerFeedback, choiceResult, correctChoiceText, type ChoiceKind, type ChoiceValue } from '@/components/lesson/ChoiceQuestion';
 import { Button } from '@/components/ui/Button';
@@ -151,7 +151,7 @@ export default function RepasoPlanPage() {
   if (loading) {
     return (
       <div role="status" className="theme-scope max-w-2xl mx-auto p-8 text-center text-fg-muted">
-        <TonitoCharacter mood="thinking" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={90} />
+        <TonitoStateClip slot="wait_thinking" mood="thinking" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={90} />
         <p className="mt-4">Preparando tu repaso…</p>
       </div>
     );
@@ -176,7 +176,7 @@ export default function RepasoPlanPage() {
     return (
       <div className="theme-scope max-w-2xl mx-auto p-4 sm:p-8">
         <Card className="p-8 text-center space-y-4 bg-success/10 border-success/40">
-          <TonitoCharacter mood="celebrating" animation="supersaiyan" gradient={['#6C5CE7', '#00D2D3']} size={110} />
+          <TonitoStateClip slot="small_win" mood="celebrating" animation="supersaiyan" gradient={['#6C5CE7', '#00D2D3']} size={110} />
           <h1 className="text-2xl font-bold text-fg">¡Ronda completada!</h1>
           <p className="text-fg-muted">
             Acertaste {score}/{questions.length} preguntas.

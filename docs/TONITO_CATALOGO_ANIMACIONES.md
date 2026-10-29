@@ -168,6 +168,22 @@ Duración **3 s**; entrega **360×640**, ≤ 150 KB **[propuesto]**. Fondo `#6C5
 | **B2** | No se pudo preparar la lección | Mirada baja y apenada, se encoge de hombros, vuelve a mirar con una sonrisa esperanzada. **Tierno, nunca dramático** (la falla es del sistema) |
 | **B3** | Refuerzo completado | Puño cerrado y pequeño salto orgulloso |
 
+**Cómo se publican (ya está conectado en la app).** Los B usan la misma tabla y el mismo comando que las cinemáticas; la "escena" es el espacio donde se muestran:
+
+| Clip | Espacio (`--scene`) | Dónde se ve | En bucle |
+|---|---|---|---|
+| **B1** | `wait_thinking` | "Preparando preguntas" de la lección, repaso pensando, aviso de refuerzo | Sí (por defecto) |
+| **B2** | `soft_error` | "No pude preparar esta lección" y "problema con esta pregunta" | No: una vez y se queda en el último cuadro |
+| **B3** | `small_win` | "¡Ronda completada!" del repaso | No |
+
+```
+npm run clip:publish -- --video ./B1.mp4 --scene wait_thinking
+npm run clip:list        (ahora lista también estos tres espacios)
+npm run clip:off -- --scene wait_thinking
+```
+
+El clip se muestra en una **tarjeta cuadrada** (90–110 px) recortada al centro, por eso Toñito debe quedar dentro del cuadrado central del video. Mientras un espacio no tenga clip, o si el video no carga o el estudiante pidió menos movimiento, se ve la pose de siempre.
+
 Opcionales, hoy cubiertos por poses: **B4** durmiendo (inactividad 2 min, bucle) y **B5** sorpresa y saludo al volver (1,5 s).
 
 ## 8. Poses fijas P1–P8 (imágenes, no video)

@@ -9,7 +9,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { TONITO_CLIPS } from '../src/lib/tonito/clips';
-import { CINEMATIC_TYPES, SCENE_DEFAULT_CLIP, isCinematicType } from '../src/lib/tonito/scenes';
+import { CLIP_SCENES, SCENE_DEFAULT_CLIP, isClipScene } from '../src/lib/tonito/scenes';
 
 const [cmd, ...rest] = process.argv.slice(2);
 const scene = rest[rest.indexOf('--scene') + 1];
@@ -33,9 +33,10 @@ async function main() {
     if (error) fail(`${redact(error.message)}. ¿Ya se aplico la migracion 073?`);
     const rows = new Map((data ?? []).map((r: any) => [r.scene, r]));
     console.log('Escena                  Estado    Clip');
-    for (const s of CINEMATIC_TYPES) {
+    for (const s of CLIP_SCENES) {
       const r: any = rows.get(s);
-      const fromCode = SCENE_DEFAULT_CLIP[s] ? TONITO_CLIPS[SCENE_DEFAULT_CLIP[s]!] : undefined;
+      const codeId = (SCENE_DEFAULT_CLIP as Record<string, string | undefined>)[s];
+      const fromCode = codeId ? TONITO_CLIPS[codeId] : undefined;
       const estado = r ? (r.active ? 'activo' : 'APAGADO') : fromCode ? 'codigo' : 'sin video';
       const clip = r ? `${r.clip_id}  (${r.src})` : fromCode ? `${fromCode.id}  (respaldo del codigo)` : '—';
       console.log(`${s.padEnd(23)} ${estado.padEnd(9)} ${clip}`);
@@ -43,7 +44,7 @@ async function main() {
     return;
   }
 
-  if (!scene || !isCinematicType(scene)) fail(`indica una escena con --scene. Escenas: ${CINEMATIC_TYPES.join(', ')}`);
+  if (!scene || !isClipScene(scene)) fail(`indica una escena con --scene. Escenas: ${CLIP_SCENES.join(', ')}`);
   const active = cmd === 'on';
   const { data, error } = await supabase.from('tonito_scene_clips').update({ active, updated_at: new Date().toISOString() }).eq('scene', scene).select('scene');
   if (error) fail(redact(error.message));

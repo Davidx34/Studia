@@ -19,7 +19,7 @@ import { RemediationPrompt } from '@/components/lesson/RemediationPrompt';
 import { useTonitoStore } from '@/stores/useTonitoStore';
 import { CinematicScene, type CinematicType } from '@/components/cinematics/CinematicScene';
 import { useSoundFx } from '@/lib/sound/useSoundFx';
-import { TonitoCharacter } from '@/components/tonito/TonitoCharacter';
+import { TonitoStateClip } from '@/components/tonito/TonitoStateClip';
 import { MathText } from '@/components/MathText';
 import { SourceHintBox } from '@/components/lesson/SourceHintBox';
 import type { SourceHint } from '@/lib/grading/sourceHint';
@@ -666,7 +666,7 @@ export default function LessonPage() {
   if (loading) return (
     <div role="status" className="flex flex-col items-center justify-center min-h-64 text-fg p-8">
       <div className="tonito-breathing">
-        <TonitoCharacter mood="thinking" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={110} />
+        <TonitoStateClip slot="wait_thinking" mood="thinking" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={110} />
       </div>
       <p className="text-lg font-semibold mt-4">Estoy preparando preguntas especiales…</p>
       <p className="text-sm text-fg-muted mt-1">Solo un momento. La primera vez puede tardar hasta un minuto.</p>
@@ -680,7 +680,7 @@ export default function LessonPage() {
   // se guarda progreso ni XP, y se ofrece reintentar.
   if (generationFailed) return (
     <div role="alert" className="flex flex-col items-center justify-center min-h-64 text-fg p-8 text-center premium-fade-in-up">
-      <TonitoCharacter mood="sad" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={110} />
+      <TonitoStateClip slot="soft_error" mood="sad" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={110} />
       <h2 className="text-xl font-semibold mt-4">No pude preparar esta lección</h2>
       <p className="text-sm text-fg-muted mt-2 max-w-sm">
         Hubo un problema generando las preguntas de <strong>{mod.title}</strong>. No es culpa
@@ -774,7 +774,7 @@ export default function LessonPage() {
     return (
       <div className="max-w-2xl mx-auto px-4 py-6 sm:p-8">
         <Card role="alert" className="p-8 text-center space-y-4">
-          <TonitoCharacter mood="sad" animation="shake" gradient={['#6C5CE7', '#00D2D3']} size={90} />
+          <TonitoStateClip slot="soft_error" mood="sad" animation="shake" gradient={['#6C5CE7', '#00D2D3']} size={90} />
           <h2 className="text-xl font-bold text-fg">Ups, hubo un problema con esta pregunta</h2>
           <p className="text-fg-muted text-sm">{questionCheck.error}</p>
           <p className="text-fg-muted text-xs">Esto no debería pasar. Ya lo registramos.</p>
