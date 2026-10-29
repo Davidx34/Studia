@@ -33,22 +33,27 @@ export function TonitoClip({
   className = 'relative',
   onEnded,
   onFailed,
+  // Para forzar como se acomoda (la tarjeta cuadrada de los clips cortos siempre recorta al centro: 'cover'). Sin esto se decide segun la ventana.
+  fit: forcedFit,
 }: {
   clip: TonitoClipDef;
   className?: string;
   onEnded?: () => void;
   onFailed?: () => void;
+  fit?: ClipFit;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(false);
   // 'cover' llena la pantalla (celular); 'contain' lo muestra entero y centrado (pantalla ancha, donde 'cover' dejaria ver solo una franja).
-  const [fit, setFit] = useState<ClipFit>('cover');
+  const [autoFit, setFit] = useState<ClipFit>('cover');
+  const fit = forcedFit ?? autoFit;
   useEffect(() => {
+    if (forcedFit) return;
     const update = () => setFit(clipFit(clip, { width: window.innerWidth, height: window.innerHeight }));
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
-  }, [clip]);
+  }, [clip, forcedFit]);
   // Con 'contain' quedan bandas a los lados: los bordes del clip se difuminan contra el color de la escena en vez de cortarse en seco.
   const feather =
     fit === 'contain'

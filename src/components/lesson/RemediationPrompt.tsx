@@ -1,5 +1,5 @@
 'use client';
-import { TonitoCharacter } from '@/components/tonito/TonitoCharacter';
+import { TonitoStateClip } from '@/components/tonito/TonitoStateClip';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 
@@ -28,7 +28,7 @@ export function RemediationPrompt({
     <div className="max-w-2xl mx-auto px-4 py-6 sm:p-8">
       <Card className="p-6 sm:p-8 space-y-5">
         <div className="flex flex-col items-center text-center gap-3">
-          <TonitoCharacter mood="thinking" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={100} />
+          <TonitoStateClip slot="wait_thinking" mood="thinking" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={100} />
           <h1 className="text-xl font-bold text-fg">¡Buen trabajo en este módulo!</h1>
           <p className="text-fg-muted text-sm">Vi que te costó un poco con estos conceptos:</p>
         </div>
