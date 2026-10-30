@@ -13,6 +13,7 @@ import { LIMITS, templateOfSpec } from '@/lib/lab/labSpec';
 import { cleanQuestions, effectiveVariable, limitHint, normalizeDraft, questionError, withConstant, withIndependent, withMode, withVariable } from '@/lib/lab/labEditor';
 import { rowToItem, specToFields, type LabItem, type LabRow, type LabStatus } from '@/lib/lab/labRows';
 import type { Evidence } from '@/lib/lab/design';
+import type { FormulaCheck, FormulaStatus } from '@/lib/lab/formulaMatch';
 import { KIND_LABEL } from '@/lib/memory/types';
 import type { LabSpec, LabVariableOverride } from '@/lib/lab/types';
 
@@ -56,7 +57,16 @@ export interface EditorStart {
   warnings?: string[];
   // Los conceptos de la memoria de la clase en los que se apoya el modelo (si lo diseño la IA).
   evidence?: Evidence[];
+  // Cada fórmula del modelo comparada, con números, contra las ecuaciones de los apuntes (formulaMatch.ts).
+  formulaChecks?: FormulaCheck[];
 }
+
+const CHECK_BADGE: Record<FormulaStatus, { text: string; cls: string }> = {
+  exact_match: { text: 'Coincide con tus apuntes', cls: 'bg-success/15 text-success' },
+  scaled_match: { text: 'Coincide con otra escala', cls: 'bg-warning/15 text-warning' },
+  divergent: { text: 'Difiere de tus apuntes', cls: 'bg-danger/15 text-danger' },
+  unverified: { text: 'Sin verificar', cls: 'bg-surface-2 text-fg-muted' },
+};
 
 export default function LabEditor({ classroomId, teacherId, start, onClose, onSaved }: { classroomId: string; teacherId: string; start: EditorStart; onClose: () => void; onSaved: (item: LabItem) => void }) {
   const supabase = useMemo(() => createClient(), []);
@@ -167,6 +177,29 @@ export default function LabEditor({ classroomId, teacherId, start, onClose, onSa
                 </p>
                 {e.definition && <p className="text-fg-muted [overflow-wrap:anywhere]">{e.definition}</p>}
                 {e.formula && <p className="mt-0.5 font-mono text-xs text-fg [overflow-wrap:anywhere]">{e.formula}</p>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {(start.formulaChecks?.length ?? 0) > 0 && (
+        <Card className="space-y-2 p-4">
+          <h4 className="font-bold text-fg">¿Las fórmulas coinciden con tus apuntes?</h4>
+          <p className="text-xs text-fg-muted">Se probó cada fórmula del modelo con números, contra las ecuaciones escritas en tus materiales. «Sin verificar» no es un error: tus apuntes no traen una ecuación para esa parte.</p>
+          <ul className="space-y-2">
+            {(start.formulaChecks ?? []).map((c) => (
+              <li key={c.id} className="rounded-lg border border-line bg-surface p-2.5 text-sm">
+                <p className="flex flex-wrap items-center gap-2 font-semibold text-fg">
+                  <span className="[overflow-wrap:anywhere]">{c.label}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${CHECK_BADGE[c.status].cls}`}>{CHECK_BADGE[c.status].text}</span>
+                </p>
+                <p className="text-fg-muted [overflow-wrap:anywhere]">{c.reason}</p>
+                {c.equation && (
+                  <p className="mt-0.5 font-mono text-xs text-fg [overflow-wrap:anywhere]">
+                    {c.concept}: {c.equation}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

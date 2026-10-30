@@ -14,6 +14,7 @@ import { assessCoverage, explainCoverage, type Coverage, type Requirement } from
 import { KIND_LABEL, type Concept, type Graph, type SourceRef } from '@/lib/memory/types';
 import { Expr, MODEL_LIMITS } from './model';
 import { MODEL_EXAMPLES } from './modelExamples';
+import { checkModelFormulas, type FormulaCheck } from './formulaMatch';
 import { validateLabSpec } from './labSpec';
 import { repairModel } from './repair';
 import type { LabSpec } from './types';
@@ -44,7 +45,7 @@ export interface Evidence {
 export type DesignFailure = 'noResponse' | 'unparseable' | 'noFit' | 'insufficient' | 'partial' | 'invalid';
 
 export type DesignResult =
-  | { ok: true; spec: LabSpec; warnings: string[]; evidence: Evidence[]; coverage: Coverage }
+  | { ok: true; spec: LabSpec; warnings: string[]; evidence: Evidence[]; coverage: Coverage; formulaChecks: FormulaCheck[] }
   | { ok: false; reason: DesignFailure; message: string; coverage?: Coverage };
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -256,7 +257,12 @@ export async function designLab(input: { idea: string; graph: Graph; allowPartia
     if (model) model.basis = evidence.map((e) => e.name).slice(0, MODEL_LIMITS.basis);
     if (evidence.length === 0) warnings.push('No se pudo identificar en qué conceptos de tus materiales se apoya este modelo: revísalo con cuidado.');
     if (coverage.verdict === 'partial') warnings.push(`Se creó con materiales que cubren solo una parte: ${coverage.missing.join('; ')}.`);
-    return { ok: true, spec: d.spec, warnings, evidence, coverage };
+    // Las formulas del modelo contra las ecuaciones LITERALES de los apuntes en que se apoya (numericamente, sin IA). Lo que difiere se avisa al profesor.
+    const formulaChecks = model ? checkModelFormulas(model, input.graph) : [];
+    formulaChecks
+      .filter((c) => c.status === 'divergent')
+      .forEach((c) => warnings.push(`La fórmula «${c.label}» no coincide con tus apuntes (${c.concept}: ${c.equation}). Revísala antes de publicar.`));
+    return { ok: true, spec: d.spec, warnings, evidence, coverage, formulaChecks };
   }
   return answered ? last : { ok: false, reason: 'noResponse', message: 'La IA no respondió. Inténtalo de nuevo en un momento.' };
 }
