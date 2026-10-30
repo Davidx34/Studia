@@ -1,58 +1,16 @@
 import { callOpenRouter } from '@/lib/ai/openrouter';
+import { effectiveMaxTokens, reasoningEffortFor } from '@/lib/ai/thinking';
+import { callCohereCandidate } from './cohere';
+import { classifyFailure, safeErrorMessage } from './failure';
 import { providerById, resolveBaseUrl, type ProviderDef } from './providers';
 import type { CallOutcome, CallRequest, Candidate, FailureKind } from './types';
 
+// Siguen exportandose desde aqui (los usan las pruebas y ai:doctor).
+export { classifyFailure, safeErrorMessage, reasoningEffortFor };
+
 type Env = Record<string, string | undefined>;
 
-// Clasifica una respuesta HTTP no exitosa. El 429 se separa en "por minuto" (esperar sirve) y "diaria" (no sirve hasta el
-// reinicio): el texto del cuerpo es lo unico que los distingue entre proveedores.
-export function classifyFailure(status: number, body: string, retryAfter?: string | null): { kind: FailureKind; retryAfterMs?: number } {
-  const retryAfterMs = (() => {
-    const n = Number(retryAfter);
-    return Number.isFinite(n) && n > 0 ? Math.round(n * 1000) : undefined;
-  })();
-  if (status === 429) {
-    const daily = /per.?day|daily|tokens per day|requests per day|\bRPD\b|\bTPD\b|quota.*(exceed|exhaust)|exceeded.*quota/i.test(body);
-    // Un Retry-After de horas tambien delata una cuota diaria.
-    if (daily || (retryAfterMs ?? 0) > 15 * 60_000) return { kind: 'rate_daily', retryAfterMs };
-    return { kind: 'rate_minute', retryAfterMs };
-  }
-  if (status === 402) return { kind: 'payment' };
-  if (status === 401 || status === 403) return { kind: 'auth' };
-  if (status === 404) return { kind: 'not_found' };
-  if (status === 408) return { kind: 'timeout' };
-  if (status >= 500) return { kind: 'server' };
-  return { kind: 'bad_request' };
-}
-
-// Motivo legible de un fallo HTTP, para diagnostico (ai:doctor): el mensaje que devuelve el proveedor ("Invalid API Token",
-// "model not found"...), recortado y con cualquier cadena larga tapada por si algun proveedor repitiera una credencial.
-export function safeErrorMessage(body: string): string | undefined {
-  if (!body) return undefined;
-  let msg = '';
-  try {
-    const j: any = JSON.parse(body);
-    msg = String(j?.errors?.[0]?.message ?? j?.error?.message ?? j?.message ?? (typeof j?.error === 'string' ? j.error : '') ?? '');
-  } catch {
-    msg = body;
-  }
-  msg = msg.replace(/\s+/g, ' ').replace(/[A-Za-z0-9_\-.]{28,}/g, '[…]').trim().slice(0, 140);
-  return msg || undefined;
-}
-
 const DEFAULT_TIMEOUT_MS = 90_000;
-
-// Los modelos gpt-oss "piensan" antes de responder y ese razonamiento cuenta como salida: con pocos tokens la respuesta llega
-// VACIA (verificado con ai:doctor --ping). Groq y Cerebras aceptan reasoning_effort: bajo para juzgar y analizar (tareas
-// cortas y deterministas), medio para generar. Otros proveedores no reciben el parametro.
-export function reasoningEffortFor(providerId: string, model: string, task: CallRequest['task']): 'low' | 'medium' | null {
-  // Gemini 3.x (3.5 Flash, 3.8 Flash...) tambien "piensa" por defecto y esos tokens ocultos cuentan contra max_tokens: medido el 2026-10-27, el 3.5 Flash
-  // dejo SIN UNA SOLA pregunta valida (salida cortada, ilegible) al generar un modulo con minijuegos (max_tokens 6000), pero con las mismas
-  // preguntas clasicas respondio bien. 'low' lo evita sin dejarlo sin razonar. Los 2.5 no se tocan.
-  if (providerId === 'gemini' && /^gemini-3\./.test(model)) return 'low';
-  if (!/gpt-oss/i.test(model) || (providerId !== 'groq' && providerId !== 'cerebras')) return null;
-  return task === 'generation' || task === 'study' ? 'medium' : 'low';
-}
 
 async function once(p: ProviderDef, base: string, model: string, req: CallRequest, env: Env, doFetch: typeof fetch, withJson: boolean, withReasoning: boolean): Promise<Response> {
   const effort = withReasoning ? reasoningEffortFor(p.id, model, req.task) : null;
@@ -66,7 +24,7 @@ async function once(p: ProviderDef, base: string, model: string, req: CallReques
     body: JSON.stringify({
       model,
       messages,
-      max_tokens: req.maxTokens ?? 4096,
+      max_tokens: effectiveMaxTokens(req.maxTokens ?? 4096, effort),
       temperature: req.temperature ?? (req.task === 'generation' || req.task === 'study' ? 0.7 : 0),
       ...(withJson ? { response_format: { type: 'json_object' } } : {}),
       ...(effort ? { reasoning_effort: effort } : {}),
@@ -79,6 +37,9 @@ async function once(p: ProviderDef, base: string, model: string, req: CallReques
 export async function callCandidate(c: Candidate, req: CallRequest, env: Env = process.env, doFetch: typeof fetch = fetch): Promise<CallOutcome> {
   const p = providerById(c.provider);
   if (!p) return { ok: false, kind: 'not_found' };
+
+  // Cohere no habla el formato de OpenAI: adaptador propio (cohere.ts).
+  if (p.id === 'cohere') return callCohereCandidate(c, req, env, doFetch);
 
   // OpenRouter conserva su adaptador propio (llave estatica o Vercel Connect, y su lista de respaldo interna).
   if (p.id === 'openrouter') {
