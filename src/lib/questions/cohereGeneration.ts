@@ -6,7 +6,7 @@
 
 import { generateEmbedding } from '@/lib/embeddings/generate';
 import { retrieveContext } from '@/lib/rag/retrieve';
-import { routeText, describeAttempts, hasProviderFor, chainFor } from '@/lib/ai/gateway';
+import { routeText, describeAttempts, hasProviderFor, chainFor, chainWithCohere } from '@/lib/ai/gateway';
 import { protectLatexBackslashes, escapeInvalidJsonBackslashes } from '@/lib/json/latexJson';
 
 export const RAG_MATCH_COUNT = 5;
@@ -376,97 +376,11 @@ export function extractJsonQuestions(text: string): any[] | null {
   return null;
 }
 
-// Sin max_tokens explicito, Cohere usa un default que en la verificacion en
-// vivo (Sesion L, corrida post-fix) resulto insuficiente para peticiones de
-// 20-34 preguntas (pool activo+backup): la respuesta se truncaba a mitad de
-// un objeto JSON y el parseo fallaba en los 3 intentos de retry por igual
-// (mismo prompt, mismo limite -- el retry no ayuda si la causa es
-// estructural, no transitoria). 4096 es el MAXIMO real permitido por
-// c4ai-aya-expanse-32b (verificado: pedir mas devuelve HTTP 400 "max
-// tokens must be less than or equal to 4096") -- no hay margen para subirlo
-// mas. El fix real para peticiones grandes es pedir menos preguntas por
-// llamada (ver regeneratePool.ts, que ahora separa activas/backup en dos
-// llamadas en vez de una sola pidiendo el pool completo).
-const MAX_OUTPUT_TOKENS = 4096;
-const COHERE_TIMEOUT_MS = 100_000;
-
-async function callCohereOnce(prompt: string, apiKey: string): Promise<{ questions: any[] | null; httpError?: string }> {
-  let res: Response;
-  try {
-    res = await fetch('https://api.cohere.com/v2/chat', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'c4ai-aya-expanse-32b',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: MAX_OUTPUT_TOKENS,
-      }),
-      // Sin limite, un Cohere colgado bloqueaba la generacion hasta el corte de la
-      // funcion (300 s) y una caida de red lanzaba una excepcion que tiraba todo.
-      signal: AbortSignal.timeout(COHERE_TIMEOUT_MS),
-    });
-  } catch (e: any) {
-    return { questions: null, httpError: e?.name === 'TimeoutError' ? `timeout tras ${COHERE_TIMEOUT_MS / 1000} s` : `error de red: ${String(e?.message ?? e)}` };
-  }
-  if (!res.ok) {
-    return { questions: null, httpError: `HTTP ${res.status}: ${(await res.text()).slice(0, 300)}` };
-  }
-  const data = await res.json();
-  const text = data.message?.content?.[0]?.text || '';
-  const questions = extractJsonQuestions(text);
-  if (!questions) {
-    // Diagnostico honesto en vez de fallar en silencio: si finish_reason
-    // indica truncamiento por limite de tokens, decirlo explicitamente en
-    // vez de dejar que se vea igual que un JSON simplemente malformado.
-    const finishReason = data.finish_reason;
-    const truncated = finishReason === 'MAX_TOKENS';
-    console.warn(
-      `[callCohere] parseo fallo (finish_reason=${finishReason}${truncated ? ', RESPUESTA TRUNCADA POR LIMITE DE TOKENS' : ''}). Ultimos 200 chars: ${text.slice(-200)}`
-    );
-  }
-  return { questions };
-}
-
 // Hay al menos un proveedor con el que generar preguntas.
 export function hasGenerationProvider(): boolean {
   return !!process.env.COHERE_API_KEY || hasProviderFor('generation');
 }
 
-// Respaldo: el mismo prompt, por la pasarela de IA (src/lib/ai/gateway): recorre los proveedores configurados (Cerebras, Groq,
-// Mistral, OpenRouter... lo que haya con llave) con cortacircuito y orden adaptativo. El prompt ya pide JSON con
-// {"questions":[...]} y el parser es el mismo que el de Cohere, asi que el resto del pipeline no cambia (validacion, tipos
-// permitidos, guardado). La calidad es la fraccion de lo pedido que llego: si un proveedor devuelve menos del 70 %, se sigue
-// con el siguiente y se conserva la mejor respuesta.
-async function callFallbackQuestions(prompt: string, expectedCount?: number): Promise<any[] | null> {
-  const r = await routeText<any[]>({
-    task: 'generation',
-    prompt,
-    maxTokens: 6000,
-    json: true,
-    validate: (text) => {
-      const questions = extractJsonQuestions(text);
-      if (!questions || questions.length === 0) return null;
-      return { value: questions, quality: expectedCount ? Math.min(1, questions.length / expectedCount) : 1 };
-    },
-    acceptQuality: 0.7,
-  });
-  if (!r.ok) {
-    console.warn(`[callFallback] sin respaldo utilizable (${r.reason}): ${describeAttempts(r.attempts)}`);
-    return null;
-  }
-  console.log(`[LLM_FALLBACK] generacion servida por ${r.provider}/${r.model}: ${r.value.length} preguntas (${describeAttempts(r.attempts)})`);
-  return r.value;
-}
-
-// Reintenta con backoff ante: error HTTP (rate limit/5xx transitorio),
-// respuesta no parseable como JSON, o un conteo de preguntas muy por debajo
-// de lo pedido (senal de que Cohere trunco o ignoro la instruccion de
-// cantidad). Antes un solo fallo aqui tiraba toda la generacion sin
-// reintentar.
-//
-// Si Cohere no logra una respuesta suficiente y OpenRouter esta configurado, se
-// intenta con el respaldo. Con respaldo disponible Cohere reintenta menos (2
-// intentos en vez de 3): esperar mas a un proveedor caido cuesta mas que cambiar.
 // QUIEN GENERA PRIMERO. Por defecto Cohere (Aya Expanse 32B) y la pasarela de IA solo de respaldo. Con GENERATION_PRIMARY=gateway la pasarela va PRIMERO
 // (con AI_PROFILE=paid, Gemini 3.5 Flash-Lite) y Cohere queda de respaldo si la pasarela no da suficientes preguntas. Motivo (medido el 2026-10-27 sobre 5 modulos,
 // mismo juez con segunda opinion): las preguntas de Cohere pasaban el juez a la primera el 30 % de las veces (54 % tras reparar); las de Gemini 3.5 Flash-Lite, el 86 %
@@ -476,65 +390,51 @@ export const generationPrimary = (env: Record<string, string | undefined> = proc
   env.GENERATION_PRIMARY?.trim().toLowerCase() === 'gateway' ? 'gateway' : 'cohere';
 
 let warnedNotGemini = false;
-async function callGatewayFirst(prompt: string, expectedCount?: number): Promise<any[] | null> {
-  const first = chainFor('generation')[0];
-  if (first && first.provider !== 'gemini' && !warnedNotGemini) {
-    warnedNotGemini = true;
-    console.warn(`[GENERATION] GENERATION_PRIMARY=gateway, pero la cadena de generacion empieza por ${first.provider}/${first.model}, no por Gemini: pon AI_PROFILE=paid o AI_CHAIN_GENERATION=gemini:gemini-3.5-flash-lite`);
-  }
-  const enough = (n: number) => !expectedCount || n >= Math.ceil(expectedCount * 0.7);
-  const viaGateway = await callFallbackQuestions(prompt, expectedCount);
-  if (viaGateway && enough(viaGateway.length)) return viaGateway;
 
-  // La pasarela no dio lo suficiente: Cohere de respaldo (si hay llave), con un reintento.
-  const cohereKey = process.env.COHERE_API_KEY;
-  if (!cohereKey) return viaGateway;
-  console.warn(`[GENERATION] la pasarela dio ${viaGateway?.length ?? 0}/${expectedCount ?? '?'} preguntas; probando Cohere de respaldo`);
-  let best: any[] | null = viaGateway;
-  for (let attempt = 0; attempt <= 1; attempt++) {
-    const { questions, httpError } = await callCohereOnce(prompt, cohereKey);
-    if (httpError) console.warn(`[callCohere] respaldo intento ${attempt + 1}/2 fallo HTTP: ${httpError}`);
-    if (questions && questions.length > 0 && (!best || questions.length > best.length)) best = questions;
-    if (best && enough(best.length)) break;
-    if (attempt < 1) await new Promise((r) => setTimeout(r, 1500));
-  }
-  return best;
-}
-
+// Genera preguntas por la pasarela de IA (src/lib/ai/gateway), donde Cohere es un proveedor mas: recorre la cadena de generacion con cortacircuito y orden
+// adaptativo, y conserva la MEJOR respuesta (la calidad es la fraccion de lo pedido que llego; desde el 70 % se acepta sin seguir probando).
+//   - Por defecto Cohere va PRIMERO; con GENERATION_PRIMARY=gateway, ULTIMO.
+//   - Cohere reintenta con espera ante fallos pasajeros o respuestas cortas: 2 intentos si hay respaldo (esperar mas a un proveedor caido cuesta mas que
+//     cambiar), 3 si es el unico. Si su cuota diaria/mensual se agoto (y la salud persistente esta activa) ni se intenta.
+//   - El prompt ya pide JSON con {"questions":[...]} y el parser es el de siempre (extractJsonQuestions, con la proteccion de LaTeX de latexJson.ts), asi
+//     que el resto del pipeline (validacion, tipos permitidos, guardado) no cambia.
 export async function callCohere(prompt: string, expectedCount?: number): Promise<any[] | null> {
-  if (generationPrimary() === 'gateway' && hasProviderFor('generation')) return callGatewayFirst(prompt, expectedCount);
-  const COHERE_API_KEY = process.env.COHERE_API_KEY;
   const fallbackAvailable = hasProviderFor('generation');
-  if (!COHERE_API_KEY && !fallbackAvailable) return null;
+  const gatewayFirst = generationPrimary() === 'gateway' && fallbackAvailable;
 
-  const RETRIES = fallbackAvailable ? 1 : 2;
-  const BASE_DELAY_MS = 1500;
-  const enough = (n: number) => !expectedCount || n >= Math.ceil(expectedCount * 0.7);
-  let best: any[] | null = null;
-
-  for (let attempt = 0; COHERE_API_KEY && attempt <= RETRIES; attempt++) {
-    const { questions, httpError } = await callCohereOnce(prompt, COHERE_API_KEY);
-    if (httpError) {
-      console.warn(`[callCohere] intento ${attempt + 1}/${RETRIES + 1} fallo HTTP: ${httpError}`);
-    } else if (!questions || questions.length === 0) {
-      console.warn(`[callCohere] intento ${attempt + 1}/${RETRIES + 1}: respuesta sin preguntas parseables`);
-    } else {
-      // Nos quedamos con la mejor respuesta vista hasta ahora (mas preguntas
-      // es mejor), por si el ultimo reintento sale peor que uno anterior.
-      if (!best || questions.length > best.length) best = questions;
-      if (enough(questions.length)) return questions;
-      console.warn(`[callCohere] intento ${attempt + 1}/${RETRIES + 1}: solo ${questions.length}/${expectedCount} preguntas, reintentando`);
-    }
-    if (attempt < RETRIES) {
-      await new Promise((r) => setTimeout(r, BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 300)));
+  if (gatewayFirst) {
+    const first = chainFor('generation')[0];
+    if (first && first.provider !== 'gemini' && !warnedNotGemini) {
+      warnedNotGemini = true;
+      console.warn(`[GENERATION] GENERATION_PRIMARY=gateway, pero la cadena de generacion empieza por ${first.provider}/${first.model}, no por Gemini: pon AI_PROFILE=paid o AI_CHAIN_GENERATION=gemini:gemini-3.5-flash-lite`);
     }
   }
 
-  if (!fallbackAvailable) return best;
+  const chain = chainWithCohere('generation', gatewayFirst ? 'last' : 'first');
+  if (chain.length === 0) return null;
+  const cohereTries = gatewayFirst || fallbackAvailable ? 2 : 3;
 
-  console.warn(`[LLM_FALLBACK] Cohere no dio una respuesta suficiente (${best?.length ?? 0}/${expectedCount ?? '?'}); probando el respaldo`);
-  const alt = await callFallbackQuestions(prompt, expectedCount);
-  // Lo mejor de los dos: el respaldo no debe empeorar lo que Cohere ya habia dado.
-  if (alt && (!best || alt.length > best.length)) return alt;
-  return best;
+  const r = await routeText<any[]>({
+    task: 'generation',
+    prompt,
+    maxTokens: 6000, // Cohere lo recorta solo a su maximo (4096)
+    json: true,
+    chain,
+    maxAttempts: 5,
+    attemptsPerCandidate: (c) => (c.provider === 'cohere' ? cohereTries : 1),
+    validate: (text) => {
+      const questions = extractJsonQuestions(text);
+      if (!questions || questions.length === 0) return null;
+      return { value: questions, quality: expectedCount ? Math.min(1, questions.length / expectedCount) : 1 };
+    },
+    acceptQuality: 0.7,
+  });
+
+  if (!r.ok) {
+    console.warn(`[callCohere] sin proveedor utilizable (${r.reason}): ${describeAttempts(r.attempts)}`);
+    return null;
+  }
+  if (r.provider !== 'cohere') console.log(`[LLM_FALLBACK] generacion servida por ${r.provider}/${r.model}: ${r.value.length} preguntas (${describeAttempts(r.attempts)})`);
+  else if (r.attempts.length > 1) console.log(`[callCohere] ${describeAttempts(r.attempts)}`);
+  return r.value;
 }

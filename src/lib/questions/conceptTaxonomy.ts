@@ -17,7 +17,7 @@
 // explicita de usar EXACTAMENTE uno de esos tags.
 
 import { getRagContext } from './cohereGeneration';
-import { callOpenRouter, isOpenRouterConfigured } from '@/lib/ai/openrouter';
+import { routeText, chainWithCohere } from '@/lib/ai/gateway';
 
 export interface ClosedConcept {
   tag: string;
@@ -28,49 +28,41 @@ export interface ClosedConcept {
 // documentaba (sin validar) el prompt de generate-questions.
 const CONCEPT_TAG_RE = /^[a-z0-9]+(_[a-z0-9]+)*$/;
 
-// Texto de la respuesta del modelo: Cohere primero y, si no responde (sin llave, caida,
-// error de red, timeout), OpenRouter. Nunca lanza: la taxonomia es una mejora, no puede
-// tumbar la generacion de preguntas.
-async function conceptsResponseText(prompt: string): Promise<string | null> {
-  const COHERE_API_KEY = process.env.COHERE_API_KEY;
-  if (COHERE_API_KEY) {
-    try {
-      const res = await fetch('https://api.cohere.com/v2/chat', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + COHERE_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'c4ai-aya-expanse-32b', messages: [{ role: 'user', content: prompt }] }),
-        signal: AbortSignal.timeout(60_000),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        return data.message?.content?.[0]?.text || '';
-      }
-    } catch {
-      // cae al respaldo
-    }
-  }
-  if (isOpenRouterConfigured()) {
-    const call = await callOpenRouter(prompt, { role: 'generation', maxTokens: 1500, timeoutMs: 45_000 });
-    if (call.ok) return call.text;
-  }
-  return null;
-}
-
-async function callCohereForConcepts(prompt: string): Promise<ClosedConcept[] | null> {
-  const text = await conceptsResponseText(prompt);
-  if (text === null) return null;
+// Lee la lista de conceptos de la respuesta del modelo. null = no hay una lista utilizable (ni JSON, ni un solo concepto valido).
+export function parseConcepts(text: string): ClosedConcept[] | null {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
   try {
     const parsed = JSON.parse(jsonMatch[0]);
     const raw = Array.isArray(parsed.concepts) ? parsed.concepts : [];
-    return raw
+    const concepts: ClosedConcept[] = raw
       .filter((c: any) => c && typeof c.tag === 'string' && typeof c.label === 'string')
       .map((c: any) => ({ tag: c.tag.trim().toLowerCase(), label: c.label.trim() }))
       .filter((c: ClosedConcept) => CONCEPT_TAG_RE.test(c.tag) && c.label.length > 0);
+    return concepts.length > 0 ? concepts : null;
   } catch {
     return null;
   }
+}
+
+// Pide los conceptos por la pasarela de IA: Cohere primero y, si no responde o no devuelve una lista utilizable, el resto de la cadena "analysis". Nunca
+// lanza: la taxonomia es una mejora, no puede tumbar la generacion de preguntas.
+async function callCohereForConcepts(prompt: string): Promise<ClosedConcept[] | null> {
+  const chain = chainWithCohere('analysis', 'first');
+  if (chain.length === 0) return null;
+  const r = await routeText<ClosedConcept[]>({
+    task: 'analysis',
+    prompt,
+    maxTokens: 1500,
+    temperature: 0.3,
+    timeoutMs: 60_000,
+    chain,
+    validate: (text) => {
+      const concepts = parseConcepts(text);
+      return concepts ? { value: concepts, quality: 1 } : null;
+    },
+  });
+  return r.ok ? r.value : null;
 }
 
 // Devuelve la lista cerrada de conceptos del modulo, generandola (y

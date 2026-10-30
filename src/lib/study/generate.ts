@@ -1,8 +1,8 @@
 // Generacion de fichas de lectura y flashcards a partir del Markdown del material.
-// Cohere primero, OpenRouter de respaldo (mismo patron que la generacion de preguntas). El orquestador recibe la
+// Cohere primero y el resto de la pasarela de IA de respaldo (mismo patron que la generacion de preguntas). El orquestador recibe la
 // funcion que llama al modelo para poder probarlo sin red.
 
-import { callOpenRouter, isOpenRouterConfigured } from '@/lib/ai/openrouter';
+import { routeText, describeAttempts, hasProviderFor, chainWithCohere } from '@/lib/ai/gateway';
 import { sanitizeLogged } from '@/lib/security/promptSanitizer';
 import type { ChunkGroup } from './grouping';
 import { extractJsonObject, validateGroupCards, type FichaCard, type FlashCard } from './validate';
@@ -104,43 +104,27 @@ export async function generateStudyCards(
 }
 
 // ── Llamada real al modelo ──
-const COHERE_TIMEOUT_MS = 90_000;
-
-async function callCohereText(prompt: string): Promise<string | null> {
-  const key = process.env.COHERE_API_KEY;
-  if (!key) return null;
-  try {
-    const res = await fetch('https://api.cohere.com/v2/chat', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'c4ai-aya-expanse-32b', messages: [{ role: 'user', content: prompt }], max_tokens: 4096, temperature: 0.3 }),
-      signal: AbortSignal.timeout(COHERE_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      console.warn(`[study] Cohere HTTP ${res.status}`);
-      return null;
-    }
-    const data = await res.json();
-    return data.message?.content?.[0]?.text || null;
-  } catch (e: any) {
-    console.warn(`[study] Cohere fallo: ${e?.name === 'TimeoutError' ? 'timeout' : String(e?.message ?? e)}`);
-    return null;
-  }
-}
-
+// Por la pasarela de IA: Cohere va primero (como siempre) y, si no responde, siguen los proveedores de la cadena "study" (Cerebras, Groq, Mistral,
+// OpenRouter... lo que tenga llave) con cortacircuito y orden adaptativo. Antes eran dos llamadas a mano (Cohere y OpenRouter) sin cortacircuito.
 export function hasStudyProvider(): boolean {
-  return !!process.env.COHERE_API_KEY || isOpenRouterConfigured();
+  return !!process.env.COHERE_API_KEY || hasProviderFor('study');
 }
 
 export const callStudyModel: ModelCaller = async (prompt) => {
-  const fromCohere = await callCohereText(prompt);
-  if (fromCohere) return fromCohere;
-  if (!isOpenRouterConfigured()) return null;
-  const alt = await callOpenRouter(prompt, { role: 'generation', maxTokens: 4000, temperature: 0.3 });
-  if (alt.ok) {
-    console.log(`[LLM_FALLBACK] fichas servidas por OpenRouter (${alt.model})`);
-    return alt.text;
+  const chain = chainWithCohere('study', 'first');
+  if (chain.length === 0) return null;
+  const r = await routeText<string>({
+    task: 'study',
+    prompt,
+    maxTokens: 4096,
+    temperature: 0.3,
+    chain,
+    validate: (text) => (text.trim() ? { value: text, quality: 1 } : null),
+  });
+  if (!r.ok) {
+    console.warn(`[study] sin proveedor utilizable (${r.reason}): ${describeAttempts(r.attempts)}`);
+    return null;
   }
-  console.warn(`[study] OpenRouter fallo: ${alt.reason}`);
-  return null;
+  if (r.provider !== 'cohere') console.log(`[LLM_FALLBACK] fichas servidas por ${r.provider}/${r.model}`);
+  return r.value;
 };

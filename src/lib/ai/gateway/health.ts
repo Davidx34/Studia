@@ -2,7 +2,8 @@ import type { Candidate, FailureKind } from './types';
 
 // Salud de cada candidato (proveedor:modelo): cortacircuito + estadisticas moviles para ordenar de forma ADAPTATIVA.
 // Vive en memoria de la instancia (Vercel reutiliza instancias calientes): una instancia nueva empieza sin historial y
-// vuelve a aprender en pocas llamadas. Reloj inyectable para probarlo.
+// vuelve a aprender en pocas llamadas. Los bloqueos LARGOS (cuota diaria agotada, sin credito, llave invalida, modelo inexistente) si se
+// pueden compartir entre instancias: ver persist.ts (opt-in con AI_HEALTH_PERSIST=1). Reloj inyectable para probarlo.
 
 export interface Health {
   openUntil: number; // epoch ms hasta el que se aparta el candidato
@@ -70,15 +71,33 @@ export class HealthTracker {
     h.calls++;
   }
 
-  failure(c: Candidate, kind: FailureKind, retryAfterMs?: number): void {
+  // Devuelve cuanto tiempo quedo apartado el candidato por ESTE fallo (0 = no se aparto) y hasta cuando.
+  failure(c: Candidate, kind: FailureKind, retryAfterMs?: number): { openMs: number; openUntil: number } {
     const h = this.get(keyOf(c));
     h.calls++;
     // Un bad_request no dice nada del proveedor: no ensucia su historial.
-    if (kind === 'bad_request') return;
+    if (kind === 'bad_request') return { openMs: 0, openUntil: h.openUntil };
     h.successEma = 0.8 * h.successEma;
     h.consecutiveFailures++;
     const open = openForMs(kind, this.now(), h.consecutiveFailures, retryAfterMs);
     if (open > 0) h.openUntil = this.now() + open;
+    return { openMs: open, openUntil: h.openUntil };
+  }
+
+  // Incorpora bloqueos largos que otra instancia guardo (ver persist.ts). Solo ALARGA: nunca acorta un bloqueo que esta instancia ya tenia,
+  // y ignora los vencidos. Devuelve cuantos aplico.
+  hydrate(blocks: { key: string; openUntil: number }[]): number {
+    const t = this.now();
+    let applied = 0;
+    for (const b of blocks) {
+      if (!Number.isFinite(b.openUntil) || b.openUntil <= t) continue;
+      const h = this.get(b.key);
+      if (b.openUntil > h.openUntil) {
+        h.openUntil = b.openUntil;
+        applied++;
+      }
+    }
+    return applied;
   }
 
   // Disponibles, ordenados por: preferencia de la cadena (indice) ajustada por lo bien que han respondido y su latencia.

@@ -8,9 +8,12 @@
 //   2. Que los SIMBOLOS (letras griegas, operadores) y los NUMEROS que la extraccion determinista si pudo
 //      leer aparezcan en la transcripcion, con su frecuencia: atrapa "β" -> "B" y terminos perdidos.
 //   3. Que las PALABRAS del texto leido aparezcan: atrapa paginas resumidas u omitidas.
+//   4. Que ninguna TABLA este transpuesta (filas por columnas): tiene los mismos simbolos, numeros y LaTeX valido, asi que lo anterior no la ve.
+//      Se compara su orientacion con las lineas del texto original (ver tableCheck.ts).
 //
 // Si una pagina no pasa, esa pagina vuelve al texto determinista (ver pdfToMarkdown.ts).
-// Limite conocido: una tabla transpuesta tiene los mismos simbolos y el mismo LaTeX valido; esto no la ve.
+
+import { checkTableOrientation } from './tableCheck';
 
 export type LatexRenderer = (expression: string, displayMode: boolean) => void;
 
@@ -162,6 +165,11 @@ export function verifyPage(plainText: string, aiMarkdown: string, render: LatexR
   const wr = pageWordRecall(plainText, aiMarkdown);
   if (wr !== null && wr < MIN_PAGE_WORD_RECALL) {
     reasons.push(`solo aparece el ${Math.round(wr * 100)}% de las palabras de la pagina`);
+  }
+
+  const tables = checkTableOrientation(plainText, aiMarkdown, latexToUnicodeSymbols);
+  if (tables.transposed.length > 0) {
+    reasons.push(`${tables.transposed.length === 1 ? 'la tabla' : 'las tablas'} ${tables.transposed.join(', ')} ${tables.transposed.length === 1 ? 'parece estar transpuesta' : 'parecen estar transpuestas'} (filas y columnas intercambiadas)`);
   }
 
   return { ok: reasons.length === 0, reasons };

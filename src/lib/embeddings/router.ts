@@ -1,4 +1,5 @@
-import { HealthTracker, sharedHealth } from '@/lib/ai/gateway/health';
+import { HealthTracker, keyOf, sharedHealth } from '@/lib/ai/gateway/health';
+import { defaultHealthStore, persistBlock, syncPersistedHealth, type HealthStore } from '@/lib/ai/gateway/persist';
 import type { Attempt } from '@/lib/ai/gateway/types';
 import { embedBatch } from './client';
 import { embedChain, embedProviderForProfile, type EmbedProvider, type EmbedRole } from './providers';
@@ -15,7 +16,7 @@ export interface EmbedRouteOptions {
   // Para reindexar sin mezclar: solo estos proveedores.
   only?: string[];
   maxAttempts?: number;
-  deps?: { env?: Env; fetchImpl?: typeof fetch; health?: HealthTracker; now?: () => number };
+  deps?: { env?: Env; fetchImpl?: typeof fetch; health?: HealthTracker; now?: () => number; healthStore?: HealthStore | null };
 }
 
 // Embebe TODOS los textos con UN mismo proveedor (los vectores de proveedores distintos no se pueden mezclar en un mismo
@@ -38,6 +39,9 @@ export async function embedTexts(texts: string[], role: EmbedRole, opts: EmbedRo
 
   // La salud se registra por (proveedor, perfil), igual que en la pasarela de texto.
   const cands = providers.map((p) => ({ provider: `embed:${p.id}`, model: p.profile }));
+  // Bloqueos largos (cuota diaria...) que otra instancia ya descubrio: la cuota gratuita de embeddings es la mas escasa.
+  const store = opts.deps?.healthStore !== undefined ? opts.deps.healthStore : await defaultHealthStore(env);
+  await syncPersistedHealth(health, store, now());
   const rankedCands = health.rank(cands);
   if (rankedCands.length === 0) return { ok: false, reason: 'all_unavailable', attempts: [] };
   const byKey = new Map(cands.map((c, i) => [`${c.provider}:${c.model}`, providers[i]]));
@@ -60,7 +64,8 @@ export async function embedTexts(texts: string[], role: EmbedRole, opts: EmbedRo
 
     const ms = now() - t0;
     if (failure) {
-      health.failure(cand, failure.kind, failure.retryAfterMs);
+      const f = health.failure(cand, failure.kind, failure.retryAfterMs);
+      await persistBlock(store, { key: keyOf(cand), kind: failure.kind, openUntil: f.openUntil }, f.openMs);
       attempts.push({ provider: cand.provider, model: cand.model, ok: false, kind: failure.kind, status: failure.status, ms });
       continue;
     }

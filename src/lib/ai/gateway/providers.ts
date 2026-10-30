@@ -1,5 +1,6 @@
 import { isOpenRouterConfigured } from '@/lib/ai/openrouter';
 import { aiProfile } from '@/lib/ai/geminiModels';
+import { cohereCandidate } from './cohere';
 import type { AiTask, Candidate } from './types';
 
 // Catalogo de proveedores. Casi todos hablan la API "chat/completions" de OpenAI, asi que UN cliente generico los cubre;
@@ -105,6 +106,20 @@ export const PROVIDERS: ProviderDef[] = [
     free: 'modelos ":free": 20/min y 50/dia (1.000/dia con >= 10 USD comprados en total); el resto de modelos es de pago por uso',
     signup: 'https://openrouter.ai',
     custom: true, // usa src/lib/ai/openrouter.ts (soporta Vercel Connect y su propia lista de respaldo)
+  },
+  {
+    // Cohere (Aya Expanse 32B). No esta en las cadenas por defecto (su lugar depende del llamador: va PRIMERO en fichas, taxonomia y, por
+    // defecto, en la generacion de preguntas; ver GENERATION_PRIMARY). Se puede poner en cualquier cadena con AI_CHAIN_<TAREA>="cohere:<modelo>,...".
+    // Los limites de la llave de prueba son orientativos y NO estan verificados con la cuenta del proyecto.
+    id: 'cohere',
+    label: 'Cohere (Aya Expanse)',
+    baseUrl: 'https://api.cohere.com/v2',
+    keyEnv: 'COHERE_API_KEY',
+    jsonMode: false,
+    tier: 'free',
+    free: 'llave de prueba gratuita con limite por minuto y por mes (se ven en el panel); uso comercial de pago',
+    signup: 'https://dashboard.cohere.com',
+    custom: true, // adaptador propio: src/lib/ai/gateway/cohere.ts (la API de Cohere no es compatible con OpenAI)
   },
   {
     id: 'openai',
@@ -266,6 +281,15 @@ export function chainFor(task: AiTask, env: Env = process.env): Candidate[] {
     const p = BY_ID.get(c.provider);
     return !!p && isProviderConfigured(p, env);
   });
+}
+
+// La cadena de una tarea con Cohere puesto al principio o al final, si hay llave y la cadena no lo nombra ya (si el entorno lo puso en la
+// cadena, se respeta su lugar). Cohere no esta en las cadenas por defecto porque su lugar depende de quien llama.
+export function chainWithCohere(task: AiTask, position: 'first' | 'last', env: Env = process.env): Candidate[] {
+  const base = chainFor(task, env);
+  if (!env.COHERE_API_KEY || base.some((c) => c.provider === 'cohere')) return base;
+  const co = cohereCandidate(env);
+  return position === 'first' ? [co, ...base] : [...base, co];
 }
 
 export function hasProviderFor(task: AiTask, env: Env = process.env): boolean {
