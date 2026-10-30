@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
         spec: result.spec,
         warnings: result.warnings,
         evidence: result.evidence,
+        formulaChecks: result.formulaChecks,
         coverage: { verdict: result.coverage.verdict, weak: result.coverage.weak },
         sourceMaterialId,
       });

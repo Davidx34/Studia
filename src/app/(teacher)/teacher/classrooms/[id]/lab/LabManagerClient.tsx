@@ -71,7 +71,7 @@ export default function LabManagerClient({ classroomId, teacherId, initialItems,
         else setProposeError(msg);
         return;
       }
-      setEditing({ id: null, spec: data.spec, status: 'draft', sourceMaterialId: data.sourceMaterialId ?? null, warnings: data.warnings ?? [], evidence: data.evidence ?? [] });
+      setEditing({ id: null, spec: data.spec, status: 'draft', sourceMaterialId: data.sourceMaterialId ?? null, warnings: data.warnings ?? [], evidence: data.evidence ?? [], formulaChecks: data.formulaChecks ?? [] });
     } catch {
       setProposeError('No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.');
     } finally {
