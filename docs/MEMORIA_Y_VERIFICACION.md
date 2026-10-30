@@ -33,7 +33,7 @@ La IA lee las ecuaciones de los materiales (la memoria de la clase) y escribe un
 
 `buildTutorContext(grafo, consulta)` extrae el subgrafo relevante para **una** pregunta: el concepto consultado, **todo lo que hay que saber antes** (cierre transitivo de prerrequisitos en orden de estudio, por el orden topológico de Kahn), las **fórmulas literales** de los materiales y los prerrequisitos que los materiales nombran pero **no explican**. Si el tema no está en los materiales, lo dice (el tutor no debe inventarlo).
 
-`renderTutorContext` lo entrega como **dato** entre `<<<CONTEXTO … CONTEXTO>>>`, en una sola línea por concepto y sin rachas de `<`/`>` (el material no puede cerrar el bloque). Acepta un `sanitize` inyectado: al integrarlo en un prompt hay que pasar `sanitizeForPrompt` (de `src/lib/security/promptSanitizer.ts`, PR #167) porque el contenido viene de los materiales.
+`renderTutorContext` lo entrega como **dato** entre `<<<CONTEXTO … CONTEXTO>>>`, en una sola línea por concepto y sin rachas de `<`/`>` (el material no puede cerrar el bloque). El contenido viene de los materiales, así que por defecto pasa por `sanitizeForPrompt` (`src/lib/security/promptSanitizer.ts`); se puede inyectar otro `sanitize`.
 
 - **Estado:** función pura probada. **Aún no hay un tutor conversacional que la use.**
 

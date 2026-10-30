@@ -2,9 +2,10 @@
 // concepto consultado, TODO lo que hay que saber antes (cierre transitivo de prerrequisitos, en orden de estudio: lo basico primero, por el orden topologico de Kahn de graph.ts) y
 // las formulas LITERALES de los materiales. Si el concepto no esta en los materiales se dice, y el tutor no debe inventarlo. Es una funcion pura, sin red ni IA.
 //
-// El contenido viene de los materiales (de segunda mano, a traves de la memoria): al renderizarlo como texto para un prompt va como DATO entre delimitadores. Quien lo use puede pasar
-// su propio `sanitize` (por ejemplo sanitizeForPrompt de src/lib/security) y siempre se neutralizan los delimitadores aqui mismo.
+// El contenido viene de los materiales (de segunda mano, a traves de la memoria): al renderizarlo como texto para un prompt va como DATO entre delimitadores y pasa por
+// sanitizeForPrompt (src/lib/security/promptSanitizer.ts). Quien lo use puede pasar otro `sanitize`; los delimitadores se neutralizan siempre aqui mismo.
 
+import { sanitizeForPrompt } from '@/lib/security/promptSanitizer';
 import { buildIndex, prerequisitesOf, searchConcepts } from './graph';
 import { COVER_THRESHOLD } from './sufficiency';
 import { KIND_LABEL, type Concept, type Graph } from './types';
@@ -91,7 +92,7 @@ function line(c: TutorCard, clean: (s: string) => string): string {
 
 // El bloque para el prompt del tutor. '' si no hay nada que anclar.
 export function renderTutorContext(ctx: TutorContext, opts: { sanitize?: (s: string) => string; maxChars?: number } = {}): string {
-  const clean = (s: string) => plain(opts.sanitize ? opts.sanitize(s) : s);
+  const clean = (s: string) => plain((opts.sanitize ?? sanitizeForPrompt)(s));
   if (!ctx.found || !ctx.concept) {
     return `<<<CONTEXTO\nLo que se preguntó («${clean(ctx.query).slice(0, 100)}») NO aparece en los materiales de la clase. No lo expliques de memoria: dile al estudiante que ese tema no está en sus materiales.\nCONTEXTO>>>`;
   }
