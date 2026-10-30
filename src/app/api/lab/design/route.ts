@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminSupabase, hasServiceRoleKey } from '@/lib/supabase/admin';
+import { QUOTA_POLICIES, consumeQuota, quotaDeniedBody, type QuotaRpc } from '@/lib/security/rateLimit';
 import { callStudyModel, hasStudyProvider } from '@/lib/study/generate';
 import { DESIGN_LIMITS, designLab } from '@/lib/lab/design';
 import { readGraph } from '@/lib/memory/graphRead';
@@ -43,6 +45,15 @@ export async function POST(req: NextRequest) {
     const graph = readGraph(memory.graph);
 
     if (!hasStudyProvider()) return NextResponse.json({ error: 'No hay un proveedor de IA configurado.' }, { status: 503 });
+
+    // Limite de uso POR PROFESOR (migracion 080): cada diseño hace de 2 a 4 llamadas a la IA. Ya se comprobo que es el dueño de la clase (404 si no) y que la memoria esta lista;
+    // se consume justo antes de llamar a la IA, asi las peticiones rechazadas por validacion no gastan cupo. Sin llave de servicio, rateLimit.ts usa su respaldo en memoria.
+    const admin: any = hasServiceRoleKey() ? createAdminSupabase() : null;
+    const rpc: QuotaRpc = admin ? (fn, args) => admin.rpc(fn, args) : async () => ({ data: null, error: { message: 'sin llave de servicio' } });
+    const quota = await consumeQuota(rpc, user.id, QUOTA_POLICIES.labDesign);
+    if (!quota.allowed) {
+      return NextResponse.json(quotaDeniedBody(quota.retryAfterSeconds, 'diseñar un laboratorio'), { status: 429, headers: { 'Retry-After': String(quota.retryAfterSeconds) } });
+    }
 
     const result = await designLab({ idea, graph, allowPartial: force }, callStudyModel);
     if (result.ok) {

@@ -394,10 +394,16 @@ describe('ruta /api/lab/design', () => {
     expect(route.indexOf('class_memory')).toBeLessThan(route.indexOf('designLab('));
   });
 
-  it('lee la memoria con la sesion del profesor (RLS), no con la llave de servicio, y no confia en lo guardado', () => {
-    expect(route).not.toContain('createAdminSupabase');
+  it('lee la memoria con la sesion del profesor (RLS) y no confia en lo guardado; la llave de servicio SOLO sirve para el contador de uso (rpc), nunca para leer ni escribir datos', () => {
     expect(route).not.toContain('SERVICE_ROLE');
+    expect(route).toMatch(/db\.from\('class_memory'\)/); // db = el cliente del profesor
     expect(route).toContain('readGraph(memory.graph)');
+    // El cliente administrador existe solo para el cupo: ninguna consulta de datos pasa por el.
+    expect(route).toContain('admin.rpc(fn, args)');
+    expect(route).not.toMatch(/admin\.from\(/);
+    expect(route).not.toMatch(/admin\.storage/);
+    // ... y se crea DESPUES de comprobar que quien pide es el dueño de la clase.
+    expect(route.indexOf('createAdminSupabase()')).toBeGreaterThan(route.indexOf(".eq('teacher_id', user.id)"));
   });
 
   it('sin memoria o construyendose responde 409 con el motivo; sin IA, 503', () => {

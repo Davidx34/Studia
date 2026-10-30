@@ -63,7 +63,7 @@ Modo **controlado** (por defecto): solo la independiente se mueve. Modo **libre*
 
 `/teacher/classrooms/[id]/lab`. Dos caminos para crear: **con IA** (una idea y/o un material de la clase; la IA elige la plantilla o se le fija una) o **desde una plantilla**. En ambos casos se abre el editor: título, pregunta de investigación, escenario, hipótesis, modo, variable independiente, rango y valor de cada variable, constantes del ambiente, ensayos mínimos, curva teórica y preguntas guía, con la **vista previa real** (el laboratorio en su iframe aislado) a un lado. Se guarda como **borrador** o se **publica**; también se puede despublicar, editar y eliminar (con confirmación).
 
-- **La IA no escribe código.** `POST /api/lab/propose` devuelve solo la ficha (`LabSpec`), ya validada y recortada a los límites de la plantilla (`propose.ts`). Si el tema no se presta a ninguna plantilla, responde 422 con el motivo. El material se envía como dato entre delimitadores. Solo el dueño de la clase (y del material) puede llamarla.
+- **La IA no escribe código.** (Esta ruta, `POST /api/lab/propose`, se **eliminó en la iteración 2**: ya nada la usaba. Hoy el camino es `/api/lab/design`, sección «Diseño desde la memoria».)
 - **Lo guardado se revalida al leer** (`labRows.ts`): una plantilla retirada o un dato corrupto no rompe la lista.
 - **Migración 078** (`labs`): el profesor gestiona solo lo suyo; el estudiante solo **lee** los publicados de sus clases; un laboratorio solo puede vincularse a un material propio. Sin la migración, la pestaña lo explica en vez de romperse.
 - Los números se confirman al salir del campo y el campo muestra el valor ya recortado.
@@ -120,7 +120,7 @@ Pestaña Laboratorio → **Diseñar un laboratorio con IA**. El profesor escribe
 
 Lo que **no** resuelve: que la fórmula que escribió la IA sea la que traen los apuntes (se muestra al profesor para que la compare) ni que el modelo sea pedagógicamente óptimo.
 
-`/api/lab/propose` (plantillas fijas) quedó sin uso en la interfaz.
+`/api/lab/propose` (plantillas fijas) quedó sin uso en la interfaz y se eliminó en la iteración 2.
 
 ## Memoria v2 (descubierta al revisar una clase real de historia)
 
@@ -145,9 +145,15 @@ La v2 leyó los 4 materiales completos (42 de 42 bloques, en 3 pasadas encadenad
 - **Qué requiere «Releer todo»:** los topes del material, `grupo` y `causa` (cambian la extracción). La importancia, el título y el tope de la clase se aplican con solo fusionar (cualquier «Actualizar»).
 - **No incluido (a propósito):** la fusión de duplicados asistida por IA («Reino Antiguo de Egipto» vs «Imperio Antiguo de Egipto»). Cuesta llamadas y puede fusionar mal; queda para después.
 
+## Iteración 2: seguridad de la IA
+
+- **Límite de uso por profesor** (`src/lib/security/rateLimit.ts` + migración `080_ai_rate_limit.sql`). `/api/memory/build` (6/min, 40/h, 150/día) y `/api/lab/design` (3/min, 20/h, 80/día). Al pasarse responde **429** con `Retry-After` y un mensaje que dice cuánto esperar. El contador vive en **Postgres** (ventanas fijas, `consume_ai_quota`, `SECURITY DEFINER`, solo `service_role`, candado de asesoría por usuario y ruta): una petición rechazada **no consume** cupo. Se consume **después** de comprobar que quien pide es el dueño de la clase y **antes** de gastar IA. Si la base no responde o la migración aún no está aplicada, se usa un contador **en memoria por instancia** (protege menos, pero nunca deja la ruta sin tope ni la rompe) y se registra `[AI_QUOTA_DEGRADED]`.
+- **Sanitizador de material** (`src/lib/security/promptSanitizer.ts`). Todo texto que viene de un material (o de la memoria, que sale de los materiales) pasa por él antes de entrar a un prompt: quita caracteres invisibles y bidireccionales, neutraliza rachas de `<`/`>` (para que el material no pueda cerrar el bloque `<<<MATERIAL … MATERIAL>>>`), convierte fichas de plantilla de chat en texto inofensivo y **cita** (`[cita: …]`) frases de secuestro («ignora las instrucciones anteriores», «you are now»…). Es **heurístico** y no la única defensa (el material sigue yendo como DATO, la salida del modelo se valida y la IA no escribe código). Es idempotente y registra solo conteos (`[PROMPT_INJECTION_SUSPECT]`), nunca el contenido.
+- **`/api/lab/propose` eliminado** (y `src/lib/lab/propose.ts`): no tenía consumidores.
+- **pgvector fuera de `public`** (migración `081_move_vector_extension.sql`): mueve la extensión a `extensions` y fija `search_path = public, extensions` en las 4 funciones propias que la usan. **No aplicada** hasta que el profesor lo apruebe; incluye instrucciones para deshacer.
+
 ## Lo que falta (siguientes PR)
 
 1. **Que algo más consuma la memoria** (hoy solo el diseñador de laboratorios): generar objetivos y explicaciones con la prueba de suficiencia, un mapa de «qué cubren tus materiales y qué falta», contexto para el tutor.
 2. **Guardar y revisar:** tabla `lab_attempts` (migración + RLS), el estudiante abre el laboratorio publicado y su informe se guarda; el profesor lo revisa.
-3. Límite de uso por profesor en `/api/lab/design`, `/api/lab/propose` y `/api/memory/build`.
-4. Borrar `/api/lab/propose` y `src/lib/lab/propose.ts` si no se vuelven a usar.
+3. (Hecho en la iteración 2: límite de uso por profesor y borrado de `/api/lab/propose`; ver arriba.)

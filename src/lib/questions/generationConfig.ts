@@ -12,6 +12,7 @@
 // nueva sin decidir que se hace con ella.
 
 import type { Database } from '@/types/database.generated';
+import { sanitizeLogged } from '@/lib/security/promptSanitizer';
 import {
   jsonFormats,
   typeInstructionLine,
@@ -247,7 +248,7 @@ export function buildGenerationPrompt(input: BuildPromptInput): BuiltPrompt {
 ${header}
 
 CONTENIDO DEL MATERIAL:
-${(input.context || '').substring(0, RAG_CONTEXT_CHAR_LIMIT)}
+${sanitizeLogged(input.context || '', 'questions.generate').substring(0, RAG_CONTEXT_CHAR_LIMIT)}
 
 Genera EXACTAMENTE ${total} preguntas, distribuidas asi (respeta la cantidad exacta de cada tipo, no generes solo un tipo):
 ${typeInstructions}

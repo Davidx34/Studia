@@ -2,6 +2,7 @@
 // pinta. Eso permite verificarla contra el material (cada cifra y cada texto deben salir de el), tematizarla y
 // hacerla accesible.
 
+import { sanitizeLogged } from '@/lib/security/promptSanitizer';
 import type { ChunkGroup } from './grouping';
 import type { ModelCaller } from './generate';
 import { extractJsonObject, groundedRatio, MIN_GROUNDING } from './validate';
@@ -108,7 +109,7 @@ export function validateInfographic(raw: any, source: string): Infographic | nul
 
 export function buildInfographicPrompt(group: ChunkGroup, materialName: string): string {
   return `Eres un disenador de material de estudio. A partir de UN fragmento de apuntes, decide si se puede resumir en una infografia y devuelve SUS DATOS (no la dibujes).
-Material: "${materialName}"${group.section ? `\nSeccion: "${group.section}"` : ''}
+Material: "${sanitizeLogged(materialName, 'study.infographic:nombre', { maxChars: 120 })}"${group.section ? `\nSeccion: "${sanitizeLogged(group.section, 'study.infographic:seccion', { maxChars: 160 })}"` : ''}
 
 Elige UN tipo, el que mejor encaje con el fragmento:
 - "timeline": hechos con fechas o epocas (minimo 3 eventos, cada uno con su fecha).
@@ -129,7 +130,7 @@ Responde SOLO con JSON valido con UNA de estas formas:
 {"infografia":{"tipo":"stats","titulo":"...","cifras":[{"valor":"...","etiqueta":"...","nota":"..."}]}}
 
 FRAGMENTO
-${group.text}`;
+${sanitizeLogged(group.text, 'study.infographic')}`;
 }
 
 export interface GeneratedInfographics {
