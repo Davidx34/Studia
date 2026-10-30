@@ -133,6 +133,18 @@ La primera versión de la memoria, con una clase de historia (4 materiales), dej
 - **Jerarquía en el panel** (`buildTree`): vista «Por temas» (Mesopotamia → ciudades-estado → Ur, Uruk…, en varios niveles) y «Por tipo»; los datos sueltos (importancia ≤ 2 y sin relaciones) van a «Detalles menores». Los datos siguen en la memoria; es solo la presentación.
 - **Sin migración.** Los materiales a medias de la versión anterior se vuelven a leer completos una vez.
 
+## Memoria v3 (descubierta al releer la clase de historia con la v2)
+
+La v2 leyó los 4 materiales completos (42 de 42 bloques, en 3 pasadas encadenadas) y mostró nuevos defectos: la clase se **recortaba a 400** (los materiales dieron 426; Doc2 llegó justo a su tope de 120), **250 de 400** conceptos quedaron con importancia 2 y solo 1 con 5, el **título del documento** entró como concepto («Mesopotamia y Egipto»), **3 de 4 relaciones `causa`** de una muestra eran erróneas («natrón causa momificación») y los pueblos salían como «persona». Cambios:
+
+- **Topes holgados:** 250 conceptos por material, 800 por clase, 2400 relaciones. El límite de la base mide el tamaño **comprimido** (400 conceptos pesan ~52 KB frente a 800 KB), así que no hizo falta migración.
+- **Importancia por percentiles** (con 20+ conceptos): el 5 % más central es 5, el siguiente 15 % es 4, 35 % es 3, 30 % es 2 y el resto 1, según el puntaje (60 % IA + 40 % centralidad). Es relativo a la clase.
+- **Título del documento fuera** (`withoutTitleConcept`): se quita el concepto que coincide con el nombre del material **solo si apenas se menciona** (≤ 2 veces). «Antiguo Egipto» en un artículo de Wikipedia sobre el Antiguo Egipto se menciona muchas veces y se conserva.
+- **`causa` solo con expresión causal:** la relación se conserva únicamente si una frase que mencione alguno de los dos conceptos trae una señal causal («porque», «por eso», «debido a», «provocó», «llevó a», «gracias a», «se debía a»…). La señal de una frase **vecina** no cuenta. Si no, queda como `relacionado`. El prompt también lo pide.
+- **Tipo `grupo`** (pueblos, civilizaciones, dinastías, instituciones: sumerios, aztecas, el Senado). `persona` es solo un individuo; `obra` es *una* obra concreta (un sistema de escritura es un concepto).
+- **Qué requiere «Releer todo»:** los topes del material, `grupo` y `causa` (cambian la extracción). La importancia, el título y el tope de la clase se aplican con solo fusionar (cualquier «Actualizar»).
+- **No incluido (a propósito):** la fusión de duplicados asistida por IA («Reino Antiguo de Egipto» vs «Imperio Antiguo de Egipto»). Cuesta llamadas y puede fusionar mal; queda para después.
+
 ## Lo que falta (siguientes PR)
 
 1. **Que algo más consuma la memoria** (hoy solo el diseñador de laboratorios): generar objetivos y explicaciones con la prueba de suficiencia, un mapa de «qué cubren tus materiales y qué falta», contexto para el tutor.
