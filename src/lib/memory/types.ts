@@ -3,7 +3,7 @@
 // no obliga a volver a llamar a la IA, solo a fusionar de nuevo.
 
 // Los cuatro primeros y 'ejemplo' son de materias cuantitativas; persona/lugar/evento/periodo/obra son de materias narrativas (historia, literatura, geografia...).
-export const CONCEPT_KINDS = ['concepto', 'variable', 'formula', 'ley', 'definicion', 'objetivo', 'ejemplo', 'persona', 'lugar', 'evento', 'periodo', 'obra'] as const;
+export const CONCEPT_KINDS = ['concepto', 'variable', 'formula', 'ley', 'definicion', 'objetivo', 'ejemplo', 'persona', 'grupo', 'lugar', 'evento', 'periodo', 'obra'] as const;
 export type ConceptKind = (typeof CONCEPT_KINDS)[number];
 
 export const KIND_LABEL: Record<ConceptKind, string> = {
@@ -15,6 +15,7 @@ export const KIND_LABEL: Record<ConceptKind, string> = {
   objetivo: 'Objetivo',
   ejemplo: 'Ejemplo',
   persona: 'Personaje',
+  grupo: 'Pueblo o grupo',
   lugar: 'Lugar',
   evento: 'Evento',
   periodo: 'Periodo',
@@ -72,10 +73,14 @@ export const MEMORY_LIMITS = {
   formula: 200,
   unit: 24,
   conceptsPerGroup: 30,
-  conceptsPerMaterial: 120,
-  conceptsPerClass: 400,
-  edgesPerClass: 1200,
+  // Topes holgados: una clase de historia real (4 materiales) dio 426 conceptos y los topes anteriores (120 por material, 400 por clase) la recortaban. El limite de la base
+  // mide el tamaño COMPRIMIDO (la memoria de 400 conceptos pesa ~52 KB frente a un limite de 800 KB), asi que hay margen.
+  conceptsPerMaterial: 250,
+  conceptsPerClass: 800,
+  edgesPerClass: 2400,
   maxGroupsPerMaterial: 12,
+  // Desde cuantos conceptos la importancia se reparte por percentiles (con menos, se usa el puntaje absoluto).
+  percentileMin: 20,
   // Bloques que se leen a la vez (en paralelo) con la IA.
   concurrency: 3,
   // Dos claves de igual numero de palabras se funden si cada palabra es igual o parecida (Dice sobre bigramas >= esto): tolera un error de tipeo, no un concepto distinto.

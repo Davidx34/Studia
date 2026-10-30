@@ -8,6 +8,7 @@ import { createHash } from 'crypto';
 import { groupChunks } from '@/lib/study/grouping';
 import { STALE_GENERATING_MS, RETRY_COOLDOWN_MS, WORK_BUDGET_MS } from '@/lib/study/constants';
 import { extractMaterial, type ModelCaller } from './extract';
+import { materialTitle, normalizeKey } from './text';
 import { mergeGraphs, type MaterialGraph } from './merge';
 import { MEMORY_LIMITS, type Graph } from './types';
 
@@ -45,6 +46,16 @@ export async function claimMemory(admin: any, classroomId: string, force: boolea
     .eq('started_at', current.started_at)
     .select('classroom_id');
   return { state: claimed && claimed.length > 0 ? 'claimed' : 'busy' };
+}
+
+// El nombre del documento ("Doc1_Mesopotamia_y_Egipto.docx") a veces entra como si fuera un concepto. Se quita SOLO si coincide con el titulo y apenas se menciona en ese
+// material (un articulo cuyo titulo ES el tema, como "Antiguo Egipto" en Wikipedia, se menciona muchas veces y se conserva).
+export function withoutTitleConcept(graph: Graph, fileName: string): Graph {
+  const key = normalizeKey(materialTitle(fileName));
+  if (!key) return graph;
+  const drop = graph.concepts.filter((c) => c.key === key && c.mentions <= 2).map((c) => c.key);
+  if (drop.length === 0) return graph;
+  return { concepts: graph.concepts.filter((c) => drop.indexOf(c.key) === -1), edges: graph.edges.filter((e) => drop.indexOf(e.from) === -1 && drop.indexOf(e.to) === -1) };
 }
 
 export interface BuildStats {
@@ -114,7 +125,7 @@ export async function runMemoryBuild(admin: any, classroomId: string, call: Mode
 
       // Ya leido por completo y sin cambios.
       if (!opts.force && same && prev.status === 'ready') {
-        graphs.push({ materialId: m.id, graph: prev.extraction });
+        graphs.push({ materialId: m.id, graph: withoutTitleConcept(prev.extraction, m.display_name ?? m.filename ?? '') });
         t.reused++;
         t.read++;
         t.groupsDone += groupsCount;
@@ -127,7 +138,7 @@ export async function runMemoryBuild(admin: any, classroomId: string, call: Mode
 
       // Se acabo el tiempo antes de llegar a este material: queda pendiente (no es un fallo).
       if (now() > deadline) {
-        if (resume) graphs.push({ materialId: m.id, graph: prev.extraction });
+        if (resume) graphs.push({ materialId: m.id, graph: withoutTitleConcept(prev.extraction, m.display_name ?? m.filename ?? '') });
         t.groupsDone += doneBefore.length;
         t.groupsTotal += groupsCount;
         if (doneBefore.length > 0) t.partial++;
@@ -162,7 +173,7 @@ export async function runMemoryBuild(admin: any, classroomId: string, call: Mode
         },
         { onConflict: 'material_id' }
       );
-      graphs.push({ materialId: m.id, graph: keepOld ? prev.extraction : r.extraction });
+      graphs.push({ materialId: m.id, graph: withoutTitleConcept(keepOld ? prev.extraction : r.extraction, name) });
     }
 
     const { graph, stats } = mergeGraphs(graphs);

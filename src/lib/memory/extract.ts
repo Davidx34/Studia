@@ -10,7 +10,7 @@ import { groupChunks, type ChunkGroup, type ChunkInput } from '@/lib/study/group
 import { sanitizeText } from '@/lib/lab/labSpec';
 import { equationsIn, findEquation, sentences } from './equations';
 import { mergeGraphs } from './merge';
-import { groundedFraction, normalizeKey, words } from './text';
+import { fold, groundedFraction, normalizeKey, words } from './text';
 import { CONCEPT_KINDS, MEMORY_LIMITS, RELATIONS, type Concept, type ConceptKind, type Edge, type MaterialExtraction, type Profile, type Relation } from './types';
 
 export type ModelCaller = (prompt: string) => Promise<string | null>;
@@ -53,11 +53,11 @@ TEXTO>>>
 ${head}
 Devuelve:
 - "conceptos": hasta ${MEMORY_LIMITS.conceptsPerGroup}. Cada uno con "nombre" (corto, como lo llama el texto), "tipo", "definicion" (una o dos frases con lo que dice el texto) e "importancia" (1 a 5).
-  · "tipo": concepto (idea o proceso) | persona (personajes) | lugar (ciudades, regiones, ríos) | evento (batallas, unificaciones, descubrimientos) | periodo (eras, dinastías, épocas) | obra (textos, códigos, monumentos, documentos; por ejemplo el Código de Hammurabi) | ley | ejemplo.
+  · "tipo": concepto (idea o proceso) | persona (un individuo) | grupo (pueblos, civilizaciones, dinastías, instituciones: los sumerios, los aztecas, el Senado) | lugar (ciudades, regiones, ríos) | evento (batallas, unificaciones, descubrimientos) | periodo (eras, dinastías, épocas) | obra (UN texto, código, monumento o documento concreto; por ejemplo el Código de Hammurabi; un sistema de escritura es un concepto) | ley | ejemplo.
   · "importancia": 5 SOLO para los 2 o 3 temas centrales del fragmento (una civilización, un periodo, un proceso grande); 3 o 4 para sus componentes principales; 1 o 2 para datos sueltos y detalles menores.
 - "relaciones": cómo se conectan, usando los MISMOS nombres de arriba. "tipo":
   · parte_de: "de" es una parte o componente de "a" (Alto Egipto parte_de Egipto).
-  · causa: "de" provoca u origina "a" (SOLO si el texto lo dice).
+  · causa: "de" provoca u origina "a"; SOLO si el texto usa una expresión causal (porque, por eso, debido a, provocó, originó, llevó a…) y con la causa en "de" y el efecto en "a". Si no, usa relacionado.
   · ocurre_en: "de" sucede en, o pertenece a, el lugar o periodo "a".
   · relacionado: se conectan pero no encaja ninguna de las anteriores.
   NO uses "requiere" ni "se_calcula_con".
@@ -91,18 +91,43 @@ Responde SOLO con un JSON válido:
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
-// ¿Hay dos frases contiguas donde aparezcan los dos conceptos? Es lo que hace creible una relacion.
-export function supportedBy(text: string, a: string, b: string): boolean {
+// La frase (o las dos frases contiguas) donde aparecen los dos conceptos, o null si no hay. Es lo que hace creible una relacion.
+export function supportingWindow(text: string, a: string, b: string): string | null {
   const wa = words(a);
   const wb = words(b);
-  if (wa.length === 0 || wb.length === 0) return false;
+  if (wa.length === 0 || wb.length === 0) return null;
   const frac = (ws: string[], src: string[]) => ws.filter((w) => src.indexOf(w) !== -1).length / ws.length;
-  const sents = sentences(text).map((s) => words(s));
+  const raw = sentences(text);
+  const sents = raw.map((s) => words(s));
   for (let i = 0; i < sents.length; i++) {
     const win = i + 1 < sents.length ? sents[i].concat(sents[i + 1]) : sents[i];
-    if (frac(wa, win) >= 0.5 && frac(wb, win) >= 0.5) return true;
+    if (frac(wa, win) >= 0.5 && frac(wb, win) >= 0.5) return i + 1 < raw.length ? raw[i] + ' ' + raw[i + 1] : raw[i];
   }
-  return false;
+  return null;
+}
+
+export function supportedBy(text: string, a: string, b: string): boolean {
+  return supportingWindow(text, a, b) !== null;
+}
+
+// ¿El texto expresa una CAUSA? La IA usaba "causa" para cualquier vinculo (y a veces al reves: "el natron causa la momificacion"). Solo se conserva si la frase trae una
+// expresion causal; si no, es una conexion neutra.
+const CAUSAL_CUE = /\b(porque|por eso|por ello|por lo que|de ahi|debido a|a causa de|se deb(?:e|en|ia|ian|io|ieron) a|fue la causa|causo|causa de|causaron|provoco|provocaron|origino|originaron|produjo|genero|llevo a|condujo|como consecuencia|consecuencia de|gracias a|resultado de|a raiz de|dio lugar|motivo|desencadeno|ocasiono|obligo|forzo|impulso|permitio)\b/;
+export function hasCausalCue(windowText: string): boolean {
+  return CAUSAL_CUE.test(fold(windowText));
+}
+
+// ¿Hay una frase con expresion causal que mencione alguno de los dos conceptos? La señal debe estar en la frase de los conceptos: la de una frase vecina ("... por eso la
+// agricultura prospero. Para la momificacion se usaba natron.") no convierte en causa un vinculo que el texto no presenta asi.
+export function hasCausalLink(text: string, a: string, b: string): boolean {
+  const wa = words(a);
+  const wb = words(b);
+  const frac = (ws: string[], src: string[]) => (ws.length === 0 ? 0 : ws.filter((w) => src.indexOf(w) !== -1).length / ws.length);
+  return sentences(text).some((s) => {
+    if (!hasCausalCue(s)) return false;
+    const src = words(s);
+    return frac(wa, src) >= 0.5 || frac(wb, src) >= 0.5;
+  });
 }
 
 export interface GroupResult {
@@ -174,10 +199,13 @@ export function parseExtraction(text: string, group: ChunkGroup, materialId: str
       // En una materia narrativa nada "requiere" ni "se calcula": la IA tiende a usar esas relaciones para cualquier cosa (y a invertir el sentido), asi que se vuelven una conexion neutra.
       if (profile === 'narrativo' && (relation === 'requiere' || relation === 'se_calcula_con')) relation = 'relacionado';
       // Que el texto la sostenga: los dos conceptos juntos en una frase (o en dos contiguas).
-      if (!supportedBy(group.text, byKey[from].name, byKey[to].name)) {
+      const win = supportingWindow(group.text, byKey[from].name, byKey[to].name);
+      if (win === null) {
         relationsRejected++;
         continue;
       }
+      // "Causa" solo si la frase expresa una causa; si no, es una conexion neutra.
+      if (relation === 'causa' && !hasCausalLink(win, byKey[from].name, byKey[to].name)) relation = 'relacionado';
       // "Se calcula con" necesita una formula (en alguno de los dos); si no, es solo una conexion.
       if (relation === 'se_calcula_con' && !byKey[from].formula && !byKey[to].formula) relation = 'relacionado';
       const id = from + '\u0000' + to + '\u0000' + relation;

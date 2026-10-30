@@ -43,7 +43,7 @@ function compatible(a: ConceptKind, b: ConceptKind): boolean {
 }
 
 // Cuando un nodo reune varios tipos, gana el mas especifico.
-const SPECIFICITY: Record<ConceptKind, number> = { formula: 9, ley: 8, variable: 7, evento: 6, persona: 6, lugar: 6, periodo: 6, obra: 6, objetivo: 3, ejemplo: 2, concepto: 1, definicion: 0 };
+const SPECIFICITY: Record<ConceptKind, number> = { formula: 9, ley: 8, variable: 7, evento: 6, persona: 6, grupo: 6, lugar: 6, periodo: 6, obra: 6, objetivo: 3, ejemplo: 2, concepto: 1, definicion: 0 };
 
 function mergeSources(list: SourceRef[][]): SourceRef[] {
   const byMaterial: Record<string, Record<number, true>> = {};
@@ -146,10 +146,21 @@ export function mergeGraphs(inputs: MaterialGraph[], opts: { blend?: boolean } =
     kept.forEach((c) => {
       maxDeg = Math.max(maxDeg, deg[c.key] ?? 0);
     });
+    const score: Record<string, number> = Object.create(null);
     kept.forEach((c) => {
       const central = 1 + 4 * ((deg[c.key] ?? 0) / maxDeg);
-      c.importance = Math.min(5, Math.max(1, Math.round(0.6 * c.importance + 0.4 * central)));
+      score[c.key] = 0.6 * c.importance + 0.4 * central;
+      c.importance = Math.min(5, Math.max(1, Math.round(score[c.key])));
     });
+    // Con una memoria de tamaño razonable, la importancia se reparte por PERCENTILES del puntaje (los numeros absolutos quedaban casi todos en 2: en una clase real, 250 de 400
+    // conceptos): el 5 % mas central es 5, el siguiente 15 % es 4, el 35 % siguiente es 3, el 30 % siguiente es 2 y el resto es 1. Es relativo a ESTA clase.
+    if (kept.length >= MEMORY_LIMITS.percentileMin) {
+      const ranked = kept.slice().sort((a, b) => score[b.key] - score[a.key] || (a.key < b.key ? -1 : 1));
+      ranked.forEach((c, i) => {
+        const f = (i + 0.5) / ranked.length;
+        c.importance = f < 0.05 ? 5 : f < 0.2 ? 4 : f < 0.55 ? 3 : f < 0.85 ? 2 : 1;
+      });
+    }
   }
 
   return { graph: { concepts: kept, edges: trimmed }, stats: { input: flat.length, merged: kept.length, cyclesBroken: removed.length, dropped } };

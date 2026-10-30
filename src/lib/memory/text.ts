@@ -75,6 +75,17 @@ export function similarKeys(a: string, b: string, tokenSimilarity: number): bool
   return true;
 }
 
+// El nombre de un material sin extension, sin prefijos de numeracion ("Doc1_") ni sufijos de sitio ("- Wikipedia, la enciclopedia libre"): "Doc1_Mesopotamia_y_Egipto.docx" -> "Mesopotamia y Egipto".
+export function materialTitle(fileName: string): string {
+  return fileName
+    .replace(/\.(docx?|pdf|txt|md|markdown|html?)$/i, '')
+    .replace(/[_]+/g, ' ')
+    .replace(/^\s*(doc|documento|material|tema|unidad|cap[ií]tulo)\s*\d+\s*[-:.]?\s*/i, '')
+    .replace(/\s+[-–—|]\s+wikipedia.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Que parte de las palabras de un concepto aparece en un texto fuente (0 a 1): sirve para descartar lo que la IA invento y no esta en el material.
 export function groundedFraction(name: string, sourceText: string): number {
   const ws = words(name);
