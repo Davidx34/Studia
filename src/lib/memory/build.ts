@@ -8,7 +8,7 @@ import { createHash } from 'crypto';
 import { groupChunks } from '@/lib/study/grouping';
 import { STALE_GENERATING_MS, RETRY_COOLDOWN_MS, WORK_BUDGET_MS } from '@/lib/study/constants';
 import { extractMaterial, type ModelCaller } from './extract';
-import { materialTitle, normalizeKey } from './text';
+import { dice, materialTitle, normalizeKey, similarKeys } from './text';
 import { mergeGraphs, type MaterialGraph } from './merge';
 import { MEMORY_LIMITS, type Graph } from './types';
 
@@ -48,12 +48,21 @@ export async function claimMemory(admin: any, classroomId: string, force: boolea
   return { state: claimed && claimed.length > 0 ? 'claimed' : 'busy' };
 }
 
-// El nombre del documento ("Doc1_Mesopotamia_y_Egipto.docx") a veces entra como si fuera un concepto. Se quita SOLO si coincide con el titulo y apenas se menciona en ese
-// material (un articulo cuyo titulo ES el tema, como "Antiguo Egipto" en Wikipedia, se menciona muchas veces y se conserva).
+// Encabezados genericos de un archivo que la IA a veces extrae como si fueran conceptos ("Introduccion", "Bibliografia"...). Solo claves exactas y poco mencionadas.
+const GENERIC_HEADINGS = ['introduccion', 'indice', 'resumen', 'contenido', 'tabla-contenido', 'conclusion', 'conclusion', 'bibliografia', 'referencia', 'presentacion', 'glosario', 'anexo', 'portada', 'documento', 'pagina'];
+
+// El nombre del documento ("Doc1_Mesopotamia_y_Egipto.docx") a veces entra como si fuera un concepto, y tambien encabezados genericos. Se quita el titulo SOLO si coincide
+// (exacta o casi exactamente) y apenas se menciona en ese material (un articulo cuyo titulo ES el tema, como "Antiguo Egipto" en Wikipedia, se menciona muchas veces y se conserva).
 export function withoutTitleConcept(graph: Graph, fileName: string): Graph {
-  const key = normalizeKey(materialTitle(fileName));
-  if (!key) return graph;
-  const drop = graph.concepts.filter((c) => c.key === key && c.mentions <= 2).map((c) => c.key);
+  const titleKey = normalizeKey(materialTitle(fileName));
+  const drop = graph.concepts
+    .filter((c) => {
+      if (GENERIC_HEADINGS.indexOf(c.key) !== -1 && c.mentions <= 3 && (c.kind === 'concepto' || c.kind === 'definicion')) return true;
+      if (!titleKey) return false;
+      const near = c.key === titleKey || dice(c.key, titleKey) >= 0.9 || similarKeys(c.key, titleKey, MEMORY_LIMITS.tokenSimilarity);
+      return near && c.mentions <= 2;
+    })
+    .map((c) => c.key);
   if (drop.length === 0) return graph;
   return { concepts: graph.concepts.filter((c) => drop.indexOf(c.key) === -1), edges: graph.edges.filter((e) => drop.indexOf(e.from) === -1 && drop.indexOf(e.to) === -1) };
 }
@@ -77,6 +86,8 @@ export interface BuildStats {
   reused: number;
   cyclesBroken: number;
   dropped: number;
+  duplicatesMerged: number;
+  duplicateCandidates: number;
 }
 
 // Mensaje para el profesor cuando la memoria quedo incompleta (null si esta completa).
@@ -192,6 +203,8 @@ export async function runMemoryBuild(admin: any, classroomId: string, call: Mode
       reused: t.reused,
       cyclesBroken: stats.cyclesBroken,
       dropped: stats.dropped,
+      duplicatesMerged: stats.duplicatesMerged,
+      duplicateCandidates: stats.duplicateCandidates,
     };
     const { data: prevMemory } = await admin.from('class_memory').select('version').eq('classroom_id', classroomId).maybeSingle();
     const nothing = graph.concepts.length === 0 && counted > 0 && incomplete;

@@ -1,7 +1,9 @@
 // Fusion de lo extraido de cada material en UN grafo por clase. Dos materiales que hablan del mismo concepto (aunque con palabras algo distintas) terminan en un solo nodo con
 // las fuentes de ambos; las relaciones se reasignan a ese nodo, se suman y se les rompen los ciclos. Determinista: mismos materiales, mismo grafo.
 
+import { aliasUnions, findDuplicateCandidates } from './duplicates';
 import { breakCycles } from './graph';
+import { reclassifyKind } from './kinds';
 import { similarKeys } from './text';
 import { MEMORY_LIMITS, type Concept, type ConceptKind, type Edge, type Graph, type SourceRef } from './types';
 
@@ -15,6 +17,9 @@ export interface MergeStats {
   merged: number;
   cyclesBroken: number;
   dropped: number;
+  // Pares de conceptos fusionados por ser alias uno del otro ("Aztecas" y "Aztecas/Mexicas"), y candidatos de confianza media que quedan SIN fusionar (sinonimos como Reino/Imperio).
+  duplicatesMerged: number;
+  duplicateCandidates: number;
 }
 
 // Union-find con compresion de caminos.
@@ -60,8 +65,9 @@ function mergeSources(list: SourceRef[][]): SourceRef[] {
 
 // blend: la importancia final mezcla lo que dijo la IA con lo CENTRAL que es el concepto en el grafo (cuantas relaciones tiene). Un dato suelto sin relaciones baja; un tema
 // del que cuelgan muchos otros sube. Se aplica a la fusion de la CLASE; al unir los bloques de un solo material no (el grafo todavia esta incompleto).
-export function mergeGraphs(inputs: MaterialGraph[], opts: { blend?: boolean } = {}): { graph: Graph; stats: MergeStats } {
+export function mergeGraphs(inputs: MaterialGraph[], opts: { blend?: boolean; dedupe?: boolean } = {}): { graph: Graph; stats: MergeStats } {
   const blend = opts.blend !== false;
+  const dedupe = opts.dedupe !== false;
   const flat: Concept[] = [];
   for (const m of inputs) for (const c of m.graph.concepts) flat.push(c);
   const sets = makeSets(flat.length);
@@ -77,6 +83,26 @@ export function mergeGraphs(inputs: MaterialGraph[], opts: { blend?: boolean } =
     }
   }
 
+  // 1b. Alias entre materiales ("Aztecas" / "Aztecas/Mexicas", "Utilidad marginal" / "Utilidad Marginal (UM)"): el propio material escribio la equivalencia, asi que se fusionan
+  // conservando las fuentes de ambos. Los sinonimos historicos (Reino/Imperio) NO se fusionan solos: ver duplicates.ts.
+  let duplicatesMerged = 0;
+  if (dedupe) {
+    const idx: Record<string, number[]> = Object.create(null);
+    flat.forEach((c, i) => (idx[c.key] = idx[c.key] ?? []).push(i));
+    for (const [ka, kb] of aliasUnions(flat)) {
+      let joined = false;
+      for (const ia of idx[ka] ?? []) {
+        for (const ib of idx[kb] ?? []) {
+          if (sets.find(ia) !== sets.find(ib)) {
+            sets.union(ia, ib);
+            joined = true;
+          }
+        }
+      }
+      if (joined) duplicatesMerged++;
+    }
+  }
+
   const clusters: Record<number, number[]> = {};
   flat.forEach((_, i) => {
     const r = sets.find(i);
@@ -89,14 +115,16 @@ export function mergeGraphs(inputs: MaterialGraph[], opts: { blend?: boolean } =
   for (const root of Object.keys(clusters)) {
     const members = clusters[Number(root)].map((i) => flat[i]);
     const canonical = members.slice().sort((a, b) => b.definition.length - a.definition.length || b.mentions - a.mentions || (a.key < b.key ? -1 : 1))[0];
-    const kind = members.map((m) => m.kind).sort((a, b) => SPECIFICITY[b] - SPECIFICITY[a])[0];
     const sources = mergeSources(members.map((m) => m.sources));
     const longest = (pick: (c: Concept) => string) => members.map(pick).sort((a, b) => b.length - a.length)[0] ?? '';
+    const definition = longest((c) => c.definition).slice(0, MEMORY_LIMITS.definition);
+    // El tipo mas especifico entre los miembros; y un colectivo etiquetado "persona" pasa a "grupo" (kinds.ts). Se hace AQUI para que tambien corrija memorias ya guardadas sin releerlas.
+    const kind = reclassifyKind(members.map((m) => m.kind).sort((a, b) => SPECIFICITY[b] - SPECIFICITY[a])[0], canonical.name, definition);
     const concept: Concept = {
       key: canonical.key,
       name: canonical.name,
       kind,
-      definition: longest((c) => c.definition).slice(0, MEMORY_LIMITS.definition),
+      definition,
       formula: longest((c) => c.formula).slice(0, MEMORY_LIMITS.formula),
       unit: longest((c) => c.unit).slice(0, MEMORY_LIMITS.unit),
       // Lo que aparece en varios materiales es mas central.
@@ -155,7 +183,8 @@ export function mergeGraphs(inputs: MaterialGraph[], opts: { blend?: boolean } =
     // Con una memoria de tamaño razonable, la importancia se reparte por PERCENTILES del puntaje (los numeros absolutos quedaban casi todos en 2: en una clase real, 250 de 400
     // conceptos): el 5 % mas central es 5, el siguiente 15 % es 4, el 35 % siguiente es 3, el 30 % siguiente es 2 y el resto es 1. Es relativo a ESTA clase.
     if (kept.length >= MEMORY_LIMITS.percentileMin) {
-      const ranked = kept.slice().sort((a, b) => score[b.key] - score[a.key] || (a.key < b.key ? -1 : 1));
+      // Desempate DETERMINISTA: primero el que tiene mas relaciones (grado) y luego la clave, para que el reparto no dependa del orden de los materiales.
+      const ranked = kept.slice().sort((a, b) => score[b.key] - score[a.key] || (deg[b.key] ?? 0) - (deg[a.key] ?? 0) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
       ranked.forEach((c, i) => {
         const f = (i + 0.5) / ranked.length;
         c.importance = f < 0.05 ? 5 : f < 0.2 ? 4 : f < 0.55 ? 3 : f < 0.85 ? 2 : 1;
@@ -163,5 +192,6 @@ export function mergeGraphs(inputs: MaterialGraph[], opts: { blend?: boolean } =
     }
   }
 
-  return { graph: { concepts: kept, edges: trimmed }, stats: { input: flat.length, merged: kept.length, cyclesBroken: removed.length, dropped } };
+  const duplicateCandidates = dedupe ? findDuplicateCandidates(kept, trimmed).filter((p) => p.confidence === 'media').length : 0;
+  return { graph: { concepts: kept, edges: trimmed }, stats: { input: flat.length, merged: kept.length, cyclesBroken: removed.length, dropped, duplicatesMerged, duplicateCandidates } };
 }

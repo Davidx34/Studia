@@ -9,6 +9,7 @@ import { extractJsonObject } from '@/lib/study/validate';
 import { groupChunks, type ChunkGroup, type ChunkInput } from '@/lib/study/grouping';
 import { sanitizeText } from '@/lib/lab/labSpec';
 import { equationsIn, findEquation, sentences } from './equations';
+import { reclassifyKind } from './kinds';
 import { mergeGraphs } from './merge';
 import { fold, groundedFraction, normalizeKey, words } from './text';
 import { CONCEPT_KINDS, MEMORY_LIMITS, RELATIONS, type Concept, type ConceptKind, type Edge, type MaterialExtraction, type Profile, type Relation } from './types';
@@ -112,7 +113,7 @@ export function supportedBy(text: string, a: string, b: string): boolean {
 
 // ¿El texto expresa una CAUSA? La IA usaba "causa" para cualquier vinculo (y a veces al reves: "el natron causa la momificacion"). Solo se conserva si la frase trae una
 // expresion causal; si no, es una conexion neutra.
-const CAUSAL_CUE = /\b(porque|por eso|por ello|por lo que|de ahi|debido a|a causa de|se deb(?:e|en|ia|ian|io|ieron) a|fue la causa|causo|causa de|causaron|provoco|provocaron|origino|originaron|produjo|genero|llevo a|condujo|como consecuencia|consecuencia de|gracias a|resultado de|a raiz de|dio lugar|motivo|desencadeno|ocasiono|obligo|forzo|impulso|permitio)\b/;
+const CAUSAL_CUE = /\b(porque|por eso|por ello|por lo que|de ahi|debido a|a causa de|se deb(?:e|en|ia|ian|io|ieron) a|fue la causa|causo|causa de|causaron|provoco|provocaron|origino|originaron|produjo|genero|llevo a|condujo|como consecuencia|consecuencia de|gracias a|resultado de|a raiz de|dio lugar|motivo|desencadeno|ocasiono|obligo|forzo|impulso|permitio|ya que|puesto que|dado que|por ende|en consecuencia|por consiguiente|por tanto|por lo tanto|desemboco|trajo consigo|tuvo como resultado|dio origen|da lugar|dan lugar|hizo que|hicieron que)\b/;
 export function hasCausalCue(windowText: string): boolean {
   return CAUSAL_CUE.test(fold(windowText));
 }
@@ -166,6 +167,9 @@ export function parseExtraction(text: string, group: ChunkGroup, materialId: str
     let kind: ConceptKind = (CONCEPT_KINDS as readonly string[]).indexOf(String(raw.tipo)) >= 0 ? (raw.tipo as ConceptKind) : 'concepto';
     // En una materia narrativa no hay variables ni formulas: un lugar mal etiquetado como "variable" es un concepto.
     if (profile === 'narrativo' && (kind === 'variable' || kind === 'formula')) kind = 'concepto';
+    const definition = sanitizeText(raw.definicion, MEMORY_LIMITS.definition);
+    // Un colectivo (pueblo, dinastia, institucion) que el modelo etiqueto "persona" pasa a "grupo" (heuristica lexica, kinds.ts).
+    if (profile === 'narrativo') kind = reclassifyKind(kind, name, definition);
     const imp = typeof raw.importancia === 'number' && Number.isFinite(raw.importancia) ? Math.round(raw.importancia) : 3;
     let formula = profile === 'narrativo' ? '' : sanitizeText(raw.formula, MEMORY_LIMITS.formula);
     // Red de seguridad: si el texto trae la ecuacion de este concepto y la IA no la copio, se toma literal del texto.
@@ -174,7 +178,7 @@ export function parseExtraction(text: string, group: ChunkGroup, materialId: str
       key,
       name,
       kind,
-      definition: sanitizeText(raw.definicion, MEMORY_LIMITS.definition),
+      definition,
       formula,
       unit: profile === 'narrativo' ? '' : sanitizeText(raw.unidad, MEMORY_LIMITS.unit),
       importance: Math.min(5, Math.max(1, imp)),
