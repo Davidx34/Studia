@@ -223,7 +223,7 @@ describe('mergeGraphs', () => {
 
   it('respeta el tope de conceptos de la clase quedandose con lo importante', () => {
     const many = Array.from({ length: MEMORY_LIMITS.conceptsPerClass + 30 }, (_, i) => concept(`tema número ${i} xq${'abcdefghij'[i % 10]}${i}`, { importance: i < 10 ? 5 : 1 }));
-    const { graph, stats } = mergeGraphs([{ materialId: 'm1', graph: { concepts: many, edges: [] } }]);
+    const { graph, stats } = mergeGraphs([{ materialId: 'm1', graph: { concepts: many, edges: [] } }], { blend: false });
     expect(graph.concepts.length).toBeLessThanOrEqual(MEMORY_LIMITS.conceptsPerClass);
     expect(stats.dropped).toBeGreaterThan(0);
     expect(graph.concepts.filter((c) => c.importance === 5).length).toBe(10);

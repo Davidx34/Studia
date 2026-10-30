@@ -161,7 +161,8 @@ describe('runMemoryBuild: incremental', () => {
     await runMemoryBuild(fakeAdmin(db), 'c1', vi.fn().mockResolvedValue(null));
     expect(db.class_memory[0].status).toBe('failed');
     expect(db.class_memory[0].error).toMatch(/ningún material/);
-    expect(db.class_memory_material.every((r) => r.status === 'failed')).toBe(true);
+    // sin ningun bloque leido el material queda a medias (se reintenta), no como "listo"
+    expect(db.class_memory_material.every((r) => r.status === 'extracting')).toBe(true);
   });
 
   it('si la IA falla despues de haber una memoria buena, NO se pierde lo que ya sabia', async () => {
@@ -172,7 +173,8 @@ describe('runMemoryBuild: incremental', () => {
     db.material_chunks[1].content += ' cambio';
     await runMemoryBuild(fakeAdmin(db), 'c1', vi.fn().mockResolvedValue(null));
     expect(db.class_memory[0].graph.concepts).toHaveLength(2);
-    expect(db.class_memory[0].error).toMatch(/2 de 2 materiales/);
+    expect(db.class_memory[0].error).toMatch(/Leídos 0 de 2 materiales/);
+    expect(db.class_memory[0].stats.incomplete).toBe(true);
   });
 
   it('un material que falla no tumba a los demas: la memoria queda lista con un aviso', async () => {
@@ -203,9 +205,11 @@ describe('runMemoryBuild: incremental', () => {
     expect(db.class_memory[0].error).toMatch(/inesperado/);
   });
 
-  it('buildWarning', () => {
-    expect(buildWarning({ materials: 3, materialsFailed: 0 })).toBeNull();
-    expect(buildWarning({ materials: 1, materialsFailed: 1 })).toMatch(/1 de 1 material /);
+  it('buildWarning: nada si esta completa; si falta leer dice cuanto, y distingue "sigue" de "la IA no respondio"', () => {
+    const done = { materials: 3, materialsRead: 3, materialsFailed: 0, groupsDone: 9, groupsTotal: 9, incomplete: false };
+    expect(buildWarning(done)).toBeNull();
+    expect(buildWarning({ ...done, materialsRead: 1, groupsDone: 4, incomplete: true })).toMatch(/Leídos 1 de 3 materiales \(4 de 9 bloques\)\. Falta leer el resto/);
+    expect(buildWarning({ ...done, materials: 1, materialsRead: 0, materialsFailed: 1, groupsDone: 0, groupsTotal: 3, incomplete: true })).toMatch(/Leídos 0 de 1 material \(0 de 3 bloques\)\. La IA no respondió/);
   });
 });
 

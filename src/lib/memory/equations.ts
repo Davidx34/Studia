@@ -17,7 +17,7 @@ function isProse(tok: string): boolean {
 }
 
 // Los trozos de un parrafo (frases), sin perder los signos.
-function sentences(text: string): string[] {
+export function sentences(text: string): string[] {
   const out: string[] = [];
   let cur = '';
   const parts = text.split(/([.;!?]\s+|\n+)/);

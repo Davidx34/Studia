@@ -1,12 +1,15 @@
-// Construccion de la memoria de una clase en segundo plano (la dispara el profesor). Es INCREMENTAL: cada material guarda el hash de su contenido y solo se vuelve a leer con la
-// IA el que cambio; despues se fusionan todos y se escribe el grafo con una version nueva. Deja el motivo si algo fallo o quedo incompleto. Usa la llave de servicio: quien llama
-// debe haber comprobado ANTES que es el profesor dueño de la clase.
+// Construccion de la memoria de una clase en segundo plano (la dispara el profesor). Es INCREMENTAL y se puede CONTINUAR:
+//   - cada material guarda el hash de su contenido y que bloques ya se leyeron; si el hash no cambio, no se vuelve a llamar a la IA por lo ya leido;
+//   - la funcion tiene un tope de tiempo: lo que no alcanza queda PENDIENTE (no "fallido") y la siguiente pasada continua donde se quedo;
+//   - al final se fusionan todos los materiales y se escribe el grafo con una version nueva, junto con el progreso (cuantos bloques y materiales faltan).
+// Usa la llave de servicio: quien llama debe haber comprobado ANTES que es el profesor dueño de la clase.
 
 import { createHash } from 'crypto';
+import { groupChunks } from '@/lib/study/grouping';
 import { STALE_GENERATING_MS, RETRY_COOLDOWN_MS, WORK_BUDGET_MS } from '@/lib/study/constants';
 import { extractMaterial, type ModelCaller } from './extract';
 import { mergeGraphs, type MaterialGraph } from './merge';
-import type { Graph } from './types';
+import { MEMORY_LIMITS, type Graph } from './types';
 
 export type ClaimState = 'claimed' | 'busy' | 'cooldown';
 
@@ -48,16 +51,35 @@ export interface BuildStats {
   concepts: number;
   edges: number;
   materials: number;
+  // Leidos por completo.
+  materialsRead: number;
+  // Con algunos bloques leidos y otros pendientes.
+  materialsPartial: number;
+  // Todavia sin leer (se acabo el tiempo antes de llegar a ellos).
+  materialsPending: number;
+  // Se intento y la IA no respondio nada util.
   materialsFailed: number;
+  groupsDone: number;
+  groupsTotal: number;
+  // Falta leer algo: el panel sigue pidiendo pasadas hasta completar (o hasta que ya no haya progreso).
+  incomplete: boolean;
   reused: number;
   cyclesBroken: number;
   dropped: number;
 }
 
-// Mensaje para el profesor cuando la memoria quedo incompleta (null si todo salio bien).
-export function buildWarning(s: Pick<BuildStats, 'materials' | 'materialsFailed'>): string | null {
-  if (s.materialsFailed === 0) return null;
-  return `${s.materialsFailed} de ${s.materials} ${s.materials === 1 ? 'material' : 'materiales'} no se pudo leer del todo (límite de uso de la IA, o el texto no se entiende). Vuelve a actualizar en unos minutos.`;
+// Mensaje para el profesor cuando la memoria quedo incompleta (null si esta completa).
+export function buildWarning(s: Pick<BuildStats, 'materials' | 'materialsRead' | 'materialsFailed' | 'groupsDone' | 'groupsTotal' | 'incomplete'>): string | null {
+  if (!s.incomplete) return null;
+  const progress = `Leídos ${s.materialsRead} de ${s.materials} ${s.materials === 1 ? 'material' : 'materiales'} (${s.groupsDone} de ${s.groupsTotal} bloques).`;
+  return s.materialsFailed > 0 ? `${progress} La IA no respondió en algunos bloques (límite de uso o conexión); vuelve a actualizar en unos minutos.` : `${progress} Falta leer el resto: se continúa desde donde quedó.`;
+}
+
+interface Known {
+  status: string;
+  content_hash: string;
+  extraction: Graph;
+  stats: { groups?: number; doneGroups?: number[] } | null;
 }
 
 export async function runMemoryBuild(admin: any, classroomId: string, call: ModelCaller, opts: { force?: boolean; now?: () => number } = {}): Promise<void> {
@@ -73,72 +95,105 @@ export async function runMemoryBuild(admin: any, classroomId: string, call: Mode
       .order('created_at');
     const list: { id: string; display_name: string | null; filename: string | null }[] = materials ?? [];
 
-    const { data: existing } = await admin.from('class_memory_material').select('material_id, status, content_hash, extraction').eq('classroom_id', classroomId);
-    const known: Record<string, { status: string; content_hash: string; extraction: Graph }> = {};
+    const { data: existing } = await admin.from('class_memory_material').select('material_id, status, content_hash, extraction, stats').eq('classroom_id', classroomId);
+    const known: Record<string, Known> = {};
     for (const r of existing ?? []) known[r.material_id] = r;
 
     const graphs: MaterialGraph[] = [];
-    let failed = 0;
-    let reused = 0;
+    const t = { read: 0, partial: 0, pending: 0, failed: 0, groupsDone: 0, groupsTotal: 0, reused: 0 };
+    let counted = 0;
     for (const m of list) {
       const { data: chunks } = await admin.from('material_chunks').select('chunk_index, content').eq('material_id', m.id).order('chunk_index').limit(2000);
       const rows: { chunk_index: number; content: string }[] = chunks ?? [];
       if (rows.length === 0) continue;
+      counted++;
       const hash = hashChunks(rows);
+      const groupsCount = groupChunks(rows, MEMORY_LIMITS.maxGroupsPerMaterial).length;
       const prev = known[m.id];
-      if (!opts.force && prev && prev.status === 'ready' && prev.content_hash === hash) {
+      const same = !!prev && prev.content_hash === hash;
+
+      // Ya leido por completo y sin cambios.
+      if (!opts.force && same && prev.status === 'ready') {
         graphs.push({ materialId: m.id, graph: prev.extraction });
-        reused++;
+        t.reused++;
+        t.read++;
+        t.groupsDone += groupsCount;
+        t.groupsTotal += groupsCount;
         continue;
       }
+      // Lo que ya se habia leido de ESTE mismo contenido (la lectura se continua, no se repite).
+      const doneBefore = !opts.force && same && Array.isArray(prev.stats?.doneGroups) ? (prev.stats?.doneGroups as number[]) : [];
+      const resume = doneBefore.length > 0 ? { extraction: prev.extraction, doneGroups: doneBefore } : null;
+
+      // Se acabo el tiempo antes de llegar a este material: queda pendiente (no es un fallo).
+      if (now() > deadline) {
+        if (resume) graphs.push({ materialId: m.id, graph: prev.extraction });
+        t.groupsDone += doneBefore.length;
+        t.groupsTotal += groupsCount;
+        if (doneBefore.length > 0) t.partial++;
+        else t.pending++;
+        continue;
+      }
+
       const name = m.display_name ?? m.filename ?? 'Material';
       const startedAt = new Date(now()).toISOString();
-      const result = await extractMaterial(rows, m.id, name, call, { deadline, now });
-      // Si NINGUN bloque se pudo leer, es un fallo (no una memoria vacia): se conserva lo anterior si lo habia.
-      const unreadable = result.groups > 0 && result.failedGroups === result.groups;
-      const partial = result.failedGroups > 0;
-      if (unreadable) {
-        failed++;
-        await admin.from('class_memory_material').upsert(
-          { material_id: m.id, classroom_id: classroomId, status: 'failed', content_hash: hash, extraction: prev?.extraction ?? { concepts: [], edges: [] }, error: 'La IA no pudo leer este material.', started_at: startedAt, finished_at: new Date(now()).toISOString() },
-          { onConflict: 'material_id' }
-        );
-        if (prev?.extraction) graphs.push({ materialId: m.id, graph: prev.extraction });
-        continue;
-      }
-      if (partial) failed++;
-      // Un material leido a medias se guarda con el hash de "incompleto" para reintentarse la proxima vez.
+      const r = await extractMaterial(rows, m.id, name, call, { deadline, now, resume });
+      const complete = r.doneGroups.length === r.groups;
+      t.groupsDone += r.doneGroups.length;
+      t.groupsTotal += r.groups;
+      if (complete) t.read++;
+      else if (r.doneGroups.length > 0) t.partial++;
+      else if (r.failedGroups > 0) t.failed++;
+      else t.pending++;
+
+      // Si no se pudo leer NADA, se conserva lo que ya se sabia de este material (aunque sea de una version anterior).
+      const keepOld = r.doneGroups.length === 0 && !!prev?.extraction;
       await admin.from('class_memory_material').upsert(
         {
           material_id: m.id,
           classroom_id: classroomId,
-          status: partial ? 'failed' : 'ready',
+          status: complete ? 'ready' : 'extracting',
           content_hash: hash,
-          extraction: result.extraction,
-          stats: { groups: result.groups, failedGroups: result.failedGroups, rejected: result.rejected, concepts: result.extraction.concepts.length },
-          error: partial ? `Solo se leyeron ${result.groups - result.failedGroups} de ${result.groups} bloques.` : null,
+          extraction: keepOld ? prev.extraction : r.extraction,
+          stats: { groups: r.groups, doneGroups: r.doneGroups, failedGroups: r.failedGroups, skippedGroups: r.skippedGroups, rejected: r.rejected, relationsRejected: r.relationsRejected, concepts: r.extraction.concepts.length, profile: r.profile },
+          error: complete ? null : r.failedGroups > 0 ? `La IA no respondió en ${r.failedGroups} de ${r.groups} bloques.` : `Quedan ${r.groups - r.doneGroups.length} de ${r.groups} bloques por leer.`,
           started_at: startedAt,
           finished_at: new Date(now()).toISOString(),
         },
         { onConflict: 'material_id' }
       );
-      graphs.push({ materialId: m.id, graph: result.extraction });
+      graphs.push({ materialId: m.id, graph: keepOld ? prev.extraction : r.extraction });
     }
 
     const { graph, stats } = mergeGraphs(graphs);
-    const full: BuildStats = { concepts: graph.concepts.length, edges: graph.edges.length, materials: list.length, materialsFailed: failed, reused, cyclesBroken: stats.cyclesBroken, dropped: stats.dropped };
+    const incomplete = t.partial + t.pending + t.failed > 0;
+    const full: BuildStats = {
+      concepts: graph.concepts.length,
+      edges: graph.edges.length,
+      materials: counted,
+      materialsRead: t.read,
+      materialsPartial: t.partial,
+      materialsPending: t.pending,
+      materialsFailed: t.failed,
+      groupsDone: t.groupsDone,
+      groupsTotal: t.groupsTotal,
+      incomplete,
+      reused: t.reused,
+      cyclesBroken: stats.cyclesBroken,
+      dropped: stats.dropped,
+    };
     const { data: prevMemory } = await admin.from('class_memory').select('version').eq('classroom_id', classroomId).maybeSingle();
-    const nothing = graph.concepts.length === 0 && list.length > 0;
+    const nothing = graph.concepts.length === 0 && counted > 0 && incomplete;
     await admin
       .from('class_memory')
       .update({
-        status: nothing && failed > 0 ? 'failed' : 'ready',
+        status: nothing ? 'failed' : 'ready',
         version: (prevMemory?.version ?? 0) + 1,
         graph,
         stats: full,
         built_at: new Date(now()).toISOString(),
         finished_at: new Date(now()).toISOString(),
-        error: nothing && failed > 0 ? 'No se pudo leer ningún material. Reintenta en unos minutos.' : buildWarning(full),
+        error: nothing ? 'No se pudo leer ningún material. Reintenta en unos minutos.' : buildWarning(full),
       })
       .eq('classroom_id', classroomId);
   } catch (e) {

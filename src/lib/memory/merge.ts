@@ -43,7 +43,7 @@ function compatible(a: ConceptKind, b: ConceptKind): boolean {
 }
 
 // Cuando un nodo reune varios tipos, gana el mas especifico.
-const SPECIFICITY: Record<ConceptKind, number> = { formula: 6, ley: 5, variable: 4, objetivo: 3, ejemplo: 2, concepto: 1, definicion: 0 };
+const SPECIFICITY: Record<ConceptKind, number> = { formula: 9, ley: 8, variable: 7, evento: 6, persona: 6, lugar: 6, periodo: 6, obra: 6, objetivo: 3, ejemplo: 2, concepto: 1, definicion: 0 };
 
 function mergeSources(list: SourceRef[][]): SourceRef[] {
   const byMaterial: Record<string, Record<number, true>> = {};
@@ -58,7 +58,10 @@ function mergeSources(list: SourceRef[][]): SourceRef[] {
     .map((materialId) => ({ materialId, chunks: Object.keys(byMaterial[materialId]).map(Number).sort((a, b) => a - b) }));
 }
 
-export function mergeGraphs(inputs: MaterialGraph[]): { graph: Graph; stats: MergeStats } {
+// blend: la importancia final mezcla lo que dijo la IA con lo CENTRAL que es el concepto en el grafo (cuantas relaciones tiene). Un dato suelto sin relaciones baja; un tema
+// del que cuelgan muchos otros sube. Se aplica a la fusion de la CLASE; al unir los bloques de un solo material no (el grafo todavia esta incompleto).
+export function mergeGraphs(inputs: MaterialGraph[], opts: { blend?: boolean } = {}): { graph: Graph; stats: MergeStats } {
+  const blend = opts.blend !== false;
   const flat: Concept[] = [];
   for (const m of inputs) for (const c of m.graph.concepts) flat.push(c);
   const sets = makeSets(flat.length);
@@ -132,6 +135,22 @@ export function mergeGraphs(inputs: MaterialGraph[]): { graph: Graph; stats: Mer
     .map((id) => acc[id]);
   const { edges, removed } = breakCycles(kept.map((c) => c.key), all);
   const trimmed = edges.sort((a, b) => b.weight - a.weight).slice(0, MEMORY_LIMITS.edgesPerClass);
+
+  if (blend) {
+    const deg: Record<string, number> = Object.create(null);
+    trimmed.forEach((e) => {
+      deg[e.from] = (deg[e.from] ?? 0) + 1;
+      deg[e.to] = (deg[e.to] ?? 0) + 1;
+    });
+    let maxDeg = 1;
+    kept.forEach((c) => {
+      maxDeg = Math.max(maxDeg, deg[c.key] ?? 0);
+    });
+    kept.forEach((c) => {
+      const central = 1 + 4 * ((deg[c.key] ?? 0) / maxDeg);
+      c.importance = Math.min(5, Math.max(1, Math.round(0.6 * c.importance + 0.4 * central)));
+    });
+  }
 
   return { graph: { concepts: kept, edges: trimmed }, stats: { input: flat.length, merged: kept.length, cyclesBroken: removed.length, dropped } };
 }
