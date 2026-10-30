@@ -2,7 +2,8 @@
 // a los fragmentos de donde salio. Sin React ni red, para poder probarlo. La memoria se arma por material (extraccion) y se FUSIONA por clase (merge.ts): borrar un material
 // no obliga a volver a llamar a la IA, solo a fusionar de nuevo.
 
-export const CONCEPT_KINDS = ['concepto', 'variable', 'formula', 'ley', 'definicion', 'objetivo', 'ejemplo'] as const;
+// Los cuatro primeros y 'ejemplo' son de materias cuantitativas; persona/lugar/evento/periodo/obra son de materias narrativas (historia, literatura, geografia...).
+export const CONCEPT_KINDS = ['concepto', 'variable', 'formula', 'ley', 'definicion', 'objetivo', 'ejemplo', 'persona', 'lugar', 'evento', 'periodo', 'obra'] as const;
 export type ConceptKind = (typeof CONCEPT_KINDS)[number];
 
 export const KIND_LABEL: Record<ConceptKind, string> = {
@@ -13,10 +14,16 @@ export const KIND_LABEL: Record<ConceptKind, string> = {
   definicion: 'Definición',
   objetivo: 'Objetivo',
   ejemplo: 'Ejemplo',
+  persona: 'Personaje',
+  lugar: 'Lugar',
+  evento: 'Evento',
+  periodo: 'Periodo',
+  obra: 'Obra o documento',
 };
 
 // 'requiere': A requiere B (B es prerrequisito de A). 'se_calcula_con': A se calcula a partir de B. 'parte_de': A es parte de B. 'relacionado': sin direccion clara.
-export const RELATIONS = ['requiere', 'se_calcula_con', 'parte_de', 'relacionado'] as const;
+// Solo narrativas: 'causa': A provoca u origina B. 'ocurre_en': A sucede en (o pertenece a) el lugar o periodo B.
+export const RELATIONS = ['requiere', 'se_calcula_con', 'parte_de', 'relacionado', 'causa', 'ocurre_en'] as const;
 export type Relation = (typeof RELATIONS)[number];
 
 export interface SourceRef {
@@ -56,6 +63,9 @@ export interface Graph {
 // Lo que sale de UN material.
 export type MaterialExtraction = Graph;
 
+// Que tipo de materia es un material: decide el vocabulario con el que la IA lo lee. 'cuantitativo' (formulas, variables, leyes) o 'narrativo' (hechos, personas, lugares, causas).
+export type Profile = 'cuantitativo' | 'narrativo';
+
 export const MEMORY_LIMITS = {
   name: 80,
   definition: 320,
@@ -66,6 +76,8 @@ export const MEMORY_LIMITS = {
   conceptsPerClass: 400,
   edgesPerClass: 1200,
   maxGroupsPerMaterial: 12,
+  // Bloques que se leen a la vez (en paralelo) con la IA.
+  concurrency: 3,
   // Dos claves de igual numero de palabras se funden si cada palabra es igual o parecida (Dice sobre bigramas >= esto): tolera un error de tipeo, no un concepto distinto.
   tokenSimilarity: 0.75,
 } as const;

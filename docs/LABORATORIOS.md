@@ -122,8 +122,20 @@ Lo que **no** resuelve: que la fórmula que escribió la IA sea la que traen los
 
 `/api/lab/propose` (plantillas fijas) quedó sin uso en la interfaz.
 
+## Memoria v2 (descubierta al revisar una clase real de historia)
+
+La primera versión de la memoria, con una clase de historia (4 materiales), dejó: solo **1 de 4 materiales leído**, relaciones sin sentido (`se_calcula_con` entre el Código de Hammurabi y la pena de muerte) y conceptos mal etiquetados (ciudades como «variable»). Cambios:
+
+- **Lectura que continúa.** Cada material guarda qué **bloques** ya leyó (`class_memory_material.stats.doneGroups`); si se acaba el tiempo (240 s), lo que no se alcanzó queda **pendiente** (antes se marcaba «La IA no pudo leer este material», que era falso) y la siguiente pasada **solo lee lo que falta**. Los bloques se leen **en paralelo** (3 a la vez) con un reintento inmediato si la respuesta viene vacía. El panel encadena pasadas **solo si el profesor pulsó el botón** (no al abrir la página), mientras falte leer y cada pasada avance (tope de 12), con barra de progreso («1 de 4 materiales · 10 de 30 bloques»).
+- **Perfil de la materia** (`detectProfile`, sin IA: por las ecuaciones que trae el texto). **Cuantitativa:** variables, fórmulas, leyes, `requiere`, `se_calcula_con`. **Narrativa:** personajes, lugares, eventos, periodos, obras; relaciones `parte_de`, `causa`, `ocurre_en`, `relacionado`; importancia graduada (5 solo para los 2–3 temas centrales). En una materia narrativa `requiere` y `se_calcula_con` se vuelven una conexión neutra (la IA los usaba para cualquier cosa y a veces al revés).
+- **Relaciones verificadas contra el texto** (`supportedBy`): se aceptan solo si los dos conceptos aparecen juntos en una frase o en dos contiguas. `se_calcula_con` además exige una fórmula.
+- **Importancia por centralidad:** al fusionar la clase, la importancia mezcla lo que dijo la IA (60 %) con cuántas relaciones tiene el concepto (40 %). Un dato suelto baja; un tema del que cuelgan otros sube.
+- **Jerarquía en el panel** (`buildTree`): vista «Por temas» (Mesopotamia → ciudades-estado → Ur, Uruk…, en varios niveles) y «Por tipo»; los datos sueltos (importancia ≤ 2 y sin relaciones) van a «Detalles menores». Los datos siguen en la memoria; es solo la presentación.
+- **Sin migración.** Los materiales a medias de la versión anterior se vuelven a leer completos una vez.
+
 ## Lo que falta (siguientes PR)
 
-1. **Guardar y revisar:** tabla `lab_attempts` (migración + RLS), el estudiante abre el laboratorio publicado y su informe se guarda; el profesor lo revisa.
-2. Límite de uso por profesor en `/api/lab/design`, `/api/lab/propose` y `/api/memory/build`.
-3. Borrar `/api/lab/propose` y `src/lib/lab/propose.ts` si no se vuelven a usar.
+1. **Que algo más consuma la memoria** (hoy solo el diseñador de laboratorios): generar objetivos y explicaciones con la prueba de suficiencia, un mapa de «qué cubren tus materiales y qué falta», contexto para el tutor.
+2. **Guardar y revisar:** tabla `lab_attempts` (migración + RLS), el estudiante abre el laboratorio publicado y su informe se guarda; el profesor lo revisa.
+3. Límite de uso por profesor en `/api/lab/design`, `/api/lab/propose` y `/api/memory/build`.
+4. Borrar `/api/lab/propose` y `src/lib/lab/propose.ts` si no se vuelven a usar.
