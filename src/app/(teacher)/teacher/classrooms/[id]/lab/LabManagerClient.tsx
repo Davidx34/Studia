@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { AlertTriangle, FlaskConical, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
@@ -278,6 +279,14 @@ export default function LabManagerClient({ classroomId, teacherId, initialItems,
                         <Button variant={it.status === 'published' ? 'ghost' : 'primary'} size="sm" loading={busyId === it.id} onClick={() => setStatus(it, it.status === 'published' ? 'draft' : 'published')}>
                           {it.status === 'published' ? 'Despublicar' : 'Publicar'}
                         </Button>
+                        {it.status === 'published' && (
+                          <Link
+                            href={`/teacher/classrooms/${classroomId}/lab/${it.id}`}
+                            className="inline-flex min-h-[40px] items-center rounded-xl border border-line bg-surface-2 px-3 text-sm font-semibold text-fg hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            Entregas
+                          </Link>
+                        )}
                       </>
                     )}
                     {confirmDelete === it.id ? (

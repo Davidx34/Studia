@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { BookOpen, BrainCircuit, CheckCircle2, Dumbbell, Lock, Play } from 'lucide-react';
+import { BookOpen, BrainCircuit, CheckCircle2, Dumbbell, FlaskConical, Lock, Play } from 'lucide-react';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { Card, Badge } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -79,6 +79,10 @@ export default async function StudentClassPage({ params }: { params: { id: strin
     .eq('classroom_id', params.id)
     .is('game_type', null);
 
+  // Laboratorios publicados (migracion 078; si la tabla aun no existe, la consulta falla y simplemente no se ofrece el enlace).
+  const labCount = await (supabase as any).from('labs').select('id', { count: 'exact', head: true }).eq('classroom_id', params.id).eq('status', 'published');
+  const hasLabs = !labCount.error && (labCount.count ?? 0) > 0;
+
   const teacher = (classroom as any).profiles;
   const completedCount = Array.from(progressMap.values()).filter((p: any) => p.status === 'completed').length;
   const total = modules?.length ?? 0;
@@ -99,6 +103,11 @@ export default async function StudentClassPage({ params }: { params: { id: strin
           {(practiceable ?? 0) > 0 && (
             <Link href={`/my-classes/${params.id}/practice`} className={`${linkBase} bg-surface-2 text-fg border border-line hover:border-line-strong`}>
               <Dumbbell aria-hidden="true" className="w-4 h-4" /> Practicar sin presión
+            </Link>
+          )}
+          {hasLabs && (
+            <Link href={`/my-classes/${params.id}/labs`} className={`${linkBase} bg-surface-2 text-fg border border-line hover:border-line-strong`}>
+              <FlaskConical aria-hidden="true" className="w-4 h-4" /> Laboratorios
             </Link>
           )}
           <Link href={`/my-classes/${params.id}/library`} className={`${linkBase} bg-surface-2 text-fg border border-line hover:border-line-strong`}>
