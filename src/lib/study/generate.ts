@@ -3,6 +3,7 @@
 // funcion que llama al modelo para poder probarlo sin red.
 
 import { callOpenRouter, isOpenRouterConfigured } from '@/lib/ai/openrouter';
+import { sanitizeLogged } from '@/lib/security/promptSanitizer';
 import type { ChunkGroup } from './grouping';
 import { extractJsonObject, validateGroupCards, type FichaCard, type FlashCard } from './validate';
 
@@ -10,7 +11,7 @@ export type ModelCaller = (prompt: string) => Promise<string | null>;
 
 export function buildStudyPrompt(group: ChunkGroup, materialName: string): string {
   return `Eres un tutor que prepara material de estudio para estudiantes a partir de UN fragmento de sus apuntes.
-Material: "${materialName}"${group.section ? `\nSeccion: "${group.section}"` : ''}
+Material: "${sanitizeLogged(materialName, 'study.generate:nombre', { maxChars: 120 })}"${group.section ? `\nSeccion: "${sanitizeLogged(group.section, 'study.generate:seccion', { maxChars: 160 })}"` : ''}
 
 REGLAS
 - Usa SOLO informacion que este en el fragmento. No agregues datos, definiciones ni ejemplos de tu propio conocimiento.
@@ -24,7 +25,7 @@ Responde SOLO con un JSON valido, sin explicacion, con esta forma exacta:
 {"ficha":{"titulo":"...","idea_principal":"...","puntos_clave":["...","..."],"terminos":[{"termino":"...","definicion":"..."}],"pregunta_reflexion":"..."},"flashcards":[{"pregunta":"...","respuesta":"..."}]}
 
 FRAGMENTO
-${group.text}`;
+${sanitizeLogged(group.text, 'study.generate')}`;
 }
 
 export interface GeneratedCards {

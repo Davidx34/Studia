@@ -7,6 +7,7 @@
 // La IA nunca escribe codigo: solo datos que se validan. Sin red: el modelo se inyecta.
 
 import { extractJsonObject } from '@/lib/study/validate';
+import { sanitizeForPrompt } from '@/lib/security/promptSanitizer';
 import { buildIndex, prerequisitesOf, searchConcepts } from '@/lib/memory/graph';
 import { sanitizeText } from './sanitize';
 import { assessCoverage, explainCoverage, type Coverage, type Requirement } from '@/lib/memory/sufficiency';
@@ -60,7 +61,7 @@ export function memoryCatalog(graph: Graph, max: number = DESIGN_LIMITS.catalog)
 
 export function buildRequirementsPrompt(idea: string, graph: Graph): string {
   const list = memoryCatalog(graph)
-    .map((c) => `- ${c.name} [${KIND_LABEL[c.kind]}]${c.formula ? ' (tiene fórmula)' : ''}`)
+    .map((c) => `- ${sanitizeForPrompt(c.name, { maxChars: 100 })} [${KIND_LABEL[c.kind]}]${c.formula ? ' (tiene fórmula)' : ''}`)
     .join('\n');
   const text = sanitizeText(idea, DESIGN_LIMITS.idea);
   return `Eres un profesor que va a crear un experimento de laboratorio NUMÉRICO (variables que se mueven y resultados que se calculan) para su clase.
@@ -137,7 +138,7 @@ function exampleJson(id: string): string {
 
 export function buildDesignPrompt(idea: string, relevant: Concept[], coverage: Coverage, errors: string[] = []): string {
   const concepts = relevant
-    .map((c) => `- ${c.name} [${KIND_LABEL[c.kind]}]${c.definition ? `: ${c.definition}` : ''}${c.formula ? ` | Fórmula del material: ${c.formula}` : ''}${c.unit ? ` | Unidad: ${c.unit}` : ''}`)
+    .map((c) => `- ${sanitizeForPrompt(c.name, { maxChars: 100 })} [${KIND_LABEL[c.kind]}]${c.definition ? `: ${sanitizeForPrompt(c.definition, { maxChars: 340 })}` : ''}${c.formula ? ` | Fórmula del material: ${sanitizeForPrompt(c.formula, { maxChars: 220 })}` : ''}${c.unit ? ` | Unidad: ${sanitizeForPrompt(c.unit, { maxChars: 30 })}` : ''}`)
     .join('\n');
   const gaps = coverage.weak.length ? `\nOJO, lo siguiente está flojo en los materiales (no inventes lo que falte, sé prudente): ${coverage.weak.join('; ')}.` : '';
   const fixes = errors.length

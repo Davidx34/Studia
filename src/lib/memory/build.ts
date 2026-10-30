@@ -27,12 +27,20 @@ export function hashChunks(chunks: { chunk_index: number; content: string }[]): 
 }
 
 // Reclamo atomico: dos peticiones no pueden construir la misma memoria a la vez.
-export async function claimMemory(admin: any, classroomId: string, force: boolean, now: number = Date.now()): Promise<{ state: ClaimState; error?: string }> {
+// Si el reclamo se logra, `startedAt` y `previous` (la fila tal como estaba; null si no habia) permiten DEVOLVERLO con releaseMemoryClaim.
+export interface MemoryClaim {
+  state: ClaimState;
+  error?: string;
+  startedAt?: string;
+  previous?: { status: string; started_at: string | null; finished_at: string | null; error: string | null } | null;
+}
+
+export async function claimMemory(admin: any, classroomId: string, force: boolean, now: number = Date.now()): Promise<MemoryClaim> {
   const { data: current } = await admin.from('class_memory').select('status, started_at, finished_at, error').eq('classroom_id', classroomId).maybeSingle();
   const startedAt = new Date(now).toISOString();
   if (!current) {
     const { error } = await admin.from('class_memory').insert({ classroom_id: classroomId, status: 'building', started_at: startedAt });
-    return { state: error ? 'busy' : 'claimed' }; // si fallo, otra peticion se adelanto
+    return error ? { state: 'busy' } : { state: 'claimed', startedAt, previous: null }; // si fallo, otra peticion se adelanto
   }
   if (current.status === 'building' && now - new Date(current.started_at).getTime() < STALE_GENERATING_MS) return { state: 'busy' };
   if (!force && current.status === 'failed' && current.finished_at && now - new Date(current.finished_at).getTime() < RETRY_COOLDOWN_MS) {
@@ -45,7 +53,24 @@ export async function claimMemory(admin: any, classroomId: string, force: boolea
     .eq('status', current.status)
     .eq('started_at', current.started_at)
     .select('classroom_id');
-  return { state: claimed && claimed.length > 0 ? 'claimed' : 'busy' };
+  if (!(claimed && claimed.length > 0)) return { state: 'busy' };
+  return { state: 'claimed', startedAt, previous: { status: current.status, started_at: current.started_at ?? null, finished_at: current.finished_at ?? null, error: current.error ?? null } };
+}
+
+// Devuelve un reclamo que NO se llego a usar (por ejemplo, el profesor se paso de su limite de uso justo despues de reclamar): la fila vuelve a como estaba. Solo toca la fila si
+// sigue siendo NUESTRO reclamo (mismo started_at y status 'building'); si otra peticion la tomo despues, no la pisa. Nunca lanza: en el peor caso el reclamo caduca solo.
+export async function releaseMemoryClaim(admin: any, classroomId: string, claim: MemoryClaim): Promise<void> {
+  if (claim.state !== 'claimed' || !claim.startedAt) return;
+  try {
+    const mine = admin.from('class_memory');
+    if (claim.previous === null) {
+      await mine.delete().eq('classroom_id', classroomId).eq('status', 'building').eq('started_at', claim.startedAt);
+    } else if (claim.previous) {
+      await mine.update({ status: claim.previous.status, started_at: claim.previous.started_at, finished_at: claim.previous.finished_at, error: claim.previous.error }).eq('classroom_id', classroomId).eq('status', 'building').eq('started_at', claim.startedAt);
+    }
+  } catch (e) {
+    console.error('[memory/build] no se pudo devolver el reclamo:', e);
+  }
 }
 
 // Encabezados genericos de un archivo que la IA a veces extrae como si fueran conceptos ("Introduccion", "Bibliografia"...). Solo claves exactas y poco mencionadas.
