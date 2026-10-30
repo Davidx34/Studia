@@ -551,7 +551,8 @@
     var missing = L.minTrials - S.trials.length;
     var problems = [];
     if (missing > 0) problems.push('Te faltan ' + missing + ' ensayo' + (missing === 1 ? '' : 's') + ' (necesitas ' + L.minTrials + ').');
-    if (!S.trials.some(function (t) { return t.control; })) problems.push('Marca al menos un ensayo como ensayo de control.');
+    // El servidor exige lo mismo (src/lib/lab/submission.ts): el primer ensayo es la linea base.
+    if (S.trials.length > 0 && !S.trials[0].control) problems.push('El primer ensayo debe ser el ensayo de control (la línea base).');
     if (S.hypothesis.trim().length < 10) problems.push('Escribe tu hipótesis.');
     if (S.conclusion.trim().length < 20) problems.push('Escribe tu conclusión (al menos una o dos frases).');
     if (problems.length) {
