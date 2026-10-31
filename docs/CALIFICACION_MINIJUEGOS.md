@@ -1,6 +1,6 @@
 # Calificación en el servidor de los minijuegos (fase 4(a), primera entrega)
 
-Las preguntas clásicas ya se califican en el servidor (PR #95): la solución no viaja al navegador. Los minijuegos seguían calificándose en el navegador con la solución dentro de `game_data`. Esta entrega cierra **los cuatro juegos de «elegir una opción»**: El Impostor Cognitivo, Alquimia Conceptual, Cuarto de Crisis y El Juicio al Conocimiento. La línea del tiempo y las categorías se cerraron en una segunda entrega (ver más abajo). Quedan **dos**: las cartas y el descifrador.
+Las preguntas clásicas ya se califican en el servidor (PR #95): la solución no viaja al navegador. Los minijuegos seguían calificándose en el navegador con la solución dentro de `game_data`. Esta entrega cierra **los cuatro juegos de «elegir una opción»**: El Impostor Cognitivo, Alquimia Conceptual, Cuarto de Crisis y El Juicio al Conocimiento. La línea del tiempo y las categorías se cerraron en una segunda entrega (ver más abajo). Las cartas y el descifrador se cerraron en una tercera entrega: **los ocho minijuegos** se califican ya en el servidor.
 
 ## Cómo funciona
 
@@ -45,4 +45,16 @@ Seis de los ocho minijuegos se califican ya en el servidor. Los dos nuevos tiene
 
 **Límite de los sondeos:** un cliente modificado puede sondear todas las combinaciones y obtener la clasificación sin jugar (no hay tope de sondeos por pregunta). Es el mismo ensayo y error que el juego permite sin penalización, sin ahorrar más que tiempo; no se puede, en cambio, **registrar** un acierto sin la clasificación correcta.
 
-Quedan sin migrar **las cartas** (memoria de pares: necesita decidir si dos cartas coinciden sin revelar los pares) y **el descifrador** (adivinar letra por letra).
+## Tercera entrega: cartas y descifrador
+
+Con ellas, los **ocho** minijuegos del catálogo se califican en el servidor (detrás de `SERVER_GRADING_GAMES=on`). Los dos usan sondeos, como las categorías.
+
+**Cartas (memoria de pares).** Las cartas viajan con una clave numérica y su texto, en un orden **determinista** que sale de un hash del texto: no deja las dos cartas de un par juntas ni en un patrón, y servir y sondear calculan el mismo orden a partir de los mismos datos, sin guardar nada. Cada par que se voltea es un sondeo `{ probe: { a, b } }` («¿coinciden?»). Al encontrar el último par, el navegador manda la lista de pares y el servidor cierra. No existe un final «perdido» (igual que antes: el juego termina al encontrar el último par); una lista de pares equivocada o incompleta se rechaza (400) y la pregunta queda abierta.
+
+**Descifrador (palabra letra por letra).**
+- Al navegador viaja la **máscara** de la palabra (letras ocultas; espacios, guiones y signos visibles, como antes) y **cuántas** pistas hay. La palabra y las pistas no viajan.
+- Cada letra es un sondeo `{ probe: { letter } }`: el servidor responde en qué posiciones aparece (y el carácter original). Las **pistas se piden de a una** (`{ probe: { hint: n } }`), como el botón que las va mostrando.
+- Para cerrar, el navegador manda el conjunto de letras que probó y **el servidor decide**: gana si cubre la palabra con menos de 6 fallos; pierde si hay 6 o más; si el juego aún no terminó (faltan letras y quedan intentos) no se puede cerrar (400). Si cubrió la palabra pero hay 6 o más fallos, pierde (con un conjunto no se sabe qué ocurrió primero).
+- La Ñ es una letra distinta de la N. Las letras con tilde en la palabra se muestran tal cual y no cuentan como letras que adivinar (en el navegador antiguo contaban como su letra base, lo que hacía imposible ganar una palabra con tilde; los datos nuevos no las llevan).
+
+**Límite (el mismo que en las categorías):** un cliente modificado puede sondear todas las letras o todas las combinaciones de cartas y obtener la solución sin jugar; es el mismo ensayo y error que los juegos permiten, y lo que no se puede es **registrar** un resultado sin haberlo logrado.

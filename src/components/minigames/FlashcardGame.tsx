@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useRef, useState } from 'react';
 import { useTonitoStore } from '@/stores/useTonitoStore';
+import { CHECK_ERROR, type GameCheck } from './serverCheck';
 
 interface Pair {
   id: number;
@@ -10,12 +11,17 @@ interface Pair {
 
 interface GameData {
   theme?: string;
-  pairs: Pair[];
   pedagogical_feedback?: string;
+  // Solo en el modo del navegador: con calificacion en el servidor las parejas NO viajan.
+  pairs?: Pair[];
+  // Solo con calificacion en el servidor: las cartas con una clave y su texto, en un orden que no delata la pareja.
+  cards?: { key: number; text: string }[];
 }
 
 interface Card {
-  pairId: number;
+  // Servidor: clave de la carta. Navegador: no se usa (la pareja esta en pairId).
+  key: number;
+  pairId?: number;
   text: string;
 }
 
@@ -34,14 +40,18 @@ function movesLabel(moves: number): string {
   return 'Memoria en desarrollo — ¡sigue practicando! 💪';
 }
 
+// Con `check` (calificacion en el servidor) las parejas NO estan en el navegador: cada par que se voltea es un sondeo ("¿coinciden estas dos?") y, al encontrar todos, se manda la
+// lista de pares para cerrar la pregunta. Como en el juego de siempre, no se pierde: termina al encontrar el ultimo par.
 export function FlashcardGame({
   gameData,
   disabled,
   onComplete,
+  check,
 }: {
   gameData: GameData;
   disabled: boolean;
   onComplete: (correct: boolean) => void;
+  check?: GameCheck;
 }) {
   const pairs = gameData.pairs || [];
   const onCorrectAnswer = useTonitoStore((s) => s.onCorrectAnswer);
@@ -49,22 +59,26 @@ export function FlashcardGame({
   const showMessage = useTonitoStore((s) => s.showMessage);
 
   const cards: Card[] = useMemo(() => {
+    if (gameData.cards) return gameData.cards.map((c) => ({ key: c.key, text: c.text }));
     const flat: Card[] = [];
     for (const p of pairs) {
-      flat.push({ pairId: p.id, text: p.card1 });
-      flat.push({ pairId: p.id, text: p.card2 });
+      flat.push({ key: flat.length, pairId: p.id, text: p.card1 });
+      flat.push({ key: flat.length, pairId: p.id, text: p.card2 });
     }
     return flat;
-  }, [pairs]);
+  }, [pairs, gameData.cards]);
+  const totalPairs = cards.length / 2;
 
   const order = useMemo(() => shuffledIndices(cards.length), [cards]);
 
   const [flipped, setFlipped] = useState<number[]>([]); // indices (en `cards`) boca arriba, max 2
-  const [matched, setMatched] = useState<Set<number>>(new Set()); // pairIds resueltos
-  const [particlesAt, setParticlesAt] = useState<number | null>(null); // pairId con efecto
+  const [matched, setMatched] = useState<Set<number>>(new Set()); // indices (en `cards`) de las cartas ya emparejadas
+  const [matchList, setMatchList] = useState<[number, number][]>([]); // claves de los pares encontrados (servidor)
+  const [particlesAt, setParticlesAt] = useState<number[]>([]); // indices con efecto
   const [moves, setMoves] = useState(0);
-  const [resolving, setResolving] = useState(false); // true mientras se muestran 2 cartas que no matchean
+  const [resolving, setResolving] = useState(false); // true mientras se muestran 2 cartas que no matchean, o se espera al servidor
   const [finished, setFinished] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const milestonesFired = useRef<Set<string>>(new Set());
   const locked = disabled || finished;
@@ -75,49 +89,101 @@ export function FlashcardGame({
     showMessage(msg, 2500);
   }
 
-  function handleFlip(idx: number) {
+  // Un par encontrado: efecto, hitos y, si era el ultimo, fin (en el servidor, tras cerrar la pregunta).
+  function pairFound(a: number, b: number, nextMatched: Set<number>) {
+    onCorrectAnswer();
+    setParticlesAt([a, b]);
+    setTimeout(() => setParticlesAt([]), 700);
+    setMatched(nextMatched);
+    setFlipped([]);
+    const foundCount = nextMatched.size / 2;
+    if (foundCount === 1) fireMilestone('first', '¡Primer par encontrado! 🎉');
+    else if (foundCount === Math.ceil(totalPairs / 2)) fireMilestone('half', '¡Vas a la mitad! 💪');
+    else if (foundCount === totalPairs - 1) fireMilestone('almost', '¡Ya casi! Solo falta un par 🔥');
+    return foundCount;
+  }
+
+  function mismatch() {
+    onWrongAnswer();
+    setResolving(true);
+    setTimeout(() => {
+      setFlipped([]);
+      setResolving(false);
+    }, 1000);
+  }
+
+  // Cierra la pregunta en el servidor con todos los pares encontrados.
+  async function finalize(matches: [number, number][]) {
+    setError(null);
+    setResolving(true);
+    const verdict = await check!({ matches });
+    setResolving(false);
+    if (!verdict || !verdict.correct) {
+      setError(CHECK_ERROR);
+      return;
+    }
+    setFinished(true);
+    onComplete(true);
+  }
+
+  async function handleFlip(idx: number) {
     if (locked || resolving) return;
     if (flipped.includes(idx)) return;
-    if (matched.has(cards[idx].pairId)) return;
+    if (matched.has(idx)) return;
     if (flipped.length === 2) return;
 
     const nextFlipped = [...flipped, idx];
     setFlipped(nextFlipped);
+    if (nextFlipped.length !== 2) return;
 
-    if (nextFlipped.length === 2) {
-      const [a, b] = nextFlipped;
+    const [a, b] = nextFlipped;
+
+    if (!check) {
       const isMatch = cards[a].pairId === cards[b].pairId;
       setMoves((m) => m + 1);
-
       if (isMatch) {
-        onCorrectAnswer();
-        const pairId = cards[a].pairId;
-        setParticlesAt(pairId);
-        setTimeout(() => setParticlesAt(null), 700);
         const nextMatched = new Set(matched);
-        nextMatched.add(pairId);
-        setMatched(nextMatched);
-        setFlipped([]);
-
-        const foundCount = nextMatched.size;
-        if (foundCount === 1) fireMilestone('first', '¡Primer par encontrado! 🎉');
-        else if (foundCount === Math.ceil(pairs.length / 2)) fireMilestone('half', '¡Vas a la mitad! 💪');
-        else if (foundCount === pairs.length - 1) fireMilestone('almost', '¡Ya casi! Solo falta un par 🔥');
-
-        if (foundCount === pairs.length) {
+        nextMatched.add(a);
+        nextMatched.add(b);
+        const foundCount = pairFound(a, b, nextMatched);
+        if (foundCount === totalPairs) {
           setFinished(true);
           onComplete(true);
         }
       } else {
-        onWrongAnswer();
-        setResolving(true);
-        setTimeout(() => {
-          setFlipped([]);
-          setResolving(false);
-        }, 1000);
+        mismatch();
       }
+      return;
+    }
+
+    // Servidor: se espera su veredicto con las dos cartas boca arriba.
+    setError(null);
+    setResolving(true);
+    const probe = await check({ probe: { a: cards[a].key, b: cards[b].key } });
+    if (!probe) {
+      setError(CHECK_ERROR);
+      setTimeout(() => {
+        setFlipped([]);
+        setResolving(false);
+      }, 600);
+      return;
+    }
+    setMoves((m) => m + 1);
+    if (probe.correct) {
+      setResolving(false);
+      const nextMatched = new Set(matched);
+      nextMatched.add(a);
+      nextMatched.add(b);
+      const nextList: [number, number][] = [...matchList, [cards[a].key, cards[b].key]];
+      setMatchList(nextList);
+      const foundCount = pairFound(a, b, nextMatched);
+      if (foundCount === totalPairs) await finalize(nextList);
+    } else {
+      mismatch();
     }
   }
+
+  const allMatched = check ? cards.length > 0 && matched.size === cards.length : false;
 
   return (
     <div className="space-y-4">
@@ -125,17 +191,17 @@ export function FlashcardGame({
 
       <div className="flex items-center justify-between text-xs text-fg-muted">
         <span>🔁 Movimientos: {moves}</span>
-        <span>✓ Pares: {matched.size}/{pairs.length}</span>
+        <span>✓ Pares: {matched.size / 2}/{totalPairs}</span>
       </div>
 
       <div className="grid grid-cols-4 gap-2">
         {order.map((idx) => {
           const card = cards[idx];
-          const isMatched = matched.has(card.pairId);
+          const isMatched = matched.has(idx);
           const isFaceUp = flipped.includes(idx) || isMatched;
           return (
             <div key={idx} className="aspect-square [perspective:600px] relative">
-              {particlesAt === card.pairId && isMatched && <CardParticles />}
+              {particlesAt.includes(idx) && isMatched && <CardParticles />}
               <button
                 onClick={() => handleFlip(idx)}
                 disabled={locked || isMatched || resolving}
@@ -165,6 +231,20 @@ export function FlashcardGame({
           );
         })}
       </div>
+
+      {check && resolving && flipped.length === 2 && <p className="text-fg-muted text-sm" aria-live="polite">Comprobando…</p>}
+      {error && (
+        <div className="space-y-2">
+          <p role="alert" className="text-danger text-sm">
+            {error}
+          </p>
+          {check && allMatched && !finished && (
+            <button onClick={() => finalize(matchList)} disabled={resolving} className="px-3 py-2 rounded-lg bg-primary text-on-primary text-sm font-bold disabled:opacity-40">
+              Reintentar
+            </button>
+          )}
+        </div>
+      )}
 
       {finished && (
         <div className="bg-success/10 border border-success p-4 rounded-lg">

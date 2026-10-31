@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     if (isGame && answerObj && 'probe' in answerObj) {
       const probed = probeGame(question.type, question.game_data, answerObj.probe);
       if (probed.status !== 'graded') return fail(400, 'Respuesta invalida');
-      return NextResponse.json({ correct: probed.correct, final: false, probe: true });
+      return NextResponse.json({ correct: probed.correct, final: false, probe: true, ...(probed.data ? { detail: probed.data } : {}) });
     }
 
     const graded = isGame ? gradeGame(question.type, question.game_data, body.answer) : gradeAnswer(question, body.answer);
