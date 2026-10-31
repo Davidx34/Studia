@@ -1,12 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useTonitoStore } from '@/stores/useTonitoStore';
+import { CHECK_ERROR, textOrNull, type GameCheck } from './serverCheck';
 
 interface Intervention {
   action_code: string;
   description: string;
-  is_solution: boolean;
-  consequence: string;
+  // Solo en el modo del navegador: con calificacion en el servidor la solucion y las consecuencias NO viajan.
+  is_solution?: boolean;
+  consequence?: string;
 }
 
 interface GameData {
@@ -22,14 +24,19 @@ const TIME_LIMIT = 45;
 // sintomas a analizar y 3 protocolos de intervencion (solo 1 soluciona el
 // problema). Cuenta con temporizador — si se acaba el tiempo, la crisis se
 // pierde igual que si se elige mal (es un simulacro de un solo intento).
+//
+// Con `check` (calificacion en el servidor) la solucion y las consecuencias llegan DESPUES de elegir. El temporizador sigue siendo del navegador (el servidor no lo
+// vigila); al acabarse se informa al servidor como "sin eleccion" para que la pregunta quede cerrada como fallada.
 export function CuartoCrisisGame({
   gameData,
   disabled,
   onComplete,
+  check,
 }: {
   gameData: GameData;
   disabled: boolean;
   onComplete: (correct: boolean) => void;
+  check?: GameCheck;
 }) {
   const interventions = gameData.interventions || [];
   const onCorrectAnswer = useTonitoStore((s) => s.onCorrectAnswer);
@@ -40,15 +47,46 @@ export function CuartoCrisisGame({
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [finished, setFinished] = useState<'won' | 'lost' | null>(null);
   const [timeLeft, setTimeLeft] = useState(TIME_LIMIT);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState<{ consequences: Record<string, string>; explanation: string | null } | null>(null);
 
-  const locked = disabled || finished !== null;
+  const locked = disabled || finished !== null || checking;
+
+  function finish(correct: boolean) {
+    if (correct) {
+      onCorrectAnswer();
+      setFinished('won');
+    } else {
+      onWrongAnswer();
+      setFinished('lost');
+    }
+    onComplete(correct);
+  }
+
+  function readReveal(reveal: Record<string, unknown> | undefined, fallbackExplanation: string | null | undefined) {
+    const raw = reveal?.consequences;
+    const consequences: Record<string, string> = {};
+    if (raw && typeof raw === 'object') for (const [k, v] of Object.entries(raw)) if (typeof v === 'string') consequences[k] = v;
+    setRevealed({ consequences, explanation: textOrNull(reveal?.explanation) ?? fallbackExplanation ?? null });
+  }
 
   useEffect(() => {
     if (locked) return;
     if (timeLeft <= 0) {
-      onWrongAnswer();
-      setFinished('lost');
-      onComplete(false);
+      if (!check) {
+        onWrongAnswer();
+        setFinished('lost');
+        onComplete(false);
+        return;
+      }
+      // Servidor: se informa que no hubo eleccion. Si no se puede, el tiempo igual se acabo: se cierra como fallada en el navegador.
+      setChecking(true);
+      void check({ selectedCode: null }).then((verdict) => {
+        setChecking(false);
+        if (verdict) readReveal(verdict.reveal, verdict.explanation);
+        finish(false);
+      });
       return;
     }
     if (timeLeft === 15) {
@@ -60,21 +98,29 @@ export function CuartoCrisisGame({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft, locked]);
 
-  function handleSelect(iv: Intervention) {
+  async function handleSelect(iv: Intervention) {
     if (locked) return;
     setSelectedCode(iv.action_code);
-    if (iv.is_solution) {
-      onCorrectAnswer();
-      setFinished('won');
-      onComplete(true);
-    } else {
-      onWrongAnswer();
-      setFinished('lost');
-      onComplete(false);
+    setError(null);
+    if (!check) {
+      finish(iv.is_solution === true);
+      return;
     }
+    setChecking(true);
+    const verdict = await check({ selectedCode: iv.action_code });
+    setChecking(false);
+    if (!verdict) {
+      setSelectedCode(null);
+      setError(CHECK_ERROR);
+      return;
+    }
+    readReveal(verdict.reveal, verdict.explanation);
+    finish(verdict.correct);
   }
 
   const selected = interventions.find((iv) => iv.action_code === selectedCode);
+  const consequence = selected ? (revealed ? revealed.consequences[selected.action_code] : selected.consequence) : undefined;
+  const explanation = revealed ? revealed.explanation : gameData.post_mortem_report;
   const timeUrgent = timeLeft <= 10;
 
   return (
@@ -117,7 +163,9 @@ export function CuartoCrisisGame({
                 (isSelected
                   ? finished === 'won'
                     ? 'bg-success/15 border-success text-fg'
-                    : 'bg-danger/15 border-danger text-fg'
+                    : finished === 'lost'
+                    ? 'bg-danger/15 border-danger text-fg'
+                    : 'bg-primary/10 border-primary text-fg'
                   : finished !== null
                   ? 'bg-surface-2 border-line-strong text-fg-muted'
                   : 'bg-surface-2 border-line-strong text-fg hover:border-primary')
@@ -130,23 +178,26 @@ export function CuartoCrisisGame({
         })}
       </div>
 
+      {checking && <p className="text-fg-muted text-sm" aria-live="polite">Comprobando…</p>}
+      {error && (
+        <p role="alert" className="text-danger text-sm">
+          {error}
+        </p>
+      )}
+
       {finished === 'won' && (
         <div className="bg-success/10 border border-success p-4 rounded-lg">
-          <p className="text-success font-bold">✅ {selected?.consequence}</p>
-          {gameData.post_mortem_report && (
-            <p className="text-fg text-sm mt-1">{gameData.post_mortem_report}</p>
-          )}
+          <p className="text-success font-bold">✅ {consequence}</p>
+          {explanation && <p className="text-fg text-sm mt-1">{explanation}</p>}
         </div>
       )}
 
       {finished === 'lost' && (
         <div className="bg-primary/10 border border-primary/40 p-4 rounded-lg">
           <p className="text-primary-text font-bold">
-            {selected ? selected.consequence : '⏰ Se acabó el tiempo. La crisis no fue contenida.'}
+            {selected ? consequence : '⏰ Se acabó el tiempo. La crisis no fue contenida.'}
           </p>
-          {gameData.post_mortem_report && (
-            <p className="text-fg text-sm mt-1">{gameData.post_mortem_report}</p>
-          )}
+          {explanation && <p className="text-fg text-sm mt-1">{explanation}</p>}
         </div>
       )}
     </div>

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { gradeAnswer } from '@/lib/grading/gradeAnswer';
-import { buildReveal, isFinalTry, isServerGradedType, serverGradingEnabled, MAX_TRIES } from '@/lib/grading/serverGrading';
+import { buildReveal, isFinalTry, isServerGradedType, serverGradingEnabled, serverGradingGamesEnabled, MAX_TRIES } from '@/lib/grading/serverGrading';
+import { buildGameReveal, gradeGame, isGradedGameType } from '@/lib/grading/gameGrading';
 import { findSourceHint } from '@/lib/grading/sourceHint';
 
 // Califica UNA respuesta de una leccion en el servidor. El navegador manda lo que respondio el estudiante; el servidor
@@ -45,10 +46,12 @@ export async function POST(req: NextRequest) {
 
     const { data: question } = await admin
       .from('lesson_questions')
-      .select('id, type, q, opts, ok, answers, pairs, keywords, exp, concept_tag')
+      .select('id, type, q, opts, ok, answers, pairs, keywords, exp, concept_tag, game_data')
       .eq('id', questionId)
       .maybeSingle();
-    if (!question || !isServerGradedType(question.type)) return fail(404, 'Pregunta no encontrada');
+    // Un minijuego solo se califica aqui si SERVER_GRADING_GAMES esta activo: si no, se sirvio con su solucion y lo califica el navegador.
+    const isGame = isGradedGameType(question?.type);
+    if (!question || !(isGame ? serverGradingGamesEnabled() : isServerGradedType(question.type))) return fail(404, 'Pregunta no encontrada');
 
     const { data: prev } = await admin
       .from('lesson_attempt_answers')
@@ -67,7 +70,7 @@ export async function POST(req: NextRequest) {
     // Al cerrar una pregunta FALLADA se busca en el material de la clase el pasaje mas probable ("Repasa en tu material").
     // Es una pista opcional: si algo falla o tarda, simplemente no se manda.
     const sourceFor = async (correct: boolean) => {
-      if (correct) return null;
+      if (correct || isGame) return null; // la pista de fuente se calcula con el enunciado de una pregunta clasica
       try {
         const mod = await getModule();
         if (!mod?.classroom_id) return null;
@@ -82,21 +85,24 @@ export async function POST(req: NextRequest) {
       }
     };
 
+    const reveal = isGame ? buildGameReveal(question.type, question.game_data) : buildReveal(question);
+    const explanation = question.exp ?? (isGame ? ((reveal as { explanation?: string | null }).explanation ?? null) : null);
+
     const closed = async (correct: boolean, tries: number, detail?: unknown) =>
       NextResponse.json({
         correct,
         final: true,
         tries,
         detail,
-        reveal: buildReveal(question),
-        explanation: question.exp ?? null,
+        reveal,
+        explanation,
         source: await sourceFor(correct),
       });
 
     // Pregunta ya cerrada: repetir la respuesta no suma ni cambia nada, se devuelve el mismo resultado.
     if (prev?.final) return await closed(!!prev.correct, prev.tries);
 
-    const graded = gradeAnswer(question, body.answer);
+    const graded = isGame ? gradeGame(question.type, question.game_data, body.answer) : gradeAnswer(question, body.answer);
     if (graded.status !== 'graded') return fail(400, 'Respuesta invalida');
 
     const triesUsed = (prev?.tries ?? 0) + 1;
@@ -140,7 +146,7 @@ export async function POST(req: NextRequest) {
         concept_tag: question.concept_tag ?? null,
         was_correct: graded.correct,
         answer_given: body.answer ?? null,
-        game_type: null,
+        game_type: isGame ? question.type : null,
       });
       if (error) console.error('[LESSON_ANSWER_LOG_FAILED]', error.message);
     }
