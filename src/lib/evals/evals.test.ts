@@ -90,7 +90,8 @@ describe('eval:memory', () => {
     ['un modelo que no responde (null)', () => async () => null, ['nodeRecall']],
     ['un modelo que alucina conceptos que NO estan en el texto', () => async () => JSON.stringify({ conceptos: ['Pirámides de Giza', 'Cleopatra', 'Imperio otomano'].map((nombre) => ({ nombre, tipo: 'concepto', definicion: 'x', importancia: 3 })), relaciones: [] }), ['nodeRecall']],
     ['un modelo que solo lee la mitad de los conceptos', (c) => async () => JSON.stringify({ conceptos: conceptsJson(c, c.expectedConcepts.slice(0, Math.floor(c.expectedConcepts.length / 2))), relaciones: [] }), ['nodeRecall']],
-    ['un modelo que invierte el sentido de las causas', (c) => async () => JSON.stringify({ conceptos: conceptsJson(c, c.expectedConcepts), relaciones: c.causalEdges.map(([a, b]) => ({ de: b, a, tipo: 'causa' })) }), ['causaFalsePositiveRate', 'causalRecall']],
+    // La tuberia (hasCausalLink con sentido) vuelve neutra la causa invertida: no entra como causa falsa, pero se PIERDE la causa (el recall cae).
+    ['un modelo que invierte el sentido de las causas', (c) => async () => JSON.stringify({ conceptos: conceptsJson(c, c.expectedConcepts), relaciones: c.causalEdges.map(([a, b]) => ({ de: b, a, tipo: 'causa' })) }), ['causalRecall']],
   ];
   for (const [name, gen, expectFail] of defects) {
     it(`FALLA con ${name}`, async () => {
@@ -100,6 +101,13 @@ describe('eval:memory', () => {
       expect(() => assertPasses(r)).toThrow(EvalFailure);
     });
   }
+
+  it('la tuberia NEUTRALIZA las causas invertidas: ninguna entra como causa falsa', async () => {
+    const reversed: MemoryGenerator = (c) => async () => JSON.stringify({ conceptos: conceptsJson(c, c.expectedConcepts), relaciones: c.causalEdges.map(([a, b]) => ({ de: b, a, tipo: 'causa' })) });
+    const r = await runMemoryEval(MEMORY_GOLDEN, reversed);
+    expect(r.metrics.causaFalsePositiveRate).toBe(0);
+    expect(r.metrics.causalRecall).toBe(0);
+  });
 
   it('FALLA con una tuberia defectuosa que marca TODO como causa (sin exigir expresion causal)', async () => {
     const allCausa: ExtractFn = async (...args) => {

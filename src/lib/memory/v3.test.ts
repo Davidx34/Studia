@@ -186,7 +186,7 @@ describe('v3: "causa" solo con una expresion causal', () => {
     expect(rel(parseExtraction(resp('Natrón', 'Momificación'), group(TEXTO), 'm1', 'narrativo'))).toBe('relacionado');
   });
 
-  it('la señal causal de una frase VECINA no cuenta: debe estar en una frase que mencione alguno de los conceptos', () => {
+  it('la señal causal de una frase VECINA no cuenta: debe unir a los dos conceptos', () => {
     expect(hasCausalLink(TEXTO, 'Nilo', 'Agricultura')).toBe(true);
     expect(hasCausalLink(TEXTO, 'Natrón', 'Momificación')).toBe(false);
     expect(hasCausalLink('', 'A', 'B')).toBe(false);

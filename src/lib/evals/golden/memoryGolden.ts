@@ -37,10 +37,11 @@ export const MEMORY_GOLDEN: MemoryGoldenCase[] = [
       ['Senado', 'República romana'],
       ['calzadas', 'provincias'],
       ['calzadas', 'Italia'],
+      // La frase causal de la vecina ("Debido a las guerras púnicas, Roma conquistó Sicilia") ya no vuelve causal este par (hasCausalLink exige los dos conceptos en la frase causal).
+      ['guerras púnicas', 'Cartago'],
     ],
-    // La frase causal ("Debido a las guerras púnicas, Roma conquistó Sicilia") nombra las guerras púnicas, y la frase vecina las vuelve a mencionar con Cartago:
-    // hasCausalLink acepta la señal de la frase contigua. Es el compromiso de la iteración 1 (no perder causas expresadas en dos frases). Se mide y se informa.
-    knownGapNotCausal: [['guerras púnicas', 'Cartago']],
+    // Limite que SIGUE: la frase causal nombra a los dos conceptos, pero no son causa y efecto entre si (Roma es quien conquista, no el efecto de las guerras). Se mide y se informa.
+    knownGapNotCausal: [['guerras púnicas', 'Roma']],
   },
   {
     id: 'consumidor',
