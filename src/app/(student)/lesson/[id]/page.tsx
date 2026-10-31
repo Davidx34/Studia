@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { evaluateAchievements } from '@/lib/achievements/evaluate';
 import { normalizeAnswer } from '@/lib/lesson/normalize';
 import { reportShadow } from '@/lib/grading/shadowClient';
+import { finishLessonOnServer } from '@/lib/grading/finishClient';
 import type { MatchVerdict } from '@/components/LessonQuestionMatch';
 import { LessonQuestionMatch } from '@/components/LessonQuestionMatch';
 import { ElDescifrador } from '@/components/minigames/ElDescifrador';
@@ -645,6 +646,17 @@ export default function LessonPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // Leccion calificada en el servidor: el servidor cierra el intento y escribe el progreso (puntaje, estado, intentos, tiempo) desde las respuestas que YA califico. Si no esta
+      // disponible se sigue como antes; si lo RECHAZA (preguntas sin responder...), no se escribe el progreso a mano.
+      if (attemptIdRef.current) {
+        const outcome = await finishLessonOnServer(attemptIdRef.current, elapsedSeconds());
+        if (outcome === 'ok') {
+          await evaluateAchievements();
+          return;
+        }
+        if (outcome === 'rejected') return;
+      }
 
       const scorePercent = Math.round((finalScore / questions.length) * 100);
       const now = new Date().toISOString();
