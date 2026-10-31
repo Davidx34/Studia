@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useTonitoStore } from '@/stores/useTonitoStore';
+import { CHECK_ERROR, textOrNull, type GameCheck } from './serverCheck';
 
 interface Paragraph {
   paragraph_id: number;
@@ -10,7 +11,8 @@ interface Paragraph {
 interface GameData {
   case_file: string;
   expert_testimony: Paragraph[];
-  guilty_paragraph_id: number;
+  // Solo en el modo del navegador: con calificacion en el servidor el parrafo culpable NO viaja.
+  guilty_paragraph_id?: number;
   verdict_explanation?: string;
   cross_examination_tip?: string;
 }
@@ -19,14 +21,18 @@ interface GameData {
 // parrafos numerados donde uno contiene un error conceptual sutil. El
 // estudiante debe objetar (tocar) el parrafo correcto. Incluye una pista
 // opcional, igual que El Descifrador.
+//
+// Con `check` (calificacion en el servidor) la solucion llega DESPUES de objetar.
 export function JuicioConocimientoGame({
   gameData,
   disabled,
   onComplete,
+  check,
 }: {
   gameData: GameData;
   disabled: boolean;
   onComplete: (correct: boolean) => void;
+  check?: GameCheck;
 }) {
   const paragraphs = gameData.expert_testimony || [];
   const onCorrectAnswer = useTonitoStore((s) => s.onCorrectAnswer);
@@ -35,22 +41,46 @@ export function JuicioConocimientoGame({
   const [accusedId, setAccusedId] = useState<number | null>(null);
   const [finished, setFinished] = useState<'won' | 'lost' | null>(null);
   const [tipShown, setTipShown] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState<{ guiltyParagraphId: number | null; explanation: string | null } | null>(null);
 
-  const locked = disabled || finished !== null;
+  const locked = disabled || finished !== null || checking;
 
-  function handleObject(p: Paragraph) {
-    if (locked) return;
-    setAccusedId(p.paragraph_id);
-    if (p.paragraph_id === gameData.guilty_paragraph_id) {
+  function finish(correct: boolean) {
+    if (correct) {
       onCorrectAnswer();
       setFinished('won');
-      onComplete(true);
     } else {
       onWrongAnswer();
       setFinished('lost');
-      onComplete(false);
     }
+    onComplete(correct);
   }
+
+  async function handleObject(p: Paragraph) {
+    if (locked) return;
+    setAccusedId(p.paragraph_id);
+    setError(null);
+    if (!check) {
+      finish(p.paragraph_id === gameData.guilty_paragraph_id);
+      return;
+    }
+    setChecking(true);
+    const verdict = await check({ selectedParagraphId: p.paragraph_id });
+    setChecking(false);
+    if (!verdict) {
+      setAccusedId(null);
+      setError(CHECK_ERROR);
+      return;
+    }
+    const g = verdict.reveal?.guiltyParagraphId;
+    setRevealed({ guiltyParagraphId: typeof g === 'number' ? g : null, explanation: textOrNull(verdict.reveal?.explanation) ?? verdict.explanation ?? null });
+    finish(verdict.correct);
+  }
+
+  const guiltyId = revealed ? revealed.guiltyParagraphId : (gameData.guilty_paragraph_id ?? null);
+  const explanation = revealed ? revealed.explanation : gameData.verdict_explanation;
 
   return (
     <div className="space-y-4">
@@ -78,7 +108,7 @@ export function JuicioConocimientoGame({
       <div className="space-y-2">
         {paragraphs.map((p) => {
           const isAccused = accusedId === p.paragraph_id;
-          const revealAsGuilty = finished !== null && p.paragraph_id === gameData.guilty_paragraph_id;
+          const revealAsGuilty = finished !== null && guiltyId !== null && p.paragraph_id === guiltyId;
           return (
             <button
               key={p.paragraph_id}
@@ -91,7 +121,9 @@ export function JuicioConocimientoGame({
                   : isAccused
                   ? finished === 'won'
                     ? 'bg-success/15 border-success text-fg'
-                    : 'bg-danger/15 border-danger text-fg'
+                    : finished === 'lost'
+                    ? 'bg-danger/15 border-danger text-fg'
+                    : 'bg-primary/10 border-primary text-fg'
                   : finished !== null
                   ? 'bg-surface-2 border-line-strong text-fg-muted'
                   : 'bg-surface-2 border-line-strong text-fg hover:border-primary')
@@ -104,16 +136,19 @@ export function JuicioConocimientoGame({
         })}
       </div>
 
+      {checking && <p className="text-fg-muted text-sm" aria-live="polite">Comprobando…</p>}
+      {error && (
+        <p role="alert" className="text-danger text-sm">
+          {error}
+        </p>
+      )}
+
       {finished && (
         <div className={`p-4 rounded-lg border ${finished === 'won' ? 'bg-success/10 border-success' : 'bg-primary/10 border-primary/40'}`}>
           <p className={`font-bold ${finished === 'won' ? 'text-success' : 'text-primary-text'}`}>
-            {finished === 'won' ? '🎉 ¡Objeción sostenida!' : `El fraude estaba en el párrafo §${gameData.guilty_paragraph_id}`}
+            {finished === 'won' ? '🎉 ¡Objeción sostenida!' : `El fraude estaba en el párrafo §${guiltyId}`}
           </p>
-          {gameData.verdict_explanation && (
-            <p className={`text-sm mt-1 ${finished === 'won' ? 'text-fg' : 'text-fg'}`}>
-              {gameData.verdict_explanation}
-            </p>
-          )}
+          {explanation && <p className="text-sm mt-1 text-fg">{explanation}</p>}
         </div>
       )}
     </div>

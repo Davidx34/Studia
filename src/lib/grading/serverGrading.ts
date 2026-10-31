@@ -1,4 +1,5 @@
 import { hasServiceRoleKey } from '@/lib/supabase/admin';
+import { isGradedGameType, sanitizeGameData } from './gameGrading';
 
 // Calificacion en el servidor de las preguntas clasicas (fase 1 del plan docs/PLAN_CALIFICACION_EN_SERVIDOR.md).
 // Las respuestas correctas y la explicacion NO viajan al navegador al servir la leccion: llegan DESPUES de responder.
@@ -7,6 +8,12 @@ import { hasServiceRoleKey } from '@/lib/supabase/admin';
 // Cualquier otro caso deja la leccion como antes (el navegador califica).
 export function serverGradingEnabled(): boolean {
   return process.env.SERVER_GRADING === 'on' && hasServiceRoleKey();
+}
+
+// Segundo interruptor, solo para los MINIJUEGOS (fase 4(a)): SERVER_GRADING_GAMES=on ademas de SERVER_GRADING=on. Asi los juegos no cambian hasta que se pida. Con el apagado,
+// los juegos se sirven y se califican en el navegador como siempre.
+export function serverGradingGamesEnabled(): boolean {
+  return serverGradingEnabled() && process.env.SERVER_GRADING_GAMES === 'on';
 }
 
 export const SERVER_GRADED_TYPES = ['multiple_choice', 'true_false', 'fill_blank', 'short_answer', 'match'] as const;
@@ -31,7 +38,12 @@ export function shuffleWith<T>(arr: readonly T[], rng: () => number = Math.rando
 // Version de una pregunta clasica SIN claves ni explicacion, para el navegador.
 // match: los terminos y las definiciones viajan por separado y las definiciones mezcladas (el orden de `pairs`
 // ya diria cual va con cual).
-export function sanitizeQuestion(q: any, rng: () => number = Math.random): any {
+export function sanitizeQuestion(q: any, rng: () => number = Math.random, opts: { games?: boolean } = {}): any {
+  // Minijuego: sin la explicacion y con los datos del juego reducidos a una lista blanca (la solucion se queda en el servidor).
+  if (q?.id && opts.games && isGradedGameType(q.type)) {
+    const { exp, ok, answers, keywords, pairs, game_data, ...rest } = q;
+    return { ...rest, game_data: sanitizeGameData(q.type, game_data), serverGraded: true };
+  }
   if (!q?.id || !isServerGradedType(q.type)) return q;
   const { ok, answers, keywords, pairs, exp, ...rest } = q;
   const safe: any = { ...rest, serverGraded: true };

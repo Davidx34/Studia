@@ -1,5 +1,6 @@
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { isServerGradedType, sanitizeQuestion, serverGradingEnabled } from './serverGrading';
+import { isGradedGameType } from './gameGrading';
+import { isServerGradedType, sanitizeQuestion, serverGradingEnabled, serverGradingGamesEnabled } from './serverGrading';
 
 // Al servir una leccion con calificacion del servidor: crea el intento (fija que preguntas se sirvieron) y entrega las
 // preguntas clasicas SIN claves. Nunca rompe la leccion: si algo falla devuelve las preguntas como antes (el navegador
@@ -11,7 +12,8 @@ export async function startLessonAttempt(
 ): Promise<{ questions: any[]; attemptId?: string }> {
   try {
     if (!serverGradingEnabled()) return { questions };
-    const gradable = questions.filter((q) => q?.id && isServerGradedType(q.type));
+    const games = serverGradingGamesEnabled();
+    const gradable = questions.filter((q) => q?.id && (isServerGradedType(q.type) || (games && isGradedGameType(q.type))));
     if (gradable.length === 0) return { questions };
 
     const {
@@ -30,7 +32,7 @@ export async function startLessonAttempt(
       console.error('[LESSON_ATTEMPT_CREATE_FAILED]', { moduleId, error: error?.message });
       return { questions };
     }
-    return { questions: questions.map((q) => sanitizeQuestion(q)), attemptId: data.id };
+    return { questions: questions.map((q) => sanitizeQuestion(q, Math.random, { games })), attemptId: data.id };
   } catch (e) {
     console.error('[LESSON_ATTEMPT_ERROR]', e);
     return { questions };

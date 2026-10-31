@@ -12,6 +12,7 @@ import { TimelineGame } from '@/components/minigames/TimelineGame';
 import { CategoriesGame } from '@/components/minigames/CategoriesGame';
 import { FlashcardGame } from '@/components/minigames/FlashcardGame';
 import { ImpostorCognitivoGame } from '@/components/minigames/ImpostorCognitivoGame';
+import type { GameCheck } from '@/components/minigames/serverCheck';
 import { AlquimiaConceptualGame } from '@/components/minigames/AlquimiaConceptualGame';
 import { CuartoCrisisGame } from '@/components/minigames/CuartoCrisisGame';
 import { JuicioConocimientoGame } from '@/components/minigames/JuicioConocimientoGame';
@@ -76,7 +77,7 @@ type ServerAnswer = {
   tries: number;
   triesLeft?: number;
   detail?: { matched?: number; total?: number; perTerm?: boolean[] };
-  reveal?: { ok?: number | boolean; answers?: string[]; keywords?: string[]; defs?: string[] };
+  reveal?: { ok?: number | boolean; answers?: string[]; keywords?: string[]; defs?: string[] } & Record<string, unknown>; // los minijuegos revelan otros campos (ver gameGrading.ts)
   explanation?: string | null;
   source?: SourceHint | null;
 };
@@ -337,6 +338,21 @@ export default function LessonPage() {
     } catch (e) {
       console.warn('Error registrando intento:', e);
     }
+  };
+
+  // Minijuegos con calificacion en el servidor: el juego manda lo que eligio el jugador y recibe el veredicto con lo que se revela. Sin la funcion, el juego se califica en el
+  // navegador como siempre.
+  const gameCheck = (q: LessonPageQuestion): GameCheck | undefined =>
+    q.serverGraded
+      ? async (answer) => {
+          const r = await gradeOnServer(q, answer);
+          return r ? { correct: r.correct, reveal: r.reveal, explanation: r.explanation ?? null } : null;
+        }
+      : undefined;
+  // El servidor ya registro el intento de una pregunta que califica el (question_attempts); desde el navegador solo se reacciona al resultado.
+  const finishGame = (q: LessonPageQuestion, correct: boolean) => {
+    if (q.serverGraded) reactToResult(correct);
+    else recordAttempt(q, correct, null);
   };
 
   const handleAnswer = async (answer: number | boolean | string) => {
@@ -929,11 +945,12 @@ export default function LessonPage() {
         key={idx}
         gameData={q.game_data || {}}
         disabled={answered}
+        check={gameCheck(q)}
         onComplete={(correct) => {
           setAnswered(true);
           setSelected('acusado');
           if (correct) setScore((s) => s + 1);
-          recordAttempt(q, correct, null);
+          finishGame(q, correct);
         }}
       />
     );
@@ -943,11 +960,12 @@ export default function LessonPage() {
         key={idx}
         gameData={q.game_data || {}}
         disabled={answered}
+        check={gameCheck(q)}
         onComplete={(correct) => {
           setAnswered(true);
           setSelected('fusionado');
           if (correct) setScore((s) => s + 1);
-          recordAttempt(q, correct, null);
+          finishGame(q, correct);
         }}
       />
     );
@@ -957,11 +975,12 @@ export default function LessonPage() {
         key={idx}
         gameData={q.game_data || {}}
         disabled={answered}
+        check={gameCheck(q)}
         onComplete={(correct) => {
           setAnswered(true);
           setSelected('resuelto');
           if (correct) setScore((s) => s + 1);
-          recordAttempt(q, correct, null);
+          finishGame(q, correct);
         }}
       />
     );
@@ -971,11 +990,12 @@ export default function LessonPage() {
         key={idx}
         gameData={q.game_data || {}}
         disabled={answered}
+        check={gameCheck(q)}
         onComplete={(correct) => {
           setAnswered(true);
           setSelected('objetado');
           if (correct) setScore((s) => s + 1);
-          recordAttempt(q, correct, null);
+          finishGame(q, correct);
         }}
       />
     );

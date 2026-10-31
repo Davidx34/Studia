@@ -1,11 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { useTonitoStore } from '@/stores/useTonitoStore';
+import { CHECK_ERROR, idList, textOrNull, type GameCheck } from './serverCheck';
 
 interface Statement {
   id: number;
   text: string;
-  is_impostor: boolean;
+  // Solo en el modo del navegador: con calificacion en el servidor la afirmacion falsa NO viaja.
+  is_impostor?: boolean;
 }
 
 interface GameData {
@@ -17,14 +19,18 @@ interface GameData {
 // Minijuego 2 del catalogo (El Impostor Cognitivo): tap-to-accuse, un solo
 // intento — 2 afirmaciones verdaderas y 1 falsa ("el impostor"), el
 // estudiante debe señalar cual es la falsa.
+//
+// Con `check` (calificacion en el servidor) la solucion llega DESPUES de acusar.
 export function ImpostorCognitivoGame({
   gameData,
   disabled,
   onComplete,
+  check,
 }: {
   gameData: GameData;
   disabled: boolean;
   onComplete: (correct: boolean) => void;
+  check?: GameCheck;
 }) {
   const statements = gameData.statements || [];
   const onCorrectAnswer = useTonitoStore((s) => s.onCorrectAnswer);
@@ -32,24 +38,47 @@ export function ImpostorCognitivoGame({
 
   const [accusedId, setAccusedId] = useState<number | null>(null);
   const [finished, setFinished] = useState<'won' | 'lost' | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Lo que revela el servidor (solo con `check`).
+  const [revealed, setRevealed] = useState<{ impostorIds: (string | number)[]; explanation: string | null } | null>(null);
 
-  const locked = disabled || finished !== null;
+  const locked = disabled || finished !== null || checking;
 
-  function handleAccuse(st: Statement) {
-    if (locked) return;
-    setAccusedId(st.id);
-    if (st.is_impostor) {
+  function finish(correct: boolean) {
+    if (correct) {
       onCorrectAnswer();
       setFinished('won');
-      onComplete(true);
     } else {
       onWrongAnswer();
       setFinished('lost');
-      onComplete(false);
     }
+    onComplete(correct);
   }
 
-  const impostor = statements.find((s) => s.is_impostor);
+  async function handleAccuse(st: Statement) {
+    if (locked) return;
+    setAccusedId(st.id);
+    setError(null);
+    if (!check) {
+      finish(st.is_impostor === true);
+      return;
+    }
+    setChecking(true);
+    const verdict = await check({ selectedId: st.id });
+    setChecking(false);
+    if (!verdict) {
+      setAccusedId(null);
+      setError(CHECK_ERROR);
+      return;
+    }
+    setRevealed({ impostorIds: idList(verdict.reveal?.impostorIds), explanation: textOrNull(verdict.reveal?.explanation) ?? verdict.explanation ?? null });
+    finish(verdict.correct);
+  }
+
+  const isImpostor = (s: Statement) => (revealed ? revealed.impostorIds.includes(s.id) : s.is_impostor === true);
+  const impostor = statements.find(isImpostor);
+  const explanation = revealed ? revealed.explanation : gameData.exposicion_del_impostor;
 
   return (
     <div className="space-y-4">
@@ -61,7 +90,7 @@ export function ImpostorCognitivoGame({
       <div className="space-y-2">
         {statements.map((st) => {
           const isAccused = accusedId === st.id;
-          const revealAsImpostor = finished !== null && st.is_impostor;
+          const revealAsImpostor = finished !== null && isImpostor(st);
           return (
             <button
               key={st.id}
@@ -74,7 +103,9 @@ export function ImpostorCognitivoGame({
                   : isAccused
                   ? finished === 'won'
                     ? 'bg-success/15 border-success text-fg'
-                    : 'bg-danger/15 border-danger text-fg'
+                    : finished === 'lost'
+                    ? 'bg-danger/15 border-danger text-fg'
+                    : 'bg-primary/10 border-primary text-fg'
                   : finished !== null
                   ? 'bg-surface-2 border-line-strong text-fg-muted'
                   : 'bg-surface-2 border-line-strong text-fg hover:border-primary')
@@ -86,23 +117,24 @@ export function ImpostorCognitivoGame({
         })}
       </div>
 
+      {checking && <p className="text-fg-muted text-sm" aria-live="polite">Comprobando…</p>}
+      {error && (
+        <p role="alert" className="text-danger text-sm">
+          {error}
+        </p>
+      )}
+
       {finished === 'won' && (
         <div className="bg-success/10 border border-success p-4 rounded-lg">
           <p className="text-success font-bold">🎉 ¡Atrapaste al impostor!</p>
-          {gameData.exposicion_del_impostor && (
-            <p className="text-fg text-sm mt-1">{gameData.exposicion_del_impostor}</p>
-          )}
+          {explanation && <p className="text-fg text-sm mt-1">{explanation}</p>}
         </div>
       )}
 
       {finished === 'lost' && (
         <div className="bg-primary/10 border border-primary/40 p-4 rounded-lg">
-          <p className="text-primary-text font-bold">
-            El impostor era: "{impostor?.text}"
-          </p>
-          {gameData.exposicion_del_impostor && (
-            <p className="text-fg text-sm mt-1">{gameData.exposicion_del_impostor}</p>
-          )}
+          <p className="text-primary-text font-bold">El impostor era: "{impostor?.text}"</p>
+          {explanation && <p className="text-fg text-sm mt-1">{explanation}</p>}
         </div>
       )}
     </div>
