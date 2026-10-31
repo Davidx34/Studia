@@ -91,7 +91,7 @@ export async function downloadClassroomReportXlsx(data: ClassroomProgressData): 
     { Campo: 'Descripción', Valor: c.description ?? '' },
     { Campo: 'Materia', Valor: c.subjectArea ?? '' },
     { Campo: 'Grado', Valor: c.gradeLevel ?? '' },
-    { Campo: 'Código de inscripción', Valor: c.joinCode },
+    { Campo: 'Código de inscripción', Valor: c.joinCode ?? '' },
     { Campo: 'Profesor', Valor: c.teacherName },
     { Campo: 'Email del profesor', Valor: c.teacherEmail ?? '' },
     { Campo: 'Materiales subidos', Valor: c.totalMaterials },
@@ -103,7 +103,7 @@ export async function downloadClassroomReportXlsx(data: ClassroomProgressData): 
     },
     { Campo: '% completado promedio', Valor: `${data.summary.avgCompletionPct}%` },
     { Campo: 'Módulos completados (total)', Valor: data.summary.totalModulesCompleted },
-    { Campo: 'Fecha de creación', Valor: new Date(c.createdAt).toLocaleDateString('es') },
+    { Campo: 'Fecha de creación', Valor: c.createdAt ? new Date(c.createdAt).toLocaleDateString('es') : '' },
     { Campo: 'Fecha de exportación', Valor: new Date().toLocaleDateString('es') },
   ];
   const wsInfo = XLSX.utils.json_to_sheet(infoRows);

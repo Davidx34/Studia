@@ -93,6 +93,26 @@ export function packByRelevance<T extends { content: string; material_id: string
   return chosen.sort((a, b) => (a.material_id === b.material_id ? a.chunk_index - b.chunk_index : a.material_id < b.material_id ? -1 : 1));
 }
 
+// Los parametros de la seleccion, juntos: los usa la recuperacion de produccion Y el barrido de hiperparametros (scripts/eval-rag-sweep.ts), asi lo que se mide es
+// exactamente lo que corre.
+export interface SelectOptions {
+  // Constante k de la fusion RRF (mas alta = mas plano el aporte de los primeros puestos).
+  k: number;
+  // Un fragmento se descarta si su puntaje fusionado es menor que este porcentaje del mejor (0 = no corta nada); nunca quedan menos de `minKeep`.
+  cutoffRatio: number;
+  minKeep: number;
+  charLimit: number;
+  maxChunks: number;
+  // Desde que parecido (Jaccard de grupos de 5 palabras) dos fragmentos se consideran repetidos.
+  dupThreshold?: number;
+}
+
+export function selectContext(lists: Retrieved[][], o: SelectOptions): Fused[] {
+  const fused = fuseVariants(lists, o.k);
+  const kept = dropNearDuplicates(relativeCutoff(fused, o.cutoffRatio, o.minKeep), o.dupThreshold);
+  return packByRelevance(kept, o.charLimit, o.maxChunks);
+}
+
 export function joinContext(chunks: { content: string }[]): string {
   return chunks.map((c) => c.content).join('\n\n');
 }

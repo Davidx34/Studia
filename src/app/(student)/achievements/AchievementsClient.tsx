@@ -5,25 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, Trophy, Lock, Sparkles, Crown, Check } from 'lucide-react';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 
-interface Achievement {
-  id: string;
-  name: string;
-  description: string | null;
-  icon_name: string;
-  color: string;
-  criteria_type: string;
-  criteria_value: number;
-  criteria_category: string | null;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
-  reward_coins: number;
-  sort_order: number;
-}
-
-interface UserAchievement {
-  achievement_id: string;
-  earned_at: string;
-  seen_by_user: boolean;
-}
+import type { Achievement, UserAchievement } from '@/lib/achievements/normalize';
 
 interface Props {
   allAchievements: Achievement[];

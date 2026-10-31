@@ -21,7 +21,7 @@ export interface StudentRow {
   fullName: string;
   username: string;
   email: string | null;
-  avatarUrl: string;
+  avatarUrl: string | null;
   streakDays: number;
   modulesCompleted: number;
   modulesTotal: number;
@@ -52,12 +52,12 @@ export interface ClassroomMeta {
   description: string | null;
   subjectArea: string | null;
   gradeLevel: string | null;
-  joinCode: string;
+  joinCode: string | null;
   teacherName: string;
   teacherEmail: string | null;
   totalMaterials: number;
   totalModules: number;
-  createdAt: string;
+  createdAt: string | null;
 }
 
 export interface ClassroomProgressData {
@@ -250,7 +250,7 @@ export async function getClassroomProgress(
     studentName: studentNameById.get(r.student_id) ?? 'Desconocido',
     moduleId: r.module_id,
     moduleTitle: moduleTitles.get(r.module_id) ?? 'Módulo desconocido',
-    status: r.status,
+    status: r.status ?? 'locked', // el valor por defecto de la base
     score: r.score,
     bestScore: r.best_score ?? 0,
     attempts: r.attempts ?? 0,

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useNotificationStore } from '@/stores/useNotificationStore';
+import { toAchievement } from '@/lib/achievements/normalize';
 
 /**
  * Hook que conecta el game state con el sistema de notificaciones.
@@ -59,14 +60,15 @@ export function useNotificationBridge() {
                 'Leyenda': '🏆',
               };
 
+              const normalized = toAchievement(achievement);
               queueAchievement({
                 id: achievement.id,
                 name: achievement.name,
                 description: achievement.description || '',
                 icon: iconMap[achievement.name] || '🏆',
                 color: achievement.color || '#FFD700',
-                rarity: achievement.rarity,
-                rewardCoins: achievement.reward_coins,
+                rarity: normalized.rarity,
+                rewardCoins: normalized.reward_coins,
               });
             }
           }

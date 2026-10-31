@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { AchievementsClient } from './AchievementsClient';
+import { toAchievement, toUserAchievement } from '@/lib/achievements/normalize';
 
 export default async function AchievementsPage() {
   const supabase = await createServerSupabase();
@@ -68,8 +69,8 @@ export default async function AchievementsPage() {
 
   return (
     <AchievementsClient
-      allAchievements={allAchievements || []}
-      userAchievements={userAchievements || []}
+      allAchievements={(allAchievements ?? []).map(toAchievement)}
+      userAchievements={(userAchievements ?? []).map(toUserAchievement)}
       progressContext={{
         streakDays: profile?.streak_days || 0,
         modulesCompleted: completedModules || 0,

@@ -14,7 +14,7 @@
 // regenere database.generated.ts, y ningun import existente en la app se
 // rompe (los nombres exportados no cambiaron).
 
-import type { Database as GeneratedDatabase, TablesGenerated as GeneratedTables } from './database.generated';
+import type { Database as GeneratedDatabase, Tables as GeneratedTables } from './database.generated';
 
 export type { Json } from './database.generated';
 export type Database = GeneratedDatabase;

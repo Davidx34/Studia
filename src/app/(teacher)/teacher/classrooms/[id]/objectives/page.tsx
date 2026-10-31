@@ -55,7 +55,7 @@ export default async function ObjectivesPage({ params }: { params: { id: string 
     <ObjectivesClient
       classroomId={params.id}
       objectives={objectives ?? []}
-      modules={modules ?? []}
+      modules={(modules ?? []).map((m) => ({ ...m, order_index: m.order_index ?? 0, auto_generated: m.auto_generated ?? false }))}
       materials={materials ?? []}
       allowedMinigames={allowedMinigames}
       poolStatus={poolStatus}

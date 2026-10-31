@@ -213,8 +213,9 @@ export async function POST(req: NextRequest) {
     // y recuperar los ids asignados por la base para poder trackear intentos.
     let generatedWithIds = validGenerated;
     if (moduleId && supabase && validGenerated.length > 0) {
+      const targetModuleId: string = moduleId;
       const rows = validGenerated.map((q) => ({
-        module_id: moduleId,
+        module_id: targetModuleId,
         type: q.type,
         q: q.q,
         opts: q.opts ?? null,

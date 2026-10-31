@@ -56,3 +56,6 @@ FASE_*_BRIEF.docx
 # Salida de npm run clip:prepare (videos convertidos, aun sin subir)
 clips-out/
 poses-out/
+
+# Conjuntos dorados con material REAL de clases (el repositorio es publico): solo en tu maquina
+evals/golden/local/
