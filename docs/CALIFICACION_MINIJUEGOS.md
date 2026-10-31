@@ -1,6 +1,6 @@
 # Calificación en el servidor de los minijuegos (fase 4(a), primera entrega)
 
-Las preguntas clásicas ya se califican en el servidor (PR #95): la solución no viaja al navegador. Los minijuegos seguían calificándose en el navegador con la solución dentro de `game_data`. Esta entrega cierra **los cuatro juegos de «elegir una opción»**: El Impostor Cognitivo, Alquimia Conceptual, Cuarto de Crisis y El Juicio al Conocimiento. Los otros cuatro (línea del tiempo, categorías, cartas, descifrador) necesitan otra interacción con el servidor y van en PR aparte.
+Las preguntas clásicas ya se califican en el servidor (PR #95): la solución no viaja al navegador. Los minijuegos seguían calificándose en el navegador con la solución dentro de `game_data`. Esta entrega cierra **los cuatro juegos de «elegir una opción»**: El Impostor Cognitivo, Alquimia Conceptual, Cuarto de Crisis y El Juicio al Conocimiento. La línea del tiempo y las categorías se cerraron en una segunda entrega (ver más abajo). Quedan **dos**: las cartas y el descifrador.
 
 ## Cómo funciona
 
@@ -27,3 +27,22 @@ Sin `SERVER_GRADING_GAMES`, los juegos se sirven y se califican en el navegador 
 - La política `students_read_lesson_questions` todavía deja leer `lesson_questions` completa con la llave pública, así que **un estudiante que consulte la base directamente aún puede ver las soluciones**. Cerrarlo es la Fase 2 del plan (`finish_lesson`, lectura cerrada); esta entrega solo evita que la solución viaje en la respuesta de la lección.
 - El temporizador del Cuarto de Crisis no se vigila en el servidor.
 - Las pantallas de los juegos no se probaron en un navegador con sesiones reales (necesitan inicio de sesión y datos): se cubren con pruebas del servidor, de la entrega de la lección con una base simulada y pruebas estáticas de los componentes.
+
+## Segunda entrega: línea del tiempo y categorías
+
+Seis de los ocho minijuegos se califican ya en el servidor. Los dos nuevos tienen más de una oportunidad, así que el servidor lleva la cuenta (`MAX_TRIES`: línea del tiempo 3, categorías 2).
+
+**Línea del tiempo** (`{ order: [id, …] }`, los eventos en el orden que puso el jugador):
+- Al navegador salen el id, el texto y el año de cada evento; **la posición correcta no**.
+- Un intento fallido **no cierra** la pregunta: el servidor responde solo qué **posiciones** estaban mal (lo mismo que el juego ya marcaba en rojo por su cuenta), sin revelar el orden. Al acertar o al agotar el tercer intento cierra y revela el orden correcto y la explicación.
+- Con el servidor, **su** cuenta de intentos decide cuándo se cierra (la del navegador podría no coincidir si se recargó la página).
+
+**Categorías:** el juego clasifica elemento por elemento con retroalimentación inmediata y sin penalización, y tiene un temporizador con una segunda oportunidad. Se respeta tal cual:
+- Cada toque envía un **sondeo** `{ probe: { itemId, category } }`: el servidor dice si esa categoría es la del elemento y **no cierra la pregunta, no gasta intentos y no escribe nada**. Es lo que el jugador descubriría por ensayo y error, y no tiene penalización en el juego.
+- Al clasificar todo, el navegador manda la clasificación completa `{ assignment: { id: categoría } }`; el servidor la verifica y cierra. Lo que el servidor impide es **declarar** una clasificación que no sea la correcta.
+- El tiempo agotado se informa como `{ timeout: true }` (intento fallido); el segundo cierra la pregunta y revela la clasificación. El reloj sigue siendo del navegador.
+- Si falla la comprobación final (sin conexión), aparece «Reintentar»; no se inventa un resultado.
+
+**Límite de los sondeos:** un cliente modificado puede sondear todas las combinaciones y obtener la clasificación sin jugar (no hay tope de sondeos por pregunta). Es el mismo ensayo y error que el juego permite sin penalización, sin ahorrar más que tiempo; no se puede, en cambio, **registrar** un acierto sin la clasificación correcta.
+
+Quedan sin migrar **las cartas** (memoria de pares: necesita decidir si dos cartas coinciden sin revelar los pares) y **el descifrador** (adivinar letra por letra).

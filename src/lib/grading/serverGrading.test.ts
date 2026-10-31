@@ -52,7 +52,7 @@ describe('la pregunta sin claves la acepta la validacion de la leccion', () => {
 
 describe('intentos por pregunta', () => {
   it('opcion multiple, V/F y respuesta corta: 1; completar: 2; emparejar: 3', () => {
-    expect(MAX_TRIES).toEqual({ multiple_choice: 1, true_false: 1, short_answer: 1, fill_blank: 2, match: 3 });
+    expect(MAX_TRIES).toEqual({ multiple_choice: 1, true_false: 1, short_answer: 1, fill_blank: 2, match: 3, linea_del_tiempo: 3, categorias_rapidas: 2 });
   });
 
   it('se cierra al acertar o al agotar los intentos', () => {

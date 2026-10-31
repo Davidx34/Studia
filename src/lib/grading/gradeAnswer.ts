@@ -18,6 +18,7 @@ export interface GradeDetail {
   matched?: number; // short_answer / fill_blank: cuantas palabras esperadas aparecieron
   total?: number;
   perTerm?: boolean[]; // match con definiciones: acierto por termino
+  perSlot?: boolean[]; // linea del tiempo: acierto por posicion
 }
 
 export type GradeResult =
