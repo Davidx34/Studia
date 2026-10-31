@@ -7,6 +7,8 @@
 // Un vector solo es comparable con vectores del MISMO modelo y la MISMA configuracion: por eso cada fragmento guarda su
 // "perfil" en material_chunks.embedding_model (migracion 068).
 
+import { buildKvKey, getKv, slugPart, type KeyValueStore, type KvKey } from '@/lib/kv';
+
 export const EMBEDDING_MODEL = 'gemini-embedding-001';
 export const EMBEDDING_DIMENSIONS = 768; // debe coincidir con material_chunks.embedding vector(768)
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
@@ -44,6 +46,8 @@ export interface EmbedOptions {
   fetchImpl?: typeof fetch;
   // null = sin taskType (solo para reproducir el comportamiento anterior en las evaluaciones).
   normalize?: boolean;
+  // Cache clave-valor de las consultas. Por defecto la de la instancia; null = sin cache.
+  kv?: KeyValueStore | null;
 }
 
 export async function embedWithGemini(text: string, task: EmbedTask | null, opts: EmbedOptions = {}): Promise<EmbedResult> {
@@ -73,8 +77,42 @@ export async function embedWithGemini(text: string, task: EmbedTask | null, opts
   }
 }
 
-// Embedding de una CONSULTA. null ante cualquier falla: el llamador sigue con la busqueda por texto.
+// Un vector leido del cache se trata como un dato leido de disco: dimension exacta y solo numeros finitos.
+export function isEmbeddingVector(v: unknown): v is number[] {
+  return Array.isArray(v) && v.length === EMBEDDING_DIMENSIONS && v.every((x) => typeof x === 'number' && Number.isFinite(x));
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Cuanto se conserva el vector de una consulta: el mismo texto da el mismo vector con el mismo modelo, asi que un dia es seguro y ahorra la llamada.
+export const QUERY_EMBED_TTL_SECONDS = 86400;
+
+// Clave del vector de una consulta: perfil + hash del texto normalizado (espacios colapsados). null si no se puede armar.
+export async function queryEmbedKey(text: string, profile: string = EMBEDDING_PROFILE): Promise<KvKey | null> {
+  try {
+    const normalized = text.trim().replace(/\s+/g, ' ');
+    if (!normalized) return null;
+    return buildKvKey('emb', 'q', slugPart(profile), await sha256Hex(`${profile}\n${normalized}`));
+  } catch {
+    return null;
+  }
+}
+
+// Embedding de una CONSULTA. null ante cualquier falla: el llamador sigue con la busqueda por texto. Consultas repetidas (varios estudiantes, reintentos de una generacion) salen del
+// cache clave-valor: sin llamada a la API, sin su costo y sin su latencia. Solo se guardan vectores correctos (nunca una falla) y solo con la configuracion actual (normalizado);
+// `opts.kv = null` lo desactiva.
 export async function embedQuery(text: string, opts: EmbedOptions = {}): Promise<number[] | null> {
+  const kv = opts.kv === undefined ? getKv() : opts.kv;
+  const key = kv && opts.normalize !== false ? await queryEmbedKey(text) : null;
+  if (kv && key) {
+    const hit = await kv.get(key, isEmbeddingVector);
+    if (hit) return hit;
+  }
   const r = await embedWithGemini(text, 'RETRIEVAL_QUERY', opts);
-  return r.ok ? r.values : null;
+  if (!r.ok) return null;
+  if (kv && key) await kv.set(key, r.values, QUERY_EMBED_TTL_SECONDS);
+  return r.values;
 }

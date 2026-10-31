@@ -397,7 +397,12 @@ describe('ruta /api/lab/design', () => {
   it('lee la memoria con la sesion del profesor (RLS) y no confia en lo guardado; la llave de servicio SOLO sirve para el contador de uso (rpc), nunca para leer ni escribir datos', () => {
     expect(route).not.toContain('SERVICE_ROLE');
     expect(route).toMatch(/db\.from\('class_memory'\)/); // db = el cliente del profesor
-    expect(route).toContain('readGraph(memory.graph)');
+    // El grafo pasa por getCachedClassGraph (que lo limpia con readGraph); las dos consultas (ligera y pesada) usan el cliente del profesor.
+    expect(route).toContain('getCachedClassGraph({');
+    expect(route.match(/db\.from\('class_memory'\)/g)).toHaveLength(2);
+    // El cache NUNCA salta la autorizacion: solo se consulta despues de comprobar que la clase es del profesor.
+    expect(route.indexOf('getCachedClassGraph({')).toBeGreaterThan(route.indexOf(".eq('teacher_id', user.id)"));
+    expect(route.indexOf('getCachedClassGraph({')).toBeGreaterThan(route.indexOf('status: 401'));
     // El cliente administrador existe solo para el cupo: ninguna consulta de datos pasa por el.
     expect(route).toContain('admin.rpc(fn, args)');
     expect(route).not.toMatch(/admin\.from\(/);

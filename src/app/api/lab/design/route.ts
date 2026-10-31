@@ -4,7 +4,7 @@ import { createAdminSupabase, hasServiceRoleKey } from '@/lib/supabase/admin';
 import { QUOTA_POLICIES, consumeQuota, quotaDeniedBody, type QuotaRpc } from '@/lib/security/rateLimit';
 import { callStudyModel, hasStudyProvider } from '@/lib/study/generate';
 import { DESIGN_LIMITS, designLab } from '@/lib/lab/design';
-import { readGraph } from '@/lib/memory/graphRead';
+import { getCachedClassGraph } from '@/lib/memory/graphCache';
 
 // La IA DISEÑA un laboratorio a partir de la MEMORIA de la clase (lo que sus materiales explican). Primero comprueba si lo cargado alcanza para lo pedido: si no, no crea nada
 // a medias y dice que falta. Si el diseño se crea, vuelve YA validado (formulas probadas con numeros en todos sus rangos) y con los conceptos en los que se apoya; el profesor
@@ -34,15 +34,26 @@ export async function POST(req: NextRequest) {
     if (!classroom) return NextResponse.json({ error: 'Clase no encontrada' }, { status: 404 });
 
     // La memoria (tabla nueva, aun no esta en los tipos generados). La lee con la sesion del profesor: la politica solo le deja leer la suya.
+    // Cache versionado (src/lib/memory/graphCache.ts): primero una consulta ligera (status, version) CON la sesion del profesor; el grafo pesado solo se lee si esa version no esta en cache.
     const db: any = supabase;
-    const { data: memory } = await db.from('class_memory').select('status, graph').eq('classroom_id', classroomId).maybeSingle();
-    if (!memory || memory.status === 'failed') {
+    const mem = await getCachedClassGraph({
+      classroomId,
+      loadMeta: async () => {
+        const { data } = await db.from('class_memory').select('status, version').eq('classroom_id', classroomId).maybeSingle();
+        return data ? { status: String(data.status), version: Number(data.version) } : null;
+      },
+      loadRow: async () => {
+        const { data } = await db.from('class_memory').select('status, version, graph').eq('classroom_id', classroomId).maybeSingle();
+        return data ? { status: String(data.status), version: Number(data.version), graph: data.graph } : null;
+      },
+    });
+    if (mem.kind === 'none' || mem.kind === 'failed') {
       return NextResponse.json({ error: 'Primero construye la memoria de la clase: así la IA conoce tus materiales.', reason: 'noMemory' }, { status: 409 });
     }
-    if (memory.status === 'building') {
+    if (mem.kind === 'building') {
       return NextResponse.json({ error: 'La memoria de la clase todavía se está construyendo. Espera a que termine.', reason: 'building' }, { status: 409 });
     }
-    const graph = readGraph(memory.graph);
+    const graph = mem.graph;
 
     if (!hasStudyProvider()) return NextResponse.json({ error: 'No hay un proveedor de IA configurado.' }, { status: 503 });
 
