@@ -33,7 +33,7 @@ afterEach(() => {
 
 describe('modelos de Gemini para PDFs', () => {
   it('el primero NO es el del juez (cuota propia) y hay un segundo de respaldo', () => {
-    expect(DEFAULT_GEMINI_PDF_MODELS[0]).toBe('gemini-2.5-flash-lite');
+    expect(DEFAULT_GEMINI_PDF_MODELS[0]).toBe('gemini-3.5-flash-lite');
     expect(DEFAULT_GEMINI_PDF_MODELS.length).toBeGreaterThan(1);
   });
 
@@ -51,47 +51,48 @@ describe('modelos de Gemini para PDFs', () => {
 
 describe('callGeminiPdf', () => {
   it('devuelve el texto, el modelo que respondio y los tokens', async () => {
-    const { f, calls } = fetchByModel({ 'gemini-2.5-flash-lite': () => geminiOk() });
+    const { f, calls } = fetchByModel({ 'gemini-3.5-flash-lite': () => geminiOk() });
     const r = await callGeminiPdf('QUJD', 'prompt', { fetchImpl: f });
-    expect(r).toMatchObject({ ok: true, provider: 'gemini', model: 'gemini-2.5-flash-lite', promptTokens: 258, outputTokens: 10 });
-    expect(calls).toEqual(['gemini-2.5-flash-lite']);
+    expect(r).toMatchObject({ ok: true, provider: 'gemini', model: 'gemini-3.5-flash-lite', promptTokens: 258, outputTokens: 10 });
+    expect(calls).toEqual(['gemini-3.5-flash-lite']);
   });
 
   it('manda el PDF como inline_data y pide temperatura 0 sin "pensar"', async () => {
-    const { f } = fetchByModel({ 'gemini-2.5-flash-lite': () => geminiOk() });
+    const { f } = fetchByModel({ 'gemini-3.5-flash-lite': () => geminiOk() });
     await callGeminiPdf('QUJD', 'prompt', { fetchImpl: f });
     const body = JSON.parse((f as any).mock.calls[0][1].body);
     expect(body.contents[0].parts[0]).toEqual({ inline_data: { mime_type: 'application/pdf', data: 'QUJD' } });
     expect(body.generationConfig.temperature).toBe(0);
-    expect(body.generationConfig.thinkingConfig.thinkingBudget).toBe(0);
+    // gemini-3.5-flash-lite (el modelo por defecto) NO lleva ajuste de "pensar": thinkingBudget: 0 le da HTTP 400 y sin parametro no piensa (ver thinkingConfigFor).
+    expect(body.generationConfig.thinkingConfig).toBeUndefined();
   });
 
   it('cuota agotada en el primer modelo: prueba el segundo', async () => {
-    const { f, calls } = fetchByModel({ 'gemini-2.5-flash-lite': cuotaDiaria, 'gemini-2.5-flash': () => geminiOk() });
+    const { f, calls } = fetchByModel({ 'gemini-3.5-flash-lite': cuotaDiaria, 'gemini-3.5-flash': () => geminiOk() });
     const r = await callGeminiPdf('QUJD', 'p', { fetchImpl: f });
-    expect(r).toMatchObject({ ok: true, model: 'gemini-2.5-flash' });
-    expect(calls).toEqual(['gemini-2.5-flash-lite', 'gemini-2.5-flash']);
+    expect(r).toMatchObject({ ok: true, model: 'gemini-3.5-flash' });
+    expect(calls).toEqual(['gemini-3.5-flash-lite', 'gemini-3.5-flash']);
   });
 
   it('un 503 en el primero tambien pasa al segundo', async () => {
-    const { f } = fetchByModel({ 'gemini-2.5-flash-lite': () => new Response('overloaded', { status: 503 }), 'gemini-2.5-flash': () => geminiOk() });
+    const { f } = fetchByModel({ 'gemini-3.5-flash-lite': () => new Response('overloaded', { status: 503 }), 'gemini-3.5-flash': () => geminiOk() });
     expect((await callGeminiPdf('QUJD', 'p', { fetchImpl: f })).ok).toBe(true);
   });
 
   it('REGRESION: un modelo sobrecargado (503) y otro sin cuota -> se reporta el 503 (reintentable), no "quota"', async () => {
     // Asi fallo el PDF real: flash-lite daba 503 y flash estaba sin cuota; reportar "quota" hacia que
     // el llamador no reintentara algo que si podia funcionar.
-    const { f } = fetchByModel({ 'gemini-2.5-flash-lite': () => new Response('overloaded', { status: 503 }), 'gemini-2.5-flash': cuotaDiaria });
+    const { f } = fetchByModel({ 'gemini-3.5-flash-lite': () => new Response('overloaded', { status: 503 }), 'gemini-3.5-flash': cuotaDiaria });
     expect(await callGeminiPdf('QUJD', 'p', { fetchImpl: f })).toMatchObject({ ok: false, reason: 'server', status: 503 });
   });
 
   it('todos sin cuota: devuelve "quota"', async () => {
-    const { f } = fetchByModel({ 'gemini-2.5-flash-lite': cuotaDiaria, 'gemini-2.5-flash': cuotaDiaria });
+    const { f } = fetchByModel({ 'gemini-3.5-flash-lite': cuotaDiaria, 'gemini-3.5-flash': cuotaDiaria });
     expect(await callGeminiPdf('QUJD', 'p', { fetchImpl: f })).toMatchObject({ ok: false, reason: 'quota' });
   });
 
   it('un 400 (PDF demasiado grande) NO prueba otros modelos: es de esta peticion', async () => {
-    const { f, calls } = fetchByModel({ 'gemini-2.5-flash-lite': () => new Response('too large', { status: 400 }) });
+    const { f, calls } = fetchByModel({ 'gemini-3.5-flash-lite': () => new Response('too large', { status: 400 }) });
     expect(await callGeminiPdf('QUJD', 'p', { fetchImpl: f })).toMatchObject({ ok: false, reason: 'bad_request' });
     expect(calls).toHaveLength(1);
   });
@@ -104,7 +105,7 @@ describe('callGeminiPdf', () => {
   });
 
   it('una respuesta vacia es un fallo, no un exito', async () => {
-    const { f } = fetchByModel({ 'gemini-2.5-flash-lite': () => geminiOk('  '), 'gemini-2.5-flash': () => geminiOk('  ') });
+    const { f } = fetchByModel({ 'gemini-3.5-flash-lite': () => geminiOk('  '), 'gemini-3.5-flash': () => geminiOk('  ') });
     expect(await callGeminiPdf('QUJD', 'p', { fetchImpl: f })).toMatchObject({ ok: false, reason: 'empty' });
   });
 
@@ -174,23 +175,35 @@ describe('callGeminiPdf con modelos retirados (404)', () => {
   const retirado = () => new Response('{"error":{"message":"This model is no longer available to new users."}}', { status: 404 });
 
   it('el primer modelo da 404: usa el segundo', async () => {
-    const { f, calls } = fetchByModel({ 'gemini-2.5-flash-lite': retirado, 'gemini-2.5-flash': () => geminiOk('del segundo') });
+    const { f, calls } = fetchByModel({ 'gemini-3.5-flash-lite': retirado, 'gemini-3.5-flash': () => geminiOk('del segundo') });
     const r = await callGeminiPdf('QUJD', 'prompt', { fetchImpl: f });
-    expect(r).toMatchObject({ ok: true, model: 'gemini-2.5-flash', text: 'del segundo' });
-    expect(calls).toEqual(['gemini-2.5-flash-lite', 'gemini-2.5-flash']);
+    expect(r).toMatchObject({ ok: true, model: 'gemini-3.5-flash', text: 'del segundo' });
+    expect(calls).toEqual(['gemini-3.5-flash-lite', 'gemini-3.5-flash']);
   });
 
   it('todos dan 404: se reporta "server" (NO "bad_request"), para que callPdfVision siga con otro proveedor', async () => {
-    const { f } = fetchByModel({ 'gemini-2.5-flash-lite': retirado, 'gemini-2.5-flash': retirado });
+    const { f } = fetchByModel({ 'gemini-3.5-flash-lite': retirado, 'gemini-3.5-flash': retirado });
     const r = await callGeminiPdf('QUJD', 'prompt', { fetchImpl: f });
     expect(r).toMatchObject({ ok: false, reason: 'server' });
   });
 
-  it('con el respaldo por defecto, una configuracion 2.5 desactualizada termina en un modelo 3.x que si responde', async () => {
+  it('con el respaldo por defecto, una configuracion 2.5 desactualizada (GEMINI_MODEL_PDF) termina en un modelo 3.x que si responde', async () => {
     delete process.env.GEMINI_MODEL_FALLBACKS;
-    const { f, calls } = fetchByModel({ 'gemini-2.5-flash-lite': retirado, 'gemini-2.5-flash': retirado, 'gemini-3.5-flash-lite': () => geminiOk('3.5') });
+    process.env.GEMINI_MODEL_PDF = 'gemini-2.5-flash-lite,gemini-2.5-flash';
+    try {
+      const { f, calls } = fetchByModel({ 'gemini-2.5-flash-lite': retirado, 'gemini-2.5-flash': retirado, 'gemini-3.5-flash-lite': () => geminiOk('3.5') });
+      const r = await callGeminiPdf('QUJD', 'prompt', { fetchImpl: f });
+      expect(r).toMatchObject({ ok: true, model: 'gemini-3.5-flash-lite' });
+      expect(calls).toEqual(['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']);
+    } finally {
+      delete process.env.GEMINI_MODEL_PDF;
+    }
+  });
+  it('y con la configuracion POR DEFECTO ya no se pide ningun modelo 2.5 (no se gasta una llamada en un 404)', async () => {
+    delete process.env.GEMINI_MODEL_FALLBACKS;
+    const { f, calls } = fetchByModel({ 'gemini-3.5-flash-lite': () => geminiOk('ok') });
     const r = await callGeminiPdf('QUJD', 'prompt', { fetchImpl: f });
     expect(r).toMatchObject({ ok: true, model: 'gemini-3.5-flash-lite' });
-    expect(calls).toEqual(['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']);
+    expect(calls).toEqual(['gemini-3.5-flash-lite']);
   });
 });

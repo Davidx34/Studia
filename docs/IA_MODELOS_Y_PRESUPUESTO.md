@@ -132,3 +132,23 @@ Hasta ahora las preguntas las generaba **Cohere Aya Expanse 32B** (`callCohere` 
 
 Medido el 2026-10-27 (5 módulos de microeconomía, mismo juez con segunda opinión): Cohere 30 % de preguntas aprobadas a la primera; Gemini 3.5 Flash-Lite 86 %. Es la
 opinión de IAs; una lectura manual de 16 aprobadas encontró 2 con defectos. Ver `evals/README.md`.
+
+## Gemini 2.5 ya no sirve con llaves nuevas (2026-10-31)
+
+`gemini-2.5-flash` y `gemini-2.5-flash-lite` aparecen en el listado de modelos de la llave pero **responden HTTP 404**. Mensaje literal de Google: *«This model … is no longer available to new users»*. No es un problema de créditos (eso daría 429 o 402/403), así que tener saldo no lo arregla. Los 3.x (`3.8-flash`, `3.5-flash`, `3.5-flash-lite`, `3.1-flash-lite`) responden bien (0,5 a 2,4 s).
+
+**Efecto que tenía:** el sistema no se caía (un 404 marca el modelo como no disponible unas horas y pasa al siguiente), pero con el perfil `free` el juez, la lectura de PDF, el resumen de fragmentos y la detección de temas pedían primero un modelo muerto y terminaban en el *respaldo*; en el juez eso era `gemini-3.5-flash-lite` (el pequeño) en vez del `gemini-3.5-flash` que el perfil de pago elige a propósito.
+
+**Qué cambió:** los valores por defecto del perfil `free` (`src/lib/ai/geminiModels.ts`) y las cadenas de la pasarela (`providers.ts`) usan ahora modelos 3.x:
+
+| Rol | Antes (`free`) | Ahora (`free`) |
+|---|---|---|
+| juez | 2.5-flash | 3.5-flash, 3.5-flash-lite |
+| PDF | 2.5-flash-lite, 2.5-flash | 3.5-flash-lite, 3.5-flash |
+| fragmentos y temas | 2.5-flash | 3.5-flash-lite |
+
+Un modelo 2.5 puesto a propósito por entorno (`GEMINI_MODEL_*`) se respeta: llaves antiguas aún lo tienen.
+
+**No se tocó** la copia de las funciones de borde de Supabase (`supabase/functions/_shared/geminiModels.ts`): mantiene el 2.5 primero para no cambiar donde ya funciona y se auto-corrige saltando los 404. Cambiarla exige desplegar las funciones; se puede ajustar sin código con el secreto `GEMINI_MODELS="gemini-3.5-flash-lite,gemini-3.5-flash"`.
+
+**Con créditos disponibles** conviene además `AI_PROFILE=paid` (variable de entorno en Vercel): pone a Gemini 3.5 Flash-Lite al frente de las cadenas de generación, análisis y estudio de la pasarela y a 3.5 Flash en el juez.

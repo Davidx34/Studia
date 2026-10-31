@@ -52,12 +52,18 @@ describe('modelChain', () => {
   it('por defecto el respaldo son los modelos 3.x; `none` lo desactiva', () => {
     expect(fallbackModels({})).toEqual(DEFAULT_FALLBACK_MODELS);
     expect(fallbackModels({ GEMINI_MODEL_FALLBACKS: 'none' })).toEqual([]);
-    expect(modelChain('judge', { GEMINI_MODEL_FALLBACKS: 'none' })).toEqual(['gemini-2.5-flash']);
+    expect(modelChain('judge', { GEMINI_MODEL_FALLBACKS: 'none' })).toEqual(['gemini-3.5-flash', 'gemini-3.5-flash-lite']);
   });
-  it('el caso real: perfil free + llave nueva -> los 2.5 daran 404, los 3.x estan despues en la cadena', () => {
-    const chain = modelChain('pdf', {});
-    expect(chain.slice(0, 2)).toEqual(['gemini-2.5-flash-lite', 'gemini-2.5-flash']);
-    expect(chain).toContain('gemini-3.5-flash-lite');
+  it('el caso real (2026-10-26/31): con una llave nueva los 2.5 dan 404, asi que NINGUNA cadena por defecto los pide', () => {
+    for (const role of ['judge', 'pdf', 'chunks', 'topics'] as const) {
+      const chain = modelChain(role, {});
+      expect(chain.length, role).toBeGreaterThan(0);
+      expect(chain.some((m) => /^gemini-2\.5/.test(m)), role).toBe(false);
+    }
+    expect(modelChain('pdf', {}).slice(0, 2)).toEqual(['gemini-3.5-flash-lite', 'gemini-3.5-flash']);
+  });
+  it('un modelo 2.5 puesto A PROPOSITO por entorno se respeta (llaves antiguas aun lo tienen)', () => {
+    expect(modelChain('judge', { GEMINI_MODEL_JUDGE: 'gemini-2.5-flash' })[0]).toBe('gemini-2.5-flash');
   });
 });
 
