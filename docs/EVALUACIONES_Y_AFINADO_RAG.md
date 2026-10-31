@@ -78,3 +78,16 @@ Se corrieron los cuatro comandos con el modelo y la base reales (solo lectura). 
 - **`eval:lab-design`: NO aprobado, solo por la suficiencia (0,67).** Las compuertas de seguridad pasan: nunca diseñó con materiales insuficientes, toda ficha aceptada validó y ninguna fórmula contradijo los apuntes. Falla la clasificación en dos casos: el modelo pidió más requisitos de los previstos en el caso «parcial» (resultó «insuficiente») y trató de listar requisitos para «escribe un poema» en vez de decir que no es un experimento. El caso «parcial» es frágil por naturaleza: depende de los requisitos exactos que elija el modelo.
 - **`eval:judge -- --dorado`: aprobado** con el criterio `subject` (0 falsos aprobados, 0 falsos rechazos, 15/15 respondidos). Aviso de configuración: `gemini-2.5-flash` devuelve 404 con la llave actual, así que el juez cayó a `gemini-3.5-flash-lite`; conviene revisar `AI_PROFILE` / `GEMINI_MODEL_JUDGE`.
 - **`eval:rag-sweep`:** de tres clases, una no tiene fragmentos (se omite) y en las otras dos **ninguna configuración mejora al menos 0,02 la actual** (0,3 / 60 / 0,25): Microeconomía I +0,003 y 5.º grado A +0,007 (la mejor allí usa peso del texto 1). **Los valores por defecto no cambian.** Limitación: 18 de 26 módulos de Microeconomía no tienen palabras clave, así que su precisión de conceptos clave es casi nula y no distingue configuraciones.
+
+## 5. `hasCausalLink` endurecido (post-iteración 6)
+
+La primera corrida real de `eval:memory` dio **0,5 de causas falsas**. Dos causas, las dos corregidas en `hasCausalLink` (`src/lib/memory/extract.ts`):
+
+1. **Bastaba con que la frase causal nombrara UNO de los dos conceptos.** «Debido a las crecidas del Nilo, la agricultura prosperó» volvía causal cualquier par con el Nilo de una frase contigua («Nilo → limo fértil», «guerras púnicas → Cartago»). Ahora la expresión causal debe unir a **los dos conceptos**: en la misma frase, o con una expresión que mira hacia atrás («por eso», «en consecuencia»…) con la causa en la frase **inmediatamente anterior** y el efecto en la de la expresión, en ese orden.
+2. **El sentido no se miraba.** La IA a veces invierte la causa y el efecto («agricultura → crecidas del Nilo»), y en la misma frase la heurística lo aceptaba. Ahora la expresión fija el sentido: con «porque / debido a / gracias a / se debe a / consecuencia de…» la causa viene **después**; con un verbo causal («provocó / permitió / llevó a…») o «por eso», **antes**. Las expresiones ambiguas («motivo», «causa de») no fijan sentido y se aceptan como antes. Una causa invertida pasa a «relacionado» (neutra): no se invierte sola.
+
+**Medido con el modelo real** (misma corrida, mismo modelo): causas falsas **1 → 0** y trampas sin expresión causal **0**. El recall de causas quedó en 0 porque en esa corrida el modelo invirtió las dos causas; ahora no contaminan la memoria, pero se pierden. (Corregir la orientación automáticamente es una opción posterior.)
+
+**Límite que sigue:** dos conceptos en una frase causal que no son causa y efecto entre sí («Debido a las guerras púnicas, Roma conquistó Sicilia» → «guerras púnicas → Roma»). Se mide aparte (`knownGapTrapCausaRate`).
+
+**Costo:** se pierde una causa solo cuando el texto la expresa con una construcción que no está en las listas (voz pasiva, por ejemplo: «fue provocada por») y con los dos conceptos separados.

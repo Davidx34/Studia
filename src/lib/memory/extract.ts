@@ -122,17 +122,61 @@ export function hasCausalCue(windowText: string): boolean {
   return CAUSAL_CUE.test(fold(windowText));
 }
 
-// ¿Hay una frase con expresion causal que mencione alguno de los dos conceptos? La señal debe estar en la frase de los conceptos: la de una frase vecina ("... por eso la
-// agricultura prospero. Para la momificacion se usaba natron.") no convierte en causa un vinculo que el texto no presenta asi.
+// Expresiones que se refieren a lo dicho ANTES ("... prospero la agricultura. Por eso crecio la poblacion."): la causa esta en la frase anterior y el efecto, en la que las trae.
+const ANAPHORIC_CUE = /\b(por eso|por ello|por lo que|de ahi|como consecuencia|en consecuencia|por ende|por consiguiente|por tanto|por lo tanto)\b/;
+
+// ¿El texto presenta a `a` como causa de `b`? La señal causal debe unir a LOS DOS conceptos:
+//   - en la misma frase ("Debido a las crecidas del Nilo, la agricultura prospero"), o
+//   - con una expresion que mira hacia atras (por eso, en consecuencia...): la causa `a` en la frase anterior y el efecto `b` en la frase de la expresion, y en ESE orden.
+// Antes bastaba con que la frase causal mencionara UNO de los dos: "Debido a las crecidas del Nilo, la agricultura prospero" volvia causal cualquier par con el Nilo de una frase contigua
+// ("Nilo -> limo fertil"), y medido con el modelo real daba la mitad de las causas falsas. Limite que sigue: dos conceptos en una frase causal que no son causa y efecto entre si
+// ("Debido a las guerras punicas, Roma conquisto Sicilia" -> "guerras punicas -> Roma").
 export function hasCausalLink(text: string, a: string, b: string): boolean {
   const wa = words(a);
   const wb = words(b);
   const frac = (ws: string[], src: string[]) => (ws.length === 0 ? 0 : ws.filter((w) => src.indexOf(w) !== -1).length / ws.length);
-  return sentences(text).some((s) => {
+  const mentions = (ws: string[], s: string) => frac(ws, words(s)) >= 0.5;
+  const sents = sentences(text);
+  return sents.some((s, i) => {
     if (!hasCausalCue(s)) return false;
-    const src = words(s);
-    return frac(wa, src) >= 0.5 || frac(wb, src) >= 0.5;
+    if (mentions(wa, s) && mentions(wb, s)) return causeBeforeEffect(s, a, b);
+    return i > 0 && ANAPHORIC_CUE.test(fold(s)) && mentions(wa, sents[i - 1]) && mentions(wb, s);
   });
+}
+
+// El SENTIDO lo marca la expresion causal. Con "porque / debido a / gracias a..." la causa viene DESPUES de la expresion ("la poblacion crecio porque la agricultura prospero",
+// "debido a las crecidas, la agricultura prospero"); con un verbo causal ("provoco / permitio / llevo a...") o "por eso", la causa viene ANTES ("la agricultura permitio el crecimiento").
+// Las expresiones ambiguas ("causa de", "motivo": "la causa de X fue Y" y "X es causa de Y" son opuestas) no fijan un sentido y se aceptan como antes. La IA a veces invierte el
+// sentido (medido con el modelo real: "agricultura -> crecidas del Nilo"); aqui se descarta.
+const CAUSE_AFTER_CUE = /\b(porque|debido a|a causa de|gracias a|ya que|puesto que|dado que|se deb(?:e|en|ia|ian|io|ieron) a|a raiz de|como consecuencia de|consecuencia de|resultado de)\b/;
+const CAUSE_BEFORE_CUE = /\b(por eso|por ello|por lo que|de ahi|por ende|por consiguiente|por tanto|por lo tanto|en consecuencia|como consecuencia|provoco|provocaron|origino|originaron|produjo|genero|llevo a|condujo|causo|causaron|dio lugar|dio origen|da lugar|dan lugar|desencadeno|ocasiono|obligo|forzo|impulso|permitio|desemboco|trajo consigo|tuvo como resultado|hizo que|hicieron que)\b/;
+
+// Donde (en el texto sin tildes) aparece por primera vez una palabra del concepto; -1 si ninguna.
+function firstMention(folded: string, concept: string): number {
+  let best = -1;
+  for (const w of words(concept)) {
+    const m = new RegExp('(^|[^a-z0-9])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).exec(folded);
+    if (m) {
+      const at = m.index + m[1].length;
+      if (best === -1 || at < best) best = at;
+    }
+  }
+  return best;
+}
+
+export function causeBeforeEffect(sentence: string, cause: string, effect: string): boolean {
+  const f = fold(sentence);
+  const after = CAUSE_AFTER_CUE.exec(f);
+  const before = CAUSE_BEFORE_CUE.exec(f);
+  // La expresion que aparece primero fija el sentido; si no hay una conocida, no se puede decidir y se acepta.
+  const first = after && before ? (after.index <= before.index ? { kind: 'after' as const, at: after.index } : { kind: 'before' as const, at: before.index }) : after ? { kind: 'after' as const, at: after.index } : before ? { kind: 'before' as const, at: before.index } : null;
+  if (!first) return true;
+  const pc = firstMention(f, cause);
+  const pe = firstMention(f, effect);
+  if (pc === -1 || pe === -1) return true;
+  if (first.kind === 'before') return pc < first.at && first.at < pe;
+  // "efecto porque causa" (el efecto va antes) o "debido a causa, efecto" (el efecto va despues de la causa)
+  return pc > first.at && (pe < first.at || pe > pc);
 }
 
 export interface GroupResult {
