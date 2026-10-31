@@ -62,7 +62,7 @@ export const PROVIDERS: ProviderDef[] = [
     keyEnv: 'GEMINI_API_KEY',
     jsonMode: true,
     tier: 'free',
-    free: 'solo modelos Flash; en esta llave se midieron 20 peticiones/dia en gemini-2.5-flash; sin tarjeta; fuera de UE/UK los prompts pueden usarse para entrenar',
+    free: 'solo modelos Flash; con llaves nuevas gemini-2.5-* da 404 (ya no disponible para usuarios nuevos); los 3.x responden; sin tarjeta; fuera de UE/UK los prompts pueden usarse para entrenar',
     signup: 'https://aistudio.google.com',
   },
   {
@@ -208,7 +208,7 @@ export const DEFAULT_CHAINS: Record<AiTask, Candidate[]> = {
     { provider: 'cerebras', model: 'gpt-oss-120b' },
     { provider: 'github', model: 'openai/gpt-4.1-mini' },
     { provider: 'mistral', model: 'mistral-small-latest' },
-    { provider: 'gemini', model: 'gemini-2.5-flash' },
+    { provider: 'gemini', model: 'gemini-3.5-flash' },
     { provider: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
     { provider: 'cloudflare', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
     { provider: 'openrouter', model: 'auto' },
@@ -218,7 +218,7 @@ export const DEFAULT_CHAINS: Record<AiTask, Candidate[]> = {
   // Analizar (temas, dificultad, clasificar): tarea corta y barata, sirve un modelo pequeno y rapido.
   analysis: [
     { provider: 'groq', model: 'openai/gpt-oss-20b' },
-    { provider: 'gemini', model: 'gemini-2.5-flash-lite' },
+    { provider: 'gemini', model: 'gemini-3.5-flash-lite' },
     { provider: 'gemini', model: 'gemini-3.1-flash-lite' },
     { provider: 'mistral', model: 'mistral-small-latest' },
     { provider: 'cerebras', model: 'gpt-oss-120b' },

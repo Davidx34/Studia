@@ -14,11 +14,15 @@ describe('aiProfile', () => {
 });
 
 describe('geminiModels', () => {
-  it('por defecto (free) deja exactamente los modelos de siempre', () => {
-    expect(geminiModels('judge', {})).toEqual(['gemini-2.5-flash']);
-    expect(geminiModels('chunks', {})).toEqual(['gemini-2.5-flash']);
-    expect(geminiModels('topics', {})).toEqual(['gemini-2.5-flash']);
-    expect(geminiModels('pdf', {})).toEqual(['gemini-2.5-flash-lite', 'gemini-2.5-flash']);
+  it('por defecto (free) usa modelos 3.x: los 2.5 dan 404 "ya no disponible para usuarios nuevos" con llaves nuevas', () => {
+    expect(geminiModels('judge', {})).toEqual(['gemini-3.5-flash', 'gemini-3.5-flash-lite']);
+    expect(geminiModels('chunks', {})).toEqual(['gemini-3.5-flash-lite']);
+    expect(geminiModels('topics', {})).toEqual(['gemini-3.5-flash-lite']);
+    expect(geminiModels('pdf', {})).toEqual(['gemini-3.5-flash-lite', 'gemini-3.5-flash']);
+  });
+  it('ningun perfil, ni ninguna cadena por defecto, pone un gemini-2.5-* al frente', () => {
+    for (const profile of ['free', 'paid'] as const) for (const list of Object.values(DEFAULT_MODELS[profile])) expect(list.some((m) => /^gemini-2\.5/.test(m))).toBe(false);
+    for (const task of ['generation', 'judge', 'analysis', 'study'] as const) expect(DEFAULT_CHAINS[task].some((c) => c.provider === 'gemini' && /^gemini-2\.5/.test(c.model))).toBe(false);
   });
 
   it('con AI_PROFILE=paid usa Gemini 3.5 (juez en el 3.5 Flash, el resto en el Lite)', () => {
