@@ -6,10 +6,10 @@ import type { GradeResult } from './gradeAnswer';
 //   - gradeGame: compara lo que el estudiante eligio con la solucion.
 //   - buildGameReveal: lo que se revela al cerrar la pregunta (la solucion, las consecuencias y la explicacion).
 //
-// Primera entrega: los cuatro juegos de "elegir una opcion" (impostor, alquimia, cuarto de crisis y juicio). Los de ordenar, clasificar, emparejar cartas y descifrar
-// necesitan otra interaccion con el servidor y van aparte.
+// Primera entrega: los cuatro juegos de "elegir una opcion" (impostor, alquimia, cuarto de crisis y juicio). Segunda: ordenar (linea del tiempo, con 3 intentos) y clasificar
+// (categorias, con "sondeos" por elemento y 2 oportunidades de tiempo). Quedan emparejar cartas y descifrar, que necesitan otra interaccion con el servidor.
 
-export const SERVER_GRADED_GAME_TYPES = ['impostor_cognitivo', 'alquimia_conceptual', 'cuarto_crisis', 'juicio_conocimiento'] as const;
+export const SERVER_GRADED_GAME_TYPES = ['impostor_cognitivo', 'alquimia_conceptual', 'cuarto_crisis', 'juicio_conocimiento', 'linea_del_tiempo', 'categorias_rapidas'] as const;
 export const isGradedGameType = (t: unknown): boolean => typeof t === 'string' && (SERVER_GRADED_GAME_TYPES as readonly string[]).includes(t);
 
 type Obj = Record<string, unknown>;
@@ -52,6 +52,18 @@ export function sanitizeGameData(type: string, gameData: unknown): Obj {
         ...pickStrings(gd, ['case_file', 'cross_examination_tip']),
         expert_testimony: list(gd.expert_testimony).map((p) => ({ paragraph_id: num(p.paragraph_id), text: str(p.text) ?? '' })),
       };
+    case 'linea_del_tiempo':
+      return {
+        ...pickStrings(gd, ['theme']),
+        items: list(gd.items).map((it) => ({ id: num(it.id), text: str(it.text) ?? '', ...(str(it.year) ? { year: str(it.year) } : {}) })),
+      };
+    case 'categorias_rapidas':
+      return {
+        ...pickStrings(gd, ['theme']),
+        categories: Array.isArray(gd.categories) ? gd.categories.filter((c): c is string => typeof c === 'string') : [],
+        items: list(gd.items).map((it) => ({ id: num(it.id), text: str(it.text) ?? '' })),
+        ...(num(gd.time_limit_seconds) !== undefined ? { time_limit_seconds: num(gd.time_limit_seconds) } : {}),
+      };
     default:
       return {};
   }
@@ -62,6 +74,8 @@ export function sanitizeGameData(type: string, gameData: unknown): Obj {
 //   alquimia_conceptual  { selectedId: string }
 //   cuarto_crisis        { selectedCode: string | null }   (null = se acabo el tiempo)
 //   juicio_conocimiento  { selectedParagraphId: number }
+//   linea_del_tiempo     { order: number[] }                         (los id de los eventos en el orden que puso el jugador)
+//   categorias_rapidas   { assignment: { [id]: categoria } }         (todos los elementos clasificados)  |  { timeout: true }  (se acabo el tiempo = intento fallido)
 // Un solo intento. Si el juego no tiene ninguna opcion correcta, no se puede calificar ('invalid'): nunca se da por buena ni por mala una pregunta sin solucion.
 export function gradeGame(type: string, gameData: unknown, answer: unknown): GradeResult {
   if (!isGradedGameType(type)) return { status: 'unsupported' };
@@ -98,9 +112,56 @@ export function gradeGame(type: string, gameData: unknown, answer: unknown): Gra
       if (!chosen || guilty === undefined) return { status: 'invalid' };
       return { status: 'graded', correct: chosen.paragraph_id === guilty };
     }
+    case 'linea_del_tiempo': {
+      const items = list(gd.items);
+      // Sin solucion utilizable (posiciones repetidas o con huecos) no se puede calificar.
+      const positions = items.map((it) => it.correct_position);
+      const isPermutation =
+        items.length > 0 &&
+        positions.every((p) => typeof p === 'number') &&
+        new Set(positions).size === items.length &&
+        positions.every((p) => (p as number) >= 1 && (p as number) <= items.length);
+      if (!isPermutation) return { status: 'invalid' };
+      const order = Array.isArray(a.order) ? a.order : null;
+      if (!order || order.length !== items.length || new Set(order).size !== order.length) return { status: 'invalid' };
+      const placed = order.map((id) => items.find((it) => it.id === id));
+      if (placed.some((it) => !it)) return { status: 'invalid' };
+      const perSlot = placed.map((it, pos) => it!.correct_position === pos + 1);
+      return { status: 'graded', correct: perSlot.every(Boolean), detail: { perSlot } };
+    }
+    case 'categorias_rapidas': {
+      const items = list(gd.items);
+      const categories = Array.isArray(gd.categories) ? gd.categories.filter((c): c is string => typeof c === 'string') : [];
+      if (items.length === 0 || !items.every((it) => typeof it.correct_category === 'string' && categories.includes(it.correct_category))) return { status: 'invalid' };
+      // Se acabo el tiempo: intento fallido (el servidor no vigila el reloj; el navegador lo avisa).
+      if (a.timeout === true) return { status: 'graded', correct: false };
+      const assignment = isObj(a.assignment) ? a.assignment : null;
+      if (!assignment) return { status: 'invalid' };
+      if (Object.keys(assignment).length !== items.length) return { status: 'invalid' };
+      let all = true;
+      for (const it of items) {
+        const given = assignment[String(it.id)];
+        if (typeof given !== 'string' || !categories.includes(given)) return { status: 'invalid' };
+        if (given !== it.correct_category) all = false;
+      }
+      return { status: 'graded', correct: all };
+    }
     default:
       return { status: 'unsupported' };
   }
+}
+
+// "Sondeo" de categorias: ¿esta categoria es la de este elemento? No cierra la pregunta ni gasta intentos (el juego da retroalimentacion inmediata en cada toque y no penaliza).
+// Equivale a lo que el jugador descubriria por ensayo y error con el navegador; lo que el servidor impide es DECLARAR una clasificacion que no sea la correcta.
+export function probeGame(type: string, gameData: unknown, probe: unknown): GradeResult {
+  if (type !== 'categorias_rapidas') return { status: 'unsupported' };
+  const gd = isObj(gameData) ? gameData : {};
+  const p = isObj(probe) ? probe : null;
+  if (!p || typeof p.itemId !== 'number' || typeof p.category !== 'string') return { status: 'invalid' };
+  const item = list(gd.items).find((it) => it.id === p.itemId);
+  const categories = Array.isArray(gd.categories) ? gd.categories : [];
+  if (!item || typeof item.correct_category !== 'string' || !categories.includes(p.category)) return { status: 'invalid' };
+  return { status: 'graded', correct: item.correct_category === p.category };
 }
 
 export function buildGameReveal(type: string, gameData: unknown): Obj {
@@ -128,6 +189,19 @@ export function buildGameReveal(type: string, gameData: unknown): Obj {
     }
     case 'juicio_conocimiento':
       return { guiltyParagraphId: num(gd.guilty_paragraph_id) ?? null, explanation: str(gd.verdict_explanation) ?? null };
+    case 'linea_del_tiempo':
+      return {
+        correctOrder: list(gd.items)
+          .filter((it) => typeof it.correct_position === 'number')
+          .sort((x, y) => (x.correct_position as number) - (y.correct_position as number))
+          .map((it) => it.id),
+        explanation: str(gd.pedagogical_feedback) ?? null,
+      };
+    case 'categorias_rapidas': {
+      const assignment: Record<string, string> = {};
+      for (const it of list(gd.items)) if (typeof it.correct_category === 'string') assignment[String(it.id)] = it.correct_category;
+      return { assignment, explanation: str(gd.pedagogical_feedback) ?? null };
+    }
     default:
       return {};
   }

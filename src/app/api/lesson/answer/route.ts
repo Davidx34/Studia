@@ -3,7 +3,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { gradeAnswer } from '@/lib/grading/gradeAnswer';
 import { buildReveal, isFinalTry, isServerGradedType, serverGradingEnabled, serverGradingGamesEnabled, MAX_TRIES } from '@/lib/grading/serverGrading';
-import { buildGameReveal, gradeGame, isGradedGameType } from '@/lib/grading/gameGrading';
+import { buildGameReveal, gradeGame, isGradedGameType, probeGame } from '@/lib/grading/gameGrading';
 import { findSourceHint } from '@/lib/grading/sourceHint';
 
 // Califica UNA respuesta de una leccion en el servidor. El navegador manda lo que respondio el estudiante; el servidor
@@ -101,6 +101,14 @@ export async function POST(req: NextRequest) {
 
     // Pregunta ya cerrada: repetir la respuesta no suma ni cambia nada, se devuelve el mismo resultado.
     if (prev?.final) return await closed(!!prev.correct, prev.tries);
+
+    // Sondeo de categorias ("¿esta categoria es la de este elemento?"): no cierra la pregunta, no gasta intentos y no escribe nada.
+    const answerObj = body.answer && typeof body.answer === 'object' ? (body.answer as Record<string, unknown>) : null;
+    if (isGame && answerObj && 'probe' in answerObj) {
+      const probed = probeGame(question.type, question.game_data, answerObj.probe);
+      if (probed.status !== 'graded') return fail(400, 'Respuesta invalida');
+      return NextResponse.json({ correct: probed.correct, final: false, probe: true });
+    }
 
     const graded = isGame ? gradeGame(question.type, question.game_data, body.answer) : gradeAnswer(question, body.answer);
     if (graded.status !== 'graded') return fail(400, 'Respuesta invalida');

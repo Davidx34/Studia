@@ -20,7 +20,7 @@ export const SERVER_GRADED_TYPES = ['multiple_choice', 'true_false', 'fill_blank
 export const isServerGradedType = (t: unknown): boolean => typeof t === 'string' && (SERVER_GRADED_TYPES as readonly string[]).includes(t);
 
 // Intentos por pregunta (los mismos que ya daba la interfaz: completar 2, emparejar 3, el resto 1).
-export const MAX_TRIES: Record<string, number> = { multiple_choice: 1, true_false: 1, short_answer: 1, fill_blank: 2, match: 3 };
+export const MAX_TRIES: Record<string, number> = { multiple_choice: 1, true_false: 1, short_answer: 1, fill_blank: 2, match: 3, linea_del_tiempo: 3, categorias_rapidas: 2 };
 
 export function isFinalTry(type: string, triesUsed: number, correct: boolean): boolean {
   return correct || triesUsed >= (MAX_TRIES[type] ?? 1);

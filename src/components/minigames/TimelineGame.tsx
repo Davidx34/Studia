@@ -1,11 +1,13 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { useTonitoStore } from '@/stores/useTonitoStore';
+import { CHECK_ERROR, boolList, idList, textOrNull, type GameCheck } from './serverCheck';
 
 interface TimelineItem {
   id: number;
   text: string;
-  correct_position: number;
+  // Solo en el modo del navegador: con calificacion en el servidor la posicion correcta NO viaja.
+  correct_position?: number;
   year?: string;
 }
 
@@ -28,14 +30,19 @@ function shuffledIndices(n: number): number[] {
 
 // Tap-to-place en vez de drag & drop: mas confiable en mobile y consistente
 // con el patron ya usado en LessonQuestionMatch (Conectar Conceptos).
+//
+// Con `check` (calificacion en el servidor) el orden se manda al servidor: tras un intento fallido solo se sabe QUE POSICIONES estaban mal (lo mismo que mostraba el juego
+// por su cuenta), y el orden correcto se revela al cerrar la pregunta.
 export function TimelineGame({
   gameData,
   disabled,
   onComplete,
+  check,
 }: {
   gameData: GameData;
   disabled: boolean;
   onComplete: (correct: boolean) => void;
+  check?: GameCheck;
 }) {
   const items = gameData.items || [];
   const onCorrectAnswer = useTonitoStore((s) => s.onCorrectAnswer);
@@ -47,8 +54,13 @@ export function TimelineGame({
   const [attempts, setAttempts] = useState(0);
   const [feedback, setFeedback] = useState<'wrong' | null>(null);
   const [finished, setFinished] = useState<'won' | 'lost' | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Servidor: posiciones que estaban mal en el ultimo intento, y lo que se revela al cerrar.
+  const [wrongSlots, setWrongSlots] = useState<boolean[] | null>(null);
+  const [revealed, setRevealed] = useState<{ correctOrder: (string | number)[]; explanation: string | null } | null>(null);
 
-  const locked = disabled || finished !== null;
+  const locked = disabled || finished !== null || checking;
   const bank = order.filter((idx) => !placed.includes(idx));
 
   function handleTapBank(idx: number) {
@@ -62,21 +74,13 @@ export function TimelineGame({
     setPlaced((prev) => prev.filter((_, i) => i !== pos));
   }
 
-  function handleCheck() {
-    if (locked || placed.length !== items.length) return;
-    const correct = placed.every((idx, pos) => items[idx].correct_position === pos + 1);
-
-    if (correct) {
-      onCorrectAnswer();
-      setFinished('won');
-      onComplete(true);
-      return;
-    }
-
+  // Intento fallido: marca lo que estaba mal y, si quedan intentos, limpia el tablero; si no, cierra.
+  function failedAttempt(close: boolean, byServer = false) {
     onWrongAnswer();
     const nextAttempts = attempts + 1;
     setAttempts(nextAttempts);
-    if (nextAttempts >= MAX_ATTEMPTS) {
+    // Con el servidor, SU cuenta de intentos manda (la del navegador podria no coincidir si la pagina se recargo).
+    if (close || (!byServer && nextAttempts >= MAX_ATTEMPTS)) {
       setFinished('lost');
       onComplete(false);
     } else {
@@ -84,11 +88,50 @@ export function TimelineGame({
       setTimeout(() => {
         setPlaced([]);
         setFeedback(null);
+        setWrongSlots(null);
       }, 1200);
     }
   }
 
-  const correctOrder = [...items].sort((a, b) => a.correct_position - b.correct_position);
+  async function handleCheck() {
+    if (locked || placed.length !== items.length) return;
+    setError(null);
+
+    if (!check) {
+      const correct = placed.every((idx, pos) => items[idx].correct_position === pos + 1);
+      if (correct) {
+        onCorrectAnswer();
+        setFinished('won');
+        onComplete(true);
+        return;
+      }
+      failedAttempt(false);
+      return;
+    }
+
+    setChecking(true);
+    const verdict = await check({ order: placed.map((idx) => items[idx].id) });
+    setChecking(false);
+    if (!verdict) {
+      setError(CHECK_ERROR);
+      return;
+    }
+    const closes = verdict.final !== false;
+    if (closes) setRevealed({ correctOrder: idList(verdict.reveal?.correctOrder), explanation: textOrNull(verdict.reveal?.explanation) ?? verdict.explanation ?? null });
+    if (verdict.correct) {
+      onCorrectAnswer();
+      setFinished('won');
+      onComplete(true);
+      return;
+    }
+    setWrongSlots(boolList(verdict.detail?.perSlot));
+    failedAttempt(closes, true);
+  }
+
+  const correctOrder = revealed
+    ? revealed.correctOrder.map((id) => items.find((it) => it.id === id)).filter((it): it is TimelineItem => !!it)
+    : [...items].sort((a, b) => (a.correct_position ?? 0) - (b.correct_position ?? 0));
+  const explanation = revealed ? revealed.explanation : gameData.pedagogical_feedback;
 
   return (
     <div className="space-y-4">
@@ -98,7 +141,8 @@ export function TimelineGame({
         {Array.from({ length: items.length }, (_, pos) => {
           const idx = placed[pos];
           const item = idx !== undefined ? items[idx] : null;
-          const wrongHere = finished === 'lost' ? false : feedback === 'wrong' && item && item.correct_position !== pos + 1;
+          const isWrongSlot = wrongSlots ? wrongSlots[pos] === false : !!item && item.correct_position !== pos + 1;
+          const wrongHere = finished === 'lost' ? false : feedback === 'wrong' && item && isWrongSlot;
           return (
             <button
               key={pos}
@@ -131,6 +175,13 @@ export function TimelineGame({
         </div>
       )}
 
+      {checking && <p className="text-fg-muted text-sm" aria-live="polite">Comprobando…</p>}
+      {error && (
+        <p role="alert" className="text-danger text-sm">
+          {error}
+        </p>
+      )}
+
       {!locked && bank.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs text-fg-muted uppercase tracking-wide">Eventos disponibles</p>
@@ -161,9 +212,7 @@ export function TimelineGame({
       {finished === 'won' && (
         <div className="bg-success/10 border border-success p-4 rounded-lg">
           <p className="text-success font-bold">🎉 ¡Orden correcto!</p>
-          {gameData.pedagogical_feedback && (
-            <p className="text-fg text-sm mt-1">{gameData.pedagogical_feedback}</p>
-          )}
+          {explanation && <p className="text-fg text-sm mt-1">{explanation}</p>}
         </div>
       )}
 
@@ -175,9 +224,7 @@ export function TimelineGame({
               <li key={item.id}>{item.text}{item.year ? ` (${item.year})` : ''}</li>
             ))}
           </ol>
-          {gameData.pedagogical_feedback && (
-            <p className="text-fg text-sm mt-1">{gameData.pedagogical_feedback}</p>
-          )}
+          {explanation && <p className="text-fg text-sm mt-1">{explanation}</p>}
         </div>
       )}
     </div>

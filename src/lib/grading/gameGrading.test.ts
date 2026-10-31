@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { SERVER_GRADED_GAME_TYPES, buildGameReveal, gradeGame, isGradedGameType, sanitizeGameData } from './gameGrading';
+import { SERVER_GRADED_GAME_TYPES, buildGameReveal, gradeGame, isGradedGameType, probeGame, sanitizeGameData } from './gameGrading';
 import { sanitizeQuestion, serverGradingGamesEnabled } from './serverGrading';
 
 const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8').replace(/\r\n/g, '\n');
@@ -53,19 +53,42 @@ const JUICIO = {
   verdict_explanation: 'El parrafo 2 viola la ley de conservacion.',
   campo_secreto: 'NO-DEBE-SALIR',
 };
-const GAMES = { impostor_cognitivo: IMPOSTOR, alquimia_conceptual: ALQUIMIA, cuarto_crisis: CRISIS, juicio_conocimiento: JUICIO } as const;
+const TIMELINE = {
+  theme: 'Egipto',
+  items: [
+    { id: 1, text: 'Construccion de la gran piramide', correct_position: 2, year: '2560 a. C.' },
+    { id: 2, text: 'Unificacion del Alto y Bajo Egipto', correct_position: 1 },
+    { id: 3, text: 'Conquista de Alejandro Magno', correct_position: 3, year: '332 a. C.' },
+  ],
+  pedagogical_feedback: 'EXPLICACION-LINEA: primero la unificacion.',
+  campo_secreto: 'NO-DEBE-SALIR',
+};
+const CATEGORIES = {
+  theme: 'Seres',
+  categories: ['Vivo', 'Inerte'],
+  items: [
+    { id: 1, text: 'Perro', correct_category: 'Vivo' },
+    { id: 2, text: 'Roca', correct_category: 'Inerte' },
+    { id: 3, text: 'Gato', correct_category: 'Vivo' },
+  ],
+  time_limit_seconds: 45,
+  pedagogical_feedback: 'EXPLICACION-CAT: los seres vivos nacen y mueren.',
+  campo_secreto: 'NO-DEBE-SALIR',
+};
+const GAMES = { impostor_cognitivo: IMPOSTOR, alquimia_conceptual: ALQUIMIA, cuarto_crisis: CRISIS, juicio_conocimiento: JUICIO, linea_del_tiempo: TIMELINE, categorias_rapidas: CATEGORIES } as const;
 
 const SOLUTION_STRINGS = [
-  'is_impostor', 'is_correct', 'is_solution', 'guilty_paragraph_id', 'consequence',
+  'is_impostor', 'is_correct', 'is_solution', 'guilty_paragraph_id', 'consequence', 'correct_position', 'correct_category', 'EXPLICACION-LINEA', 'EXPLICACION-CAT',
   'exposicion_del_impostor', 'unlocked_knowledge', 'post_mortem_report', 'verdict_explanation',
   'cloroplastos, no en', 'El precio de equilibrio iguala', 'Crisis evitada', 'Colapso diferido', 'Explosion', 'perdida de moderacion', 'conservacion', 'NO-DEBE-SALIR',
 ];
 
 describe('tipos', () => {
-  it('son los cuatro juegos de "elegir una opcion"', () => {
-    expect([...SERVER_GRADED_GAME_TYPES]).toEqual(['impostor_cognitivo', 'alquimia_conceptual', 'cuarto_crisis', 'juicio_conocimiento']);
+  it('son seis: los cuatro de "elegir una opcion", la linea del tiempo y las categorias', () => {
+    expect([...SERVER_GRADED_GAME_TYPES]).toEqual(['impostor_cognitivo', 'alquimia_conceptual', 'cuarto_crisis', 'juicio_conocimiento', 'linea_del_tiempo', 'categorias_rapidas']);
     expect(isGradedGameType('impostor_cognitivo')).toBe(true);
-    for (const t of ['linea_del_tiempo', 'categorias_rapidas', 'flashcard_rapida', 'el_descifrador', 'multiple_choice', '', undefined, null, 7]) expect(isGradedGameType(t)).toBe(false);
+    expect(isGradedGameType('linea_del_tiempo')).toBe(true);
+    for (const t of ['flashcard_rapida', 'el_descifrador', 'multiple_choice', '', undefined, null, 7]) expect(isGradedGameType(t)).toBe(false);
   });
 });
 
@@ -95,7 +118,7 @@ describe('sanitizeGameData: lo que llega al navegador no trae la solucion', () =
     for (const t of SERVER_GRADED_GAME_TYPES) {
       for (const bad of [null, undefined, 'x', 5, [], { statements: 'no' }]) expect(() => sanitizeGameData(t, bad)).not.toThrow();
     }
-    expect(sanitizeGameData('linea_del_tiempo', IMPOSTOR)).toEqual({});
+    expect(sanitizeGameData('flashcard_rapida', IMPOSTOR)).toEqual({});
   });
 });
 
@@ -135,10 +158,10 @@ describe('gradeGame', () => {
     expect(gradeGame('impostor_cognitivo', null, { selectedId: 1 })).toEqual({ status: 'invalid' });
   });
   it('otros tipos: "unsupported"', () => {
-    expect(gradeGame('linea_del_tiempo', {}, {})).toEqual({ status: 'unsupported' });
+    expect(gradeGame('flashcard_rapida', {}, {})).toEqual({ status: 'unsupported' });
     expect(gradeGame('multiple_choice', {}, {})).toEqual({ status: 'unsupported' });
     // el tipo se comprueba ANTES que la forma de la respuesta: un juego que no se califica aqui no es "invalid", es "unsupported"
-    expect(gradeGame('linea_del_tiempo', {}, null)).toEqual({ status: 'unsupported' });
+    expect(gradeGame('flashcard_rapida', {}, null)).toEqual({ status: 'unsupported' });
     expect(gradeGame('el_descifrador', {}, 'x')).toEqual({ status: 'unsupported' });
   });
   it('paridad con el navegador: con varias opciones marcadas correctas, cualquiera de ellas acierta (como hacia el juego)', () => {
@@ -184,8 +207,8 @@ describe('sanitizeQuestion con minijuegos', () => {
     expect(sanitizeQuestion(game, Math.random, { games: false })).toBe(game);
   });
   it('los juegos que aun no se califican en el servidor no se tocan, ni con el interruptor', () => {
-    const timeline = { id: 'g2', type: 'linea_del_tiempo', game_data: { items: [{ id: 1, text: 'a', correct_position: 1 }] } };
-    expect(sanitizeQuestion(timeline, Math.random, { games: true })).toBe(timeline);
+    const cartas = { id: 'g2', type: 'flashcard_rapida', game_data: { pairs: [{ id: 1, card1: 'a', card2: 'b' }] } };
+    expect(sanitizeQuestion(cartas, Math.random, { games: true })).toBe(cartas);
   });
   it('sin id no se toca', () => {
     const sinId = { type: 'impostor_cognitivo', game_data: IMPOSTOR };
@@ -411,7 +434,7 @@ describe('startLessonAttempt con minijuegos (entrega de la leccion)', () => {
   const served = () => [
     { id: 'c1', type: 'multiple_choice', q: '?', opts: ['a', 'b'], ok: 1, exp: 'EXP-CLASICA' },
     { id: 'g1', type: 'impostor_cognitivo', q: 'Juega', exp: 'EXP-JUEGO', game_type: 'impostor_cognitivo', game_data: IMPOSTOR },
-    { id: 'g2', type: 'linea_del_tiempo', q: 'Ordena', exp: 'EXP-TIEMPO', game_type: 'linea_del_tiempo', game_data: { items: [{ id: 1, text: 'a', correct_position: 1 }] } },
+    { id: 'g2', type: 'flashcard_rapida', q: 'Empareja', exp: 'EXP-CARTAS', game_type: 'flashcard_rapida', game_data: { pairs: [{ id: 1, card1: 'a', card2: 'b' }] } },
   ];
 
   it('con ambos interruptores: el juego sale sin solucion y entra en el intento; los juegos aun no migrados salen intactos', async () => {
@@ -447,8 +470,8 @@ describe('startLessonAttempt con minijuegos (entrega de la leccion)', () => {
 
 describe('el navegador', () => {
   const page = read('src/app/(student)/lesson/[id]/page.tsx');
-  it('los cuatro juegos reciben `check` desde la pagina y, calificados en el servidor, no se registran desde el navegador', () => {
-    for (const comp of ['ImpostorCognitivoGame', 'AlquimiaConceptualGame', 'CuartoCrisisGame', 'JuicioConocimientoGame']) {
+  it('los seis juegos reciben `check` desde la pagina y, calificados en el servidor, no se registran desde el navegador', () => {
+    for (const comp of ['ImpostorCognitivoGame', 'AlquimiaConceptualGame', 'CuartoCrisisGame', 'JuicioConocimientoGame', 'TimelineGame', 'CategoriesGame']) {
       const block = page.slice(page.indexOf(`<${comp}`), page.indexOf('/>', page.indexOf(`<${comp}`)));
       expect(block, comp).toContain('check={gameCheck(q)}');
       expect(block, comp).toContain('finishGame(q, correct)');
@@ -457,13 +480,13 @@ describe('el navegador', () => {
     expect(page).toMatch(/if \(q\.serverGraded\) reactToResult\(correct\);\s*else recordAttempt\(q, correct, null\);/);
   });
   it('los juegos que aun no migran siguen registrando desde el navegador', () => {
-    for (const comp of ['ElDescifrador', 'TimelineGame', 'CategoriesGame', 'FlashcardGame']) {
+    for (const comp of ['ElDescifrador', 'FlashcardGame']) {
       const block = page.slice(page.indexOf(`<${comp}`), page.indexOf('/>', page.indexOf(`<${comp}`)));
       expect(block, comp).toContain('recordAttempt(q, correct, null)');
       expect(block, comp).not.toContain('check=');
     }
   });
-  for (const comp of ['ImpostorCognitivoGame', 'AlquimiaConceptualGame', 'CuartoCrisisGame', 'JuicioConocimientoGame']) {
+  for (const comp of ['ImpostorCognitivoGame', 'AlquimiaConceptualGame', 'CuartoCrisisGame', 'JuicioConocimientoGame', 'TimelineGame', 'CategoriesGame']) {
     it(`${comp}: con \`check\` espera al servidor, no conoce la solucion y deja reintentar si no se pudo comprobar`, () => {
       const src = read(`src/components/minigames/${comp}.tsx`);
       expect(src).toContain('check?: GameCheck');
@@ -471,10 +494,232 @@ describe('el navegador', () => {
       expect(src).toContain('CHECK_ERROR');
       expect(src).toContain('Comprobando…');
       // los campos de solucion son OPCIONALES en los datos del juego (no vienen del servidor)
-      expect(src).toMatch(/is_impostor\?|is_correct\?|is_solution\?|guilty_paragraph_id\?/);
+      expect(src).toMatch(/is_impostor\?|is_correct\?|is_solution\?|guilty_paragraph_id\?|correct_position\?|correct_category\?/);
     });
   }
   it('Cuarto de Crisis informa al servidor cuando se acaba el tiempo', () => {
     expect(read('src/components/minigames/CuartoCrisisGame.tsx')).toContain('check({ selectedCode: null })');
+  });
+});
+
+// ───────────────────── linea del tiempo y categorias ─────────────────────
+describe('linea del tiempo (funciones puras)', () => {
+  it('al navegador solo salen el id, el texto y el año: la posicion correcta y la explicacion no', () => {
+    expect(sanitizeGameData('linea_del_tiempo', TIMELINE)).toEqual({
+      theme: 'Egipto',
+      items: [
+        { id: 1, text: 'Construccion de la gran piramide', year: '2560 a. C.' },
+        { id: 2, text: 'Unificacion del Alto y Bajo Egipto' },
+        { id: 3, text: 'Conquista de Alejandro Magno', year: '332 a. C.' },
+      ],
+    });
+  });
+  it('el orden correcto acierta y marca todas las posiciones', () => {
+    expect(gradeGame('linea_del_tiempo', TIMELINE, { order: [2, 1, 3] })).toEqual({ status: 'graded', correct: true, detail: { perSlot: [true, true, true] } });
+  });
+  it('un orden incorrecto falla y dice QUE POSICIONES estaban mal (lo mismo que mostraba el juego), nada mas', () => {
+    expect(gradeGame('linea_del_tiempo', TIMELINE, { order: [1, 2, 3] })).toEqual({ status: 'graded', correct: false, detail: { perSlot: [false, false, true] } });
+    expect(gradeGame('linea_del_tiempo', TIMELINE, { order: [2, 3, 1] })).toEqual({ status: 'graded', correct: false, detail: { perSlot: [true, false, false] } });
+  });
+  it('formas invalidas: no es lista, largo distinto, repetidos, id desconocido, ids de otro tipo', () => {
+    for (const order of [undefined, 'x', {}, [2, 1], [2, 1, 3, 3], [2, 2, 1], [2, 1, 99], ['2', '1', '3'], [2, 1, null]]) {
+      expect(gradeGame('linea_del_tiempo', TIMELINE, { order }), JSON.stringify(order)).toEqual({ status: 'invalid' });
+    }
+  });
+  it('datos sin solucion utilizable (posiciones repetidas, con huecos o faltantes) no se califican', () => {
+    const items = (positions: unknown[]) => ({ items: positions.map((correct_position, i) => ({ id: i + 1, text: `e${i}`, correct_position })) });
+    for (const pos of [[1, 1, 2], [1, 2, 4], [0, 1, 2], [1, 2, undefined], ['1', '2', '3']]) expect(gradeGame('linea_del_tiempo', items(pos), { order: [1, 2, 3] }), JSON.stringify(pos)).toEqual({ status: 'invalid' });
+    expect(gradeGame('linea_del_tiempo', { items: [] }, { order: [] })).toEqual({ status: 'invalid' });
+    expect(gradeGame('linea_del_tiempo', null, { order: [] })).toEqual({ status: 'invalid' });
+  });
+  it('revela el orden correcto (ids) y la explicacion', () => {
+    expect(buildGameReveal('linea_del_tiempo', TIMELINE)).toEqual({ correctOrder: [2, 1, 3], explanation: TIMELINE.pedagogical_feedback });
+    expect(buildGameReveal('linea_del_tiempo', {})).toEqual({ correctOrder: [], explanation: null });
+  });
+});
+
+describe('categorias (funciones puras)', () => {
+  it('al navegador salen las categorias y los elementos SIN su categoria', () => {
+    expect(sanitizeGameData('categorias_rapidas', CATEGORIES)).toEqual({
+      theme: 'Seres',
+      categories: ['Vivo', 'Inerte'],
+      items: [{ id: 1, text: 'Perro' }, { id: 2, text: 'Roca' }, { id: 3, text: 'Gato' }],
+      time_limit_seconds: 45,
+    });
+  });
+  it('la clasificacion completa y correcta acierta; con un error, falla', () => {
+    expect(gradeGame('categorias_rapidas', CATEGORIES, { assignment: { 1: 'Vivo', 2: 'Inerte', 3: 'Vivo' } })).toEqual({ status: 'graded', correct: true });
+    expect(gradeGame('categorias_rapidas', CATEGORIES, { assignment: { 1: 'Vivo', 2: 'Vivo', 3: 'Vivo' } })).toEqual({ status: 'graded', correct: false });
+  });
+  it('se acabo el tiempo = intento fallido', () => {
+    expect(gradeGame('categorias_rapidas', CATEGORIES, { timeout: true })).toEqual({ status: 'graded', correct: false });
+    // solo `timeout: true` cuenta: otra cosa no es una respuesta
+    expect(gradeGame('categorias_rapidas', CATEGORIES, { timeout: 'si' })).toEqual({ status: 'invalid' });
+    expect(gradeGame('categorias_rapidas', CATEGORIES, { timeout: false })).toEqual({ status: 'invalid' });
+  });
+  it('formas invalidas: sin clasificacion, faltan o sobran elementos, categoria desconocida, valores que no son texto', () => {
+    const bad: unknown[] = [undefined, null, 'x', [], { 1: 'Vivo', 2: 'Inerte' }, { 1: 'Vivo', 2: 'Inerte', 3: 'Vivo', 4: 'Vivo' }, { 1: 'Vivo', 2: 'Inerte', 3: 'Raro' }, { 1: 'Vivo', 2: 'Inerte', 3: 7 }, { 1: 'Vivo', 2: 'Inerte', 9: 'Vivo' }];
+    for (const assignment of bad) expect(gradeGame('categorias_rapidas', CATEGORIES, { assignment }), JSON.stringify(assignment)).toEqual({ status: 'invalid' });
+  });
+  it('datos sin solucion utilizable (categoria que no existe, sin elementos) no se califican', () => {
+    expect(gradeGame('categorias_rapidas', { categories: ['A'], items: [{ id: 1, text: 'x', correct_category: 'B' }] }, { assignment: { 1: 'A' } })).toEqual({ status: 'invalid' });
+    expect(gradeGame('categorias_rapidas', { categories: ['A'], items: [] }, { assignment: {} })).toEqual({ status: 'invalid' });
+    expect(gradeGame('categorias_rapidas', { categories: ['A'], items: [{ id: 1, text: 'x' }] }, { timeout: true })).toEqual({ status: 'invalid' });
+  });
+  it('revela la clasificacion correcta y la explicacion', () => {
+    expect(buildGameReveal('categorias_rapidas', CATEGORIES)).toEqual({ assignment: { 1: 'Vivo', 2: 'Inerte', 3: 'Vivo' }, explanation: CATEGORIES.pedagogical_feedback });
+  });
+});
+
+describe('probeGame: el sondeo de categorias', () => {
+  it('dice si esa categoria es la del elemento', () => {
+    expect(probeGame('categorias_rapidas', CATEGORIES, { itemId: 1, category: 'Vivo' })).toEqual({ status: 'graded', correct: true });
+    expect(probeGame('categorias_rapidas', CATEGORIES, { itemId: 1, category: 'Inerte' })).toEqual({ status: 'graded', correct: false });
+  });
+  it('invalido: elemento o categoria que no existen, tipos equivocados, sin objeto', () => {
+    for (const probe of [null, undefined, 'x', {}, { itemId: 99, category: 'Vivo' }, { itemId: 1, category: 'Raro' }, { itemId: '1', category: 'Vivo' }, { itemId: 1, category: 5 }]) {
+      expect(probeGame('categorias_rapidas', CATEGORIES, probe), JSON.stringify(probe)).toEqual({ status: 'invalid' });
+    }
+  });
+  it('solo existe para las categorias', () => {
+    for (const t of ['impostor_cognitivo', 'linea_del_tiempo', 'multiple_choice']) expect(probeGame(t, CATEGORIES, { itemId: 1, category: 'Vivo' })).toEqual({ status: 'unsupported' });
+  });
+});
+
+describe('POST /api/lesson/answer: varios intentos y sondeos (comportamiento)', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://ejemplo.supabase.co');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'x'.repeat(40));
+    vi.stubEnv('SERVER_GRADING', 'on');
+    vi.stubEnv('SERVER_GRADING_GAMES', 'on');
+    h.user = { id: 'stu-1' };
+    h.hasKey = true;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+  const send = async (answer: unknown) => (await post({ attemptId: ATT, questionId: QID, answer })).json();
+
+  it('linea del tiempo: un intento fallido NO cierra ni revela; dice solo las posiciones; el tercero cierra y revela', async () => {
+    seed('linea_del_tiempo');
+    const first = await send({ order: [1, 2, 3] });
+    expect(first).toEqual({ correct: false, final: false, tries: 1, triesLeft: 2, detail: { perSlot: [false, false, true] } });
+    expect(JSON.stringify(first)).not.toContain('EXPLICACION-LINEA');
+    expect(h.db.question_attempts).toHaveLength(0);
+    expect(h.db.lesson_attempt_answers[0]).toMatchObject({ tries: 1, final: false, correct: false });
+
+    const second = await send({ order: [2, 3, 1] });
+    expect(second).toMatchObject({ correct: false, final: false, tries: 2, triesLeft: 1, detail: { perSlot: [true, false, false] } });
+
+    const third = await send({ order: [3, 2, 1] });
+    expect(third).toMatchObject({ correct: false, final: true, tries: 3, reveal: { correctOrder: [2, 1, 3] }, explanation: 'Explicacion de la pregunta' });
+    expect(h.db.lesson_attempt_answers).toHaveLength(1);
+    expect(h.db.question_attempts).toEqual([expect.objectContaining({ was_correct: false, game_type: 'linea_del_tiempo' })]);
+  });
+
+  it('linea del tiempo: acertar en el segundo intento cierra con 2 intentos y se registra como acierto', async () => {
+    seed('linea_del_tiempo');
+    await send({ order: [1, 2, 3] });
+    const body = await send({ order: [2, 1, 3] });
+    expect(body).toMatchObject({ correct: true, final: true, tries: 2, reveal: { correctOrder: [2, 1, 3] } });
+    expect(h.db.question_attempts).toEqual([expect.objectContaining({ was_correct: true, game_type: 'linea_del_tiempo' })]);
+  });
+
+  it('linea del tiempo: pasado el cierre, otro envio no cambia nada', async () => {
+    seed('linea_del_tiempo');
+    await send({ order: [2, 1, 3] });
+    const again = await send({ order: [1, 2, 3] });
+    expect(again).toMatchObject({ correct: true, final: true, tries: 1 });
+    expect(h.db.lesson_attempt_answers).toHaveLength(1);
+    expect(h.db.question_attempts).toHaveLength(1);
+  });
+
+  it('linea del tiempo: un orden con formas invalidas es 400 y no gasta un intento', async () => {
+    seed('linea_del_tiempo');
+    const res = await post({ attemptId: ATT, questionId: QID, answer: { order: [1, 2] } });
+    expect(res.status).toBe(400);
+    expect(h.db.lesson_attempt_answers).toHaveLength(0);
+  });
+
+  it('categorias: el sondeo no cierra, no gasta intentos y no escribe nada', async () => {
+    seed('categorias_rapidas');
+    expect(await send({ probe: { itemId: 1, category: 'Vivo' } })).toEqual({ correct: true, final: false, probe: true });
+    expect(await send({ probe: { itemId: 1, category: 'Inerte' } })).toEqual({ correct: false, final: false, probe: true });
+    expect(h.db.lesson_attempt_answers).toHaveLength(0);
+    expect(h.db.question_attempts).toHaveLength(0);
+  });
+
+  it('categorias: un sondeo invalido, o sobre un juego que no es de categorias, es 400', async () => {
+    seed('categorias_rapidas');
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { probe: { itemId: 99, category: 'Vivo' } } })).status).toBe(400);
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { probe: 'x' } })).status).toBe(400);
+    seed('impostor_cognitivo');
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { probe: { itemId: 1, category: 'Vivo' } } })).status).toBe(400);
+    expect(h.db.lesson_attempt_answers).toHaveLength(0);
+  });
+
+  it('categorias: un sondeo no se acepta con el interruptor de juegos apagado ni en un intento ajeno', async () => {
+    vi.stubEnv('SERVER_GRADING_GAMES', '');
+    seed('categorias_rapidas');
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { probe: { itemId: 1, category: 'Vivo' } } })).status).toBe(404);
+    vi.stubEnv('SERVER_GRADING_GAMES', 'on');
+    seed('categorias_rapidas', { attempt: { student_id: 'otro' } });
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { probe: { itemId: 1, category: 'Vivo' } } })).status).toBe(404);
+  });
+
+  it('categorias: la clasificacion completa y correcta cierra con acierto y revela la clasificacion', async () => {
+    seed('categorias_rapidas');
+    const body = await send({ assignment: { 1: 'Vivo', 2: 'Inerte', 3: 'Vivo' } });
+    expect(body).toMatchObject({ correct: true, final: true, tries: 1, reveal: { assignment: { 1: 'Vivo', 2: 'Inerte', 3: 'Vivo' } } });
+    expect(h.db.question_attempts).toEqual([expect.objectContaining({ was_correct: true, game_type: 'categorias_rapidas' })]);
+  });
+
+  it('categorias: una clasificacion completa pero equivocada es un intento fallido (no se puede "declarar" lo que no es)', async () => {
+    seed('categorias_rapidas');
+    const body = await send({ assignment: { 1: 'Inerte', 2: 'Inerte', 3: 'Vivo' } });
+    expect(body).toMatchObject({ correct: false, final: false, tries: 1, triesLeft: 1 });
+    expect(body.reveal).toBeUndefined();
+  });
+
+  it('categorias: el tiempo agotado cuenta; la segunda vez cierra como fallada y revela', async () => {
+    seed('categorias_rapidas');
+    expect(await send({ timeout: true })).toMatchObject({ correct: false, final: false, tries: 1, triesLeft: 1 });
+    const second = await send({ timeout: true });
+    expect(second).toMatchObject({ correct: false, final: true, tries: 2, reveal: { assignment: { 1: 'Vivo', 2: 'Inerte', 3: 'Vivo' } } });
+    expect(h.db.question_attempts).toEqual([expect.objectContaining({ was_correct: false, game_type: 'categorias_rapidas' })]);
+  });
+
+  it('categorias: acertar despues de un tiempo agotado cierra con acierto en el segundo intento', async () => {
+    seed('categorias_rapidas');
+    await send({ timeout: true });
+    expect(await send({ assignment: { 1: 'Vivo', 2: 'Inerte', 3: 'Vivo' } })).toMatchObject({ correct: true, final: true, tries: 2 });
+  });
+
+  it('categorias: una clasificacion incompleta es 400 y no gasta intentos', async () => {
+    seed('categorias_rapidas');
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { assignment: { 1: 'Vivo' } } })).status).toBe(400);
+    expect(h.db.lesson_attempt_answers).toHaveLength(0);
+  });
+});
+
+describe('los dos juegos nuevos en el navegador', () => {
+  it('la linea del tiempo manda el ORDEN (ids) y marca solo las posiciones que el servidor dice', () => {
+    const src = read('src/components/minigames/TimelineGame.tsx');
+    expect(src).toContain('check({ order: placed.map((idx) => items[idx].id) })');
+    expect(src).toContain('verdict.detail?.perSlot');
+    expect(src).toContain('failedAttempt(closes, true)'); // con el servidor, SU cuenta de intentos manda
+  });
+  it('las categorias sondean cada toque, informan el tiempo agotado y cierran con la clasificacion completa', () => {
+    const src = read('src/components/minigames/CategoriesGame.tsx');
+    expect(src).toContain('check({ probe: { itemId: item.id, category: cat } })');
+    expect(src).toContain('check({ timeout: true })');
+    expect(src).toContain('check!({ assignment: finalAssignment })');
+    expect(src).toContain('Reintentar'); // si falla la comprobacion final, se puede reintentar
+  });
+  it('la pagina pasa a `check` el estado de cierre y el detalle del servidor', () => {
+    const page = read('src/app/(student)/lesson/[id]/page.tsx');
+    expect(page).toContain('final: r.final, detail: r.detail');
   });
 });

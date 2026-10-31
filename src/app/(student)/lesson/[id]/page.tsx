@@ -77,7 +77,7 @@ type ServerAnswer = {
   final: boolean;
   tries: number;
   triesLeft?: number;
-  detail?: { matched?: number; total?: number; perTerm?: boolean[] };
+  detail?: { matched?: number; total?: number; perTerm?: boolean[]; perSlot?: boolean[] };
   reveal?: { ok?: number | boolean; answers?: string[]; keywords?: string[]; defs?: string[] } & Record<string, unknown>; // los minijuegos revelan otros campos (ver gameGrading.ts)
   explanation?: string | null;
   source?: SourceHint | null;
@@ -347,7 +347,7 @@ export default function LessonPage() {
     q.serverGraded
       ? async (answer) => {
           const r = await gradeOnServer(q, answer);
-          return r ? { correct: r.correct, reveal: r.reveal, explanation: r.explanation ?? null } : null;
+          return r ? { correct: r.correct, reveal: r.reveal, explanation: r.explanation ?? null, final: r.final, detail: r.detail } : null;
         }
       : undefined;
   // El servidor ya registro el intento de una pregunta que califica el (question_attempts); desde el navegador solo se reacciona al resultado.
@@ -915,11 +915,12 @@ export default function LessonPage() {
         key={idx}
         gameData={q.game_data || {}}
         disabled={answered}
+        check={gameCheck(q)}
         onComplete={(correct) => {
           setAnswered(true);
           setSelected('ordenado');
           if (correct) setScore((s) => s + 1);
-          recordAttempt(q, correct, null);
+          finishGame(q, correct);
         }}
       />
     );
@@ -929,11 +930,12 @@ export default function LessonPage() {
         key={idx}
         gameData={q.game_data || {}}
         disabled={answered}
+        check={gameCheck(q)}
         onComplete={(correct) => {
           setAnswered(true);
           setSelected('clasificado');
           if (correct) setScore((s) => s + 1);
-          recordAttempt(q, correct, null);
+          finishGame(q, correct);
         }}
       />
     );
