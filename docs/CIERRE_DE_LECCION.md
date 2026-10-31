@@ -21,7 +21,7 @@ La aplicación funciona con y sin la migración. Para activarlo: aplicar la **08
 
 La política `ALL` de `student_progress` **sigue abierta**. Cerrarla ahora rompería las lecciones que el servidor aún no califica. Falta, en este orden, para poder «contraer»:
 
-1. Los 4 minijuegos pendientes (línea del tiempo, categorías, cartas, descifrador): sus preguntas no entran en el intento, así que una lección solo de esos juegos no puede cerrarse en el servidor.
+1. ~~Los minijuegos pendientes~~ (hecho: los ocho se califican en el servidor con `SERVER_GRADING_GAMES=on`, ver `docs/CALIFICACION_MINIJUEGOS.md`). Mientras esa variable esté apagada, las preguntas de juego no entran en el intento y una lección solo de juegos no puede cerrarse en el servidor.
 2. Pasar `markInProgress` (que marca «en progreso» al abrir la lección) y la ruta sin conexión (`persistOffline`) al servidor.
 3. Entonces: `student_progress` pasa a solo lectura para el estudiante; `question_attempts` deja de aceptar `INSERT` propio; y se cierra la lectura de `lesson_questions` por estudiantes (hoy deja ver `ok`, `answers`, `keywords` y `game_data` con la llave pública).
 

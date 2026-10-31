@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { SERVER_GRADED_GAME_TYPES, buildGameReveal, gradeGame, isGradedGameType, probeGame, sanitizeGameData } from './gameGrading';
+import { SERVER_GRADED_GAME_TYPES, buildGameReveal, gradeGame, isGradedGameType, DECIPHER_MAX_WRONG, probeGame, sanitizeGameData } from './gameGrading';
 import { sanitizeQuestion, serverGradingGamesEnabled } from './serverGrading';
 
 const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8').replace(/\r\n/g, '\n');
@@ -75,20 +75,47 @@ const CATEGORIES = {
   pedagogical_feedback: 'EXPLICACION-CAT: los seres vivos nacen y mueren.',
   campo_secreto: 'NO-DEBE-SALIR',
 };
-const GAMES = { impostor_cognitivo: IMPOSTOR, alquimia_conceptual: ALQUIMIA, cuarto_crisis: CRISIS, juicio_conocimiento: JUICIO, linea_del_tiempo: TIMELINE, categorias_rapidas: CATEGORIES } as const;
+const CARDS = {
+  theme: 'Astronomia',
+  pairs: [
+    { id: 1, card1: 'Sol', card2: 'Estrella' },
+    { id: 2, card1: 'Luna', card2: 'Satelite' },
+    { id: 3, card1: 'Marte', card2: 'Planeta' },
+  ],
+  pedagogical_feedback: 'EXPLICACION-CARTAS: cada cuerpo celeste tiene su clase.',
+  campo_secreto: 'NO-DEBE-SALIR',
+};
+const DECIPHER = {
+  word_to_guess: 'ESCRIBA',
+  initial_clue: 'Funcionario que registraba documentos oficiales',
+  hints: ['Pista uno: llevaba registros', 'Pista dos: sin el no habria leyes escritas', 'Pista tres: viene de scribere'],
+  pedagogical_feedback: 'EXPLICACION-DESCIFRADOR: el escriba preservaba la ley.',
+  campo_secreto: 'NO-DEBE-SALIR',
+};
+const GAMES = {
+  impostor_cognitivo: IMPOSTOR,
+  alquimia_conceptual: ALQUIMIA,
+  cuarto_crisis: CRISIS,
+  juicio_conocimiento: JUICIO,
+  linea_del_tiempo: TIMELINE,
+  categorias_rapidas: CATEGORIES,
+  flashcard_rapida: CARDS,
+  el_descifrador: DECIPHER,
+} as const;
 
 const SOLUTION_STRINGS = [
-  'is_impostor', 'is_correct', 'is_solution', 'guilty_paragraph_id', 'consequence', 'correct_position', 'correct_category', 'EXPLICACION-LINEA', 'EXPLICACION-CAT',
+  'is_impostor', 'is_correct', 'is_solution', 'guilty_paragraph_id', 'consequence', 'correct_position', 'correct_category', 'EXPLICACION-LINEA', 'EXPLICACION-CAT', 'EXPLICACION-CARTAS', 'EXPLICACION-DESCIFRADOR', 'ESCRIBA', 'word_to_guess', 'pairId', 'pair_id', 'Pista uno', 'Pista dos', 'Pista tres', 'card1', 'card2',
   'exposicion_del_impostor', 'unlocked_knowledge', 'post_mortem_report', 'verdict_explanation',
   'cloroplastos, no en', 'El precio de equilibrio iguala', 'Crisis evitada', 'Colapso diferido', 'Explosion', 'perdida de moderacion', 'conservacion', 'NO-DEBE-SALIR',
 ];
 
 describe('tipos', () => {
-  it('son seis: los cuatro de "elegir una opcion", la linea del tiempo y las categorias', () => {
-    expect([...SERVER_GRADED_GAME_TYPES]).toEqual(['impostor_cognitivo', 'alquimia_conceptual', 'cuarto_crisis', 'juicio_conocimiento', 'linea_del_tiempo', 'categorias_rapidas']);
-    expect(isGradedGameType('impostor_cognitivo')).toBe(true);
-    expect(isGradedGameType('linea_del_tiempo')).toBe(true);
-    for (const t of ['flashcard_rapida', 'el_descifrador', 'multiple_choice', '', undefined, null, 7]) expect(isGradedGameType(t)).toBe(false);
+  it('son los ocho minijuegos del catalogo', () => {
+    expect([...SERVER_GRADED_GAME_TYPES]).toEqual([
+      'impostor_cognitivo', 'alquimia_conceptual', 'cuarto_crisis', 'juicio_conocimiento', 'linea_del_tiempo', 'categorias_rapidas', 'flashcard_rapida', 'el_descifrador',
+    ]);
+    for (const t of SERVER_GRADED_GAME_TYPES) expect(isGradedGameType(t)).toBe(true);
+    for (const t of ['multiple_choice', 'match', 'juego_futuro', '', undefined, null, 7]) expect(isGradedGameType(t)).toBe(false);
   });
 });
 
@@ -118,7 +145,7 @@ describe('sanitizeGameData: lo que llega al navegador no trae la solucion', () =
     for (const t of SERVER_GRADED_GAME_TYPES) {
       for (const bad of [null, undefined, 'x', 5, [], { statements: 'no' }]) expect(() => sanitizeGameData(t, bad)).not.toThrow();
     }
-    expect(sanitizeGameData('flashcard_rapida', IMPOSTOR)).toEqual({});
+    expect(sanitizeGameData('juego_futuro', IMPOSTOR)).toEqual({});
   });
 });
 
@@ -158,11 +185,11 @@ describe('gradeGame', () => {
     expect(gradeGame('impostor_cognitivo', null, { selectedId: 1 })).toEqual({ status: 'invalid' });
   });
   it('otros tipos: "unsupported"', () => {
-    expect(gradeGame('flashcard_rapida', {}, {})).toEqual({ status: 'unsupported' });
+    expect(gradeGame('juego_futuro', {}, {})).toEqual({ status: 'unsupported' });
     expect(gradeGame('multiple_choice', {}, {})).toEqual({ status: 'unsupported' });
     // el tipo se comprueba ANTES que la forma de la respuesta: un juego que no se califica aqui no es "invalid", es "unsupported"
-    expect(gradeGame('flashcard_rapida', {}, null)).toEqual({ status: 'unsupported' });
-    expect(gradeGame('el_descifrador', {}, 'x')).toEqual({ status: 'unsupported' });
+    expect(gradeGame('juego_futuro', {}, null)).toEqual({ status: 'unsupported' });
+    expect(gradeGame('match', {}, 'x')).toEqual({ status: 'unsupported' });
   });
   it('paridad con el navegador: con varias opciones marcadas correctas, cualquiera de ellas acierta (como hacia el juego)', () => {
     const gd = { bridge_options: [{ id: 'A', text: 'a', is_correct: true }, { id: 'B', text: 'b', is_correct: true }, { id: 'C', text: 'c', is_correct: false }] };
@@ -207,8 +234,8 @@ describe('sanitizeQuestion con minijuegos', () => {
     expect(sanitizeQuestion(game, Math.random, { games: false })).toBe(game);
   });
   it('los juegos que aun no se califican en el servidor no se tocan, ni con el interruptor', () => {
-    const cartas = { id: 'g2', type: 'flashcard_rapida', game_data: { pairs: [{ id: 1, card1: 'a', card2: 'b' }] } };
-    expect(sanitizeQuestion(cartas, Math.random, { games: true })).toBe(cartas);
+    const futuro = { id: 'g2', type: 'juego_futuro', game_data: { secreto: 1 } };
+    expect(sanitizeQuestion(futuro, Math.random, { games: true })).toBe(futuro);
   });
   it('sin id no se toca', () => {
     const sinId = { type: 'impostor_cognitivo', game_data: IMPOSTOR };
@@ -434,10 +461,10 @@ describe('startLessonAttempt con minijuegos (entrega de la leccion)', () => {
   const served = () => [
     { id: 'c1', type: 'multiple_choice', q: '?', opts: ['a', 'b'], ok: 1, exp: 'EXP-CLASICA' },
     { id: 'g1', type: 'impostor_cognitivo', q: 'Juega', exp: 'EXP-JUEGO', game_type: 'impostor_cognitivo', game_data: IMPOSTOR },
-    { id: 'g2', type: 'flashcard_rapida', q: 'Empareja', exp: 'EXP-CARTAS', game_type: 'flashcard_rapida', game_data: { pairs: [{ id: 1, card1: 'a', card2: 'b' }] } },
+    { id: 'g2', type: 'juego_futuro', q: 'Nuevo', exp: 'EXP-FUTURO', game_type: 'juego_futuro', game_data: { x: 1 } },
   ];
 
-  it('con ambos interruptores: el juego sale sin solucion y entra en el intento; los juegos aun no migrados salen intactos', async () => {
+  it('con ambos interruptores: el juego sale sin solucion y entra en el intento; un tipo desconocido sale intacto', async () => {
     vi.stubEnv('SERVER_GRADING_GAMES', 'on');
     const { startLessonAttempt } = await import('./lessonAttempt');
     const r = await startLessonAttempt(userClient, MOD, served());
@@ -470,8 +497,8 @@ describe('startLessonAttempt con minijuegos (entrega de la leccion)', () => {
 
 describe('el navegador', () => {
   const page = read('src/app/(student)/lesson/[id]/page.tsx');
-  it('los seis juegos reciben `check` desde la pagina y, calificados en el servidor, no se registran desde el navegador', () => {
-    for (const comp of ['ImpostorCognitivoGame', 'AlquimiaConceptualGame', 'CuartoCrisisGame', 'JuicioConocimientoGame', 'TimelineGame', 'CategoriesGame']) {
+  it('los ocho juegos reciben `check` desde la pagina y, calificados en el servidor, no se registran desde el navegador', () => {
+    for (const comp of ['ImpostorCognitivoGame', 'AlquimiaConceptualGame', 'CuartoCrisisGame', 'JuicioConocimientoGame', 'TimelineGame', 'CategoriesGame', 'FlashcardGame', 'ElDescifrador']) {
       const block = page.slice(page.indexOf(`<${comp}`), page.indexOf('/>', page.indexOf(`<${comp}`)));
       expect(block, comp).toContain('check={gameCheck(q)}');
       expect(block, comp).toContain('finishGame(q, correct)');
@@ -479,14 +506,7 @@ describe('el navegador', () => {
     }
     expect(page).toMatch(/if \(q\.serverGraded\) reactToResult\(correct\);\s*else recordAttempt\(q, correct, null\);/);
   });
-  it('los juegos que aun no migran siguen registrando desde el navegador', () => {
-    for (const comp of ['ElDescifrador', 'FlashcardGame']) {
-      const block = page.slice(page.indexOf(`<${comp}`), page.indexOf('/>', page.indexOf(`<${comp}`)));
-      expect(block, comp).toContain('recordAttempt(q, correct, null)');
-      expect(block, comp).not.toContain('check=');
-    }
-  });
-  for (const comp of ['ImpostorCognitivoGame', 'AlquimiaConceptualGame', 'CuartoCrisisGame', 'JuicioConocimientoGame', 'TimelineGame', 'CategoriesGame']) {
+  for (const comp of ['ImpostorCognitivoGame', 'AlquimiaConceptualGame', 'CuartoCrisisGame', 'JuicioConocimientoGame', 'TimelineGame', 'CategoriesGame', 'FlashcardGame', 'ElDescifrador']) {
     it(`${comp}: con \`check\` espera al servidor, no conoce la solucion y deja reintentar si no se pudo comprobar`, () => {
       const src = read(`src/components/minigames/${comp}.tsx`);
       expect(src).toContain('check?: GameCheck');
@@ -494,7 +514,7 @@ describe('el navegador', () => {
       expect(src).toContain('CHECK_ERROR');
       expect(src).toContain('Comprobando…');
       // los campos de solucion son OPCIONALES en los datos del juego (no vienen del servidor)
-      expect(src).toMatch(/is_impostor\?|is_correct\?|is_solution\?|guilty_paragraph_id\?|correct_position\?|correct_category\?/);
+      expect(src).toMatch(/is_impostor\?|is_correct\?|is_solution\?|guilty_paragraph_id\?|correct_position\?|correct_category\?|word_to_guess\?|pairs\?/);
     });
   }
   it('Cuarto de Crisis informa al servidor cuando se acaba el tiempo', () => {
@@ -721,5 +741,209 @@ describe('los dos juegos nuevos en el navegador', () => {
   it('la pagina pasa a `check` el estado de cierre y el detalle del servidor', () => {
     const page = read('src/app/(student)/lesson/[id]/page.tsx');
     expect(page).toContain('final: r.final, detail: r.detail');
+  });
+});
+
+// ───────────────────── cartas (memoria de pares) ─────────────────────
+describe('cartas (funciones puras)', () => {
+  const served = () => (sanitizeGameData('flashcard_rapida', CARDS).cards as { key: number; text: string }[]);
+  const key = (text: string) => served().find((c) => c.text === text)!.key;
+
+  it('al navegador salen las cartas con una clave y su texto: sin parejas, sin explicacion', () => {
+    const cards = served();
+    expect(cards.map((c) => c.key)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(cards.map((c) => c.text).sort()).toEqual(['Estrella', 'Luna', 'Marte', 'Planeta', 'Satelite', 'Sol']);
+    expect(Object.keys(sanitizeGameData('flashcard_rapida', CARDS)).sort()).toEqual(['cards', 'theme']);
+    // cada carta lleva SOLO su clave y su texto: nada que diga con cual hace pareja
+    for (const c of cards) expect(Object.keys(c).sort()).toEqual(['key', 'text']);
+  });
+  it('el orden es DETERMINISTA (servir y sondear coinciden) y no deja las parejas contiguas como en los datos', () => {
+    expect(served()).toEqual(served());
+    expect(served().map((c) => c.text)).not.toEqual(['Sol', 'Estrella', 'Luna', 'Satelite', 'Marte', 'Planeta']);
+    // no depende del orden en que vengan los pares
+    const reversed = { ...CARDS, pairs: [...CARDS.pairs].reverse() };
+    const a = (sanitizeGameData('flashcard_rapida', reversed).cards as { key: number; text: string }[]).map((c) => c.text);
+    expect(a.sort()).toEqual(served().map((c) => c.text).sort());
+  });
+  it('el sondeo dice si dos cartas coinciden', () => {
+    expect(probeGame('flashcard_rapida', CARDS, { a: key('Sol'), b: key('Estrella') })).toEqual({ status: 'graded', correct: true });
+    expect(probeGame('flashcard_rapida', CARDS, { a: key('Estrella'), b: key('Sol') })).toEqual({ status: 'graded', correct: true });
+    expect(probeGame('flashcard_rapida', CARDS, { a: key('Sol'), b: key('Luna') })).toEqual({ status: 'graded', correct: false });
+  });
+  it('sondeo invalido: la misma carta, fuera de rango, que no sea entero, sin objeto, o datos sin pares utilizables', () => {
+    for (const probe of [{ a: 1, b: 1 }, { a: 0, b: 99 }, { a: -1, b: 2 }, { a: 1.5, b: 2 }, { a: '1', b: 2 }, { a: 1 }, null, 'x']) {
+      expect(probeGame('flashcard_rapida', CARDS, probe), JSON.stringify(probe)).toEqual({ status: 'invalid' });
+    }
+    expect(probeGame('flashcard_rapida', { pairs: [{ id: 1, card1: 'a', card2: 'b' }] }, { a: 0, b: 1 })).toEqual({ status: 'invalid' }); // menos de 2 pares
+    expect(probeGame('flashcard_rapida', { pairs: [{ id: 1, card1: 'a', card2: 'b' }, { id: 1, card1: 'c', card2: 'd' }] }, { a: 0, b: 1 })).toEqual({ status: 'invalid' }); // ids repetidos
+  });
+  it('todos los pares bien se cierran como acierto; cualquier otra cosa no se puede cerrar', () => {
+    const good = [[key('Sol'), key('Estrella')], [key('Luna'), key('Satelite')], [key('Marte'), key('Planeta')]];
+    expect(gradeGame('flashcard_rapida', CARDS, { matches: good })).toEqual({ status: 'graded', correct: true });
+    expect(gradeGame('flashcard_rapida', CARDS, { matches: [...good].reverse().map(([x, y]) => [y, x]) })).toEqual({ status: 'graded', correct: true });
+    const bad: unknown[] = [
+      undefined, 'x', [], good.slice(0, 2), [...good, [0, 1]],
+      [[key('Sol'), key('Luna')], [key('Estrella'), key('Satelite')], [key('Marte'), key('Planeta')]], // pares equivocados
+      [[key('Sol'), key('Estrella')], [key('Sol'), key('Estrella')], [key('Marte'), key('Planeta')]], // carta repetida
+      [[1], [2, 3], [4, 5]], [[1, 1], [2, 3], [4, 5]], [[0, 99], [2, 3], [4, 5]], [['a', 'b'], [2, 3], [4, 5]],
+    ];
+    for (const matches of bad) expect(gradeGame('flashcard_rapida', CARDS, { matches }), JSON.stringify(matches)).toEqual({ status: 'invalid' });
+  });
+  it('revela solo la explicacion', () => {
+    expect(buildGameReveal('flashcard_rapida', CARDS)).toEqual({ explanation: CARDS.pedagogical_feedback });
+    expect(buildGameReveal('flashcard_rapida', {})).toEqual({ explanation: null });
+  });
+});
+
+// ───────────────────── descifrador (palabra letra por letra) ─────────────────────
+describe('descifrador (funciones puras)', () => {
+  it('al navegador sale la MASCARA (letras ocultas, el resto visible), la pista inicial y cuantas pistas hay: ni la palabra ni las pistas', () => {
+    expect(sanitizeGameData('el_descifrador', DECIPHER)).toEqual({ initial_clue: DECIPHER.initial_clue, mask: [null, null, null, null, null, null, null], hint_count: 3 });
+    expect(sanitizeGameData('el_descifrador', { word_to_guess: 'AÑO NUEVO-2', hints: [] })).toEqual({ mask: [null, null, null, ' ', null, null, null, null, null, '-', '2'], hint_count: 0 });
+    // una letra con tilde no cuenta como letra oculta (igual que el juego)
+    expect((sanitizeGameData('el_descifrador', { word_to_guess: 'CANCIÓN' }).mask as unknown[])[5]).toBe('Ó');
+  });
+  it('sondeo de letra: posiciones y caracteres originales; sin importar mayusculas ni tildes', () => {
+    expect(probeGame('el_descifrador', DECIPHER, { letter: 'E' })).toEqual({ status: 'graded', correct: true, data: { positions: [0], chars: ['E'] } });
+    expect(probeGame('el_descifrador', DECIPHER, { letter: 'e' })).toEqual({ status: 'graded', correct: true, data: { positions: [0], chars: ['E'] } });
+    expect(probeGame('el_descifrador', { word_to_guess: 'CASA' }, { letter: 'A' })).toEqual({ status: 'graded', correct: true, data: { positions: [1, 3], chars: ['A', 'A'] } });
+    expect(probeGame('el_descifrador', DECIPHER, { letter: 'Z' })).toEqual({ status: 'graded', correct: false, data: { positions: [], chars: [] } });
+  });
+  it('la Ñ es una letra distinta de la N', () => {
+    expect(probeGame('el_descifrador', { word_to_guess: 'AÑO' }, { letter: 'N' })).toMatchObject({ correct: false });
+    expect(probeGame('el_descifrador', { word_to_guess: 'AÑO' }, { letter: 'Ñ' })).toMatchObject({ correct: true, data: { positions: [1] } });
+  });
+  it('sondeo de letra invalido: vacio, varias letras, digitos, tipos equivocados, palabra sin letras', () => {
+    for (const probe of [{ letter: '' }, { letter: 'AB' }, { letter: '1' }, { letter: 5 }, { letter: '-' }, {}, null]) {
+      expect(probeGame('el_descifrador', DECIPHER, probe), JSON.stringify(probe)).toEqual({ status: 'invalid' });
+    }
+    expect(probeGame('el_descifrador', { word_to_guess: '123' }, { letter: 'A' })).toEqual({ status: 'invalid' });
+  });
+  it('las pistas se piden de a una', () => {
+    expect(probeGame('el_descifrador', DECIPHER, { hint: 0 })).toEqual({ status: 'graded', correct: true, data: { hint: 'Pista uno: llevaba registros' } });
+    expect(probeGame('el_descifrador', DECIPHER, { hint: 2 })).toMatchObject({ data: { hint: 'Pista tres: viene de scribere' } });
+    for (const hint of [3, -1, 1.5, NaN]) expect(probeGame('el_descifrador', DECIPHER, { hint }), String(hint)).toEqual({ status: 'invalid' });
+  });
+  const ESCRIBA = ['E', 'S', 'C', 'R', 'I', 'B', 'A'];
+  it('gana si prueba todas las letras de la palabra con menos de 6 fallos', () => {
+    expect(gradeGame('el_descifrador', DECIPHER, { letters: ESCRIBA })).toEqual({ status: 'graded', correct: true });
+    expect(gradeGame('el_descifrador', DECIPHER, { letters: [...ESCRIBA, 'X', 'Y', 'Z', 'W', 'K'] })).toEqual({ status: 'graded', correct: true }); // 5 fallos
+    expect(gradeGame('el_descifrador', DECIPHER, { letters: ['e', 's', 'c', 'r', 'i', 'b', 'a'] })).toEqual({ status: 'graded', correct: true }); // minusculas
+  });
+  it('pierde con 6 fallos (haya o no cubierto la palabra)', () => {
+    expect(DECIPHER_MAX_WRONG).toBe(6);
+    expect(gradeGame('el_descifrador', DECIPHER, { letters: ['X', 'Y', 'Z', 'W', 'K', 'J'] })).toEqual({ status: 'graded', correct: false });
+    expect(gradeGame('el_descifrador', DECIPHER, { letters: [...ESCRIBA, 'X', 'Y', 'Z', 'W', 'K', 'J'] })).toEqual({ status: 'graded', correct: false }); // no se sabe cual vino primero: pierde
+  });
+  it('el juego aun no termino (faltan letras y quedan intentos): no se puede cerrar', () => {
+    expect(gradeGame('el_descifrador', DECIPHER, { letters: ['E', 'S'] })).toEqual({ status: 'invalid' });
+    expect(gradeGame('el_descifrador', DECIPHER, { letters: [] })).toEqual({ status: 'invalid' });
+    expect(gradeGame('el_descifrador', DECIPHER, { letters: ['E', 'X', 'Y'] })).toEqual({ status: 'invalid' });
+  });
+  it('formas invalidas: no es lista, elementos que no son una letra, palabra sin letras', () => {
+    for (const letters of [undefined, 'ESCRIBA', {}, ['ES'], [5], [''], ['1'], [null]]) expect(gradeGame('el_descifrador', DECIPHER, { letters }), JSON.stringify(letters)).toEqual({ status: 'invalid' });
+    expect(gradeGame('el_descifrador', { word_to_guess: '123' }, { letters: ['A'] })).toEqual({ status: 'invalid' });
+    expect(gradeGame('el_descifrador', {}, { letters: ['A'] })).toEqual({ status: 'invalid' });
+  });
+  it('letras repetidas cuentan una sola vez (un fallo repetido no suma)', () => {
+    expect(gradeGame('el_descifrador', DECIPHER, { letters: [...ESCRIBA, 'X', 'X', 'X', 'X', 'X', 'X'] })).toEqual({ status: 'graded', correct: true });
+  });
+  it('revela la palabra y la explicacion', () => {
+    expect(buildGameReveal('el_descifrador', DECIPHER)).toEqual({ word: 'ESCRIBA', explanation: DECIPHER.pedagogical_feedback });
+    expect(buildGameReveal('el_descifrador', {})).toEqual({ word: '', explanation: null });
+  });
+});
+
+describe('POST /api/lesson/answer: cartas y descifrador (comportamiento)', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://ejemplo.supabase.co');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'x'.repeat(40));
+    vi.stubEnv('SERVER_GRADING', 'on');
+    vi.stubEnv('SERVER_GRADING_GAMES', 'on');
+    h.user = { id: 'stu-1' };
+    h.hasKey = true;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+  const send = async (answer: unknown) => (await post({ attemptId: ATT, questionId: QID, answer })).json();
+  const key = (text: string) => (sanitizeGameData('flashcard_rapida', CARDS).cards as { key: number; text: string }[]).find((c) => c.text === text)!.key;
+
+  it('descifrador: un sondeo de letra devuelve las posiciones y NO escribe nada', async () => {
+    seed('el_descifrador');
+    expect(await send({ probe: { letter: 'S' } })).toEqual({ correct: true, final: false, probe: true, detail: { positions: [1], chars: ['S'] } });
+    expect(await send({ probe: { letter: 'Z' } })).toEqual({ correct: false, final: false, probe: true, detail: { positions: [], chars: [] } });
+    expect(h.db.lesson_attempt_answers).toHaveLength(0);
+    expect(h.db.question_attempts).toHaveLength(0);
+  });
+  it('descifrador: una pista se pide de a una y tampoco escribe', async () => {
+    seed('el_descifrador');
+    const body = await send({ probe: { hint: 1 } });
+    expect(body).toMatchObject({ final: false, probe: true, detail: { hint: 'Pista dos: sin el no habria leyes escritas' } });
+    expect(JSON.stringify(body)).not.toContain('Pista tres');
+    expect(h.db.lesson_attempt_answers).toHaveLength(0);
+  });
+  it('descifrador: ganar cierra con acierto y revela la palabra', async () => {
+    seed('el_descifrador');
+    const body = await send({ letters: ['E', 'S', 'C', 'R', 'I', 'B', 'A'] });
+    expect(body).toMatchObject({ correct: true, final: true, tries: 1, reveal: { word: 'ESCRIBA' } });
+    expect(h.db.question_attempts).toEqual([expect.objectContaining({ was_correct: true, game_type: 'el_descifrador' })]);
+  });
+  it('descifrador: perder (6 fallos) cierra como fallo y revela la palabra', async () => {
+    seed('el_descifrador');
+    const body = await send({ letters: ['X', 'Y', 'Z', 'W', 'K', 'J'] });
+    expect(body).toMatchObject({ correct: false, final: true, reveal: { word: 'ESCRIBA' } });
+    expect(h.db.question_attempts).toEqual([expect.objectContaining({ was_correct: false, game_type: 'el_descifrador' })]);
+  });
+  it('descifrador: cerrar antes de terminar es 400 y no escribe ni gasta nada', async () => {
+    seed('el_descifrador');
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { letters: ['E', 'S'] } })).status).toBe(400);
+    expect(h.db.lesson_attempt_answers).toHaveLength(0);
+  });
+  it('descifrador: un sondeo invalido es 400', async () => {
+    seed('el_descifrador');
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { probe: { letter: '1' } } })).status).toBe(400);
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { probe: { hint: 9 } } })).status).toBe(400);
+  });
+
+  it('cartas: un sondeo dice si coinciden y NO escribe nada', async () => {
+    seed('flashcard_rapida');
+    expect(await send({ probe: { a: key('Sol'), b: key('Estrella') } })).toEqual({ correct: true, final: false, probe: true });
+    expect(await send({ probe: { a: key('Sol'), b: key('Luna') } })).toEqual({ correct: false, final: false, probe: true });
+    expect(h.db.lesson_attempt_answers).toHaveLength(0);
+    expect(h.db.question_attempts).toHaveLength(0);
+  });
+  it('cartas: encontrar todos los pares cierra con acierto', async () => {
+    seed('flashcard_rapida');
+    const body = await send({ matches: [[key('Sol'), key('Estrella')], [key('Luna'), key('Satelite')], [key('Marte'), key('Planeta')]] });
+    expect(body).toMatchObject({ correct: true, final: true, tries: 1, reveal: { explanation: CARDS.pedagogical_feedback } });
+    expect(h.db.question_attempts).toEqual([expect.objectContaining({ was_correct: true, game_type: 'flashcard_rapida' })]);
+  });
+  it('cartas: pares equivocados o incompletos es 400: no se puede declarar un acierto que no se logro', async () => {
+    seed('flashcard_rapida');
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { matches: [[key('Sol'), key('Luna')], [key('Estrella'), key('Satelite')], [key('Marte'), key('Planeta')]] } })).status).toBe(400);
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { matches: [[key('Sol'), key('Estrella')]] } })).status).toBe(400);
+    expect(h.db.lesson_attempt_answers).toHaveLength(0);
+    expect(h.db.question_attempts).toHaveLength(0);
+  });
+  it('cartas: un sondeo invalido es 400', async () => {
+    seed('flashcard_rapida');
+    expect((await post({ attemptId: ATT, questionId: QID, answer: { probe: { a: 0, b: 0 } } })).status).toBe(400);
+  });
+});
+
+describe('cartas y descifrador en el navegador', () => {
+  it('el descifrador sondea cada letra y cada pista, y cierra con las letras jugadas', () => {
+    const src = read('src/components/minigames/ElDescifrador.tsx');
+    expect(src).toContain('check({ probe: { letter: norm } })');
+    expect(src).toContain('check({ probe: { hint: hintsRevealed } })');
+    expect(src).toContain('check!({ letters: Array.from(played) })');
+  });
+  it('las cartas sondean cada par volteado y cierran con la lista de pares', () => {
+    const src = read('src/components/minigames/FlashcardGame.tsx');
+    expect(src).toContain('check({ probe: { a: cards[a].key, b: cards[b].key } })');
+    expect(src).toContain('check!({ matches })');
   });
 });

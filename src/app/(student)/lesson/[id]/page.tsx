@@ -77,7 +77,7 @@ type ServerAnswer = {
   final: boolean;
   tries: number;
   triesLeft?: number;
-  detail?: { matched?: number; total?: number; perTerm?: boolean[]; perSlot?: boolean[] };
+  detail?: { matched?: number; total?: number; perTerm?: boolean[]; perSlot?: boolean[] } & Record<string, unknown>; // los sondeos devuelven otros datos (letras, pistas)
   reveal?: { ok?: number | boolean; answers?: string[]; keywords?: string[]; defs?: string[] } & Record<string, unknown>; // los minijuegos revelan otros campos (ver gameGrading.ts)
   explanation?: string | null;
   source?: SourceHint | null;
@@ -901,11 +901,12 @@ export default function LessonPage() {
         key={idx}
         gameData={q.game_data || {}}
         disabled={answered}
+        check={gameCheck(q)}
         onComplete={(correct) => {
           setAnswered(true);
           setSelected('descifrado');
           if (correct) setScore((s) => s + 1);
-          recordAttempt(q, correct, null);
+          finishGame(q, correct);
         }}
       />
     );
@@ -945,11 +946,12 @@ export default function LessonPage() {
         key={idx}
         gameData={q.game_data || {}}
         disabled={answered}
+        check={gameCheck(q)}
         onComplete={(correct) => {
           setAnswered(true);
           setSelected('emparejado');
           if (correct) setScore((s) => s + 1);
-          recordAttempt(q, correct, null);
+          finishGame(q, correct);
         }}
       />
     );
