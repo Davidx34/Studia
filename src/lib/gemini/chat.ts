@@ -126,6 +126,6 @@ export async function loadChatHistory(limit: number = 20): Promise<ChatMessage[]
   return data.reverse().map((row) => ({
     role: row.role as 'user' | 'tonito',
     text: row.message,
-    timestamp: new Date(row.created_at).getTime(),
+    timestamp: row.created_at ? new Date(row.created_at).getTime() : 0,
   }));
 }

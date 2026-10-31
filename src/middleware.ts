@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { isAuthPage as isAuthPagePath, isPublicPage as isPublicPagePath, isPublicAsset } from "@/lib/auth/routes";
 
 const TEACHER_ROUTES = ["/teacher"];
@@ -11,6 +11,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const pendingCookies: { name: string; value: string; options: CookieOptions }[] = [];
+  const finish = (res: NextResponse): NextResponse => {
+    pendingCookies.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
+    return res;
+  };
+
   try {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,12 +26,10 @@ export async function middleware(request: NextRequest) {
           getAll() {
             return request.cookies.getAll();
           },
+          // El tipo de setAll es void: no puede devolver una respuesta. Las cookies que Supabase pide fijar (renovacion de la sesion) se guardan
+          // y se aplican a la respuesta que se devuelva al final (ver `finish`).
           setAll(cookiesToSet) {
-            const response = NextResponse.next();
-            cookiesToSet.forEach(({ name, value, options }) => {
-              response.cookies.set(name, value, options);
-            });
-            return response;
+            cookiesToSet.forEach((c) => pendingCookies.push(c));
           },
         },
       }
@@ -46,11 +50,11 @@ export async function middleware(request: NextRequest) {
     const isPublicPage = isPublicPagePath(pathname);
 
     if (!user && !isAuthPage && !isPublicPage) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      return finish(NextResponse.redirect(new URL("/login", request.url)));
     }
 
     if (!user) {
-      return NextResponse.next();
+      return finish(NextResponse.next());
     }
 
     // El rol vive en profiles, no en auth user_metadata (el signup no lo setea ahi).
@@ -63,18 +67,18 @@ export async function middleware(request: NextRequest) {
 
     if (isAuthPage) {
       const redirectUrl = role === "teacher" ? "/teacher/dashboard" : "/dashboard";
-      return NextResponse.redirect(new URL(redirectUrl, request.url));
+      return finish(NextResponse.redirect(new URL(redirectUrl, request.url)));
     }
 
     if (role !== "teacher" && TEACHER_ROUTES.some((r) => pathname.startsWith(r))) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return finish(NextResponse.redirect(new URL("/dashboard", request.url)));
     }
 
     if (role === "teacher" && STUDENT_ROUTES.some((r) => pathname.startsWith(r))) {
-      return NextResponse.redirect(new URL("/teacher/dashboard", request.url));
+      return finish(NextResponse.redirect(new URL("/teacher/dashboard", request.url)));
     }
 
-    return NextResponse.next();
+    return finish(NextResponse.next());
   } catch (error) {
     const { pathname } = request.nextUrl;
     // Fail-closed selectivo: rutas protegidas redirigen a /login si hay error,

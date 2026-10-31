@@ -1,6 +1,6 @@
 import { embedQuery, QUERYABLE_PROFILES } from '@/lib/embeddings/embed';
 import { buildQueryVariants } from './queries';
-import { dropNearDuplicates, fuseVariants, joinContext, packByRelevance, relativeCutoff, type Retrieved } from './fusion';
+import { joinContext, selectContext, type Retrieved } from './fusion';
 
 // Recuperacion de contexto para un modulo (RAG), en tres capas:
 //   1. HIBRIDA: cada consulta del modulo se busca por vectores Y por texto completo en español (RRF en la base,
@@ -21,6 +21,10 @@ export interface RetrieveOptions {
   // Consultas propias EN LUGAR de las que se derivan del modulo (titulo, descripcion, palabras clave). Sirve para recuperar lo que
   // respalda UNA pregunta concreta; el acotamiento a los materiales vinculados del modulo se mantiene.
   queries?: string[];
+  // Solo evaluaciones y pruebas: sustituyen a los valores de produccion (RAG_TEXT_WEIGHT, RAG_RRF_K, RAG_CUTOFF_RATIO).
+  textWeight?: number;
+  fusionK?: number;
+  cutoffRatio?: number;
 }
 
 export interface RetrieveResult {
@@ -40,6 +44,17 @@ function readTextWeight(): number {
   return Number.isFinite(n) && n >= 0 && n <= 2 && process.env.RAG_TEXT_WEIGHT !== undefined && process.env.RAG_TEXT_WEIGHT !== '' ? n : 0.3;
 }
 export const RAG_TEXT_WEIGHT = readTextWeight();
+
+// Constante k de la fusion RRF y corte relativo: tambien cambiables sin desplegar (RAG_RRF_K de 1 a 1000, RAG_CUTOFF_RATIO de 0 a 1). Los valores por defecto son los
+// de siempre (60 y 0,25); se afinan con `npm run eval:rag-sweep`.
+function readNumber(name: string, def: number, min: number, max: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return def;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= min && n <= max ? n : def;
+}
+export const RAG_RRF_K = readNumber('RAG_RRF_K', 60, 1, 1000);
+export const RAG_CUTOFF_RATIO = readNumber('RAG_CUTOFF_RATIO', 0.25, 0, 1);
 
 const DEFAULT_MAX_CHUNKS = 8;
 const DEFAULT_CANDIDATES = 12;
@@ -85,7 +100,7 @@ export async function retrieveContext(supabase: any, moduleId: string, opts: Ret
           match_count: candidates,
           vector_models: QUERYABLE_PROFILES,
           vector_weight: 1.0,
-          text_weight: RAG_TEXT_WEIGHT,
+          text_weight: opts.textWeight ?? RAG_TEXT_WEIGHT,
         })
       )
     );
@@ -110,9 +125,13 @@ export async function retrieveContext(supabase: any, moduleId: string, opts: Ret
   }
   if (lists.every((l) => l.length === 0)) return null;
 
-  const fused = fuseVariants(lists);
-  const kept = dropNearDuplicates(relativeCutoff(fused));
-  const packed = packByRelevance(kept, opts.charLimit, opts.maxChunks ?? DEFAULT_MAX_CHUNKS);
+  const packed = selectContext(lists, {
+    k: opts.fusionK ?? RAG_RRF_K,
+    cutoffRatio: opts.cutoffRatio ?? RAG_CUTOFF_RATIO,
+    minKeep: 4,
+    charLimit: opts.charLimit,
+    maxChunks: opts.maxChunks ?? DEFAULT_MAX_CHUNKS,
+  });
   if (packed.length === 0) return null;
 
   const hasVectors = embeddings.some((e) => e !== null);

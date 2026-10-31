@@ -194,7 +194,7 @@ function ModuleRow({
   return (
     <div className="rounded-xl border border-line shadow-card bg-surface backdrop-blur-xl p-4 flex items-start gap-3 group">
       <div className="w-9 h-9 rounded-lg bg-surface-2 border border-line-strong flex items-center justify-center text-xs font-mono text-fg-muted flex-shrink-0">
-        {module.order_index + 1}
+        {(module.order_index ?? 0) + 1}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -220,7 +220,7 @@ function ModuleRow({
             {completedBy} {completedBy === 1 ? 'estudiante completó' : 'estudiantes completaron'}
           </span>
           {(module.prerequisites?.length ?? 0) > 0 && (
-            <span>· Requiere {module.prerequisites.length} prereq</span>
+            <span>· Requiere {module.prerequisites?.length ?? 0} prereq</span>
           )}
         </div>
       </div>

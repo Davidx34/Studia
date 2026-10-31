@@ -11,6 +11,7 @@
 //   - Retorna shape consistente: { ok: true, data } o { ok: false, error }.
 
 import { revalidatePath } from 'next/cache';
+import type { TablesUpdate } from '@/types/database.generated';
 import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { parseEmailList } from '@/lib/classrooms/email-parser';
@@ -83,7 +84,7 @@ export async function createClassroom(input: CreateClassroomInput): Promise<Crea
     if (!error && data) {
       revalidatePath('/teacher/classrooms');
       revalidatePath('/teacher/dashboard');
-      return { ok: true, classroomId: data.id, joinCode: data.join_code };
+      return { ok: true, classroomId: data.id, joinCode: data.join_code ?? undefined };
     }
 
     // Si fue colisión de join_code, reintentamos. Si fue otra cosa, salimos.
@@ -110,7 +111,7 @@ export interface UpdateClassroomInput {
 export async function updateClassroom(id: string, patch: UpdateClassroomInput) {
   const { supabase, user } = await requireUser();
 
-  const update: Record<string, unknown> = {};
+  const update: TablesUpdate<'classrooms'> = {};
   if (patch.name !== undefined) update.name = patch.name.trim();
   if (patch.description !== undefined) update.description = patch.description?.trim() || null;
   if (patch.subject_area !== undefined) update.subject_area = patch.subject_area || null;

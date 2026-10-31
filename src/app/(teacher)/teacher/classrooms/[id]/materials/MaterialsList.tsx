@@ -166,7 +166,7 @@ function MaterialRow({
           {!isExternal && (
             <>
               <span>·</span>
-              <span>{formatBytes(material.size_bytes)}</span>
+              <span>{formatBytes(material.size_bytes ?? 0)}</span>
             </>
           )}
           {material.chunk_count != null && material.chunk_count > 0 && (

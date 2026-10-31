@@ -6,6 +6,7 @@
 // asi que estas funciones solo agregan validacion de forma + revalidacion.
 
 import { revalidatePath } from 'next/cache';
+import type { TablesUpdate } from '@/types/database.generated';
 import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { regenerateModulePool, type RegeneratePoolResult } from '@/lib/questions/regeneratePool';
@@ -115,7 +116,7 @@ export async function updateModuleObjectiveConfig(
   const cleanMinigames = (data.minigameTypes || []).filter((mg) => VALID_MINIGAME_TYPES.includes(mg));
   const questionCount = Math.min(15, Math.max(5, data.configuredQuestionCount || 10));
 
-  const update: Record<string, unknown> = {
+  const update: TablesUpdate<'content_modules'> = {
     learning_objective_id: data.learningObjectiveId,
     order_in_objective: data.orderInObjective ?? null,
     minigame_types: cleanMinigames,

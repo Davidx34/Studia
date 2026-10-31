@@ -37,7 +37,12 @@ export default async function ClassroomLibraryPage({ params }: { params: { id: s
     <LibraryClient
       classroomId={params.id}
       classroomName={classroom.name}
-      materials={materials || []}
+      materials={(materials ?? []).map((m) => ({
+        ...m,
+        display_name: m.display_name ?? 'Sin título',
+        created_at: m.created_at ?? new Date(0).toISOString(),
+        source_type: m.source_type === 'link' || m.source_type === 'notebooklm' ? m.source_type : 'file',
+      }))}
     />
   );
 }

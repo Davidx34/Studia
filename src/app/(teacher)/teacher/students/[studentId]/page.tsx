@@ -120,7 +120,7 @@ export default async function StudentDetailPage({ params }: PageProps) {
 
         {/* Stats grid */}
         <div className="grid grid-cols-3 gap-3 mt-6">
-          <Stat icon={Coins} label="Monedas" value={student.coins.toLocaleString()} accent="amber" />
+          <Stat icon={Coins} label="Monedas" value={(student.coins ?? 0).toLocaleString()} accent="amber" />
           <Stat icon={Flame} label="Racha" value={`${profileStreak(student).streak}d`} accent="orange" />
           <Stat icon={Heart} label="Vidas" value={`${student.current_hearts}/${student.max_hearts}`} accent="rose" />
         </div>

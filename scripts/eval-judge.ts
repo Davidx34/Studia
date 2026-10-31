@@ -20,13 +20,20 @@
 //   npx tsx --env-file=.env.local scripts/eval-judge.ts
 //   npx tsx --env-file=.env.local scripts/eval-judge.ts --limit 24   (cuota de Gemini)
 //   npx tsx --env-file=.env.local scripts/eval-judge.ts --guardar    (escribe evals/runs/)
+//   npx tsx --env-file=.env.local scripts/eval-judge.ts --dorado     (conjunto dorado con alucinaciones sutiles; codigo 1 si una compuerta falla)
+//
+// --dorado NO necesita preguntas etiquetadas por un profesor: usa un conjunto SINTETICO (src/lib/evals/golden/judgeGolden.ts) y mide el FALSO APROBADO segun el
+// criterio activo del juez (JUDGE_CRITERION: 'subject' por defecto, o 'material').
 //
 // Solo lectura sobre lesson_questions: no modifica ningun review_status.
 
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
-import { judgeQuestionsBatch } from '../src/lib/questions/judge';
+import { judgeCriterion, judgeQuestionsBatch } from '../src/lib/questions/judge';
+import { formatReport } from '../src/lib/evals/common';
+import { runJudgeEval } from '../src/lib/evals/judgeEval';
+import { JUDGE_GOLDEN } from '../src/lib/evals/golden/judgeGolden';
 import { getRagContext } from '../src/lib/questions/cohereGeneration';
 import { retrieveContext } from '../src/lib/rag/retrieve';
 
@@ -38,7 +45,23 @@ const porPregunta = args.includes('--por-pregunta');
 
 type Fila = { humano: 'approved' | 'rejected'; juez: 'pass' | 'fail' | 'review' | null; familia: 'clasica' | 'minijuego'; tipo: string; razon: string };
 
+async function runGolden() {
+  const criterion = judgeCriterion();
+  const report = await runJudgeEval(JUDGE_GOLDEN, judgeQuestionsBatch, criterion);
+  console.log(formatReport(report));
+  if (guardar) {
+    const dir = path.join(process.cwd(), 'evals', 'runs');
+    fs.mkdirSync(dir, { recursive: true });
+    const out = path.join(dir, `juez-dorado-${criterion}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`);
+    fs.writeFileSync(out, JSON.stringify({ fecha: new Date().toISOString(), report }, null, 2));
+    console.log(`
+Guardado en ${out}`);
+  }
+  if (!report.ok) process.exit(1);
+}
+
 async function main() {
+  if (args.includes('--dorado')) return runGolden();
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
