@@ -22,6 +22,8 @@ export const JSONB_BUDGETS = {
   // Migracion 079 (class_memory_material)
   materialExtraction: { limit: 400_000, root: 'object' },
   materialStats: { limit: 4_000, root: 'object' },
+  // Migracion 085 (course_blueprints): el plan del curso por cortes
+  courseBlueprint: { limit: 400_000, root: 'object' },
   // Migracion 082 (lab_attempts)
   labTrials: { limit: 65_536, root: 'array' },
   labAnswers: { limit: 16_384, root: 'array' },

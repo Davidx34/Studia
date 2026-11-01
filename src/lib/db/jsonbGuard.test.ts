@@ -30,6 +30,7 @@ describe('presupuestos = CHECK de las migraciones (no se desvian)', () => {
     ['materialExtraction', '079_class_memory.sql', 'extraction'],
     ['labTrials', '082_lab_attempts.sql', 'trials'],
     ['labAnswers', '082_lab_attempts.sql', 'answers'],
+    ['courseBlueprint', '085_course_blueprints.sql', 'doc'],
   ] as const)('%s coincide con %s (%s)', (name, file, col) => {
     const c = check(file, col);
     expect(JSONB_BUDGETS[name].limit).toBe(c.size);
