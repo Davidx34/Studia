@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseBlueprint, normalizeText } from './parse';
 import { checkBlueprint, isPublishable } from './validate';
 import { planRegeneration, type NodeAction } from './regenerate';
-import { courseGrade, flattenModules, hasMastered, moduleScore, periodModuleAverage, unlockedModules } from './progress';
+import { PERIOD_EXAM_POINTS, PERIOD_MODULES_POINTS, courseGrade, flattenModules, hasMastered, moduleScore, periodResult, periodResultOf, unlockedModules } from './progress';
 import { BLUEPRINT_LIMITS, type Blueprint, type IssueCode } from './types';
 
 // Plan base valido: 2 comprensiones, 2 cortes (40 / 60), 3 objetivos, 4 modulos.
@@ -618,45 +618,190 @@ describe('flattenModules y unlockedModules: avance por dominio', () => {
   });
 });
 
-describe('periodModuleAverage', () => {
-  it('promedio de las notas de sus modulos; null si a alguno le falta algun intento', () => {
-    const bp = base();
-    expect(periodModuleAverage(bp.periods[0], att({ m1: [100], m2: [80, 100] }))).toBe(95);
-    expect(periodModuleAverage(bp.periods[0], att({ m1: [100] }))).toBeNull();
-    expect(periodModuleAverage(bp.periods[1], att({ m3: [60, 100], m4: [100] }))).toBe(90);
+describe('periodResult: 70 % modulos + 30 % evaluacion, computada a medida que se califica', () => {
+  it('las constantes son las del dueño y suman 100', () => {
+    expect(PERIOD_MODULES_POINTS).toBe(70);
+    expect(PERIOD_EXAM_POINTS).toBe(30);
+    expect(PERIOD_MODULES_POINTS + PERIOD_EXAM_POINTS).toBe(100);
   });
-  it('un corte sin modulos no tiene nota', () => {
-    const bp = base();
-    bp.periods[0].objectives = [];
-    expect(periodModuleAverage(bp.periods[0], att({}))).toBeNull();
+  it('todo al 100 -> 100 puntos, completo', () => {
+    const r = periodResult({ moduleScores: [100, 100, 100, 100], totalModules: 4, exam: 100 });
+    expect(r).toMatchObject({ points: 100, gradedShare: 100, score: 100, complete: true, modulesAverage: 100, modulesDone: 4, modulesTotal: 4, exam: 100 });
+  });
+  it('ejemplo: modulos 80, 90, 100 (promedio 90) y evaluacion 50 -> 63 + 15 = 78', () => {
+    const r = periodResult({ moduleScores: [80, 90, 100], totalModules: 3, exam: 50 });
+    expect(r.points).toBe(78);
+    expect(r.score).toBe(78);
+    expect(r.modulesAverage).toBe(90);
+    expect(r.exam).toBe(50);
+    expect(r.complete).toBe(true);
+  });
+  it('el reparto es 70/30: modulos perfectos y evaluacion en 0 -> 70; al reves -> 30', () => {
+    expect(periodResult({ moduleScores: [100, 100], totalModules: 2, exam: 0 }).points).toBe(70);
+    expect(periodResult({ moduleScores: [0, 0], totalModules: 2, exam: 100 }).points).toBe(30);
+  });
+  it('la nota de los modulos y la de la evaluacion son APARTE: una no mueve a la otra', () => {
+    const a = periodResult({ moduleScores: [80, 100], totalModules: 2, exam: 10 });
+    const b = periodResult({ moduleScores: [80, 100], totalModules: 2, exam: 90 });
+    expect(a.modulesAverage).toBe(90);
+    expect(b.modulesAverage).toBe(90);
+    expect(a.exam).toBe(10);
+    expect(b.exam).toBe(90);
+    expect(b.points - a.points).toBe(24); // 30 * (90 - 10) / 100
+  });
+  it('progresivo: 2 de 4 modulos al 100 y sin evaluacion -> 35 puntos de 35 calificados (nota 100), no completo', () => {
+    const r = periodResult({ moduleScores: [100, 100], totalModules: 4 });
+    expect(r).toMatchObject({ points: 35, gradedShare: 35, score: 100, complete: false, modulesDone: 2 });
+    expect(r.exam).toBeNull();
+  });
+  it('lo que falta no hunde la nota: 1 de 4 modulos al 100 -> nota 100 sobre lo calificado', () => {
+    expect(periodResult({ moduleScores: [100], totalModules: 4 }).score).toBe(100);
+    expect(periodResult({ moduleScores: [50], totalModules: 2 })).toMatchObject({ points: 17.5, gradedShare: 35, score: 50 });
+  });
+  it('solo la evaluacion: 80 -> 24 puntos de 30 (nota 80), modulos sin promedio', () => {
+    const r = periodResult({ moduleScores: [], totalModules: 3, exam: 80 });
+    expect(r).toMatchObject({ points: 24, gradedShare: 30, score: 80, modulesAverage: null, complete: false });
+  });
+  it('sin nada calificado: 0 puntos y sin nota', () => {
+    const r = periodResult({ moduleScores: [], totalModules: 3 });
+    expect(r).toMatchObject({ points: 0, gradedShare: 0, score: null, modulesAverage: null, complete: false });
+    expect(periodResult({ moduleScores: [], totalModules: 3, exam: null }).exam).toBeNull();
+  });
+  it('un 0 real SI cuenta (distinto de "sin calificar")', () => {
+    const r = periodResult({ moduleScores: [0], totalModules: 1, exam: 0 });
+    expect(r).toMatchObject({ points: 0, gradedShare: 100, score: 0, complete: true, exam: 0 });
+  });
+  it('puntajes invalidos se ignoran: modulos (NaN, -1, 101) y evaluacion (NaN, 101, -5, texto)', () => {
+    expect(periodResult({ moduleScores: [100, NaN, -1, 101], totalModules: 2 })).toMatchObject({ modulesDone: 1, points: 35 });
+    for (const bad of [NaN, 101, -5, '90' as any, Infinity]) {
+      const r = periodResult({ moduleScores: [100], totalModules: 1, exam: bad });
+      expect(r.exam).toBeNull();
+      expect(r.complete).toBe(false);
+      expect(r.points).toBe(70);
+    }
+  });
+  it('mas puntajes que modulos: solo cuentan los primeros', () => {
+    const r = periodResult({ moduleScores: [100, 100, 0, 0], totalModules: 2, exam: 100 });
+    expect(r.modulesDone).toBe(2);
+    expect(r.points).toBe(100);
+  });
+  it('un corte sin modulos (total 0, negativo o no entero): sin parte de modulos y nunca completo', () => {
+    for (const total of [0, -2, 1.5, NaN]) {
+      const r = periodResult({ moduleScores: [100], totalModules: total, exam: 100 });
+      expect(r).toMatchObject({ modulesTotal: 0, modulesDone: 0, points: 30, gradedShare: 30, complete: false });
+    }
+  });
+  it('redondea a 2 decimales', () => {
+    // 70 * 100 / 100 / 3 = 23.3333 + 30 * 77 / 100 = 23.1 -> 46.43
+    expect(periodResult({ moduleScores: [33, 33, 34], totalModules: 3, exam: 77 }).points).toBe(46.43);
+  });
+  it('los puntos ganados nunca pasan de lo calificado ni de 100 (propiedad)', () => {
+    let seed = 5;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x80000000);
+    for (let i = 0; i < 500; i++) {
+      const total = 1 + Math.floor(rnd() * 6);
+      const done = Math.floor(rnd() * (total + 1));
+      const scores = Array.from({ length: done }, () => Math.round(rnd() * 100));
+      const exam = rnd() < 0.5 ? Math.round(rnd() * 100) : null;
+      const r = periodResult({ moduleScores: scores, totalModules: total, exam });
+      expect(r.points).toBeLessThanOrEqual(r.gradedShare + 1e-9);
+      expect(r.gradedShare).toBeLessThanOrEqual(100);
+      expect(r.points).toBeGreaterThanOrEqual(0);
+      if (r.score !== null) expect(r.score).toBeLessThanOrEqual(100);
+      expect(r.complete).toBe(done === total && exam !== null);
+    }
   });
 });
 
-describe('courseGrade: la suma ponderada de los cortes', () => {
+describe('periodResultOf: desde el plan y los intentos', () => {
+  it('promedia los intentos de cada modulo y cuenta como "falta" el que no tiene ninguno', () => {
+    const bp = base();
+    const r = periodResultOf(bp.periods[0], att({ m1: [80, 100], m2: [100] }), 60);
+    // modulos: (90 + 100) / 2 = 95 -> 70 * 95 / 100 = 66.5; evaluacion 60 -> 18
+    expect(r.modulesAverage).toBe(95);
+    expect(r.points).toBe(84.5);
+    expect(r.complete).toBe(true);
+    const parcial = periodResultOf(bp.periods[0], att({ m1: [100] }));
+    expect(parcial).toMatchObject({ modulesDone: 1, modulesTotal: 2, points: 35, gradedShare: 35, score: 100, complete: false });
+  });
+  it('cuenta los modulos de TODOS los objetivos del corte', () => {
+    const bp = base();
+    const r = periodResultOf(bp.periods[1], att({ m3: [100], m4: [50] }), 100);
+    expect(r.modulesTotal).toBe(2);
+    expect(r.modulesAverage).toBe(75);
+    expect(r.points).toBe(52.5 + 30);
+  });
+  it('un corte sin modulos no tiene parte de modulos', () => {
+    const bp = base();
+    bp.periods[0].objectives = [];
+    expect(periodResultOf(bp.periods[0], att({}), 100)).toMatchObject({ modulesTotal: 0, points: 30, complete: false });
+  });
+});
+
+describe('courseGrade: la suma ponderada de los cortes, computada a medida que se califica', () => {
   const periods = [{ id: 'p1', weight: 40 }, { id: 'p2', weight: 60 }];
-  it('completo: 100 y 50 con pesos 40/60 -> 70', () => {
-    const g = courseGrade(periods, new Map([['p1', 100], ['p2', 50]]));
+  const res = (o: Record<string, { points: number; gradedShare: number }>) => new Map(Object.entries(o));
+  it('completo: cortes con 100 y 50 puntos, pesos 40/60 -> 70', () => {
+    const g = courseGrade(periods, res({ p1: { points: 100, gradedShare: 100 }, p2: { points: 50, gradedShare: 100 } }));
     expect(g).toEqual({ earned: 70, completedWeight: 100, average: 70, complete: true });
   });
-  it('parcial: solo el primero -> 40 puntos ganados de 40 posibles, promedio 100, no completo', () => {
-    const g = courseGrade(periods, new Map([['p1', 100]]));
-    expect(g).toEqual({ earned: 40, completedWeight: 40, average: 100, complete: false });
+  it('progresivo: un corte completo (90) y otro a medias (17.5 de 35 calificados) -> 46.5 ganados sobre 61 calificados', () => {
+    const g = courseGrade(periods, res({ p1: { points: 90, gradedShare: 100 }, p2: { points: 17.5, gradedShare: 35 } }));
+    expect(g).toEqual({ earned: 46.5, completedWeight: 61, average: 76.23, complete: false });
   });
   it('sin ninguna nota', () => {
     expect(courseGrade(periods, new Map())).toEqual({ earned: 0, completedWeight: 0, average: null, complete: false });
-    expect(courseGrade(periods, new Map([['p1', null], ['p2', null]])).average).toBeNull();
   });
-  it('una nota invalida cuenta como "sin nota", y un peso 0 no cuenta', () => {
-    expect(courseGrade(periods, new Map([['p1', NaN], ['p2', 80]]))).toMatchObject({ earned: 48, completedWeight: 60, complete: false });
-    expect(courseGrade(periods, new Map([['p1', 101], ['p2', -1]])).completedWeight).toBe(0);
-    expect(courseGrade([{ id: 'p1', weight: 0 }, { id: 'p2', weight: 100 }], new Map([['p1', 100], ['p2', 80]]))).toMatchObject({ earned: 80, completedWeight: 100, complete: false });
+  it('solo cuenta como completo si TODOS los cortes estan calificados al 100 %', () => {
+    expect(courseGrade(periods, res({ p1: { points: 100, gradedShare: 100 }, p2: { points: 60, gradedShare: 99.99 } })).complete).toBe(false);
+    expect(courseGrade(periods, res({ p1: { points: 100, gradedShare: 100 } })).complete).toBe(false);
+  });
+  it('un resultado imposible o un peso 0 se ignora', () => {
+    // mas puntos que lo calificado
+    expect(courseGrade(periods, res({ p1: { points: 50, gradedShare: 30 } })).completedWeight).toBe(0);
+    // fuera de rango y NaN
+    expect(courseGrade(periods, res({ p1: { points: 101, gradedShare: 100 }, p2: { points: NaN, gradedShare: 100 } })).completedWeight).toBe(0);
+    expect(courseGrade(periods, res({ p1: { points: -1, gradedShare: 10 } })).completedWeight).toBe(0);
+    // lo calificado por encima de 100 (un corte no puede estar calificado mas que entero)
+    expect(courseGrade(periods, res({ p1: { points: 50, gradedShare: 150 } })).completedWeight).toBe(0);
+    // peso 0
+    const g = courseGrade([{ id: 'a', weight: 0 }, { id: 'b', weight: 100 }], res({ a: { points: 100, gradedShare: 100 }, b: { points: 80, gradedShare: 100 } }));
+    expect(g).toMatchObject({ earned: 80, completedWeight: 100, complete: false });
   });
   it('sin cortes no esta completo', () => {
     expect(courseGrade([], new Map()).complete).toBe(false);
   });
   it('redondea a 2 decimales', () => {
-    const g = courseGrade([{ id: 'a', weight: 33.33 }, { id: 'b', weight: 66.67 }], new Map([['a', 77], ['b', 91]]));
+    const g = courseGrade([{ id: 'a', weight: 33.33 }, { id: 'b', weight: 66.67 }], res({ a: { points: 77, gradedShare: 100 }, b: { points: 91, gradedShare: 100 } }));
     expect(g.earned).toBe(86.33); // 33.33*77/100 + 66.67*91/100 = 86.3338
     expect(g.average).toBe(86.33);
+  });
+  it('de punta a punta con el plan: modulos 80/90/100 y evaluaciones, curso completo', () => {
+    const bp = base();
+    const attempts = att({ m1: [100], m2: [80, 100], m3: [100], m4: [100] });
+    const r1 = periodResultOf(bp.periods[0], attempts, 80); // modulos 95 -> 66.5 + 24 = 90.5
+    const r2 = periodResultOf(bp.periods[1], attempts, 100); // modulos 100 -> 70 + 30 = 100
+    expect(r1.points).toBe(90.5);
+    expect(r2.points).toBe(100);
+    const g = courseGrade(bp.periods, new Map([['p1', r1], ['p2', r2]]));
+    expect(g.earned).toBe(96.2); // 40 * 90.5 / 100 + 60 * 100 / 100
+    expect(g.complete).toBe(true);
+  });
+  it('el curso va subiendo a medida que se califica (monotono)', () => {
+    const bp = base();
+    const steps = [
+      att({}),
+      att({ m1: [100] }),
+      att({ m1: [100], m2: [100] }),
+      att({ m1: [100], m2: [100], m3: [100] }),
+      att({ m1: [100], m2: [100], m3: [100], m4: [100] }),
+    ];
+    let last = -1;
+    for (const a of steps) {
+      const g = courseGrade(bp.periods, new Map(bp.periods.map((p) => [p.id, periodResultOf(p, a)])));
+      expect(g.earned).toBeGreaterThanOrEqual(last);
+      last = g.earned;
+    }
+    expect(last).toBe(70); // todos los modulos perfectos, sin evaluaciones: 70 de 100
   });
 });
