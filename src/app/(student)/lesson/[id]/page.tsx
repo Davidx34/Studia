@@ -177,7 +177,6 @@ export default function LessonPage() {
           setQuestions(data.questions);
           setLoading(false);
           lessonStartedAtRef.current = Date.now();
-          markInProgress();
           setMood('happy');
           showMessage('¡Listo! Vamos a aprender 🚀');
           return;
@@ -205,43 +204,8 @@ export default function LessonPage() {
     showMessage('No pude preparar esta leccion. ¿Probamos de nuevo?', 0);
   };
 
-  // Marca el modulo como empezado en cuanto el estudiante ve la primera
-  // pregunta. Antes de este cambio, saveProgress escribia SIEMPRE
-  // status:'completed'/completion_percentage:100 y no existia ni una sola
-  // escritura de 'in_progress' en todo el codigo -- las 10 filas de
-  // student_progress en produccion estaban en 'completed' por construccion.
-  // Consecuencia: el producto no podia ver donde abandona un estudiante, que
-  // es la informacion mas valiosa que tiene una herramienta educativa, y el
-  // estado "en progreso" del mapa (LearningMap) representaba algo que nunca
-  // habia ocurrido en produccion. Ver review 360 §3.5.
-  const markInProgress = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: existing } = await supabase
-        .from('student_progress')
-        .select('status, started_at')
-        .eq('student_id', user.id)
-        .eq('module_id', moduleId)
-        .maybeSingle();
-
-      // Un modulo ya completado no vuelve a 'in_progress' por reintentarlo:
-      // eso borraria el hecho de que el estudiante ya lo habia terminado.
-      if (existing?.status === 'completed') return;
-
-      const now = new Date().toISOString();
-      await supabase.from('student_progress').upsert({
-        student_id: user.id,
-        module_id: moduleId,
-        status: 'in_progress',
-        completion_percentage: 0,
-        started_at: existing?.started_at ?? now,
-        last_attempt_at: now,
-      }, { onConflict: 'student_id,module_id' });
-    } catch (e) {
-      console.warn('Error marcando modulo en progreso:', e);
-    }
-  };
+  // "En progreso": lo marca el SERVIDOR cuando sirve las preguntas (/api/generate-questions -> markLessonInProgress). Antes lo escribia el navegador en student_progress; esa tabla pasa
+  // a ser de solo lectura para el estudiante (migracion 086), asi nadie puede escribirse un progreso a mano. Ver review 360 §3.5 para por que importa registrarlo.
 
   // Tiempo real dedicado a la leccion. student_progress.time_spent_seconds se
   // LEE en 4 lugares del panel del profesor (classroom-progress.ts:209 tiempo
@@ -650,7 +614,12 @@ export default function LessonPage() {
       // Leccion calificada en el servidor: el servidor cierra el intento y escribe el progreso (puntaje, estado, intentos, tiempo) desde las respuestas que YA califico. Si no esta
       // disponible se sigue como antes; si lo RECHAZA (preguntas sin responder...), no se escribe el progreso a mano.
       if (attemptIdRef.current) {
-        const outcome = await finishLessonOnServer(attemptIdRef.current, elapsedSeconds());
+        // Un solo reintento si el servidor no estuvo disponible (corte de red, error momentaneo): cerrar es idempotente, no suma dos veces.
+        let outcome = await finishLessonOnServer(attemptIdRef.current, elapsedSeconds());
+        if (outcome === 'unavailable') {
+          await new Promise((r) => setTimeout(r, 1200));
+          outcome = await finishLessonOnServer(attemptIdRef.current, elapsedSeconds());
+        }
         if (outcome === 'ok') {
           await evaluateAchievements();
           return;
