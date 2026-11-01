@@ -13,6 +13,7 @@ import { getRagContext, normalizeGeneratedQuestion, callCohere, hasGenerationPro
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
 import { resolveQuestionCount, countServable, planFill } from '@/lib/questions/poolPlan';
 import { resolveConfig, resolveMinigames, enforceAllowedTypes, buildGenerationPrompt } from '@/lib/questions/generationConfig';
+import { gateGenerated, logGateResult } from '@/lib/jev/runtimeGate';
 
 export interface RegeneratePoolResult {
   ok: boolean;
@@ -145,13 +146,18 @@ export async function regenerateModulePool(
     if (dropped.length > 0) {
       console.warn('[REGENERATE_OFF_CONFIG]', { moduleId, descartadas: dropped.map((q: any) => q.type) });
     }
-    return kept.filter((q: any) => {
+    const structurallyValid = kept.filter((q: any) => {
       const check = isValidQuestion(q);
       if (!check.valid) {
         console.warn('[REGENERATE_VALIDATION_FAILED]', { type: q.type, error: check.error });
       }
       return check.valid;
     });
+    // JEV-2: ademas de la forma, el ejercicio tiene que poder CALIFICARSE (se simula la jugada perfecta con los calificadores del servidor). Lo que no, se descarta antes de guardar;
+    // y como el borrado del pool viejo ('replace') va DESPUES de comprobar que algo sirve, un lote entero imposible no destruye el pool que ya habia.
+    const gate = gateGenerated(structurallyValid);
+    logGateResult('REGENERATE', { moduleId }, gate);
+    return gate.kept;
   };
 
   const activeQuestions = normalizeValidate(activeBatch);

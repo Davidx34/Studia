@@ -26,6 +26,7 @@ import { servableQuestions, drawQuestions } from '@/lib/questions/poolServing';
 import { startLessonAttempt } from '@/lib/grading/lessonAttempt';
 import { questionBank } from '@/lib/grading/bankAccess';
 import { markLessonInProgress } from '@/lib/grading/progressStart';
+import { gateGenerated, logGateResult } from '@/lib/jev/runtimeGate';
 
 // Una generacion con Cohere tarda de 37 a 67 s (medido el 2026-09-19 con un prompt de
 // ~28.000 caracteres; la de 67 s incluia un reintento interno), y hasta ~110 s si
@@ -210,13 +211,19 @@ export async function POST(req: NextRequest) {
     // ANTES de guardarlos en cache o servirlos — nunca deben llegar al
     // estudiante en blanco o rotos. isValidQuestion es la misma validacion
     // que usa lesson/[id]/page.tsx para el fallback de "saltar pregunta".
-    const validGenerated = onConfig.filter((q) => {
+    const structurallyValid = onConfig.filter((q) => {
       const check = isValidQuestion(q);
       if (!check.valid) {
         console.warn('[GENERATION_VALIDATION_FAILED]', { type: q.type, error: check.error });
       }
       return check.valid;
     });
+
+    // JEV-2: ademas de la forma, el ejercicio tiene que poder CALIFICARSE: se simula la jugada perfecta con los calificadores del servidor (src/lib/jev). Si no sale 100 %,
+    // o hay otra opcion que tambien puntua, se descarta aqui y nunca llega a la base ni a un estudiante.
+    const gate = gateGenerated(structurallyValid);
+    logGateResult('GENERATE', { moduleId }, gate);
+    const validGenerated = gate.kept;
 
     // 3. Guardar lo generado en el cache para las proximas aperturas (best-effort),
     // y recuperar los ids asignados por la base para poder trackear intentos.
