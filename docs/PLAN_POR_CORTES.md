@@ -70,9 +70,22 @@ La **evaluación final no se guarda aparte**: es, por construcción, *todas* las
 - **¿Cuándo se desbloquea la evaluación final?** ¿Al terminar todos los cortes, o antes?
 - **¿Cuántos intentos máximos** (si hay tope) tiene una evaluación?
 
+## Esquema en la base (migración 085, sin aplicar hasta el «aplica la 085»)
+
+Dos tablas, cada una con el modelo que le corresponde (ver `docs/ESCALABILIDAD_DE_DATOS.md`):
+
+- **`course_blueprints`** — el plan como **documento `jsonb`**, una fila por versión (`draft` → `published` → `archived`). Un plan publicado es **inmutable**: cambiarlo crea una versión nueva, así los intentos de los estudiantes siguen apuntando a la versión con la que se hicieron. Un solo borrador y un solo plan publicado por clase; el número de versión de la fila y el del documento coinciden; el documento pesa menos de 400 KB (cubre el máximo teórico de `parseBlueprint`).
+- **`exam_attempts`** — los intentos de las evaluaciones de corte y final, **relacionales**. La base asigna el número de intento bajo un candado por (plan, estudiante, evaluación), exige plan publicado, estudiante matriculado y corte existente, y **rechaza un intento nuevo si la evaluación ya se dominó (100 %)**. Es un historial: un `UPDATE` se rechaza.
+
+**Seguridad:** nadie escribe desde el navegador (`anon` y `authenticated` solo tienen `SELECT`, y no hay políticas de escritura). El servidor escribe el plan tras validarlo (`parseBlueprint` + `checkBlueprint` + la guardia `jsonb`) y los intentos tras calificar. El profesor dueño ve todo lo de su clase; el estudiante ve solo los planes **publicados** de sus clases y solo **sus** intentos. Sin `SECURITY DEFINER`; las funciones fijan su `search_path`; la migración es aditiva (no toca ninguna tabla existente).
+
+**Lo que la base NO impone** (lo impone la aplicación, `courseProgress`): el orden del recorrido (la evaluación de un corte se desbloquea al dominar sus módulos; la final, al terminar todos los cortes). Tampoco vincula todavía los módulos del plan con las lecciones reales (`content_modules`); eso es un PR posterior.
+
+**Verificación previa a aplicarla:** la migración se ejecutó contra la base de producción dentro de una transacción que se revierte (sin dejar rastro) con 57 comprobaciones: restricciones del documento, transiciones de estado, numeración y dominio de intentos, matrícula, y qué ve cada rol (estudiante matriculado, no matriculado, otro estudiante de la clase, profesor dueño y `anon`), incluido el borrado en cascada.
+
 ## Lo que sigue (PRs pequeños)
 
-1. Esquema aditivo en la base (migración sin aplicar hasta tu «aplica la 08x»): plan versionado, evaluaciones de corte, intentos de evaluación calificados en el servidor.
+1. ~~Esquema aditivo en la base~~ (migración 085, ver arriba).
 2. Motor "hacia atrás" con la IA: cada paso (comprensiones → evaluación de corte → objetivos → módulos) con su prompt, validado con `parseBlueprint` + `checkBlueprint`, y con reintentos guiados por los errores, como el diseño de laboratorios.
 3. Pantalla de borrador del profesor.
 4. Preguntas por corte.
