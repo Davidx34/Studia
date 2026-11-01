@@ -22,6 +22,8 @@ La **evaluación final no se guarda aparte**: es, por construcción, *todas* las
 | Regenerar **no destruye intentos**: lo ya intentado se *versiona* | `regenerate.ts` |
 | El estudiante **no avanza** al siguiente módulo sin 100 % | `progress.ts` (`unlockedModules`) |
 | **Cada intento cuenta**: la nota del módulo es el promedio (80, 90, 100 → 90) | `progress.ts` (`moduleScore`) |
+| **Las evaluaciones (de corte y final) se pueden repetir** y su nota es el **promedio de todos los intentos hasta llegar al 100 %**, igual que un módulo (60, 80, 100 → 80); con un 100 ya no se repite | `progress.ts` (`examScore`, `canRetakeExam`) |
+| **Evaluación final: nota propia, vale medio corte.** Con 3 cortes y la final son 3,5 cortes que se promedian para la nota del curso | `progress.ts` (`finalExamResult`, `finalExamWeight`, `courseGrade`) |
 | **Nota de un corte = 70 % módulos + 30 % evaluación de corte.** La nota de la evaluación va **aparte** de la de los módulos y las dos se van sumando a la nota del curso a medida que existen | `progress.ts` (`periodResult`, `courseGrade`) |
 
 ## Piezas
@@ -45,9 +47,13 @@ La **evaluación final no se guarda aparte**: es, por construcción, *todas* las
   | `archive` | ya no está pero alguien lo intentó: se conserva |
 
   Qué cuenta como cambio: una comprensión cambia si cambia su texto (sin importar mayúsculas ni espacios), se agrega o se quita; una evaluación de corte, si cambia el *conjunto* de comprensiones que evalúa o alguna de ellas cambió; un objetivo, igual (cambiar solo su título **no** obliga a regenerar); un módulo, si su objetivo se regenera o cambia de objetivo. Una prueba de propiedades (400 casos aleatorios) comprueba que **jamás** se borra ni se regenera en su lugar algo que un estudiante ya intentó.
-- **`progress.ts`** — `moduleScore`, `hasMastered`, `flattenModules`, `unlockedModules`, `periodResult` / `periodResultOf`, `courseGrade`. Recibe puntajes ya calificados; no califica nada. Ignora (sin moverlos) los datos fuera de 0–100. Usa `Map` porque `__proto__` es un id válido.
+- **`progress.ts`** — `moduleScore`, `hasMastered`, `flattenModules`, `unlockedModules`, `examScore`, `canRetakeExam`, `periodResult` / `periodResultOf`, `finalExamResult`, `finalExamWeight`, `courseGrade`. Recibe los **intentos** ya calificados (0–100) de cada módulo y de cada evaluación; no califica nada. Ignora (sin moverlos) los datos fuera de 0–100. Usa `Map` porque `__proto__` es un id válido.
 
-  **La nota se va computando.** Cada corte vale 100 puntos: hasta 70 por los módulos (se reparten por igual entre los N módulos del corte; cada módulo intentado aporta `70/N · nota/100`) y hasta 30 por la evaluación. Lo que todavía no se calificó **no cuenta como un cero**: simplemente aún no suma. Por eso hay dos números: `points` (puntos ganados) y `gradedShare` (cuánto del corte ya tiene nota), y el `score` es el promedio sobre lo ya calificado. Ejemplo: 1 de 4 módulos al 100 y sin evaluación → 17,5 puntos de 17,5 calificados (nota 100), no 17,5 sobre 100. El curso suma lo mismo ponderado por el peso de cada corte (`earned`, `completedWeight`, `average`). Los módulos y la evaluación se exponen por separado (`modulesAverage`, `exam`).
+  **La nota se va computando.** Cada corte vale 100 puntos: hasta 70 por los módulos (se reparten por igual entre los N módulos del corte; cada módulo intentado aporta `70/N · nota/100`) y hasta 30 por la evaluación (la nota de cada módulo y de la evaluación es el promedio de sus intentos). Lo que todavía no se calificó **no cuenta como un cero**: simplemente aún no suma. Por eso hay dos números: `points` (puntos ganados) y `gradedShare` (cuánto del corte ya tiene nota), y el `score` es el promedio sobre lo ya calificado. Ejemplo: 1 de 4 módulos al 100 y sin evaluación → 17,5 puntos de 17,5 calificados (nota 100), no 17,5 sobre 100. El curso suma lo mismo ponderado por el peso de cada corte (`earned`, `completedWeight`, `average`). Los módulos y la evaluación se exponen por separado (`modulesAverage`, `exam`).
+
+  **Dos banderas distintas:** `graded` = todo tiene nota (todos los módulos intentados y la evaluación tomada; la nota todavía puede subir si algo se repite) y `closed` = no queda nada por hacer (todos los módulos y la evaluación llegaron al 100 % en algún intento).
+
+  **Evaluación final = medio corte.** Su peso es la **mitad del peso promedio de un corte**, y la nota del curso es la suma ponderada de los cortes y la final dividida entre el peso total (cortes + final). Con 3 cortes iguales eso es exactamente 1/3,5 del curso: cortes en 100 y final en 0 → 85,71; cortes en 0 y final en 100 → 14,29. La final cuenta en el peso total aunque aún no se haya tomado (la nota es «sobre el curso completo»), pero no en lo ya calificado.
 
 ## Supuestos que tomé (decídelos tú si no te sirven)
 
@@ -55,12 +61,14 @@ La **evaluación final no se guarda aparte**: es, por construcción, *todas* las
 2. **Un módulo sin intentos no tiene nota**, y un corte no tiene nota por sus módulos hasta que todos tengan alguno.
 3. **Mover un módulo de objetivo lo rehace** (o lo versiona), por prudencia: su contenido estaba atado a las comprensiones del objetivo anterior.
 4. Los 70 puntos de los módulos se reparten **por igual** entre los módulos del corte (sin pesos distintos por módulo).
+   Como los cortes llevan ponderación (no son todos iguales), «medio corte» lo interpreté como **la mitad del peso promedio** de un corte. Con cortes iguales coincide con tu ejemplo de 3,5 cortes; con cortes de pesos distintos es una generalización mía.
 5. Un corte sin módulos no tiene parte de módulos y nunca se considera completo (la validación ya lo impide al publicar).
 
 ## Decisiones abiertas (cambian el siguiente PR)
 
-- **¿Se puede repetir la evaluación de corte?** Si sí, ¿cuenta el último intento, el mejor o el promedio como en los módulos? `periodResult` recibe una sola nota de evaluación ya decidida.
-- **¿La evaluación final tiene nota propia?** Hoy es solo la cobertura de todas las comprensiones; no pesa aparte. Si debe pesar, hay que decidir si es un corte más o un porcentaje fuera de los cortes.
+- **¿La evaluación de un corte bloquea el paso al siguiente corte?** (¿hay que llegar al 100 % en ella para seguir, como en los módulos?) Hoy `canRetakeExam` solo dice si se puede repetir.
+- **¿Cuándo se desbloquea la evaluación final?** ¿Al terminar todos los cortes, o antes?
+- **¿Cuántos intentos máximos** (si hay tope) tiene una evaluación?
 
 ## Lo que sigue (PRs pequeños)
 
