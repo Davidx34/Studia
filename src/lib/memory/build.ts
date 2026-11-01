@@ -11,8 +11,23 @@ import { extractMaterial, type ModelCaller } from './extract';
 import { dice, materialTitle, normalizeKey, similarKeys } from './text';
 import { mergeGraphs, type MaterialGraph } from './merge';
 import { MEMORY_LIMITS, type Graph } from './types';
+import { guardJsonb, type JsonbBudgetName } from '@/lib/db/jsonbGuard';
 
 export type ClaimState = 'claimed' | 'busy' | 'cooldown';
+
+// Un documento que no cabe en su columna jsonb (o que no es JSON valido) hace fallar la construccion con un mensaje claro, en vez de un error generico de la base.
+class DocumentRejected extends Error {
+  constructor(readonly what: string) {
+    super(what);
+  }
+}
+
+// Copia limpia y acotada del documento (sin NUL, sin claves peligrosas) lista para escribirse en una columna jsonb.
+function guarded(value: unknown, budget: JsonbBudgetName, what: string): any {
+  const g = guardJsonb(value, budget);
+  if (!g.ok) throw new DocumentRejected(what);
+  return g.value;
+}
 
 // Hash estable del contenido de un material (orden por indice): si no cambia, no se vuelve a extraer.
 export function hashChunks(chunks: { chunk_index: number; content: string }[]): string {
@@ -201,8 +216,8 @@ export async function runMemoryBuild(admin: any, classroomId: string, call: Mode
           classroom_id: classroomId,
           status: complete ? 'ready' : 'extracting',
           content_hash: hash,
-          extraction: keepOld ? prev.extraction : r.extraction,
-          stats: { groups: r.groups, doneGroups: r.doneGroups, failedGroups: r.failedGroups, skippedGroups: r.skippedGroups, rejected: r.rejected, relationsRejected: r.relationsRejected, concepts: r.extraction.concepts.length, profile: r.profile },
+          extraction: guarded(keepOld ? prev.extraction : r.extraction, 'materialExtraction', `el material «${name}»`),
+          stats: guarded({ groups: r.groups, doneGroups: r.doneGroups, failedGroups: r.failedGroups, skippedGroups: r.skippedGroups, rejected: r.rejected, relationsRejected: r.relationsRejected, concepts: r.extraction.concepts.length, profile: r.profile }, 'materialStats', `las cifras del material «${name}»`),
           error: complete ? null : r.failedGroups > 0 ? `La IA no respondió en ${r.failedGroups} de ${r.groups} bloques.` : `Quedan ${r.groups - r.doneGroups.length} de ${r.groups} bloques por leer.`,
           started_at: startedAt,
           finished_at: new Date(now()).toISOString(),
@@ -238,8 +253,8 @@ export async function runMemoryBuild(admin: any, classroomId: string, call: Mode
       .update({
         status: nothing ? 'failed' : 'ready',
         version: (prevMemory?.version ?? 0) + 1,
-        graph,
-        stats: full,
+        graph: guarded(graph, 'classMemoryGraph', 'el grafo de la clase'),
+        stats: guarded(full, 'classMemoryStats', 'las cifras de la memoria'),
         built_at: new Date(now()).toISOString(),
         finished_at: new Date(now()).toISOString(),
         error: nothing ? 'No se pudo leer ningún material. Reintenta en unos minutos.' : buildWarning(full),
@@ -247,6 +262,7 @@ export async function runMemoryBuild(admin: any, classroomId: string, call: Mode
       .eq('classroom_id', classroomId);
   } catch (e) {
     console.error('[memory] la construccion fallo:', e);
-    await admin.from('class_memory').update({ status: 'failed', finished_at: new Date(now()).toISOString(), error: 'Error inesperado al construir la memoria.' }).eq('classroom_id', classroomId);
+    const error = e instanceof DocumentRejected ? `La memoria es demasiado grande o no se puede guardar (${e.what}). Quita materiales muy extensos e inténtalo de nuevo.` : 'Error inesperado al construir la memoria.';
+    await admin.from('class_memory').update({ status: 'failed', finished_at: new Date(now()).toISOString(), error }).eq('classroom_id', classroomId);
   }
 }

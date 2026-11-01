@@ -376,7 +376,24 @@ const h = vi.hoisted(() => ({
   adminCalls: 0,
   reviewRows: [] as unknown[],
   reviewPayload: null as Record<string, unknown> | null,
+  // Presupuesto de jsonb que la guardia debe rechazar en esta prueba (null = comportamiento real).
+  guardFail: null as string | null,
+  guardMark: false,
+  guardCalls: [] as string[],
 }));
+
+vi.mock('@/lib/db/jsonbGuard', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/db/jsonbGuard')>();
+  return {
+    ...real,
+    guardJsonb: (value: unknown, budget: any, opts?: any) => {
+      h.guardCalls.push(String(budget));
+      if (h.guardFail === budget) return { ok: false, reason: 'size', message: 'forzado por la prueba' };
+      if (h.guardMark) return { ok: true, value: [{ marca: String(budget) }], bytes: 1, report: { removedKeys: 0, strippedNul: 0, fixedSurrogates: 0, nonFinite: 0 } };
+      return real.guardJsonb(value, budget, opts);
+    },
+  };
+});
 
 vi.mock('@/lib/supabase/server', () => {
   const chain = (result: unknown, onUpdate?: (p: Record<string, unknown>) => void) => {
@@ -435,6 +452,9 @@ const reset = () => {
   h.adminCalls = 0;
   h.reviewRows = [{ id: ATT_ID, score: 90, teacher_feedback: 'Bien', status: 'reviewed' }];
   h.reviewPayload = null;
+  h.guardFail = null;
+  h.guardMark = false;
+  h.guardCalls = [];
 };
 
 describe('POST /api/lab/attempt (comportamiento)', () => {
@@ -450,6 +470,27 @@ describe('POST /api/lab/attempt (comportamiento)', () => {
     expect(p.classroom_id).toBe(CLS_ID);
     expect(p.lab_id).toBe(LAB_ID);
     expect((p.trials as unknown[]).length).toBe(lab().minTrials);
+  });
+  it('los dos documentos jsonb del informe pasan por la guardia (ensayos y respuestas) antes de abrir el cliente de servicio', async () => {
+    reset();
+    expect((await post({ labId: LAB_ID, state: validState(lab()) })).status).toBe(200);
+    expect(h.guardCalls.sort()).toEqual(['labAnswers', 'labTrials']);
+  });
+  it('lo que se escribe en la base es la copia que devuelve la guardia, no el original del informe', async () => {
+    reset();
+    h.guardMark = true;
+    expect((await post({ labId: LAB_ID, state: validState(lab()) })).status).toBe(200);
+    expect(h.inserted[0].payload.trials).toEqual([{ marca: 'labTrials' }]);
+    expect(h.inserted[0].payload.answers).toEqual([{ marca: 'labAnswers' }]);
+  });
+  it.each(['labTrials', 'labAnswers'])('si la guardia rechaza %s: 422 con mensaje claro, sin abrir el cliente de servicio ni guardar nada', async (budget) => {
+    reset();
+    h.guardFail = budget;
+    const res = await post({ labId: LAB_ID, state: validState(lab()) });
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toMatch(/demasiado grande/);
+    expect(h.inserted).toHaveLength(0);
+    expect(h.adminCalls).toBe(0);
   });
   it('un informe invalido se rechaza con 422 y los errores, y NO se guarda nada', async () => {
     reset();

@@ -220,9 +220,27 @@ export function parseDesign(text: string): DesignParse {
 
 // ───────────────────────────── el flujo completo ─────────────────────────────
 
+// ───────────────────────────── actividades que no son numericas ─────────────────────────────
+
+// Una idea que PIDE una obra creativa y no menciona nada cuantitativo no es un experimento simulable, y no hace falta gastar IA para saberlo. Lo comprobamos con el modelo real y los
+// retoques al prompt no lo lograban de forma consistente (inventaba variables economicas para que "escribir un poema sobre el mercado" encajara), asi que se decide aqui, en codigo.
+// Es CONSERVADORA a proposito: solo bloquea si hay una obra creativa Y ninguna pista cuantitativa; ante la duda la idea sigue a la IA (el peor caso es el comportamiento de antes).
+const CREATIVE_WORK = /\b(poemas?|poesia|cuentos?|novelas?|ensayos?|canciones|cancion|dibujos?|pinturas?|collages?|caricaturas?|historietas?|comics?|redaccion(?:es)?|eslogan(?:es)?|slogans?|obras? de teatro|fabulas?|rimas?|versos?|coreografias?)\b/;
+const NUMERIC_HINT = /\b(calcul\w*|simul\w*|variab\w*|medi[rd]\w*|medicion\w*|graf\w*|ecuacion\w*|formula\w*|tasas?|cantidad\w*|porcentaj\w*|numer\w*|curvas?|funcion\w*|optim\w*|maxim\w*|minim\w*|parametr\w*|datos?|rangos?|tablas?|cuant\w*|precios?|costos?|ingresos?|ganancias?|utilidad\w*|presupuest\w*|oferta|demanda|equilibrio|elasticidad|probabilidad\w*|velocidad|temperatura|presion|masa|fuerza)\b/;
+
+function plain(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+export function isNonNumericActivity(idea: string): boolean {
+  const t = plain(idea);
+  return CREATIVE_WORK.test(t) && !NUMERIC_HINT.test(t);
+}
+
 export async function designLab(input: { idea: string; graph: Graph; allowPartial?: boolean }, call: ModelCaller): Promise<DesignResult> {
   const idea = sanitizeText(input.idea, DESIGN_LIMITS.idea);
   if (idea.length < 10) return { ok: false, reason: 'invalid', message: 'Cuéntame qué quieres que investiguen (al menos una frase).' };
+  if (isNonNumericActivity(idea)) return { ok: false, reason: 'noFit', message: 'Lo pedido es una actividad creativa (escribir, dibujar o componer), no un experimento numérico que se pueda simular. Los laboratorios necesitan magnitudes que se varíen y resultados que se calculen.' };
   if (input.graph.concepts.length === 0) return { ok: false, reason: 'insufficient', message: 'La memoria de la clase está vacía. Constrúyela primero para que la IA conozca tus materiales.' };
 
   // 1. Requisitos y prueba de suficiencia.
