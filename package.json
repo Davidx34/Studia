@@ -19,6 +19,7 @@
     "audit:questions": "npx tsx --env-file=.env.local scripts/audit-questions.ts",
     "ai:doctor": "npx tsx --env-file=.env.local scripts/ai-doctor.ts",
     "ai:probe": "npx tsx --env-file=.env.local scripts/gemini-probe.ts",
+    "kv:smoke": "npx tsx --env-file=.env.local scripts/kv-smoke.ts",
     "eval:retrieval": "npx tsx --env-file=.env.local scripts/eval-retrieval.ts",
     "reindex:embeddings": "npx tsx --env-file=.env.local scripts/reindex-embeddings.ts",
     "media:check": "npx tsx --env-file=.env.local scripts/media-check.ts",
