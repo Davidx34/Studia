@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseBlueprint, normalizeText } from './parse';
 import { checkBlueprint, isPublishable } from './validate';
 import { planRegeneration, type NodeAction } from './regenerate';
-import { FINAL_EXAM_FACTOR, PERIOD_EXAM_POINTS, PERIOD_MODULES_POINTS, canRetakeExam, courseGrade, examMastered, examScore, finalExamResult, finalExamWeight, flattenModules, hasMastered, moduleScore, periodResult, periodResultOf, unlockedModules } from './progress';
+import { FINAL_EXAM_FACTOR, PERIOD_EXAM_POINTS, PERIOD_MODULES_POINTS, canRetakeExam, courseGrade, courseProgress, examMastered, examScore, finalExamResult, finalExamWeight, flattenModules, hasMastered, moduleScore, periodResult, periodResultOf } from './progress';
 import { BLUEPRINT_LIMITS, type Blueprint, type IssueCode } from './types';
 
 // Plan base valido: 2 comprensiones, 2 cortes (40 / 60), 3 objetivos, 4 modulos.
@@ -567,7 +567,7 @@ describe('hasMastered: 100 % en UN intento', () => {
   });
 });
 
-describe('flattenModules y unlockedModules: avance por dominio', () => {
+describe('flattenModules', () => {
   it('recorre cortes por orden, objetivos como estan y modulos por orden, sin importar el orden del arreglo', () => {
     const bp = base();
     bp.periods.reverse();
@@ -575,46 +575,138 @@ describe('flattenModules y unlockedModules: avance por dominio', () => {
     expect(flattenModules(bp).map((m) => m.moduleId)).toEqual(['m1', 'm2', 'm3', 'm4']);
     expect(flattenModules(bp)[2]).toEqual({ moduleId: 'm3', objectiveId: 'ob2', periodId: 'p2' });
   });
-  it('al empezar solo esta disponible el primero', () => {
-    const u = unlockedModules(base(), att({}));
-    expect([...u.available]).toEqual(['m1']);
-    expect(u.next).toBe('m1');
-    expect(u.mastered.size).toBe(0);
+});
+
+describe('courseProgress: modulos -> evaluacion del corte -> siguiente corte -> evaluacion final', () => {
+  const run = (modules: Record<string, number[]> = {}, exams: Record<string, number[]> = {}, final?: number[], bp: Blueprint = base()) =>
+    courseProgress(bp, { modules: att(modules), exams: att(exams), final });
+  const list = (s: Set<string>) => [...s];
+
+  it('al empezar solo esta disponible el primer modulo; la evaluacion final esta bloqueada', () => {
+    const p = run();
+    expect(list(p.availableModules)).toEqual(['m1']);
+    expect(p.next).toEqual({ type: 'module', moduleId: 'm1', periodId: 'p1' });
+    expect(p.masteredModules.size).toBe(0);
+    expect(p.availableExams.size).toBe(0);
+    expect(p.finalExam).toBe('locked');
   });
   it('no se pasa de modulo sin 100 %: 80 y 90 no desbloquean; el 100 si', () => {
-    expect(unlockedModules(base(), att({ m1: [80, 90] })).next).toBe('m1');
-    expect([...unlockedModules(base(), att({ m1: [80, 90] })).available]).toEqual(['m1']);
-    const u = unlockedModules(base(), att({ m1: [80, 90, 100] }));
-    expect([...u.available]).toEqual(['m1', 'm2']);
-    expect(u.next).toBe('m2');
-    expect([...u.mastered]).toEqual(['m1']);
+    expect(list(run({ m1: [80, 90] }).availableModules)).toEqual(['m1']);
+    expect(run({ m1: [80, 90] }).next).toMatchObject({ type: 'module', moduleId: 'm1' });
+    const p = run({ m1: [80, 90, 100] });
+    expect(list(p.availableModules)).toEqual(['m1', 'm2']);
+    expect(p.next).toMatchObject({ moduleId: 'm2' });
+    expect(list(p.masteredModules)).toEqual(['m1']);
   });
   it('dominar uno de mas adelante no salta los que faltan', () => {
-    const u = unlockedModules(base(), att({ m2: [100], m3: [100] }));
-    expect([...u.available]).toEqual(['m1']);
-    expect(u.next).toBe('m1');
+    const p = run({ m2: [100], m3: [100] });
+    expect(list(p.availableModules)).toEqual(['m1']);
+    expect(p.next).toMatchObject({ moduleId: 'm1' });
   });
-  it('cruza de un corte al siguiente', () => {
-    const u = unlockedModules(base(), att({ m1: [100], m2: [100] }));
-    expect(u.next).toBe('m3');
-    expect([...u.available]).toEqual(['m1', 'm2', 'm3']);
+  it('al dominar todos los modulos del corte se desbloquea SU evaluacion (y todavia no el siguiente corte)', () => {
+    const p = run({ m1: [100], m2: [100] });
+    expect(list(p.availableModules)).toEqual(['m1', 'm2']); // m3 (del corte 2) sigue bloqueado
+    expect(list(p.availableExams)).toEqual(['p1']);
+    expect(p.next).toEqual({ type: 'periodExam', periodId: 'p1' });
+    expect(p.finalExam).toBe('locked');
   });
-  it('al dominarlos todos, no queda ninguno por hacer y todos estan disponibles', () => {
-    const u = unlockedModules(base(), att({ m1: [100], m2: [100], m3: [100], m4: [100] }));
-    expect(u.next).toBeNull();
-    expect([...u.available]).toEqual(['m1', 'm2', 'm3', 'm4']);
-    expect(u.mastered.size).toBe(4);
+  it('la evaluacion del corte sin dominar (60, 80) sigue bloqueando el siguiente corte; es repetible', () => {
+    const p = run({ m1: [100], m2: [100] }, { p1: [60, 80] });
+    expect(list(p.availableModules)).toEqual(['m1', 'm2']);
+    expect(p.next).toEqual({ type: 'periodExam', periodId: 'p1' });
+    expect(canRetakeExam([60, 80])).toBe(true);
   });
-  it('un plan sin modulos no bloquea nada', () => {
-    const u = unlockedModules({ version: 1, outcomes: [], periods: [] }, att({}));
-    expect(u.next).toBeNull();
-    expect(u.available.size).toBe(0);
+  it('con la evaluacion del corte al 100 % se abre el siguiente corte', () => {
+    const p = run({ m1: [100], m2: [100] }, { p1: [60, 100] });
+    expect(list(p.masteredExams)).toEqual(['p1']);
+    expect(list(p.availableExams)).toEqual([]);
+    expect(list(p.availableModules)).toEqual(['m1', 'm2', 'm3']);
+    expect(p.next).toEqual({ type: 'module', moduleId: 'm3', periodId: 'p2' });
+  });
+  it('dominar una evaluacion SIN los modulos de su corte no desbloquea nada', () => {
+    const p = run({ m1: [100] }, { p1: [100] });
+    expect(list(p.availableModules)).toEqual(['m1', 'm2']);
+    expect(p.masteredExams.size).toBe(0);
+    expect(p.next).toMatchObject({ moduleId: 'm2' });
+  });
+  it('la evaluacion final se desbloquea al terminar TODOS los cortes (modulos y evaluacion de cada uno)', () => {
+    const casi = run({ m1: [100], m2: [100], m3: [100], m4: [100] }, { p1: [100] });
+    expect(casi.finalExam).toBe('locked'); // falta la evaluacion del corte 2
+    expect(casi.next).toEqual({ type: 'periodExam', periodId: 'p2' });
+    const todo = run({ m1: [100], m2: [100], m3: [100], m4: [100] }, { p1: [100], p2: [70, 100] });
+    expect(todo.finalExam).toBe('available');
+    expect(todo.next).toEqual({ type: 'finalExam' });
+    expect(list(todo.masteredExams)).toEqual(['p1', 'p2']);
+  });
+  it('la evaluacion final dominada cierra el curso; sin dominar (intentos ilimitados) sigue disponible', () => {
+    const modules = { m1: [100], m2: [100], m3: [100], m4: [100] };
+    const exams = { p1: [100], p2: [100] };
+    expect(run(modules, exams, [60, 80]).finalExam).toBe('available');
+    expect(run(modules, exams, [60, 80]).next).toEqual({ type: 'finalExam' });
+    const fin = run(modules, exams, [60, 80, 100]);
+    expect(fin.finalExam).toBe('mastered');
+    expect(fin.next).toEqual({ type: 'done' });
+  });
+  it('una final con intentos pero con cortes sin terminar sigue bloqueada', () => {
+    expect(run({ m1: [100] }, {}, [100]).finalExam).toBe('locked');
+  });
+  it('no hay tope de intentos: 50 intentos fallidos no bloquean para siempre', () => {
+    const muchos = Array.from({ length: 50 }, () => 10);
+    const p = run({ m1: muchos });
+    expect(p.next).toMatchObject({ moduleId: 'm1' });
+    expect(canRetakeExam(muchos)).toBe(true);
+    expect(run({ m1: [...muchos, 100] }).next).toMatchObject({ moduleId: 'm2' });
+  });
+  it('los cortes se recorren por su orden, no por su posicion en la lista', () => {
+    const bp = base();
+    bp.periods.reverse();
+    const p = run({ m1: [100], m2: [100] }, { p1: [100] }, undefined, bp);
+    expect(p.next).toMatchObject({ type: 'module', moduleId: 'm3' });
+    // sin ningun intento, lo primero es el modulo del PRIMER corte aunque este al final de la lista
+    expect(run({}, {}, undefined, bp).next).toMatchObject({ type: 'module', moduleId: 'm1', periodId: 'p1' });
+  });
+  it('un corte sin modulos pasa directo a su evaluacion', () => {
+    const bp = base();
+    bp.periods[0].objectives = [];
+    const p = run({}, {}, undefined, bp);
+    expect(p.next).toEqual({ type: 'periodExam', periodId: 'p1' });
+  });
+  it('un plan sin cortes deja la evaluacion final disponible', () => {
+    const p = run({}, {}, undefined, { version: 1, outcomes: [], periods: [] });
+    expect(p.finalExam).toBe('available');
   });
   it('un id "__proto__" funciona con Map', () => {
     const bp = base();
     bp.periods[0].objectives[0].modules[0].id = '__proto__';
-    const u = unlockedModules(bp, new Map([['__proto__', [100]]]));
-    expect(u.next).toBe('m2');
+    const p = courseProgress(bp, { modules: new Map([['__proto__', [100]]]) });
+    expect(p.next).toMatchObject({ moduleId: 'm2' });
+  });
+  it('PROPIEDAD: lo disponible es siempre un prefijo del recorrido y "next" apunta a lo primero sin dominar', () => {
+    let seed = 11;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x80000000);
+    const att10 = () => (rnd() < 0.5 ? [] : rnd() < 0.5 ? [100] : [Math.round(rnd() * 99)]);
+    for (let i = 0; i < 400; i++) {
+      const modules = Object.fromEntries(['m1', 'm2', 'm3', 'm4'].map((id) => [id, att10()]));
+      const exams = Object.fromEntries(['p1', 'p2'].map((id) => [id, att10()]));
+      const final = att10();
+      const p = run(modules, exams, final);
+      // lo dominado es lo dominado, y un modulo disponible lo es solo si todos los anteriores estan dominados
+      const order = ['m1', 'm2', 'm3', 'm4'];
+      for (const [k, id] of order.entries()) {
+        if (p.availableModules.has(id)) for (const prev of order.slice(0, k)) expect(p.masteredModules.has(prev), `${id} disponible sin ${prev}`).toBe(true);
+      }
+      // la evaluacion de un corte solo esta disponible o dominada con todos los modulos de ese corte dominados
+      if (p.availableExams.has('p1') || p.masteredExams.has('p1')) expect(['m1', 'm2'].every((m) => p.masteredModules.has(m))).toBe(true);
+      if (p.availableExams.has('p2') || p.masteredExams.has('p2')) {
+        expect(['m3', 'm4'].every((m) => p.masteredModules.has(m))).toBe(true);
+        expect(p.masteredExams.has('p1')).toBe(true);
+      }
+      // la final solo se abre con todo dominado
+      if (p.finalExam !== 'locked') expect(p.masteredExams.size).toBe(2);
+      // exactamente una cosa pendiente a la vez
+      expect(p.availableExams.size).toBeLessThanOrEqual(1);
+      if (p.next.type === 'module') expect(p.availableExams.size).toBe(0);
+    }
   });
 });
 

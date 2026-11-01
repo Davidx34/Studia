@@ -49,27 +49,6 @@ export function flattenModules(bp: Blueprint): FlatModule[] {
   return out;
 }
 
-export interface Unlocked {
-  // Modulos que el estudiante puede abrir ahora: los que ya domino, mas el primero que le falta.
-  available: Set<string>;
-  // El primero que le falta dominar (null si termino todo).
-  next: string | null;
-  mastered: Set<string>;
-}
-
-export function unlockedModules(bp: Blueprint, attempts: Attempts): Unlocked {
-  const available = new Set<string>();
-  const mastered = new Set<string>();
-  let next: string | null = null;
-  for (const m of flattenModules(bp)) {
-    if (next !== null) break; // todo lo que sigue al primero sin dominar esta bloqueado
-    available.add(m.moduleId);
-    if (hasMastered(attempts.get(m.moduleId))) mastered.add(m.moduleId);
-    else next = m.moduleId;
-  }
-  return { available, next, mastered };
-}
-
 // ───────────────────────────── evaluaciones: se repiten hasta llegar al 100 % ─────────────────────────────
 //
 // Decision del dueño: la evaluacion de un corte (y la final) se puede REPETIR, y su nota es el PROMEDIO de todos los intentos hasta llegar al 100 %, igual que un modulo
@@ -78,6 +57,75 @@ export function unlockedModules(bp: Blueprint, attempts: Attempts): Unlocked {
 export const examScore = moduleScore;
 export const examMastered = hasMastered;
 export const canRetakeExam = (attempts: readonly number[] | undefined): boolean => !hasMastered(attempts);
+
+// ───────────────────────────── avance por el curso ─────────────────────────────
+//
+// Reglas del dueño: el recorrido es   modulos del corte  ->  EVALUACION del corte  ->  siguiente corte  -> ...  ->  EVALUACION FINAL.
+//   - no se pasa de un modulo al siguiente sin 100 % en el actual;
+//   - la evaluacion de un corte se desbloquea al dominar todos los modulos del corte, y SIN dominarla (100 % en un intento) no se pasa al siguiente corte;
+//   - la evaluacion final se desbloquea al terminar todos los cortes (modulos y evaluacion de cada uno);
+//   - los intentos son ILIMITADOS hasta llegar al 100 %.
+
+export type Step = { type: 'module'; moduleId: string; periodId: string } | { type: 'periodExam'; periodId: string } | { type: 'finalExam' } | { type: 'done' };
+
+export interface CourseProgress {
+  // Modulos que el estudiante puede abrir: los ya dominados y el primero que le falta.
+  availableModules: Set<string>;
+  masteredModules: Set<string>;
+  // Evaluaciones de corte que puede tomar ahora (desbloqueadas y aun sin dominar), y las ya dominadas.
+  availableExams: Set<string>;
+  masteredExams: Set<string>;
+  finalExam: 'locked' | 'available' | 'mastered';
+  // Lo siguiente que le toca hacer.
+  next: Step;
+}
+
+export interface ProgressInput {
+  modules: Attempts; // intentos por modulo
+  exams?: Attempts; // intentos de la evaluacion de cada corte, por id de corte
+  final?: readonly number[]; // intentos de la evaluacion final
+}
+
+export function courseProgress(bp: Blueprint, input: ProgressInput): CourseProgress {
+  const availableModules = new Set<string>();
+  const masteredModules = new Set<string>();
+  const availableExams = new Set<string>();
+  const masteredExams = new Set<string>();
+  let next: Step | null = null;
+
+  const flat = flattenModules(bp);
+  const periods = bp.periods.slice().sort((a, b) => a.order - b.order);
+  for (const p of periods) {
+    if (next !== null) break; // todo lo que sigue a lo primero sin dominar esta bloqueado
+    for (const m of flat.filter((f) => f.periodId === p.id)) {
+      availableModules.add(m.moduleId);
+      if (hasMastered(input.modules.get(m.moduleId))) masteredModules.add(m.moduleId);
+      else {
+        next = { type: 'module', moduleId: m.moduleId, periodId: p.id };
+        break;
+      }
+    }
+    if (next !== null) break;
+    // Todos los modulos del corte dominados: toca su evaluacion.
+    if (examMastered(input.exams?.get(p.id))) masteredExams.add(p.id);
+    else {
+      availableExams.add(p.id);
+      next = { type: 'periodExam', periodId: p.id };
+    }
+  }
+
+  let finalExam: CourseProgress['finalExam'] = 'locked';
+  if (next === null) {
+    if (examMastered(input.final)) {
+      finalExam = 'mastered';
+      next = { type: 'done' };
+    } else {
+      finalExam = 'available';
+      next = { type: 'finalExam' };
+    }
+  }
+  return { availableModules, masteredModules, availableExams, masteredExams, finalExam, next };
+}
 
 // ───────────────────────────── nota de un corte: 70 % modulos + 30 % evaluacion ─────────────────────────────
 //
