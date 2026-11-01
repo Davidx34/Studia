@@ -22,8 +22,11 @@ La aplicación funciona con y sin la migración. Para activarlo: aplicar la **08
 La política `ALL` de `student_progress` **sigue abierta**. Cerrarla ahora rompería las lecciones que el servidor aún no califica. Falta, en este orden, para poder «contraer»:
 
 1. ~~Los minijuegos pendientes~~ (hecho: los ocho se califican en el servidor con `SERVER_GRADING_GAMES=on`, ver `docs/CALIFICACION_MINIJUEGOS.md`). Mientras esa variable esté apagada, las preguntas de juego no entran en el intento y una lección solo de juegos no puede cerrarse en el servidor.
-2. Pasar `markInProgress` (que marca «en progreso» al abrir la lección) y la ruta sin conexión (`persistOffline`) al servidor.
+2. ~~Pasar `markInProgress` y la ruta sin conexión al servidor~~ (hecho): el servidor marca «en progreso» al servir las preguntas (`markLessonInProgress`, desde `/api/generate-questions`); `persistProgressOffline` no tenía ningún llamador y se eliminó. Además `/api/generate-questions` lee y escribe el banco de preguntas con la llave de servicio, **pero solo si el usuario ve el módulo** (por su RLS de `content_modules`): sin eso, cerrar la lectura del banco habría hecho que cada apertura regenerara preguntas con la IA.
 3. Entonces: `student_progress` pasa a solo lectura para el estudiante; `question_attempts` deja de aceptar `INSERT` propio; y se cierra la lectura de `lesson_questions` por estudiantes (hoy deja ver `ok`, `answers`, `keywords` y `game_data` con la llave pública).
+   Al revisar la base de producción apareció además que un estudiante matriculado puede **insertar** preguntas en el banco de su clase (`students_insert_lesson_questions`). La migración 086 cierra también eso.
+
+   **Orden seguro:** (1) este código desplegado; (2) `SERVER_GRADING_GAMES=on` en producción tras probar los 8 juegos; (3) recién entonces la migración 086. Si se aplica la 086 antes de (2), los resultados de los minijuegos dejan de registrarse en `question_attempts` (su camino de registro desde el navegador queda cerrado) aunque la lección sí se cierra y puntúa.
 
 ## Detalle a tener en cuenta
 

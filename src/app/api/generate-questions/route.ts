@@ -24,6 +24,8 @@ import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/que
 import { withGenerationLock } from '@/lib/questions/generationLock';
 import { servableQuestions, drawQuestions } from '@/lib/questions/poolServing';
 import { startLessonAttempt } from '@/lib/grading/lessonAttempt';
+import { questionBank } from '@/lib/grading/bankAccess';
+import { markLessonInProgress } from '@/lib/grading/progressStart';
 
 // Una generacion con Cohere tarda de 37 a 67 s (medido el 2026-09-19 con un prompt de
 // ~28.000 caracteres; la de 67 s incluia un reintento interno), y hasta ~110 s si
@@ -97,12 +99,16 @@ export async function POST(req: NextRequest) {
     // El cuerpo solo se usa cuando no hay moduleId (peticion sin modulo real).
     let dbConfig: AiConfigRow | null = null;
     let moduleChosen: string[] | null = null;
+    // El usuario PUEDE ver el modulo (RLS de content_modules: un estudiante ve los de SUS clases, un profesor los suyos). Es lo que autoriza leer y escribir el banco de preguntas con
+    // la llave de servicio mas abajo: el banco ya no se abre a los estudiantes con la llave publica (migracion 086).
+    let moduleVisible = false;
     if (moduleId && supabase) {
       const { data: modRow } = await supabase
         .from('content_modules')
         .select('classroom_id, minigame_types')
         .eq('id', moduleId)
         .single();
+      moduleVisible = !!modRow;
       moduleChosen = modRow?.minigame_types ?? null;
       if (modRow?.classroom_id) {
         const { data: cfg, error: cfgError } = await supabase
@@ -125,7 +131,9 @@ export async function POST(req: NextRequest) {
 
     // 1. Intentar servir del cache (rapido, sin llamar a Cohere).
     if (moduleId && supabase) {
-      const { data: cached } = await supabase
+      // Solo si el usuario ve el modulo se lee el banco con la llave de servicio; si no, con su propio cliente (la RLS no le devuelve nada).
+      const bank = moduleVisible ? questionBank(supabase) : supabase;
+      const { data: cached } = await bank
         .from('lesson_questions')
         .select('*')
         .eq('module_id', moduleId);
@@ -140,6 +148,7 @@ export async function POST(req: NextRequest) {
         const picked = drawQuestions(validCached, SERVE_COUNT);
         // Con calificacion en el servidor las preguntas clasicas salen SIN claves y con un intento abierto.
         const served = await startLessonAttempt(supabase, moduleId, picked);
+        await markLessonInProgress(supabase, moduleId);
         return NextResponse.json({ ...served, cached: true });
       }
     }
@@ -228,7 +237,8 @@ export async function POST(req: NextRequest) {
         game_type: q.game_type ?? null,
         game_data: q.game_data ?? null,
       }));
-      const { data: inserted } = await supabase.from('lesson_questions').insert(rows).select('id');
+      const writer = moduleVisible ? questionBank(supabase) : supabase;
+      const { data: inserted } = await writer.from('lesson_questions').insert(rows).select('id');
       if (inserted && inserted.length === validGenerated.length) {
         generatedWithIds = validGenerated.map((q, i) => ({ ...q, id: inserted[i].id }));
       }
@@ -237,6 +247,7 @@ export async function POST(req: NextRequest) {
     // El estudiante solo ve SERVE_COUNT, aunque se hayan generado/guardado mas.
     const toServe = moduleId ? shuffle(generatedWithIds).slice(0, SERVE_COUNT) : generatedWithIds;
     const served = moduleId && supabase ? await startLessonAttempt(supabase, moduleId, toServe) : { questions: toServe };
+    if (moduleId && supabase) await markLessonInProgress(supabase, moduleId);
     return NextResponse.json({ ...served, cached: false });
     });
 
