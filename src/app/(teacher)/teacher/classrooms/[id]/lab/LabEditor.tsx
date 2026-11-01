@@ -12,6 +12,7 @@ import { LabFrame } from '@/components/lab/LabFrame';
 import { LIMITS, templateOfSpec } from '@/lib/lab/labSpec';
 import { cleanQuestions, effectiveVariable, limitHint, normalizeDraft, questionError, withConstant, withIndependent, withMode, withVariable } from '@/lib/lab/labEditor';
 import { rowToItem, specToFields, type LabItem, type LabRow, type LabStatus } from '@/lib/lab/labRows';
+import { guardJsonb } from '@/lib/db/jsonbGuard';
 import type { Evidence } from '@/lib/lab/design';
 import type { FormulaCheck, FormulaStatus } from '@/lib/lab/formulaMatch';
 import { KIND_LABEL } from '@/lib/memory/types';
@@ -113,12 +114,19 @@ export default function LabEditor({ classroomId, teacherId, start, onClose, onSa
 
   const save = async (status: LabStatus) => {
     if (!full || hasQError) return;
+    const fields = specToFields(full.spec);
+    // Antes de guardar: documento limpio y dentro del tope de la columna (src/lib/db/jsonbGuard.ts).
+    const guard = guardJsonb(fields.spec, 'labSpec');
+    if (!guard.ok) {
+      setError('La ficha del laboratorio es demasiado grande o tiene un formato no válido. Simplifícala e inténtalo de nuevo.');
+      return;
+    }
     setBusy(status === 'published' ? 'publish' : 'draft');
     setError(null);
-    const fields = specToFields(full.spec);
     const now = new Date().toISOString();
     const payload = {
       ...fields,
+      spec: guard.value,
       source_material_id: start.sourceMaterialId,
       status,
       published_at: status === 'published' ? now : null,

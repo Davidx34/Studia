@@ -4,6 +4,7 @@ import { createAdminSupabase, hasServiceRoleKey, MISSING_SERVICE_KEY_MESSAGE } f
 import { rowToItem, type LabRow } from '@/lib/lab/labRows';
 import { parseAttemptState } from '@/lib/lab/protocol';
 import { validateSubmission } from '@/lib/lab/submission';
+import { guardJsonb } from '@/lib/db/jsonbGuard';
 
 // El estudiante ENTREGA el informe de un laboratorio publicado de su clase. Nada que venga del navegador se acepta tal cual: se vuelve a leer el laboratorio (con la sesion del
 // estudiante, asi que la base solo le muestra los publicados de sus clases), se valida el informe en el servidor (incluida la coherencia numerica de los ensayos) y recien entonces
@@ -51,6 +52,11 @@ export async function POST(req: NextRequest) {
     const checked = validateSubmission(lab, state);
     if (!checked.ok) return fail(422, 'Tu informe tiene problemas: ' + checked.errors.join(' '), { errors: checked.errors });
 
+    // Documentos jsonb limpios y dentro del tope de sus columnas (un informe enorme se rechaza aqui, con un mensaje claro, y no con un error de la base).
+    const trials = guardJsonb(checked.clean.trials, 'labTrials');
+    const answers = guardJsonb(checked.clean.answers, 'labAnswers');
+    if (!trials.ok || !answers.ok) return fail(422, 'Tu informe es demasiado grande. Reduce el número de ensayos o el largo de las respuestas.');
+
     const admin: any = createAdminSupabase();
     const { data, error } = await admin
       .from('lab_attempts')
@@ -59,8 +65,8 @@ export async function POST(req: NextRequest) {
         student_id: user.id,
         classroom_id: row.classroom_id,
         hypothesis: checked.clean.hypothesis,
-        trials: checked.clean.trials,
-        answers: checked.clean.answers,
+        trials: trials.value,
+        answers: answers.value,
         conclusion: checked.clean.conclusion,
       })
       .select('id')

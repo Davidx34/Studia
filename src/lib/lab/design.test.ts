@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { DESIGN_LIMITS, buildDesignPrompt, buildRequirementsPrompt, designLab, memoryCatalog, parseDesign, parseRequirements, relevantConcepts, resolveEvidence } from './design';
+import { DESIGN_LIMITS, buildDesignPrompt, buildRequirementsPrompt, designLab, isNonNumericActivity, memoryCatalog, parseDesign, parseRequirements, relevantConcepts, resolveEvidence } from './design';
 import { REPAIR_ROUNDS, repairModel, trimRanges } from './repair';
 import { validateModel } from './model';
 import { MODEL_EXAMPLES } from './modelExamples';
@@ -240,6 +240,76 @@ describe('designLab', () => {
     }
   });
 });
+
+describe('actividades que no son numericas (noFit decidido en codigo)', () => {
+  const poema = 'Que los estudiantes escriban un poema sobre el mercado y lo comparen entre sí.';
+
+  it('una obra creativa sin ninguna pista cuantitativa es noFit', () => {
+    for (const idea of [
+      poema,
+      'Que cada grupo escriba un cuento sobre un día en la fábrica',
+      'Un ensayo sobre la inflación y sus causas',
+      'Que cada grupo haga un dibujo que explique el ahorro',
+      'Componer una CANCIÓN sobre el trueque',
+      'Escribir una obra de teatro sobre la revolución industrial',
+      'Redacciones cortas sobre su barrio',
+      'Que escriban un cuento sobre cómo amasar el pan en casa', // "masa" dentro de "amasar" NO es una pista cuantitativa
+      'Que escriban un cuento sobre cómo se amasa el pan', // ... ni al final de "amasa"
+    ]) expect(isNonNumericActivity(idea), idea).toBe(true);
+  });
+
+  it('con una pista cuantitativa NO se bloquea: la decide la IA (ante la duda se deja pasar)', () => {
+    for (const idea of [
+      'Que dibujen la curva de oferta y demanda y calculen el equilibrio',
+      'Un ensayo con datos: simular el efecto de la tasa de interés',
+      'Que escriban un poema y luego midan cuántas sílabas tiene cada verso',
+      'Que grafiquen una caricatura del precio en el tiempo',
+      'Que dibujen un cuento ilustrado y luego calculen su duración', // la unica pista es "calculen"
+      idea0(),
+    ]) expect(isNonNumericActivity(idea), idea).toBe(false);
+  });
+
+  it('sin obra creativa tampoco se bloquea, aunque no tenga pistas', () => {
+    expect(isNonNumericActivity('Que exploren cómo eligen las personas en un mercado')).toBe(false);
+    expect(isNonNumericActivity('Quiero un laboratorio para investigar el consumo')).toBe(false);
+  });
+
+  it('respeta los limites de palabra y no distingue tildes ni mayusculas', () => {
+    expect(isNonNumericActivity('Estudiar la educación primaria y sus diversos niveles')).toBe(false); // "rima" en primaria, "versos" en diversos
+    expect(isNonNumericActivity('Que escriban una POESÍA sobre el trueque')).toBe(true);
+    expect(isNonNumericActivity('Que escriban un POEMA sobre el trueque')).toBe(true);
+  });
+
+  it('designLab responde noFit SIN llamar a la IA y antes de mirar la memoria', async () => {
+    const call = vi.fn();
+    const r = await designLab({ idea: poema, graph }, call);
+    expect(call).not.toHaveBeenCalled();
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe('noFit');
+    expect(r.message).toMatch(/no un experimento numérico/);
+    // con la memoria vacia tambien es noFit (no "construye la memoria": no hace falta)
+    const empty = await designLab({ idea: poema, graph: { concepts: [], edges: [] } }, call);
+    expect(empty.ok === false && empty.reason).toBe('noFit');
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it('una idea cuantitativa con obra creativa SI llega a la IA', async () => {
+    const call = vi.fn().mockResolvedValue(null);
+    const r = await designLab({ idea: 'Que dibujen la curva de oferta y demanda y calculen el equilibrio', graph }, call);
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(r.ok === false && r.reason).toBe('noResponse');
+  });
+
+  it('una idea demasiado corta sigue siendo invalid (la comprobacion de longitud va primero)', async () => {
+    const r = await designLab({ idea: 'poema', graph }, vi.fn());
+    expect(r.ok === false && r.reason).toBe('invalid');
+  });
+});
+
+function idea0() {
+  return 'Quiero que exploren cómo elige un consumidor cuánto comprar con su presupuesto';
+}
 
 describe('piezas del diseño', () => {
   it('relevantConcepts: lo que cubre los requisitos mas sus prerrequisitos, sin pasarse del tope', () => {

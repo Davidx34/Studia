@@ -4,7 +4,15 @@ import path from 'path';
 import { buildWarning, claimMemory, hashChunks, runMemoryBuild } from './build';
 import { NO_MEMORY, groupConcepts, headline, isStale, type MemorySummary } from './panelState';
 import { normalizeKey } from './text';
+import { guardJsonb } from '@/lib/db/jsonbGuard';
 import type { Concept } from './types';
+
+// La guardia delega en la real salvo que una prueba la fuerce a rechazar un presupuesto.
+vi.mock('@/lib/db/jsonbGuard', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/db/jsonbGuard')>();
+  return { ...real, guardJsonb: vi.fn(real.guardJsonb) };
+});
+const realGuard = async () => (await vi.importActual<typeof import('@/lib/db/jsonbGuard')>('@/lib/db/jsonbGuard')).guardJsonb;
 
 const root = process.cwd();
 const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8').replace(/\r\n/g, '\n');
@@ -193,6 +201,51 @@ describe('runMemoryBuild: incremental', () => {
     await runMemoryBuild(fakeAdmin(db), 'c1', vi.fn());
     expect(db.class_memory[0].status).toBe('ready');
     expect(db.class_memory[0].graph.concepts).toEqual([]);
+  });
+
+  it('cada documento jsonb pasa por SU presupuesto antes de escribirse', async () => {
+    const db = world();
+    vi.mocked(guardJsonb).mockClear();
+    await runMemoryBuild(fakeAdmin(db), 'c1', vi.fn().mockResolvedValue(answer));
+    const budgets = vi.mocked(guardJsonb).mock.calls.map((c) => c[1]);
+    expect(budgets.filter((b) => b === 'materialExtraction')).toHaveLength(2);
+    expect(budgets.filter((b) => b === 'materialStats')).toHaveLength(2);
+    expect(budgets).toContain('classMemoryGraph');
+    expect(budgets).toContain('classMemoryStats');
+  });
+
+  it('lo que se escribe es la copia que devuelve la guardia, no el original', async () => {
+    const db = world();
+    const real = await realGuard();
+    vi.mocked(guardJsonb).mockImplementation((v, b, o) => (b === 'classMemoryStats' ? { ok: true, value: { marcado: true }, bytes: 1, report: { removedKeys: 0, strippedNul: 0, fixedSurrogates: 0, nonFinite: 0 } } : real(v, b, o)));
+    try {
+      await runMemoryBuild(fakeAdmin(db), 'c1', vi.fn().mockResolvedValue(answer));
+      expect(db.class_memory[0].stats).toEqual({ marcado: true });
+    } finally {
+      vi.mocked(guardJsonb).mockImplementation(real);
+    }
+  });
+
+  it.each([
+    ['classMemoryGraph', /el grafo de la clase/],
+    ['classMemoryStats', /cifras de la memoria/],
+    ['materialExtraction', /material/],
+    ['materialStats', /cifras del material/],
+  ])('si %s no cabe en su columna: la memoria queda en fallo con un motivo claro (no el generico) y no se escribe un grafo a medias', async (budget, msg) => {
+    const db = world();
+    const real = await realGuard();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(guardJsonb).mockImplementation((v, b, o) => (b === budget ? { ok: false, reason: 'size', message: 'forzado' } : real(v, b, o)));
+    try {
+      await runMemoryBuild(fakeAdmin(db), 'c1', vi.fn().mockResolvedValue(answer));
+    } finally {
+      vi.mocked(guardJsonb).mockImplementation(real);
+    }
+    expect(db.class_memory[0].status).toBe('failed');
+    expect(db.class_memory[0].error).toMatch(/demasiado grande/);
+    expect(db.class_memory[0].error).toMatch(msg);
+    expect(db.class_memory[0].error).not.toMatch(/inesperado/);
+    expect(db.class_memory[0].version ?? 0).toBe(0); // no subio la version: el caché del grafo no ve una version a medias
   });
 
   it('un error inesperado deja el motivo en vez de quedarse "construyendo" para siempre', async () => {
