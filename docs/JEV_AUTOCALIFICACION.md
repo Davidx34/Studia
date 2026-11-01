@@ -31,10 +31,22 @@ Corrida del 2026-11-01 sobre producción (775 preguntas):
 
 Posible arreglo (no incluido aquí, es un cambio de regla con impacto pedagógico): para respuestas esperadas cortas (≤ 2 caracteres normalizados, o solo números y símbolos) exigir **coincidencia por palabra completa** en vez de por subcadena.
 
-## Lo que sigue
-- **JEV-2:** la misma compuerta **dentro de la generación** (`/api/generate-questions` y `regeneratePool`): ninguna pregunta entra a `lesson_questions` sin pasar `selfGrade`; si falla, se descarta o se reintenta.
-- Decidir la regla de coincidencia por palabra completa para respuestas cortas.
+## JEV-2: la compuerta en la generación
 
-## Límites
-- Comprueba que el ejercicio es **coherente con el calificador**, no que sea **correcto** (que la respuesta marcada sea verdad); eso lo hace el juez de preguntas.
-- La auditoría mira solo `lesson_questions`; no audita el material ni las memorias.
+`gateGenerated` (`src/lib/jev/runtimeGate.ts`) aplica `selfGrade` a todo lo que genera la IA **antes de guardarlo**, en los dos caminos que insertan en `lesson_questions`:
+
+- `/api/generate-questions` (cuando un estudiante abre una lección y el caché no alcanza);
+- `regenerateModulePool` (el botón «Regenerar» / «Generar lo que falta» del profesor).
+
+Reglas:
+- **Solo las fallas descartan.** Los avisos (una respuesta de un carácter, dos definiciones iguales) se conservan. Un tipo que el servidor no califica se conserva.
+- **La compuerta no puede dejar a una clase sin lecciones:** si ella misma falla (no debería), el ejercicio se conserva y se registra `[JEV_GATE_ERROR]`.
+- **Interruptor de emergencia:** `JEV_GATE=off` en el servidor la apaga sin desplegar código (como `GRADING_SHADOW=off`).
+- **Registro sin contenido:** `[JEV_REJECTED:GENERATE|REGENERATE]` dice el módulo, cuántas se descartaron y, por cada una, el **tipo** y el **motivo**; nunca el enunciado ni las respuestas.
+- **No destruye lo que ya hay:** en modo `replace`, un lote entero imposible devuelve error («No se generó ninguna pregunta válida») **antes** de borrar el pool existente.
+
+Efecto esperable: casi ninguno sobre lo normal (la auditoría de lo guardado dio 0 fallas); evita que una pregunta ambigua o con datos contradictorios entre al banco. Para saber cuánto descarta en la práctica hay que mirar los registros tras unos días.
+
+## Lo que sigue
+- Decidir la regla de coincidencia por palabra completa para respuestas cortas (hallazgo de arriba).
+- Medir con los registros cuántas preguntas descarta la compuerta y de qué tipos; si son muchas, afinar el prompt de generación.
