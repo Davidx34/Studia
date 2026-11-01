@@ -17,6 +17,7 @@
     "retire:questions": "npx tsx --env-file=.env.local scripts/retire-questions.ts",
     "replenish:pools": "npx tsx --env-file=.env.local scripts/replenish-pools.ts",
     "audit:questions": "npx tsx --env-file=.env.local scripts/audit-questions.ts",
+    "audit:games": "npx tsx --env-file=.env.local scripts/audit-games.ts",
     "ai:doctor": "npx tsx --env-file=.env.local scripts/ai-doctor.ts",
     "ai:probe": "npx tsx --env-file=.env.local scripts/gemini-probe.ts",
     "kv:smoke": "npx tsx --env-file=.env.local scripts/kv-smoke.ts",
