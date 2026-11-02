@@ -116,6 +116,24 @@ export function checkLinks(raw: unknown, bp: Blueprint, classModuleIds: Iterable
   return errors.length > 0 ? { ok: false, errors } : { ok: true, links };
 }
 
+// Cambia el enlace de UN modulo del plan (moduleId = null lo desenlaza). Si el modulo real ya servia a OTRO nodo, pasa a este (un modulo real solo sirve a un nodo): asi la lista nunca
+// queda con un repetido que el servidor rechazaria. No toca los demas enlaces ni el orden.
+export function setLink(links: Link[], nodeId: string, moduleId: string | null): Link[] {
+  const rest = links.filter((l) => l.nodeId !== nodeId && (moduleId === null || l.moduleId !== moduleId));
+  return moduleId === null ? rest : [...rest, { nodeId, moduleId }];
+}
+
+// Mezcla sugerencias con los enlaces actuales (las sugerencias solo cubren lo que no estaba enlazado, asi que no pisan nada).
+export function applySuggestions(links: Link[], suggestions: Suggestion[]): Link[] {
+  return suggestions.reduce((acc, s) => setLink(acc, s.nodeId, s.moduleId), links);
+}
+
+// Los enlaces que de verdad corresponden a este plan: descarta los de nodos que el plan ya no tiene (por ejemplo, tras editar el borrador).
+export function relevantLinks(bp: Blueprint, links: Link[]): Link[] {
+  const nodes = new Set(planModules(bp).map((m) => m.nodeId));
+  return links.filter((l) => nodes.has(l.nodeId));
+}
+
 // Cuanto del plan ya tiene contenido real enlazado.
 export function coverage(bp: Blueprint, links: Link[]): { linked: number; total: number; pending: PlanModule[] } {
   const done = new Set(links.map((l) => l.nodeId));

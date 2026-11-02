@@ -16,6 +16,9 @@ import {
   setObjectiveTitle, setOutcomeText, setPeriod, toggleAssessed, toggleObjectiveOutcome,
 } from '@/lib/blueprint/edit';
 import { BLUEPRINT_LIMITS as L, type Blueprint, type Issue } from '@/lib/blueprint/types';
+import type { Link, RealModule } from '@/lib/blueprint/links';
+import LinksPanel from './LinksPanel';
+import { call } from './planApi';
 
 export interface StoredPlan {
   version: number;
@@ -30,20 +33,13 @@ const read = (doc: unknown): Blueprint | null => {
   return r.ok ? r.blueprint : null;
 };
 
-async function call(body: Record<string, unknown>): Promise<{ ok: boolean; status: number; data: any }> {
-  try {
-    const res = await fetch('/api/blueprint', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const data = await res.json().catch(() => ({}));
-    return { ok: res.ok, status: res.status, data };
-  } catch {
-    return { ok: false, status: 0, data: { error: 'No hay conexion con el servidor. Revisa tu red e intenta de nuevo.' } };
-  }
-}
-
-export default function PlanClient({ classroomId, className, draft, published: publishedInit, tableMissing }: { classroomId: string; className: string; draft: StoredPlan | null; published: StoredPlan | null; tableMissing: boolean }) {
+export default function PlanClient({ classroomId, className, draft, published: publishedInit, tableMissing, modules, draftLinks: draftLinksInit, publishedLinks: publishedLinksInit }: { classroomId: string; className: string; draft: StoredPlan | null; published: StoredPlan | null; tableMissing: boolean; modules: RealModule[]; draftLinks: Link[]; publishedLinks: Link[] }) {
   const initial = draft ? read(draft.doc) : null;
   // El plan publicado vive en el estado: al publicar uno nuevo, "editar una copia" debe partir de ESE y no del que llego con la pagina.
   const [published, setPublished] = useState<StoredPlan | null>(publishedInit);
+  // Los enlaces guardados de cada version; viven aqui para no perderse al editar y volver a mostrar el panel.
+  const [draftLinks, setDraftLinks] = useState<Link[]>(draftLinksInit);
+  const [publishedLinks, setPublishedLinks] = useState<Link[]>(publishedLinksInit);
   const [plan, setPlan] = useState<Blueprint | null>(initial);
   const [savedVersion, setSavedVersion] = useState<number | null>(draft && initial ? draft.version : null);
   const [dirty, setDirty] = useState(false);
@@ -60,6 +56,7 @@ export default function PlanClient({ classroomId, className, draft, published: p
   const issues: Issue[] = useMemo(() => (plan ? checkBlueprint(plan) : []), [plan]);
   const errors = issues.filter((i) => i.severity === 'error');
   const warnings = issues.filter((i) => i.severity === 'warning');
+  const publishedPlan = useMemo(() => (published ? read(published.doc) : null), [published]);
   const blanks = useMemo(() => (plan ? blankFields(plan) : []), [plan]);
   const publishable = plan !== null && isPublishable(issues) && blanks.length === 0;
   const weightTotal = plan ? Math.round(plan.periods.reduce((s, p) => s + p.weight, 0) * 100) / 100 : 0;
@@ -117,6 +114,8 @@ export default function PlanClient({ classroomId, className, draft, published: p
       return;
     }
     setPublished({ version: r.data.version, doc: plan, publishedAt: new Date().toISOString() });
+    setPublishedLinks(draftLinks); // es la MISMA fila: al publicarse, sus enlaces se quedan con ella
+    setDraftLinks([]);
     setSavedVersion(null);
     setDirty(false);
     setPlan(null);
@@ -127,6 +126,7 @@ export default function PlanClient({ classroomId, className, draft, published: p
     const bp = published ? read(published.doc) : null;
     if (!bp) return;
     setPlan(bp);
+    setDraftLinks([]);
     setDirty(true);
     setNotice({ tone: 'ok', text: 'Editando una copia del plan publicado. Al guardar se crea una version nueva; el publicado no cambia hasta que publiques la nueva.' });
   };
@@ -228,6 +228,10 @@ export default function PlanClient({ classroomId, className, draft, published: p
           </div>
           {busy === 'generate' && <p className="text-sm text-fg-muted">La IA hace una llamada por corte; puede tardar un minuto.</p>}
         </Card>
+      )}
+
+      {!plan && publishedPlan && (
+        <LinksPanel key={`pub-${published!.version}`} classroomId={classroomId} plan={publishedPlan} modules={modules} initialLinks={publishedLinks} target="published" onSaved={setPublishedLinks} />
       )}
 
       {plan && (
@@ -409,6 +413,12 @@ export default function PlanClient({ classroomId, className, draft, published: p
             </div>
             {confirmPublish && published !== null && <p className="text-sm text-fg-muted">La version {published.version} que esta publicada pasara a archivada.</p>}
           </Card>
+
+          {dirty || savedVersion === null ? (
+            <Card className="p-4 text-sm text-fg-muted sm:p-5">Guarda el borrador para poder enlazar sus modulos con los modulos de la clase.</Card>
+          ) : (
+            <LinksPanel key={`draft-${savedVersion}`} classroomId={classroomId} plan={plan} modules={modules} initialLinks={draftLinks} target="draft" onSaved={setDraftLinks} />
+          )}
         </>
       )}
     </div>

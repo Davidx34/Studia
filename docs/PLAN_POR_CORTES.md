@@ -170,3 +170,17 @@ El plan habla de módulos «de papel» (un id y un título); los estudiantes tra
 Verificación de la 087 contra la base real **sin aplicarla**: una transacción que se revirtió, con 15 comprobaciones (enlace válido; nodo inexistente; id de objetivo usado como módulo; módulo de otra clase; nodo y módulo repetidos; plan de otra clase; edición; id con caracteres raros; RLS de profesor dueño, estudiante matriculado con plan en borrador (0) y publicado (1), y usuario no matriculado (0); escritura y borrado desde el navegador; plan archivado; cascada al borrar el módulo real). Después se confirmó que no quedó nada (la tabla no existe y los 46 módulos siguen igual).
 
 Falta (siguiente paso): la pantalla para enlazar (con las sugerencias) y la vista del estudiante.
+
+## Pantalla para enlazar (en «Plan del curso»)
+
+Debajo del editor, **«Enlazar con los módulos de la clase»**: cada módulo del plan (agrupado por corte y objetivo) tiene un selector con los módulos reales de la clase. «Aplicar N sugerencias» rellena los que se parecen por título, pero **solo cambia la lista en pantalla**: nada se guarda hasta pulsar «Guardar enlaces» (acción `saveLinks`). Muestra «X de Y módulos con contenido enlazado» y lo pendiente.
+
+- **Qué plan se enlaza:** el **borrador** si existe (el panel aparece solo con el plan **guardado y sin cambios**, porque el servidor valida los enlaces contra lo guardado) y, si no hay borrador, el **publicado**. Al publicar, los enlaces del borrador pasan con él (es la misma fila). «Editar una copia» empieza **sin** enlaces.
+- **Elegir un módulo real que ya sirve a otro nodo lo MUEVE** (un módulo real solo sirve a un nodo); la opción lo avisa («ya enlazado a «X»: pasaria a este»).
+- Un enlace a un nodo que el plan ya no tiene se **ignora** al cargar (si no, el servidor rechazaría todo el guardado).
+- La página lee módulos y enlaces con la sesión del profesor (RLS); la escritura sigue siendo solo por `/api/blueprint`.
+- `links.ts` suma `setLink`, `applySuggestions` y `relevantLinks` (puras, probadas).
+
+**Todavía no hace nada que vea el estudiante**: los enlaces quedan guardados, pero ninguna pantalla de estudiante los usa aún.
+
+Verificada en un navegador real (servidor simulado): sugerencias, mover un módulo, guardar (el envío lleva solo los enlaces vigentes), editar el plan y volver (los enlaces se conservan), publicar (los enlaces pasan al publicado), escritorio y teléfono sin desbordamiento.
