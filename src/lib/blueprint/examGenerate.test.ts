@@ -23,9 +23,11 @@ const EXP = 'La elasticidad compara cuánto se mueve la cantidad demandada frent
 
 // Una pregunta buena sobre el trozo n (1..3).
 const QUOTES = ['mide cuánto cambia la cantidad demandada cuando cambia el precio', 'tienden a tener una demanda más elástica porque el consumidor cambia fácilmente', 'a largo plazo los consumidores encuentran alternativas y la demanda se vuelve más elástica'];
+// Los enunciados de prueba deben ser DISTINTOS entre si (la generacion rechaza los casi iguales): cada etiqueta aporta palabras propias.
+const stem = (tag: string): string => { const t = tag.replace(/[^A-Za-z0-9]/g, ''); return t ? `alfa${t} beta${t} gama${t} delta${t}` : ''; };
 const good = (n: number, tag = '', over: Record<string, unknown> = {}) => ({
   type: 'multiple_choice',
-  q: `¿Qué dice el material sobre el tema ${n} ${tag}?`,
+  q: `¿Qué dice el material sobre el tema ${stem(`n${n}${tag}`)}?`,
   opts: ['A. Una cosa distinta', 'B. Lo que el material explica', 'C. Algo que no se relaciona'],
   ok: 1,
   exp: EXP,
@@ -377,5 +379,42 @@ describe('generateExamQuestions con juez de sustento', () => {
     const { gen, judge } = await withJudge([reply(good(1))], [judgeSays(true)], { count: 1 });
     expect(gen.prompts[0]).toContain('Escribes preguntas de EXAMEN');
     expect(judge.prompts[0]).toContain('verificador de hechos MUY ESTRICTO');
+  });
+});
+
+describe('generateExamQuestions: sin casi-duplicados', () => {
+  const near = (n: number, q: string, over: Record<string, unknown> = {}) => good(n, '', { q, ...over });
+  it('rechaza una pregunta casi igual a una ya existente (misma cita y tipo) y lo dice', async () => {
+    const existing = [{ q: '¿Qué mide la elasticidad precio de la demanda?', type: 'multiple_choice', quote: QUOTES[0] }];
+    const { r } = await run([reply(near(1, '¿Qué representa la elasticidad precio de la demanda?'), good(2, 'b')), reply()], { count: 3, existing });
+    expect(r.ok && r.accepted.map((q) => q.source.chunkIndex)).toEqual([1]);
+    expect(r.ok && r.rejected.map((x) => x.errors[0])).toEqual(['Se parece demasiado a otra pregunta que ya existe.']);
+  });
+  it('rechaza tambien la casi igual de la MISMA tanda', async () => {
+    const { r } = await run([reply(near(1, '¿Qué mide la elasticidad precio de la demanda?'), near(1, '¿Qué representa la elasticidad precio de la demanda?')), reply()], { count: 2 });
+    expect(r.ok && r.accepted).toHaveLength(1);
+    expect(r.ok && r.rejected).toHaveLength(1);
+  });
+  it('una existente rechazada por el profesor tampoco vuelve (el filtro no mira el estado)', async () => {
+    const existing = [{ q: '¿Qué mide la elasticidad precio de la demanda ordinaria?', type: 'multiple_choice', quote: 'otra' }];
+    const { r } = await run([reply(near(1, '¿Qué mide la elasticidad precio de la demanda ordinaria hoy?'))], { count: 1, existing });
+    expect(r.ok && r.accepted).toHaveLength(0);
+  });
+  it('el juez no se gasta en lo casi repetido', async () => {
+    const existing = [{ q: '¿Qué mide la elasticidad precio de la demanda?', type: 'multiple_choice', quote: QUOTES[0] }];
+    const s = scripted([reply(near(1, '¿Qué representa la elasticidad precio de la demanda?'))]);
+    let judged = 0;
+    await generateExamQuestions({ plan: plan(), outcomeId: 'o1', nodeId: 'm1', chunks: chunks(), count: 1, existing }, s.model, async () => { judged++; return null; });
+    expect(judged).toBe(0);
+  });
+  it('el prompt le muestra a la IA lo que ya existe (solo las ultimas 15) y no menciona nada si no hay', async () => {
+    const existing = Array.from({ length: 20 }, (_, i) => ({ q: `Pregunta existente numero ${i + 100}`, type: 'true_false', quote: 'x' }));
+    const { prompts } = await run([reply(good(1))], { count: 1, existing });
+    expect(prompts[0]).toContain('NO las repitas');
+    expect(prompts[0]).toContain('Pregunta existente numero 119');
+    expect(prompts[0]).toContain('Pregunta existente numero 105');
+    expect(prompts[0]).not.toContain('Pregunta existente numero 104');
+    const none = await run([reply(good(1))], { count: 1 });
+    expect(none.prompts[0]).not.toContain('NO las repitas');
   });
 });
