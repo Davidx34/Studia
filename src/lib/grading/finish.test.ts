@@ -196,13 +196,34 @@ describe('migracion 084', () => {
 
 describe('la leccion del navegador', () => {
   const page = read('src/app/(student)/lesson/[id]/page.tsx');
-  const save = page.slice(page.indexOf('const saveProgress = async'), page.indexOf('if (loading) return ('));
-  it('una leccion con intento la cierra el servidor; rechazada no se escribe a mano; no disponible sigue como antes', () => {
-    expect(save).toContain('finishLessonOnServer(attemptIdRef.current, elapsedSeconds())');
-    expect(save).toMatch(/outcome === 'ok'[\s\S]*await evaluateAchievements\(\);\s*return;/);
-    expect(save).toMatch(/outcome === 'rejected'\) return;/);
-    // el camino de siempre sigue DESPUES (leccion sin intento o cierre no disponible)
-    expect(save.indexOf("from('student_progress')")).toBeGreaterThan(save.indexOf("outcome === 'rejected'"));
+  const save = page.slice(page.indexOf('const saveProgress ='), page.indexOf('const retrySave ='));
+  it('la pagina cierra la leccion con closeLesson, el cliente real del servidor y los logros DESPUES de guardar (la logica esta probada en saveOutcome.test.ts)', () => {
+    expect(save).toContain('closeLesson(attemptIdRef.current, {');
+    expect(save).toContain('finish: finishLessonOnServer,');
+    expect(save).toContain('seconds: elapsedSeconds,');
+    expect(save).toContain('onSaved: evaluateAchievements,');
+    expect(page).toContain("import { closeLesson, noticeFor, type SaveOutcome } from '@/lib/grading/saveOutcome';");
+  });
+  it('YA NO hay respaldo de escritura directa: el navegador no escribe student_progress (migracion 086)', () => {
+    expect(save).not.toContain("from('student_progress')");
+    expect(save).not.toContain('upsert');
+    expect(page).not.toContain("from('student_progress')");
+  });
+  it('un fallo de guardado se AVISA al estudiante, con reintento solo cuando sirve', () => {
+    expect(page).toContain("const [saveOutcome, setSaveOutcome] = useState<SaveOutcome>('saved');");
+    // el resultado se informa al cerrar el modulo Y al reintentar (dos llamadas, no basta una)
+    expect(page.match(/setSaveOutcome\(await saveProgress\(\)\);/g)).toHaveLength(2);
+    expect(page).toMatch(/setSaveOutcome\(await saveProgress\(\)\);\s*useTonitoStore\.getState\(\)\.onModuleComplete\(scorePercent\);/);
+    expect(page).toContain('const notice = noticeFor(saveOutcome);');
+    // el aviso se dibuja cuando hay aviso (no se anula con una condicion fija)
+    expect(page).toContain('const saveNotice = notice && (');
+    expect(page).toContain('{notice.canRetry ? (');
+    expect(page).toContain('No pudimos guardar tu resultado');
+    expect(page).toContain('Reintentar guardado');
+    // el aviso esta en las DOS pantallas finales (repaso completado y leccion completada)
+    expect(page.match(/\{saveNotice\}/g)).toHaveLength(2);
+    // el reintento relee el resultado
+    expect(page).toMatch(/const retrySave = async \(\) => \{\s*setSaving\(true\);\s*setSaveOutcome\(await saveProgress\(\)\);\s*setSaving\(false\);\s*\};/);
   });
   it('el navegador no manda su puntaje al servidor', () => {
     expect(save).not.toMatch(/finishLessonOnServer\([^)]*(scorePercent|finalScore|score)/);

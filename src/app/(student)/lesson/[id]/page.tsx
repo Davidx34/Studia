@@ -4,8 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { evaluateAchievements } from '@/lib/achievements/evaluate';
 import { normalizeAnswer } from '@/lib/lesson/normalize';
-import { reportShadow } from '@/lib/grading/shadowClient';
 import { finishLessonOnServer } from '@/lib/grading/finishClient';
+import { closeLesson, noticeFor, type SaveOutcome } from '@/lib/grading/saveOutcome';
 import type { MatchVerdict } from '@/components/LessonQuestionMatch';
 import { LessonQuestionMatch } from '@/components/LessonQuestionMatch';
 import { ElDescifrador } from '@/components/minigames/ElDescifrador';
@@ -90,6 +90,7 @@ type WeakConcept = { tag: string; accuracy: number };
 type RemediationPhase = 'none' | 'offered' | 'active' | 'completed';
 type FillBlankFeedback = 'correct' | 'retry' | 'revealed' | null;
 
+
 export default function LessonPage() {
   const params = useParams();
   const router = useRouter();
@@ -103,6 +104,8 @@ export default function LessonPage() {
   const [score, setScore] = useState(0);
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState(false);
+  const [saveOutcome, setSaveOutcome] = useState<SaveOutcome>('saved');
+  const [saving, setSaving] = useState(false);
   // Review 360 §3.6: si la generacion falla no se inventan preguntas, se dice.
   const [generationFailed, setGenerationFailed] = useState(false);
   const [shortAnswerText, setShortAnswerText] = useState('');
@@ -273,38 +276,6 @@ export default function LessonPage() {
     );
   };
 
-  const recordAttempt = async (question: LessonPageQuestion, wasCorrect: boolean, answerGiven: any) => {
-    reactToResult(wasCorrect);
-    if (!question?.id) return;
-    // Modo sombra: el servidor califica en paralelo y registra si coincide con este veredicto (no cambia nada visible).
-    reportShadow(question.id, answerGiven, wasCorrect);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      await supabase.from('question_attempts').insert({
-        student_id: user.id,
-        question_id: question.id,
-        module_id: moduleId,
-        // classroom_id es NOT NULL en la DB -- mod! es seguro aqui porque el
-        // gate de "loading" ya garantiza que mod esta cargado antes de que
-        // cualquier handler que llegue a recordAttempt pueda ejecutarse.
-        classroom_id: mod!.classroom_id!,
-        concept_tag: question.concept_tag ?? null,
-        was_correct: wasCorrect,
-        answer_given: answerGiven ?? null,
-        // Review 360 §3.3: game_type existe desde la migracion 028 y estaba
-        // en NULL en las 78 filas de question_attempts de produccion, porque
-        // recordAttempt nunca lo escribia -- ni siquiera en los 8 call sites
-        // que SI vienen de un minijuego. Resultado: cero medicion de si
-        // alguien jugo un minijuego alguna vez, sobre 1300 lineas de codigo
-        // que son la diferenciacion del producto.
-        game_type: question.game_type ?? null,
-      });
-    } catch (e) {
-      console.warn('Error registrando intento:', e);
-    }
-  };
-
   // Minijuegos con calificacion en el servidor: el juego manda lo que eligio el jugador y recibe el veredicto con lo que se revela. Sin la funcion, el juego se califica en el
   // navegador como siempre.
   const gameCheck = (q: LessonPageQuestion): GameCheck | undefined =>
@@ -314,10 +285,10 @@ export default function LessonPage() {
           return r ? { correct: r.correct, reveal: r.reveal, explanation: r.explanation ?? null, final: r.final, detail: r.detail } : null;
         }
       : undefined;
-  // El servidor ya registro el intento de una pregunta que califica el (question_attempts); desde el navegador solo se reacciona al resultado.
-  const finishGame = (q: LessonPageQuestion, correct: boolean) => {
-    if (q.serverGraded) reactToResult(correct);
-    else recordAttempt(q, correct, null);
+  // El intento de cada pregunta lo registra el SERVIDOR al calificarla (question_attempts); el navegador ya no escribe nada: solo reacciona al resultado. Un minijuego que el servidor
+  // aun no califica (SERVER_GRADING_GAMES apagada) se juega y se muestra igual, pero su intento no queda registrado.
+  const finishGame = (_q: LessonPageQuestion, correct: boolean) => {
+    reactToResult(correct);
   };
 
   const handleAnswer = async (answer: number | boolean | string) => {
@@ -345,12 +316,12 @@ export default function LessonPage() {
     if (q.type === 'multiple_choice') {
       const correct = answer === q.ok;
       if (correct) setScore(s => s + 1);
-      recordAttempt(q, correct, { selectedIndex: answer });
+      reactToResult(correct);
     }
     if (q.type === 'true_false') {
       const correct = answer === q.ok;
       if (correct) setScore(s => s + 1);
-      recordAttempt(q, correct, { selected: answer });
+      reactToResult(correct);
     }
     if (q.type === 'short_answer') setScore(s => s + 1);
   };
@@ -379,7 +350,7 @@ export default function LessonPage() {
     const matched = (q.keywords || []).filter((k) => norm.includes(normalizeAnswer(k))).length;
     setShortAnswerMatchedCount(matched);
     const allKeywordsMatched = (q.keywords?.length || 0) > 0 && matched === (q.keywords?.length ?? 0);
-    recordAttempt(q, allKeywordsMatched, { text: shortAnswerText });
+    reactToResult(allKeywordsMatched);
     handleAnswer('answered');
   };
 
@@ -418,7 +389,7 @@ export default function LessonPage() {
       setAnswered(true);
       setSelected('filled');
       setScore((s) => s + 1);
-      recordAttempt(q, true, { text: fillBlankText });
+      reactToResult(true);
       return;
     }
 
@@ -428,7 +399,7 @@ export default function LessonPage() {
       setFillBlankFeedback('revealed');
       setAnswered(true);
       setSelected('filled');
-      recordAttempt(q, false, { text: fillBlankText });
+      reactToResult(false);
     } else {
       setFillBlankFeedback('retry');
     }
@@ -486,7 +457,7 @@ export default function LessonPage() {
   const finishModule = async () => {
     setModuleFinishing(true);
     const scorePercent = Math.round((score / questions.length) * 100);
-    await saveProgress(score);
+    setSaveOutcome(await saveProgress());
     useTonitoStore.getState().onModuleComplete(scorePercent);
 
     const queue: CinematicType[] = [scorePercent >= 70 ? 'module_complete_good' : 'module_complete_low'];
@@ -520,7 +491,7 @@ export default function LessonPage() {
               .insert({
                 student_id: user.id,
                 module_id: moduleId,
-                classroom_id: mod!.classroom_id!, // ver nota de invariante en recordAttempt
+                classroom_id: mod!.classroom_id!, // `mod` ya esta cargado: lo garantiza el gate de "loading"
                 concept_tags: weak.map((w) => w.tag),
                 was_offered: true,
               })
@@ -557,7 +528,7 @@ export default function LessonPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           moduleId,
-          moduleTitle: mod!.title, // ver nota de invariante en recordAttempt
+          moduleTitle: mod!.title, // `mod` ya esta cargado: lo garantiza el gate de "loading"
           remediationConcepts: weakConcepts.map((w) => w.tag),
         }),
       });
@@ -606,58 +577,22 @@ export default function LessonPage() {
     useTonitoStore.getState().onModuleComplete(100);
   };
 
-  const saveProgress = async (finalScore: number) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Leccion calificada en el servidor: el servidor cierra el intento y escribe el progreso (puntaje, estado, intentos, tiempo) desde las respuestas que YA califico. Si no esta
-      // disponible se sigue como antes; si lo RECHAZA (preguntas sin responder...), no se escribe el progreso a mano.
-      if (attemptIdRef.current) {
-        // Un solo reintento si el servidor no estuvo disponible (corte de red, error momentaneo): cerrar es idempotente, no suma dos veces.
-        let outcome = await finishLessonOnServer(attemptIdRef.current, elapsedSeconds());
-        if (outcome === 'unavailable') {
-          await new Promise((r) => setTimeout(r, 1200));
-          outcome = await finishLessonOnServer(attemptIdRef.current, elapsedSeconds());
-        }
-        if (outcome === 'ok') {
-          await evaluateAchievements();
-          return;
-        }
-        if (outcome === 'rejected') return;
-      }
-
-      const scorePercent = Math.round((finalScore / questions.length) * 100);
-      const now = new Date().toISOString();
-
-      const { data: existing } = await supabase
-        .from('student_progress')
-        .select('status, attempts, best_score, started_at, time_spent_seconds')
-        .eq('student_id', user.id)
-        .eq('module_id', moduleId)
-        .maybeSingle();
-
-      await supabase.from('student_progress').upsert({
-        student_id: user.id,
-        module_id: moduleId,
-        status: 'completed',
-        completion_percentage: 100,
-        score: scorePercent,
-        best_score: Math.max(existing?.best_score ?? 0, scorePercent),
-        attempts: (existing?.attempts ?? 0) + 1,
-        // Acumula sobre lo ya registrado: un segundo intento suma tiempo en
-        // vez de pisar el del primero (review 360 §3.5).
-        time_spent_seconds: (existing?.time_spent_seconds ?? 0) + elapsedSeconds(),
-        started_at: existing?.started_at ?? now,
-        completed_at: now,
-        last_attempt_at: now,
-      }, { onConflict: 'student_id,module_id' });
-
+  // Cierra la leccion en el SERVIDOR (finish_lesson): el servidor calcula el puntaje desde las respuestas que YA califico y escribe el progreso. El navegador ya no escribe student_progress
+  // (migracion 086). El resultado (guardado / reintentar / sin registrar) se le MUESTRA al estudiante en la pantalla final; la logica esta en src/lib/grading/saveOutcome.ts.
+  const saveProgress = (): Promise<SaveOutcome> =>
+    closeLesson(attemptIdRef.current, {
+      finish: finishLessonOnServer,
+      seconds: elapsedSeconds,
+      wait: (ms) => new Promise((r) => setTimeout(r, ms)),
       // Verificar y otorgar logros (el modal de desbloqueo aparece via Realtime).
-      await evaluateAchievements();
-    } catch (e) {
-      console.warn('Error guardando progreso:', e);
-    }
+      onSaved: evaluateAchievements,
+      onError: (e) => console.warn('Error guardando progreso:', e),
+    });
+
+  const retrySave = async () => {
+    setSaving(true);
+    setSaveOutcome(await saveProgress());
+    setSaving(false);
   };
 
   if (loading) return (
@@ -729,12 +664,31 @@ export default function LessonPage() {
     />
   );
 
+  // Si el resultado no se pudo guardar, la pantalla final lo DICE (antes un fallo de guardado pasaba sin que nadie lo notara).
+  const notice = noticeFor(saveOutcome);
+  const saveNotice = notice && (
+    <div role="alert" className="mb-6 rounded-lg border border-warning/50 bg-warning/10 p-4 text-left text-fg">
+      <p className="font-semibold">No pudimos guardar tu resultado</p>
+      {notice.canRetry ? (
+        <>
+          <p className="mt-1 text-sm text-fg-muted">Terminaste la lección, pero no hubo conexión con el servidor. Tu resultado todavía no cuenta: reintenta guardarlo.</p>
+          <Button className="mt-3" variant="secondary" onClick={retrySave} loading={saving} disabled={saving}>
+            Reintentar guardado
+          </Button>
+        </>
+      ) : (
+        <p className="mt-1 text-sm text-fg-muted">Esta lección no quedó registrada. Avísale a tu profesor si necesitas que cuente.</p>
+      )}
+    </div>
+  );
+
   if (remediationPhase === 'completed') return (
     <div className="max-w-2xl mx-auto px-4 py-6 sm:p-8">
       <Card className="p-8 text-center bg-success/10 border-success/40">
         <h1 className="text-3xl font-bold text-fg mb-4">¡Repaso completado! 🎉</h1>
         <p className="text-lg text-fg mb-2">Ahora estás listo para lo siguiente.</p>
         <div className="mb-8" />
+        {saveNotice}
         <Button size="lg" onClick={() => router.back()}>Volver</Button>
       </Card>
     </div>
@@ -747,6 +701,7 @@ export default function LessonPage() {
         <p className="text-2xl text-fg mb-2">{score}/{questions.length} correctas</p>
         <p className="text-lg text-fg-muted mb-2">{Math.round((score / questions.length) * 100)}% de acierto</p>
         <div className="mb-8" />
+        {saveNotice}
         <Button size="lg" onClick={() => router.back()}>Volver</Button>
       </Card>
     </div>
@@ -860,7 +815,7 @@ export default function LessonPage() {
           setAnswered(true);
           setSelected('matched');
           if (correct) setScore((s) => s + 1);
-          recordAttempt(q, correct, { pairing });
+          reactToResult(correct);
         }}
       />
     );

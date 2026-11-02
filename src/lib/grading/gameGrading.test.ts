@@ -504,7 +504,14 @@ describe('el navegador', () => {
       expect(block, comp).toContain('finishGame(q, correct)');
       expect(block, comp).not.toContain('recordAttempt');
     }
-    expect(page).toMatch(/if \(q\.serverGraded\) reactToResult\(correct\);\s*else recordAttempt\(q, correct, null\);/);
+    // el navegador solo reacciona al resultado: el intento de lo que califica el servidor lo registra el servidor, y ya no hay camino de escritura desde el navegador
+    expect(page).toMatch(/const finishGame = \(_q: LessonPageQuestion, correct: boolean\) => \{\s*reactToResult\(correct\);\s*\};/);
+    // (sin contar los comentarios: uno historico todavia lo nombra)
+    const codeOnly = page
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('//'))
+      .join('\n');
+    expect(codeOnly).not.toContain('recordAttempt');
   });
   for (const comp of ['ImpostorCognitivoGame', 'AlquimiaConceptualGame', 'CuartoCrisisGame', 'JuicioConocimientoGame', 'TimelineGame', 'CategoriesGame', 'FlashcardGame', 'ElDescifrador']) {
     it(`${comp}: con \`check\` espera al servidor, no conoce la solucion y deja reintentar si no se pudo comprobar`, () => {

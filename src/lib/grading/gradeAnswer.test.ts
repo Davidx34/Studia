@@ -83,31 +83,23 @@ describe('gradeAnswer: lo que aun no verifica', () => {
   });
 });
 
-describe('modo sombra: integracion', () => {
-  it('la ruta exige sesion, lee con la sesion del estudiante (RLS) y no devuelve el veredicto', () => {
-    const src = read('src/app/api/lesson/shadow/route.ts');
-    expect(src).toContain('supabase.auth.getUser()');
-    expect(src).toContain("from('lesson_questions')");
-    expect(src).not.toMatch(/createAdminSupabase|SERVICE_ROLE/);
-    expect(src).toContain("GRADING_SHADOW === 'off'");
-    // Todas las respuestas 200 son { ok: true }: ni correct ni la clave llegan al navegador.
-    expect(src).not.toMatch(/NextResponse\.json\(\{[^}]*(correct|answers|keywords|pairs)/);
+describe('modo sombra: retirado', () => {
+  it('la ruta y el cliente del modo sombra ya no existen (tras la migracion 086 el estudiante no lee el banco y el registro quedo sin efecto)', () => {
+    expect(fs.existsSync(path.join(process.cwd(), 'src/app/api/lesson/shadow/route.ts'))).toBe(false);
+    expect(fs.existsSync(path.join(process.cwd(), 'src/lib/grading/shadowClient.ts'))).toBe(false);
   });
-
-  it('la tabla de registro solo admite INSERT propio y nadie la lee desde la app', () => {
+  it('la pagina de la leccion ya no informa intentos al modo sombra', () => {
+    const page = read('src/app/(student)/lesson/[id]/page.tsx');
+    expect(page).not.toContain('reportShadow');
+    expect(page).not.toContain('shadowClient');
+    expect(page).not.toContain('/api/lesson/shadow');
+  });
+  it('la tabla de registro (migracion 065) se conserva como historia: solo admite INSERT propio y nadie la lee desde la app', () => {
     const sql = read('supabase/migrations/065_grading_shadow_log.sql');
     expect(sql).toContain('ENABLE ROW LEVEL SECURITY');
     expect(sql).toContain('REVOKE ALL ON public.grading_shadow_log FROM PUBLIC, anon, authenticated');
     expect(sql).toContain('GRANT INSERT ON public.grading_shadow_log TO authenticated');
     expect(sql).not.toMatch(/GRANT (SELECT|UPDATE|DELETE|ALL)/);
     expect(sql).toContain('WITH CHECK (student_id = (SELECT auth.uid()))');
-  });
-
-  it('la leccion informa cada intento registrable y la ruta del navegador nunca lanza', () => {
-    const page = read('src/app/(student)/lesson/[id]/page.tsx');
-    expect(page).toContain('reportShadow(question.id, answerGiven, wasCorrect)');
-    // emparejar ahora dice QUE conecto el estudiante (antes solo "correcto/incorrecto")
-    expect(page).toContain('recordAttempt(q, correct, { pairing })');
-    expect(read('src/lib/grading/shadowClient.ts')).toMatch(/\.catch\(\(\) => \{\}\)/);
   });
 });
