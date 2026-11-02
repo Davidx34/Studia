@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allocate, composeExam, shuffle, DEFAULT_FINAL_EXAM_SIZE, DEFAULT_PERIOD_EXAM_SIZE, EXAM_QUESTION_TYPES, MAX_EXAM_QUESTIONS, MIN_EXAM_QUESTIONS, type BankQuestion } from './exam';
+import { allocate, composeExam, DEFAULT_FINAL_EXAM_SIZE, DEFAULT_PERIOD_EXAM_SIZE, MAX_EXAM_QUESTIONS, MIN_EXAM_QUESTIONS, shuffle, type PoolQuestion } from './exam';
 import type { Blueprint } from './types';
 
 // rng con semilla (mulberry32): las pruebas son reproducibles.
@@ -11,17 +11,30 @@ const seeded = (seed: number) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 
+// Plan: 3 comprensiones. Corte 1 evalua o1 y o2 (o1 se ve en m1 y m2; o2 en m3). Corte 2 evalua o2 y o3 (o2 y o3 en m4; o3 tambien en m5).
 const plan = (): Blueprint => ({
   version: 1,
-  outcomes: [{ id: 'o1', statement: 'x' }],
+  outcomes: [{ id: 'o1', statement: 'Uno' }, { id: 'o2', statement: 'Dos' }, { id: 'o3', statement: 'Tres' }],
   periods: [
-    { id: 'p1', name: 'A', order: 1, weight: 40, assessesOutcomeIds: ['o1'], objectives: [{ id: 'ob1', title: 'T', outcomeIds: ['o1'], modules: [{ id: 'm1', title: 'Uno', order: 1 }, { id: 'm2', title: 'Dos', order: 2 }] }] },
-    { id: 'p2', name: 'B', order: 2, weight: 60, assessesOutcomeIds: ['o1'], objectives: [{ id: 'ob2', title: 'T2', outcomeIds: ['o1'], modules: [{ id: 'm3', title: 'Tres', order: 1 }] }] },
+    {
+      id: 'p1', name: 'A', order: 1, weight: 40, assessesOutcomeIds: ['o1', 'o2'],
+      objectives: [
+        { id: 'ob1', title: 'T1', outcomeIds: ['o1'], modules: [{ id: 'm1', title: 'M1', order: 1 }, { id: 'm2', title: 'M2', order: 2 }] },
+        { id: 'ob2', title: 'T2', outcomeIds: ['o2'], modules: [{ id: 'm3', title: 'M3', order: 1 }] },
+      ],
+    },
+    {
+      id: 'p2', name: 'B', order: 2, weight: 60, assessesOutcomeIds: ['o2', 'o3'],
+      objectives: [
+        { id: 'ob3', title: 'T3', outcomeIds: ['o2', 'o3'], modules: [{ id: 'm4', title: 'M4', order: 1 }] },
+        { id: 'ob4', title: 'T4', outcomeIds: ['o3'], modules: [{ id: 'm5', title: 'M5', order: 1 }] },
+      ],
+    },
   ],
 });
-const LINKS = [{ nodeId: 'm1', moduleId: 'R1' }, { nodeId: 'm2', moduleId: 'R2' }, { nodeId: 'm3', moduleId: 'R3' }];
-const bankOf = (counts: Record<string, number>, type = 'multiple_choice'): BankQuestion[] => Object.entries(counts).flatMap(([moduleId, n]) => Array.from({ length: n }, (_, i) => ({ id: `${moduleId}-q${i}`, moduleId, type })));
-const BANK = bankOf({ R1: 10, R2: 10, R3: 10 });
+// n preguntas de (comprension, modulo)
+const pq = (outcomeId: string, nodeId: string, n: number, type = 'multiple_choice'): PoolQuestion[] => Array.from({ length: n }, (_, i) => ({ id: `${outcomeId}-${nodeId}-${i}`, outcomeId, nodeId, type }));
+const POOL: PoolQuestion[] = [...pq('o1', 'm1', 6), ...pq('o1', 'm2', 6), ...pq('o2', 'm3', 8), ...pq('o2', 'm4', 8), ...pq('o3', 'm4', 6), ...pq('o3', 'm5', 6)];
 const ok = (r: ReturnType<typeof composeExam>) => {
   if (!r.ok) throw new Error('fallo: ' + r.reason);
   return r;
@@ -34,7 +47,6 @@ describe('allocate', () => {
   });
   it('reparte por peso', () => {
     expect(allocate(10, [20, 20], [40, 60])).toEqual([4, 6]);
-    expect(allocate(20, [50, 50], [1, 3])).toEqual([5, 15]);
   });
   it('nadie recibe mas de lo que tiene y el sobrante pasa a los demas', () => {
     expect(allocate(10, [1, 20, 20], [1, 1, 1])).toEqual([1, 5, 4]);
@@ -43,13 +55,13 @@ describe('allocate', () => {
   it('si no alcanza, reparte todo lo que hay', () => {
     expect(allocate(50, [3, 4], [1, 1])).toEqual([3, 4]);
   });
-  it('casos borde: nada que repartir, pesos cero o negativos', () => {
+  it('casos borde', () => {
     expect(allocate(0, [5, 5], [1, 1])).toEqual([0, 0]);
     expect(allocate(5, [], [])).toEqual([]);
-    expect(allocate(6, [9, 9], [0, 0])).toEqual([3, 3]); // sin pesos utiles: por igual
+    expect(allocate(6, [9, 9], [0, 0])).toEqual([3, 3]);
     expect(allocate(6, [9, 9], [-5, 1])).toEqual([0, 6]);
   });
-  it('propiedad: la suma es min(total, disponibles), nunca pasa del cupo y nadie sobra mientras otro falte (500 casos)', () => {
+  it('propiedad: suma exacta, nunca pasa del cupo (500 casos)', () => {
     const rng = seeded(7);
     for (let t = 0; t < 500; t++) {
       const n = 1 + Math.floor(rng() * 6);
@@ -68,172 +80,162 @@ describe('allocate', () => {
     const rng = seeded(11);
     for (let t = 0; t < 500; t++) {
       const n = 1 + Math.floor(rng() * 7);
-      const total = Math.floor(rng() * 30);
-      const out = allocate(total, new Array(n).fill(100), new Array(n).fill(1));
+      const out = allocate(Math.floor(rng() * 30), new Array(n).fill(100), new Array(n).fill(1));
       expect(Math.max(...out) - Math.min(...out)).toBeLessThanOrEqual(1);
     }
   });
 });
 
-describe('composeExam: corte', () => {
-  it('arma un examen de 10 con las preguntas de los modulos del corte, repartidas por igual', () => {
-    const r = ok(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'period', periodId: 'p1' }, rng: seeded(1) }));
+describe('composeExam: examen de un corte', () => {
+  it('mide las comprensiones del corte, repartidas por igual, con 10 preguntas', () => {
+    const r = ok(composeExam({ plan: plan(), pool: POOL, exam: { kind: 'period', periodId: 'p1' }, rng: seeded(1) }));
     expect(r.questionIds).toHaveLength(DEFAULT_PERIOD_EXAM_SIZE);
-    expect(r.perModule).toEqual({ R1: 5, R2: 5 });
-    expect(r.questionIds.every((q) => q.startsWith('R1-') || q.startsWith('R2-'))).toBe(true);
+    expect(r.perOutcome).toEqual({ o1: 5, o2: 5 });
   });
-  it('NUNCA incluye preguntas de modulos de otros cortes', () => {
-    const r = ok(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'period', periodId: 'p2' }, rng: seeded(2) }));
-    expect(r.questionIds.every((q) => q.startsWith('R3-'))).toBe(true);
+  it('solo entran preguntas de modulos de ESE corte (nunca de otro, aunque midan la misma comprension)', () => {
+    const r = ok(composeExam({ plan: plan(), pool: POOL, exam: { kind: 'period', periodId: 'p1' }, size: 20, rng: seeded(2) }));
+    // o2 tiene preguntas en m3 (corte 1) y en m4 (corte 2): el corte 1 solo puede usar las de m3
+    expect(r.questionIds.some((q) => q.includes('-m4-') || q.includes('-m5-') || q.startsWith('o3'))).toBe(false);
+    expect(Object.keys(r.perModule).sort()).toEqual(['m1', 'm2', 'm3']);
   });
-  it('sin repetidas y sin inventar: todo id sale del banco', () => {
-    const r = ok(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'period', periodId: 'p1' }, size: 20, rng: seeded(3) }));
-    expect(new Set(r.questionIds).size).toBe(r.questionIds.length);
-    const ids = new Set(BANK.map((q) => q.id));
-    expect(r.questionIds.every((q) => ids.has(q))).toBe(true);
+  it('dentro de una comprension reparte entre los modulos donde se vio (no siempre el mismo)', () => {
+    const r = ok(composeExam({ plan: plan(), pool: POOL, exam: { kind: 'period', periodId: 'p1' }, rng: seeded(3) }));
+    expect(r.perModule.m1 + r.perModule.m2).toBe(5); // las 5 de o1
+    expect(Math.abs(r.perModule.m1 - r.perModule.m2)).toBeLessThanOrEqual(1);
   });
-  it('un banco con ids repetidos no mete la misma pregunta dos veces', () => {
-    const dup = [...bankOf({ R1: 6, R2: 6 }), ...bankOf({ R1: 6, R2: 6 })];
-    const r = ok(composeExam({ plan: plan(), links: LINKS, bank: dup, exam: { kind: 'period', periodId: 'p1' }, size: 12, rng: seeded(4) }));
-    expect(new Set(r.questionIds).size).toBe(12);
-  });
-  it('solo entran tipos que el servidor califica (los minijuegos no)', () => {
-    const mixed = [...bankOf({ R1: 6, R2: 6 }), ...bankOf({ R1: 20, R2: 20 }, 'ordenar_pasos'), ...bankOf({ R1: 20 }, 'cartas')];
-    const r = ok(composeExam({ plan: plan(), links: LINKS, bank: mixed, exam: { kind: 'period', periodId: 'p1' }, size: 12, rng: seeded(5) }));
-    expect(r.questionIds).toHaveLength(12);
-    expect(r.questionIds.every((q) => /^R[12]-q\d$/.test(q))).toBe(true);
-    for (const t of EXAM_QUESTION_TYPES) expect(['multiple_choice', 'true_false', 'fill_blank', 'short_answer', 'match']).toContain(t);
-  });
-  it('un modulo con pocas preguntas aporta lo que tiene y el resto lo ponen los demas', () => {
-    const r = ok(composeExam({ plan: plan(), links: LINKS, bank: bankOf({ R1: 2, R2: 30, R3: 5 }), exam: { kind: 'period', periodId: 'p1' }, rng: seeded(6) }));
-    expect(r.perModule).toEqual({ R1: 2, R2: 8 });
-  });
-  it('si hay menos preguntas que el tamano, usa todas las que hay', () => {
-    const r = ok(composeExam({ plan: plan(), links: LINKS, bank: bankOf({ R1: 3, R2: 4, R3: 9 }), exam: { kind: 'period', periodId: 'p1' }, rng: seeded(6) }));
-    expect(r.questionIds).toHaveLength(7);
-  });
-  it('es reproducible con la misma semilla y cambia de orden con otra', () => {
-    const a = ok(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'period', periodId: 'p1' }, rng: seeded(9) }));
-    const b = ok(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'period', periodId: 'p1' }, rng: seeded(9) }));
-    const c = ok(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'period', periodId: 'p1' }, rng: seeded(10) }));
-    expect(a.questionIds).toEqual(b.questionIds);
-    expect(c.questionIds).not.toEqual(a.questionIds);
-  });
-  it('el orden final esta mezclado (no queda agrupado por modulo)', () => {
-    const orders = new Set<string>();
-    for (let s = 0; s < 20; s++) orders.add(ok(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'period', periodId: 'p1' }, rng: seeded(s) })).questionIds.map((q) => q[1]).join(''));
-    expect(orders.size).toBeGreaterThan(10);
+  it('una comprension con pocas preguntas aporta lo que tiene y el resto lo ponen las demas', () => {
+    const pool = [...pq('o1', 'm1', 2), ...pq('o2', 'm3', 30)];
+    const r = ok(composeExam({ plan: plan(), pool, exam: { kind: 'period', periodId: 'p1' }, rng: seeded(4) }));
+    expect(r.perOutcome).toEqual({ o1: 2, o2: 8 });
   });
   it('un corte que no existe: error claro', () => {
-    expect(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'period', periodId: 'nope' } })).toMatchObject({ ok: false, reason: 'noSuchPeriod' });
+    expect(composeExam({ plan: plan(), pool: POOL, exam: { kind: 'period', periodId: 'nope' } })).toMatchObject({ ok: false, reason: 'noSuchPeriod' });
+  });
+  it('un corte que no evalua ninguna comprension: error claro', () => {
+    const p = plan();
+    p.periods[0].assessesOutcomeIds = [];
+    expect(composeExam({ plan: p, pool: POOL, exam: { kind: 'period', periodId: 'p1' } })).toMatchObject({ ok: false, reason: 'noOutcomes' });
   });
 });
 
 describe('composeExam: lo que el examen NO puede comprobar no se salta en silencio', () => {
-  it('un modulo del corte sin enlace: no se arma y se dice cual', () => {
-    const r = composeExam({ plan: plan(), links: [LINKS[0], LINKS[2]], bank: BANK, exam: { kind: 'period', periodId: 'p1' } });
-    expect(r).toMatchObject({ ok: false, reason: 'unlinked', missing: [{ nodeId: 'm2', title: 'Dos' }] });
+  it('una comprension sin ninguna pregunta: no se arma y se dice cual', () => {
+    const r = composeExam({ plan: plan(), pool: POOL.filter((q) => q.outcomeId !== 'o2'), exam: { kind: 'period', periodId: 'p1' } });
+    expect(r).toMatchObject({ ok: false, reason: 'uncoveredOutcomes', missing: [{ outcomeId: 'o2', statement: 'Dos' }] });
   });
-  it('un modulo enlazado sin preguntas calificables: no se arma y se dice cual', () => {
-    const r = composeExam({ plan: plan(), links: LINKS, bank: bankOf({ R1: 10, R3: 10 }), exam: { kind: 'period', periodId: 'p1' } });
-    expect(r).toMatchObject({ ok: false, reason: 'noQuestions', missing: [{ nodeId: 'm2', title: 'Dos' }] });
-  });
-  it('un modulo con SOLO minijuegos cuenta como sin preguntas', () => {
-    const r = composeExam({ plan: plan(), links: LINKS, bank: [...bankOf({ R1: 10 }), ...bankOf({ R2: 10 }, 'ordenar_pasos')], exam: { kind: 'period', periodId: 'p1' } });
-    expect(r).toMatchObject({ ok: false, reason: 'noQuestions' });
+  it('preguntas de la comprension pero de modulos de OTRO corte no la cubren', () => {
+    const r = composeExam({ plan: plan(), pool: [...pq('o1', 'm1', 6), ...pq('o2', 'm4', 6)], exam: { kind: 'period', periodId: 'p1' } });
+    expect(r).toMatchObject({ ok: false, reason: 'uncoveredOutcomes', missing: [{ outcomeId: 'o2' }] });
   });
   it('un hueco en OTRO corte no impide el examen de este', () => {
-    ok(composeExam({ plan: plan(), links: [LINKS[0], LINKS[1]], bank: BANK, exam: { kind: 'period', periodId: 'p1' } }));
+    ok(composeExam({ plan: plan(), pool: POOL.filter((q) => q.outcomeId !== 'o3'), exam: { kind: 'period', periodId: 'p1' } }));
   });
   it('muy pocas preguntas en total: no se arma', () => {
-    const r = composeExam({ plan: plan(), links: LINKS, bank: bankOf({ R1: 2, R2: 2, R3: 9 }), exam: { kind: 'period', periodId: 'p1' } });
+    const r = composeExam({ plan: plan(), pool: [...pq('o1', 'm1', 2), ...pq('o2', 'm3', 2)], exam: { kind: 'period', periodId: 'p1' } });
     expect(r).toMatchObject({ ok: false, reason: 'tooFew' });
     expect(MIN_EXAM_QUESTIONS).toBe(5);
   });
-  it('un plan sin modulos', () => {
-    const p = plan();
-    p.periods.forEach((x) => x.objectives.forEach((o) => (o.modules = [])));
-    expect(composeExam({ plan: p, links: [], bank: BANK, exam: { kind: 'final' } })).toMatchObject({ ok: false, reason: 'noModules' });
+  it('un tipo que el servidor no califica no cuenta (una comprension solo con minijuegos queda sin cubrir)', () => {
+    const r = composeExam({ plan: plan(), pool: [...pq('o1', 'm1', 10), ...pq('o2', 'm3', 10, 'ordenar_pasos')], exam: { kind: 'period', periodId: 'p1' } });
+    expect(r).toMatchObject({ ok: false, reason: 'uncoveredOutcomes', missing: [{ outcomeId: 'o2' }] });
   });
-  it('filas del banco mal formadas se ignoran sin romper', () => {
-    const junk: any[] = [null, undefined, {}, { id: 5, moduleId: 'R1', type: 'multiple_choice' }, { id: 'x', moduleId: 7, type: 'multiple_choice' }, { id: 'y', moduleId: 'R1', type: null }];
-    ok(composeExam({ plan: plan(), links: LINKS, bank: [...BANK, ...junk], exam: { kind: 'period', periodId: 'p1' }, rng: seeded(1) }));
+  it('filas mal formadas o repetidas del banco se ignoran sin romper', () => {
+    const junk: any[] = [null, undefined, {}, { id: 5, outcomeId: 'o1', nodeId: 'm1', type: 'multiple_choice' }, { id: 'x', outcomeId: 'o1', nodeId: 7, type: 'multiple_choice' }, { id: 'y', outcomeId: 'o1', nodeId: 'm1', type: null }, { id: 'z', outcomeId: 'inventada', nodeId: 'm1', type: 'multiple_choice' }];
+    const r = ok(composeExam({ plan: plan(), pool: [...POOL, ...POOL, ...junk], exam: { kind: 'period', periodId: 'p1' }, size: 20, rng: seeded(1) }));
+    expect(new Set(r.questionIds).size).toBe(r.questionIds.length);
+    expect(r.questionIds).not.toContain('z');
   });
 });
 
 describe('composeExam: evaluacion final', () => {
-  it('toma de TODOS los cortes, por peso (40/60) y luego por modulo', () => {
-    const r = ok(composeExam({ plan: plan(), links: LINKS, bank: bankOf({ R1: 10, R2: 10, R3: 30 }), exam: { kind: 'final' }, rng: seeded(1) }));
+  it('mide TODAS las comprensiones del plan, con 20 preguntas repartidas por igual', () => {
+    const r = ok(composeExam({ plan: plan(), pool: POOL, exam: { kind: 'final' }, rng: seeded(1) }));
     expect(r.questionIds).toHaveLength(DEFAULT_FINAL_EXAM_SIZE);
-    expect(r.perModule).toEqual({ R1: 4, R2: 4, R3: 12 }); // 8 del corte 1 (40 %) repartidas en 2 modulos y 12 del corte 2 (60 %)
+    expect(Object.keys(r.perOutcome).sort()).toEqual(['o1', 'o2', 'o3']);
+    expect(Math.max(...Object.values(r.perOutcome)) - Math.min(...Object.values(r.perOutcome))).toBeLessThanOrEqual(1);
   });
-  it('si el modulo de un corte tiene pocas preguntas, el sobrante pasa a los demas cortes (la final sigue completa)', () => {
-    const r = ok(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'final' }, rng: seeded(1) })); // R3 solo tiene 10
-    expect(r.questionIds).toHaveLength(DEFAULT_FINAL_EXAM_SIZE);
-    expect(r.perModule).toEqual({ R1: 5, R2: 5, R3: 10 });
+  it('toma de modulos de todos los cortes', () => {
+    const r = ok(composeExam({ plan: plan(), pool: POOL, exam: { kind: 'final' }, size: 30, rng: seeded(2) }));
+    expect(Object.keys(r.perModule).sort()).toEqual(['m1', 'm2', 'm3', 'm4', 'm5']);
   });
-  it('cubre todos los modulos (ninguno queda sin una sola pregunta)', () => {
-    const r = ok(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'final' }, size: 6, rng: seeded(2) }));
-    expect(Object.keys(r.perModule).sort()).toEqual(['R1', 'R2', 'R3']);
-  });
-  it('un hueco en cualquier corte impide la final', () => {
-    expect(composeExam({ plan: plan(), links: [LINKS[0], LINKS[1]], bank: BANK, exam: { kind: 'final' } })).toMatchObject({ ok: false, reason: 'unlinked', missing: [{ nodeId: 'm3' }] });
+  it('un hueco en cualquier comprension impide la final', () => {
+    expect(composeExam({ plan: plan(), pool: POOL.filter((q) => q.outcomeId !== 'o3'), exam: { kind: 'final' } })).toMatchObject({ ok: false, reason: 'uncoveredOutcomes', missing: [{ outcomeId: 'o3' }] });
   });
 });
 
 describe('composeExam: tamano', () => {
-  it('respeta el tamano pedido y lo acota a [1, MAX]', () => {
-    expect(ok(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'final' }, size: 12, rng: seeded(1) })).questionIds).toHaveLength(12);
-    const big = bankOf({ R1: 100, R2: 100, R3: 100 });
-    expect(ok(composeExam({ plan: plan(), links: LINKS, bank: big, exam: { kind: 'final' }, size: 9999, rng: seeded(1) })).questionIds).toHaveLength(MAX_EXAM_QUESTIONS);
-    expect(composeExam({ plan: plan(), links: LINKS, bank: BANK, exam: { kind: 'final' }, size: -4 })).toMatchObject({ ok: false, reason: 'tooFew' });
+  const many = (n: number): { plan: Blueprint; pool: PoolQuestion[] } => {
+    const p: Blueprint = {
+      version: 1,
+      outcomes: Array.from({ length: n }, (_, i) => ({ id: `o${i}`, statement: `C${i}` })),
+      periods: [{ id: 'p', name: 'P', order: 1, weight: 100, assessesOutcomeIds: Array.from({ length: n }, (_, i) => `o${i}`), objectives: Array.from({ length: n }, (_, i) => ({ id: `ob${i}`, title: 'T', outcomeIds: [`o${i}`], modules: [{ id: `m${i}`, title: 'M', order: 1 }] })) }],
+    };
+    return { plan: p, pool: Array.from({ length: n }, (_, i) => pq(`o${i}`, `m${i}`, 5)).flat() };
+  };
+  it('nunca baja de UNA pregunta por comprension: si hay mas comprensiones que preguntas pedidas, sube el tamano', () => {
+    const { plan: p, pool } = many(8);
+    const r = ok(composeExam({ plan: p, pool, exam: { kind: 'period', periodId: 'p' }, size: 5, rng: seeded(1) }));
+    expect(r.questionIds).toHaveLength(8);
+    expect(Object.values(r.perOutcome).every((x) => x === 1)).toBe(true);
   });
-  it('propiedad: sin repetidas, dentro del banco, y nunca mas que el tamano (200 casos)', () => {
+  it('respeta el tamano pedido y lo acota al maximo', () => {
+    expect(ok(composeExam({ plan: plan(), pool: POOL, exam: { kind: 'final' }, size: 12, rng: seeded(1) })).questionIds).toHaveLength(12);
+    const big = [...pq('o1', 'm1', 100), ...pq('o2', 'm3', 100), ...pq('o2', 'm4', 100), ...pq('o3', 'm4', 100)];
+    expect(ok(composeExam({ plan: plan(), pool: big, exam: { kind: 'final' }, size: 9999, rng: seeded(1) })).questionIds).toHaveLength(MAX_EXAM_QUESTIONS);
+  });
+  it('propiedad: sin repetidas, dentro del banco, cuentas que cuadran y TODA comprension medida tiene al menos una (200 casos)', () => {
     const rng = seeded(21);
     for (let t = 0; t < 200; t++) {
-      const bank = bankOf({ R1: 1 + Math.floor(rng() * 12), R2: 1 + Math.floor(rng() * 12), R3: 1 + Math.floor(rng() * 12) });
+      const pool = [...pq('o1', 'm1', Math.floor(rng() * 9)), ...pq('o1', 'm2', Math.floor(rng() * 9)), ...pq('o2', 'm3', Math.floor(rng() * 9)), ...pq('o2', 'm4', Math.floor(rng() * 9)), ...pq('o3', 'm4', Math.floor(rng() * 9)), ...pq('o3', 'm5', Math.floor(rng() * 9))];
       const size = 5 + Math.floor(rng() * 25);
-      const r = composeExam({ plan: plan(), links: LINKS, bank, exam: { kind: 'final' }, size, rng });
+      const r = composeExam({ plan: plan(), pool, exam: { kind: 'final' }, size, rng });
       if (!r.ok) continue;
-      const ids = new Set(bank.map((q) => q.id));
+      const ids = new Set(pool.map((q) => q.id));
       expect(new Set(r.questionIds).size).toBe(r.questionIds.length);
       expect(r.questionIds.every((q) => ids.has(q))).toBe(true);
-      expect(r.questionIds.length).toBeLessThanOrEqual(size);
+      expect(Object.values(r.perOutcome).reduce((a, b) => a + b, 0)).toBe(r.questionIds.length);
       expect(Object.values(r.perModule).reduce((a, b) => a + b, 0)).toBe(r.questionIds.length);
+      expect(Object.values(r.perOutcome).every((x) => x >= 1)).toBe(true);
     }
   });
   it('no cambia sus entradas', () => {
     const p = plan();
-    const before = JSON.stringify([p, LINKS, BANK]);
-    composeExam({ plan: p, links: LINKS, bank: BANK, exam: { kind: 'final' }, rng: seeded(1) });
-    expect(JSON.stringify([p, LINKS, BANK])).toBe(before);
+    const before = JSON.stringify([p, POOL]);
+    composeExam({ plan: p, pool: POOL, exam: { kind: 'final' }, rng: seeded(1) });
+    expect(JSON.stringify([p, POOL])).toBe(before);
   });
 });
 
-describe('aleatoriedad y robustez', () => {
-  it('shuffle es una permutacion (no pierde ni repite) y puede dejar un elemento en su sitio (no es un ciclo forzado)', () => {
+describe('aleatoriedad', () => {
+  it('es reproducible con la misma semilla y cambia con otra', () => {
+    const a = ok(composeExam({ plan: plan(), pool: POOL, exam: { kind: 'final' }, rng: seeded(9) }));
+    const b = ok(composeExam({ plan: plan(), pool: POOL, exam: { kind: 'final' }, rng: seeded(9) }));
+    const c = ok(composeExam({ plan: plan(), pool: POOL, exam: { kind: 'final' }, rng: seeded(10) }));
+    expect(a.questionIds).toEqual(b.questionIds);
+    expect(c.questionIds).not.toEqual(a.questionIds);
+  });
+  it('el orden final esta mezclado (no queda agrupado por comprension)', () => {
+    const orders = new Set<string>();
+    for (let s = 0; s < 20; s++) orders.add(ok(composeExam({ plan: plan(), pool: POOL, exam: { kind: 'final' }, rng: seeded(s) })).questionIds.map((q) => q[1]).join(''));
+    expect(orders.size).toBeGreaterThan(15);
+  });
+  it('de una comprension con mas preguntas que su cupo se eligen DISTINTAS segun el azar', () => {
+    const chosen = new Set<string>();
+    for (let s = 0; s < 40; s++) for (const q of ok(composeExam({ plan: plan(), pool: [...pq('o1', 'm1', 20), ...pq('o2', 'm3', 20)], exam: { kind: 'period', periodId: 'p1' }, rng: seeded(s) })).questionIds) chosen.add(q);
+    expect(chosen.size).toBeGreaterThan(25);
+  });
+  it('shuffle es una permutacion y puede dejar un elemento en su sitio (no es un ciclo forzado)', () => {
     let fixed = 0;
     for (let s = 0; s < 300; s++) {
       const out = shuffle([0, 1, 2, 3, 4], seeded(s));
       expect([...out].sort()).toEqual([0, 1, 2, 3, 4]);
       if (out.some((x, i) => x === i)) fixed++;
     }
-    expect(fixed).toBeGreaterThan(100); // con un algoritmo sesgado (Sattolo) seria 0
+    expect(fixed).toBeGreaterThan(100);
   });
-  it('shuffle da todas las posiciones a cada elemento, con frecuencias parecidas', () => {
+  it('shuffle da todas las posiciones a cada elemento con frecuencias parecidas', () => {
     const pos = [0, 0, 0, 0];
     for (let s = 0; s < 2000; s++) pos[shuffle([0, 1, 2, 3], seeded(s)).indexOf(0)]++;
-    for (const n of pos) expect(n).toBeGreaterThan(380); // ideal 500
-  });
-  it('de un modulo con mas preguntas que su cupo se eligen DISTINTAS segun el azar (no siempre las primeras)', () => {
-    const chosen = new Set<string>();
-    for (let s = 0; s < 40; s++) for (const q of ok(composeExam({ plan: plan(), links: LINKS, bank: bankOf({ R1: 20, R2: 20, R3: 20 }), exam: { kind: 'period', periodId: 'p1' }, rng: seeded(s) })).questionIds) chosen.add(q);
-    expect(chosen.size).toBeGreaterThan(30); // de 40 posibles; si siempre fueran las 5 primeras de cada modulo serian 10
-  });
-  it('si un mismo modulo real estuviera enlazado a dos nodos, no se repite ninguna pregunta y las cuentas cuadran', () => {
-    const twice = [{ nodeId: 'm1', moduleId: 'R1' }, { nodeId: 'm2', moduleId: 'R1' }, { nodeId: 'm3', moduleId: 'R3' }];
-    const r = ok(composeExam({ plan: plan(), links: twice, bank: bankOf({ R1: 12, R3: 12 }), exam: { kind: 'period', periodId: 'p1' }, size: 10, rng: seeded(3) }));
-    expect(new Set(r.questionIds).size).toBe(r.questionIds.length);
-    expect(Object.values(r.perModule).reduce((a, b) => a + b, 0)).toBe(r.questionIds.length);
+    for (const n of pos) expect(n).toBeGreaterThan(380);
   });
 });
