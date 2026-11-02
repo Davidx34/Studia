@@ -37,6 +37,14 @@ export const QUOTA_POLICIES = {
       { seconds: 86400, limit: 40 },
     ],
   },
+  // Empezar y entregar examenes (sin IA: solo base de datos); frena el abuso, no el uso normal.
+  examSession: {
+    bucket: 'exam.sess',
+    rules: [
+      { seconds: 60, limit: 12 },
+      { seconds: 3600, limit: 60 },
+    ],
+  },
   examGenerate: {
     bucket: 'exam.gen',
     rules: [
