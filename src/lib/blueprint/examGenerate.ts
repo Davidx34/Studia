@@ -5,7 +5,7 @@
 // calificadores reales y una CITA TEXTUAL del trozo que se comprueba contra el texto real. Lo que no pasa se descarta y se informa por que; nunca se arregla en silencio.
 // Un reintento guiado con los motivos reales del rechazo. El material es DATO (delimitado y saneado), no instrucciones.
 
-import { extractJsonObject } from '@/lib/study/validate';
+import { extractLooseJsonObject } from './lenientJson';
 import { fenceMaterial, sanitizeMaterialText } from '@/lib/security/promptSanitizer';
 import { judgeExamQuestion, type JudgeVerdict } from './examJudge';
 import { chunkKey, comparable, EXAM_TYPES, validateExamQuestion, type ChunkIndex, type ExamQuestion } from './examQuestion';
@@ -57,6 +57,8 @@ function prompt(plan: Blueprint, outcomeId: string, nodeId: string, shown: Sourc
     `- Tipos permitidos: ${EXAM_TYPES.join(', ')}. Varia los tipos.`,
     '- Cada pregunta lleva "exp": una explicacion de fondo de POR QUE esa es la respuesta correcta (no solo cual es), de al menos dos frases.',
     '- Cada pregunta lleva "source": {"chunk": N, "quote": "..."} donde N es el numero del fragmento y "quote" es una frase COPIADA TEXTUALMENTE de ese fragmento (entre 25 y 300 caracteres) que respalda la respuesta. No la reescribas.',
+    '- La cita es UNA sola frase seguida de prosa, tal como aparece: no unas dos partes distintas, no uses simbolos, ecuaciones ni restos de formulas como cita, y pon UN solo "source" por pregunta (tambien en match: elige la frase que mejor respalda las parejas). Si lo que quieres preguntar solo aparece en una formula, pregunta por la frase que la explica.',
+    '- fill_blank: cada respuesta de "answers" es una palabra o expresion CORTA (1 a 3 palabras, maximo 5): se compara por texto exacto. Si la respuesta es una frase larga, usa short_answer.',
     '- multiple_choice: "opts" con 3 o 4 opciones que empiezan con "A. ", "B. "...; "ok" es el indice (desde 0) de la correcta. true_false: "ok" es true o false. fill_blank: la pregunta lleva "____" y "answers" es una lista de respuestas aceptadas. short_answer: "keywords" es una lista de palabras clave esperadas. match: "pairs" es una lista de {"term","def"} (3 a 5).',
     feedback.length ? `Tu intento anterior tuvo estos problemas, evitalos: ${feedback.join(' / ')}` : '',
     'Responde SOLO con JSON: {"questions":[{"type":"multiple_choice","q":"...","opts":["A. ...","B. ..."],"ok":0,"exp":"...","source":{"chunk":1,"quote":"..."}}]}',
@@ -97,7 +99,7 @@ export async function generateExamQuestions(input: { plan: Blueprint; outcomeId:
     const text = await model(prompt(plan, outcomeId, nodeId, shown, count - accepted.length, feedback));
     if (text === null) break;
     gotText = true;
-    const json = extractJsonObject(text);
+    const json = extractLooseJsonObject(text);
     const list = isObj(json) && Array.isArray(json.questions) ? json.questions : null;
     if (!list) {
       feedback = ['La respuesta no era el JSON pedido ({"questions":[...]}).'];

@@ -37,6 +37,14 @@ export const QUOTA_POLICIES = {
       { seconds: 86400, limit: 40 },
     ],
   },
+  examGenerate: {
+    bucket: 'exam.gen',
+    rules: [
+      { seconds: 60, limit: 3 },
+      { seconds: 3600, limit: 20 },
+      { seconds: 86400, limit: 80 },
+    ],
+  },
   labDesign: {
     bucket: 'lab.design',
     rules: [

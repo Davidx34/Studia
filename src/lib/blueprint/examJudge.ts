@@ -11,7 +11,7 @@
 //   - unclear: el juez no respondio de forma utilizable, o la pregunta es ambigua (otra opcion tambien estaria respaldada);
 //   - supported: todo respaldado y sin ambiguedad.
 
-import { extractJsonObject } from '@/lib/study/validate';
+import { extractLooseJsonObject } from './lenientJson';
 import { fenceMaterial } from '@/lib/security/promptSanitizer';
 import { quoteIsInChunk, type ExamQuestion } from './examQuestion';
 
@@ -123,7 +123,7 @@ export async function judgeExamQuestion(question: ExamQuestion, chunks: readonly
       break;
     }
     // La evidencia solo vale si esta en lo que el juez VIO (los mismos fragmentos que se le mostraron en el prompt).
-    const r = read(extractJsonObject(text), chunks.slice(0, JUDGE_LIMITS.maxChunks));
+    const r = read(extractLooseJsonObject(text), chunks.slice(0, JUDGE_LIMITS.maxChunks));
     if (r.ok) return { verdict: r.verdict, problems: r.problems, modelCalls: calls };
     lastError = r.error;
   }

@@ -41,7 +41,7 @@ Al cerrar el examen el estudiante ve **todas** las preguntas, marcando cuáles l
 | `examFeedback.ts` | Construye la retroalimentación 3D y los módulos a repasar | **Hecha** |
 | `examGenerate.ts` + `npm run eval:exam-gen` | Generación con IA de preguntas de examen por comprensión y módulo, con todo validado, y su medición con el modelo real | **Hecha** (ver «Medición real»); sin llamador |
 | Banco de preguntas de examen (migración 088, `examBank.ts`, `/api/exam-bank`) | Tabla `exam_questions` con las claves (solo la lee el profesor dueño; **jamás un estudiante**), estado de revisión (pendiente / aprobada / rechazada) y lo que dijo el juez; guardar lo generado, aprobar/rechazar, y armar el banco que usa `composeExam` | **Hecha, migración SIN aplicar** |
-| Generación con IA | Por comprensión: recuperar los trozos de material relevantes, generar, validar con `validateExamQuestion`, guardar; con cupo por profesor; **`eval` con el modelo real** antes de ofrecerlo | Pendiente |
+| Generación con IA (`examChunks.ts`, `examFlow.ts`, acción `generate` de `/api/exam-bank`) | Por comprensión y módulo: recupera los trozos de material relevantes (búsqueda híbrida real de la clase), genera, valida, pasa el juez y guarda **pendiente**; con cupo por profesor (`examGenerate`: 3/min, 20/h, 80/día). Devuelve solo un resumen, nunca el contenido | **Hecha** (ver «Generación con material real»); sin pantalla |
 | Revisión del profesor | El profesor ve cada pregunta (con su cita y explicación) y la aprueba o rechaza; solo las aprobadas entran a un examen | Pendiente |
 | Sesión de examen | Tabla propia que fija **qué preguntas se sirvieron** a ese estudiante en ese intento | Pendiente |
 | Calificación y cierre | Reusar los calificadores; escribir `exam_attempts` (el trigger de la 085 asigna el número y bloquea repetir tras un 100 %); entregar la retroalimentación 3D | Pendiente |
@@ -96,7 +96,7 @@ De 46 módulos activos, 24 tienen banco de preguntas de lección y 22 no tienen 
 
 **Límites que hay que tener presentes:** 24 casos escritos por mí (no apuntes reales), 3 materiales, un solo juez (Gemini u otro de la cadena `judge`, según las llaves); si el generador cae a un proveedor que sea también el del juez, el sesgo de «juzgarse a sí mismo» vuelve (hoy el generador usa Cohere primero y el juez lo excluye, pero el generador puede caer a Groq/Gemini y no se registra cuál respondió).
 
-## Banco de preguntas de examen (migración 088, **sin aplicar**)
+## Banco de preguntas de examen (migración 088, **aplicada 2026-11-02**)
 
 **Tabla `exam_questions`.** Cada pregunta pertenece a **una versión del plan** (no se copia entre versiones: los ids de módulo pueden reutilizarse con otro significado al regenerar) y nace **atada** a tres cosas que **la base comprueba**: la comprensión que mide y el módulo donde se ve (el módulo debe estar en un objetivo que contribuye a esa comprensión; los ids viajan como variables de `jsonpath`, no concatenados), el **material de la misma clase** (con la cita) y una explicación de fondo. Un tipo solo puede ser de los 5 que el servidor califica y la **forma de la clave** la exige la base según el tipo (opción correcta dentro del rango, verdadero/falso booleano, respuestas no vacías, ≥ 2 parejas…).
 
@@ -111,4 +111,14 @@ De 46 módulos activos, 24 tienen banco de preguntas de lección y 22 no tienen 
 
 **Verificada contra la base real sin aplicarla** (transacción revertida, 28 comprobaciones): pregunta válida; módulo que no enseña la comprensión, inexistente o con caracteres raros; comprensión inexistente; material de otra clase; nace aprobada; enunciado repetido; forma de la clave por tipo (5 casos); explicación y cita cortas; aprobar sin fecha; editar enunciado, clave y veredicto; rechazar después de aprobar; RLS de profesor / **estudiante** / otro usuario / anon; insertar, actualizar y borrar desde el navegador; plan archivado; cascada al borrar el plan. Después se confirmó que no quedó nada (la tabla no existe).
 
-**Todavía no hace nada visible:** nadie guarda preguntas en esta tabla (falta la ruta que genera, con la recuperación del material y el cupo) ni hay pantalla de revisión.
+**Todavía sin pantalla:** el profesor aún no puede ver ni aprobar las preguntas desde la interfaz (la acción `review` existe en la ruta); y nada sirve el examen a un estudiante.
+
+## Generación con material real (2026-11-02, `scripts/probe-exam-gen.ts`, solo lectura)
+
+La sonda arma un plan en memoria, recupera los trozos reales de una clase (11 PDF de microeconomía) y genera con los modelos reales, sin escribir en la base. Lo que mostró:
+
+- **El modelo devuelve «casi JSON»**: bloques ```json, `"ok": False` (Python) y comas colgando. Con eso se perdía la respuesta entera. `lenientJson.ts` repara solo esos defectos y solo fuera de las cadenas de texto.
+- **Respuestas de completar de 15 palabras** (se califican por texto exacto: nadie las acierta). Regla nueva: 1 a 5 palabras y 40 caracteres. Y se rechaza la pregunta que ya trae la respuesta escrita en el enunciado.
+- **Tema «elasticidad»** (prosa): 4 preguntas válidas, el juez aprobó las 4.
+- **Tema «restricción presupuestaria»** (PDF con fórmulas): 1 a 2 válidas de 5. Los rechazos eran **correctos**, no un fallo del texto del PDF: citas empalmadas de dos sitios, «citas» hechas de restos de fórmula (` = − `), un `match` con tres claves `source`. Se añadió orientación al prompt (una sola frase de prosa, sin fórmulas, un `source`) y mejoró poco: con material de fórmulas el rendimiento es bajo y el sistema falla **hacia el lado seguro** (rechaza lo que no puede probar). Sin arreglo determinista: tolerar texto de PDF alterado dejaría pasar citas inventadas.
+- **No medido:** la calidad pedagógica de las preguntas aceptadas (solo se leyeron a mano 6) ni el rendimiento sobre otros materiales.
