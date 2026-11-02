@@ -158,9 +158,9 @@ describe('pagina de la leccion', () => {
     expect(code(page)).not.toContain('markInProgress');
     expect(code(page)).not.toMatch(/status:\s*'in_progress'/);
   });
-  it('reintenta una vez el cierre si el servidor no estuvo disponible', () => {
-    expect(page).toContain("if (outcome === 'unavailable') {");
-    expect(page.match(/finishLessonOnServer\(attemptIdRef\.current, elapsedSeconds\(\)\)/g)).toHaveLength(2);
+  it('cierra la leccion con closeLesson (que reintenta una vez si el servidor no estuvo disponible: ver saveOutcome.test.ts)', () => {
+    expect(page).toContain('closeLesson(attemptIdRef.current, {');
+    expect(page).not.toContain('finishLessonOnServer(attemptIdRef.current');
   });
   it('la ruta sin conexion que escribia student_progress desde el navegador ya no existe', () => {
     expect(fs.existsSync(path.join(process.cwd(), 'src/lib/offline/persistOffline.ts'))).toBe(false);
@@ -190,18 +190,15 @@ describe('GUARDIAN: escrituras a student_progress y question_attempts', () => {
     if ([...src.matchAll(WRITE)].length > 0 && /^'use client'|^"use client"/m.test(src)) clientFiles.push(rel);
   }
 
-  it('solo escriben las rutas del servidor y el camino heredado de la pagina de la leccion, y cada una con el numero de escrituras esperado', () => {
+  it('solo escriben las rutas del SERVIDOR, y cada una con el numero de escrituras esperado', () => {
     expect(writes).toEqual({
-      // heredado: el respaldo de saveProgress (sin intento en el servidor) y recordAttempt (juegos aun no calificados en el servidor); se retira con la 086 y SERVER_GRADING_GAMES=on
-      'src/app/(student)/lesson/[id]/page.tsx :: student_progress': 1,
-      'src/app/(student)/lesson/[id]/page.tsx :: question_attempts': 1,
       // servidor: registra el intento tras calificar
       'src/app/api/lesson/answer/route.ts :: question_attempts': 1,
       // servidor: "en progreso"
       'src/lib/grading/progressStart.ts :: student_progress': 1,
     });
   });
-  it('la unica escritura del NAVEGADOR esta en la pagina de la leccion', () => {
-    expect(clientFiles).toEqual(['src/app/(student)/lesson/[id]/page.tsx']);
+  it('NINGUN archivo del navegador escribe esas tablas (desde la migracion 086 el estudiante solo las lee)', () => {
+    expect(clientFiles).toEqual([]);
   });
 });

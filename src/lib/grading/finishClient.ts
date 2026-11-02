@@ -2,9 +2,8 @@
 //
 //   'ok'          el servidor cerro la leccion y escribio el progreso desde las respuestas verificadas.
 //   'rejected'    el servidor la rechazo (quedan preguntas sin responder, el intento no es suyo, no hay nada que calificar...): NO se escribe el progreso a mano.
-//   'unavailable' el cierre en el servidor no esta disponible (calificacion apagada, migracion sin aplicar, sin red): se sigue como antes.
-//
-// 'unavailable' es TRANSITORIO: mientras student_progress siga siendo escribible desde el navegador. Cuando se cierre esa politica ("contraer"), este camino se elimina.
+//   'unavailable' el cierre en el servidor no esta disponible (calificacion apagada, migracion sin aplicar, error del servidor, sin red): el estudiante recibe un AVISO y puede reintentar
+//                 (src/lib/grading/saveOutcome.ts). Desde la migracion 086 el navegador ya no escribe el progreso por su cuenta.
 export type FinishOutcome = 'ok' | 'rejected' | 'unavailable';
 
 export async function finishLessonOnServer(attemptId: string, elapsedSeconds: number, fetchImpl: typeof fetch = fetch): Promise<FinishOutcome> {

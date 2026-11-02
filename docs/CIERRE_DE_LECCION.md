@@ -28,6 +28,16 @@ La política `ALL` de `student_progress` **sigue abierta**. Cerrarla ahora rompe
 
    **Orden seguro:** (1) este código desplegado; (2) `SERVER_GRADING_GAMES=on` en producción tras probar los 8 juegos; (3) recién entonces la migración 086. Si se aplica la 086 antes de (2), los resultados de los minijuegos dejan de registrarse en `question_attempts` (su camino de registro desde el navegador queda cerrado) aunque la lección sí se cierra y puntúa.
 
+## Código heredado del navegador (retirado)
+
+Con la 086 aplicada el navegador ya no puede escribir `student_progress` ni `question_attempts`, así que se retiró lo que lo intentaba:
+
+- El **respaldo de escritura directa** de `saveProgress` (si el servidor fallaba, el navegador escribía el progreso él mismo). Fallaba en silencio y el estudiante terminaba sin saber que su resultado no contó.
+- `recordAttempt` y las escrituras de `question_attempts` desde la página.
+- El **modo sombra** (`/api/lesson/shadow`, `shadowClient.ts`): comparaba la calificación del navegador con la del servidor; ya no hay calificación en el navegador que comparar. La tabla de la migración 065 se conserva.
+
+Ahora el cierre es `closeLesson` (`src/lib/grading/saveOutcome.ts`, lógica pura con pruebas de comportamiento): un reintento automático tras 1,2 s si el servidor no está disponible, y tres resultados: `saved`, `retry` (aviso con botón **Reintentar guardado**; cerrar es idempotente) y `unrecorded` (no hubo intento o el servidor lo rechazó; aviso sin botón porque reintentar no ayuda). Los logros se evalúan solo si quedó guardado. El aviso sale en las dos pantallas finales.
+
 ## Detalle a tener en cuenta
 
 El puntaje que guarda el servidor es **acertadas / servidas por el servidor**. Una lección que mezcla clásicas con minijuegos aún no migrados puntúa solo las verificadas (los juegos no migrados no cuentan hasta que migren). El puntaje que el estudiante ve al terminar sigue calculándose en el navegador.
