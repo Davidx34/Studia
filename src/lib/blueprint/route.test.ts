@@ -19,7 +19,7 @@ describe('/api/blueprint: cableado', () => {
     expect(route).not.toMatch(/body\??\.teacherId|body\??\.teacher_id/);
   });
   it('valida accion e id de clase y limita el cuerpo antes de tocar nada', () => {
-    expect(route).toContain("if (action !== 'save' && action !== 'publish' && action !== 'generate') return fail(400, 'accion invalida');");
+    expect(route).toContain("if (action !== 'save' && action !== 'publish' && action !== 'generate' && action !== 'saveLinks') return fail(400, 'accion invalida');");
     expect(route).toContain("if (!UUID_RE.test(classroomId)) return fail(400, 'classroomId invalido');");
     expect(route).toContain('if (text.length > MAX_BODY_CHARS) return fail(413');
     expect(idx('MAX_BODY_CHARS)')).toBeLessThan(idx('JSON.parse'));

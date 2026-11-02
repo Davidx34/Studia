@@ -4,6 +4,8 @@ import { createAdminSupabase, hasServiceRoleKey, MISSING_SERVICE_KEY_MESSAGE } f
 import { publishDraft, saveDraft } from '@/lib/blueprint/store';
 import { isPublishable } from '@/lib/blueprint/validate';
 import { supabaseBlueprintDb } from '@/lib/blueprint/storeDb';
+import { saveLinks } from '@/lib/blueprint/linkStore';
+import { supabaseLinkDb } from '@/lib/blueprint/linkStoreDb';
 import { checkBrief, generateBlueprint } from '@/lib/blueprint/generate';
 import { callStudyModel, hasStudyProvider } from '@/lib/study/generate';
 import { QUOTA_POLICIES, consumeQuota, quotaDeniedBody } from '@/lib/security/rateLimit';
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
     }
     const action = body?.action;
     const classroomId = typeof body?.classroomId === 'string' ? body.classroomId : '';
-    if (action !== 'save' && action !== 'publish' && action !== 'generate') return fail(400, 'accion invalida');
+    if (action !== 'save' && action !== 'publish' && action !== 'generate' && action !== 'saveLinks') return fail(400, 'accion invalida');
     if (!UUID_RE.test(classroomId)) return fail(400, 'classroomId invalido');
 
     const supabase = await createServerSupabase();
@@ -60,6 +62,13 @@ export async function POST(req: NextRequest) {
     }
 
     const db = supabaseBlueprintDb(admin);
+
+    // ENLAZAR los modulos del plan con los modulos reales de la clase (migracion 087). Nunca crea ni cambia modulos reales: solo asocia.
+    if (action === 'saveLinks') {
+      const r = await saveLinks(db, supabaseLinkDb(admin), { classroomId }, body?.links);
+      if (!r.ok) return fail(r.status, r.error, r.errors ? { errors: r.errors } : {});
+      return NextResponse.json({ ok: true, version: r.version, status: r.status, added: r.added, removed: r.removed, total: r.total });
+    }
 
     if (action === 'save') {
       const r = await saveDraft(db, { classroomId, teacherId: user.id }, body?.blueprint);
