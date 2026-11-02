@@ -94,3 +94,12 @@ Dos tablas, cada una con el modelo que le corresponde (ver `docs/ESCALABILIDAD_D
 
 - Nada de esto se ejecuta aún en la app: son funciones y tipos sin consumidores. No hay ningún cambio visible.
 - Las reglas de `checkBlueprint` comprueban coherencia **estructural**; no juzgan si una comprensión está bien redactada ni si un objetivo realmente la enseña. Eso será trabajo de la IA y del profesor.
+
+## Ruta del servidor: guardar y publicar (`POST /api/blueprint`)
+
+El plan se **lee** desde el navegador con la sesión y la RLS de la migración 085 (el profesor ve sus versiones; el estudiante, solo el publicado de sus clases). Se **escribe** solo por esta ruta, que comprueba sesión y que quien pide es el **profesor dueño** (cualquier otro recibe 404) y escribe con la llave de servicio.
+
+- `{ action: 'save', classroomId, blueprint }` — pasa el documento por `guardJsonb('courseBlueprint')` (tamaño, profundidad, claves peligrosas), `parseBlueprint` (forma, 400 con la ruta de cada error) y `checkBlueprint` (reglas). **Un borrador a medias sí se guarda**; la respuesta trae `issues` y `publishable`. La versión la decide la fila, no el navegador: si ya hay borrador se actualiza ese; si no, se crea la versión siguiente (contando también las archivadas).
+- `{ action: 'publish', classroomId }` — vuelve a leer y revisar lo **guardado**; si tiene errores de reglas responde 422 con `issues` y no toca nada. Si pasa, **archiva el publicado anterior y luego publica** el borrador.
+- Archivar y publicar son dos escrituras (supabase-js no tiene transacciones y la base admite un solo publicado por clase). Si la segunda falla, la clase queda un momento sin plan publicado; **reintentar publica sin problema** (ya no hay publicado que archivar) y el borrador no se pierde. Si esto importa más adelante, se resuelve con una función SQL (migración nueva) que haga las dos en una transacción.
+- Código: `src/lib/blueprint/store.ts` (lógica con la base inyectada), `storeDb.ts` (adaptador de Supabase), `src/app/api/blueprint/route.ts`.
