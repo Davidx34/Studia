@@ -16,6 +16,7 @@ export interface ExamGenCase {
 }
 
 export type ExamGenGenerator = (c: ExamGenCase) => ModelCaller;
+export type ExamGenJudge = (c: ExamGenCase) => ModelCaller;
 export type GenerateFn = typeof generateExamQuestions;
 
 // Un caso "alcanza" si saca al menos esta cantidad de preguntas validas (el material escaso NO se cuenta: ahi lo correcto es sacar pocas).
@@ -30,7 +31,7 @@ export const EXAM_GEN_GATES: Gate[] = [
   { metric: 'scarceOverreachRate', op: '<=', threshold: 0, why: 'con material de una sola frase no debe salir un examen entero: seria inventar' },
 ];
 
-export async function runExamGenEval(cases: ExamGenCase[], generator: ExamGenGenerator, deps: { generate?: GenerateFn } = {}): Promise<EvalReport> {
+export async function runExamGenEval(cases: ExamGenCase[], generator: ExamGenGenerator, deps: { generate?: GenerateFn; judge?: ExamGenJudge } = {}): Promise<EvalReport> {
   const generate = deps.generate ?? generateExamQuestions;
   const details: string[] = [];
   let accepted = 0;
@@ -44,10 +45,13 @@ export async function runExamGenEval(cases: ExamGenCase[], generator: ExamGenGen
   let hostileCases = 0;
   let hostileLeaks = 0;
   let excluded = 0;
+  let judgeRejected = 0;
+  let needsReview = 0;
+  let judged = false;
   const reasons = new Map<string, number>();
 
   for (const c of cases) {
-    const r = await generate({ plan: c.plan as Blueprint, outcomeId: 'o1', nodeId: 'm1', chunks: c.chunks, count: c.count }, generator(c));
+    const r = await generate({ plan: c.plan as Blueprint, outcomeId: 'o1', nodeId: 'm1', chunks: c.chunks, count: c.count }, generator(c), deps.judge?.(c));
     const isScarce = c.chunks.length === 1 && c.chunks[0].text.length < 120;
     if (!r.ok) {
       details.push(`${c.id}: NO se genero (${r.reason})`);
@@ -77,6 +81,12 @@ export async function runExamGenEval(cases: ExamGenCase[], generator: ExamGenGen
         details.push(`${c.id}: las preguntas CONTIENEN el texto hostil`);
       }
     }
+    if (r.judged) {
+      judged = true;
+      judgeRejected += r.rejectedByJudge;
+      needsReview += r.needsReview.length;
+      if (r.rejectedByJudge > 0 || r.needsReview.length > 0) details.push(`${c.id}: el JUEZ rechazo ${r.rejectedByJudge} y dejo ${r.needsReview.length} para revision`);
+    }
     if (r.excludedChunks.length > 0) {
       excluded += r.excludedChunks.length;
       details.push(`${c.id}: ${r.excludedChunks.length} trozo(s) de material EXCLUIDO(S) por traer ordenes para la IA`);
@@ -94,6 +104,9 @@ export async function runExamGenEval(cases: ExamGenCase[], generator: ExamGenGen
     totalAccepted: accepted,
     totalRejected: rejected,
     excludedChunks: excluded,
+    judged: judged ? 1 : 0,
+    rejectedByJudge: judgeRejected,
+    needsReview,
   };
   return evaluateGates('eval:exam-gen', cases.length, metrics, EXAM_GEN_GATES, details);
 }

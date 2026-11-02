@@ -46,7 +46,7 @@ Al cerrar el examen el estudiante ve **todas** las preguntas, marcando cuáles l
 | Sesión de examen | Tabla propia que fija **qué preguntas se sirvieron** a ese estudiante en ese intento | Pendiente |
 | Calificación y cierre | Reusar los calificadores; escribir `exam_attempts` (el trigger de la 085 asigna el número y bloquea repetir tras un 100 %); entregar la retroalimentación 3D | Pendiente |
 | Pantalla del estudiante | Tomar el examen y ver la retroalimentación | Pendiente |
-| Juez de sustento | Un segundo modelo (proveedor distinto) que comprueba que la respuesta y **cada afirmación de la explicación** están respaldadas por el material; **medido como necesario** (ver abajo) | Pendiente |
+| Juez de sustento (`examJudge.ts`, `npm run eval:exam-judge`) | Un segundo modelo (**sin Cohere**) que comprueba que la respuesta y **cada afirmación de la explicación** están respaldadas por el material, citando evidencia que el código verifica; integrado en el generador como paso opcional | **Hecha** (ver «Medición del juez»); sin llamador |
 | Cumplimiento del 100 % (2B) | Bloqueo en el servidor al abrir lección/examen + no publicar con módulos sin enlazar (**propuestas aprobadas por el dueño**) | Pendiente |
 
 ## Datos de producción (2026-11-02, solo lectura)
@@ -74,3 +74,24 @@ De 46 módulos activos, 24 tienen banco de preguntas de lección y 22 no tienen 
 - **Afirmaciones fuera de la cita.** En una pregunta sobre la mitocondria, la explicación decía que el ciclo de Krebs «genera moléculas de alta energía que alimentan la cadena transportadora», y **eso no está en el material** (la cita solo respaldaba su ubicación). Se probó un chequeo por **coincidencia de palabras** entre explicación y material: **no distingue** lo bueno de lo malo (la pregunta inventada puntuó 0,79; preguntas buenas, 0,50), así que **no se construyó** (habría sido una falsa garantía). La defensa real es un **juez de sustento** (otro modelo, proveedor distinto) y la **revisión del profesor**; ninguna de las dos existe todavía.
 - La calidad pedagógica de las preguntas (¿miden de verdad la comprensión?) no se mide automáticamente.
 - Un `true_false` a veces sale redactado como pregunta («¿El Frente Nacional permitió…?») y un `fill_blank` a veces sin el hueco `____`; el calificador los acepta, pero la redacción es mejorable.
+
+## Medición del juez de sustento (2026-11-02, `npm run eval:exam-judge`)
+
+**Qué es.** Para cada pregunta aceptada, un segundo modelo (tarea `judge` del gateway, **excluyendo a Cohere**, que es el que escribe) recibe el material y la pregunta y devuelve: ¿la respuesta correcta está respaldada?, la lista de afirmaciones de la explicación con su veredicto, y si hay ambigüedad. **El veredicto lo calcula el código**, no el modelo. Para cada cosa que marca como respaldada **tiene que copiar una frase textual del material y el código comprueba que esa frase existe**: un «sí está respaldada» sin evidencia verificable cuenta como no respaldada. Si no responde o responde ilegible, la pregunta queda **«sin juzgar» → para revisión del profesor, nunca aprobada**.
+
+**Cómo se midió.** Con respuesta conocida (a diferencia de los otros `eval`): 24 casos escritos a mano sobre 3 materiales: 11 bien respaldados (incluidas paráfrasis e inferencias directas), 12 mal respaldados **plantados a propósito** (dato de más en la explicación, respuesta que contradice el material, fecha o número cambiados, efecto invertido, negación, cifra no dicha, mecanismo plausible que el material no dice, **conocimiento externo VERDADERO pero ausente del material**, generalización, términos confundidos) y 1 ambigua.
+
+| Versión del juez | Mal respaldadas que aprobó | Buenas que rechazó | Respondió «no sé» |
+|---|---|---|---|
+| Sin pedir evidencia (3 corridas) | **0 – 1 de 13** (la pregunta de la mitocondria se aprobó en 2 de 3) | 0 | 0 – 7 % |
+| **Con evidencia verificable** (7 corridas) | **0 de 13 en 6 corridas; 1 de 13 en 1 corrida** | 0 en 6 corridas; 1 de 11 en 1 | 0 – 4 % |
+
+- La pregunta que motivó el juez (explicación que dice que el ciclo de Krebs «genera moléculas de alta energía», dato que el material no tiene) pasó de **aprobarse en 2 de 3 corridas a 0 de 7**.
+- **Falla que sigue existiendo:** en 1 corrida el juez aprobó «dato extra en la explicación» (los gobiernos usan la elasticidad para fijar impuestos): **citó una frase real del material, pero esa frase no respalda esa afirmación**. Que la cita *exista* no prueba que sea *relevante*; el código no puede comprobar la relevancia. Por eso el juez **reduce** el riesgo, **no lo elimina**: la revisión del profesor sigue siendo necesaria.
+- **Costo de la estrictez:** exigir evidencia literal rechazó 1 buena (el juez parafraseó «ADN propio de la mitocondria» y la cita no coincidió). Se prefiere rechazar de más que aprobar de menos.
+- Una pregunta de **emparejar** tiene varias parejas y una sola cita no las respalda: para ese tipo el juez debe listar cada pareja como afirmación con su propia evidencia.
+- La ambigüedad (dos respuestas correctas) se detectó siempre como no aprobable, pero casi siempre como «sin respaldo» y no como «ambigua»: sirve para no aprobarla, no para explicarla.
+
+**De extremo a extremo** (`npm run eval:exam-gen -- --juez`, 5 casos): el juez rechazó entre 2 y 4 preguntas por corrida que habían pasado todas las demás validaciones, y la tasa global de preguntas aceptadas bajó de ~70 % a ~63 %. Cuesta **una llamada extra por pregunta aceptada** (más que generarla en tokens de entrada por mandar todo el material); sin medir en dinero.
+
+**Límites que hay que tener presentes:** 24 casos escritos por mí (no apuntes reales), 3 materiales, un solo juez (Gemini u otro de la cadena `judge`, según las llaves); si el generador cae a un proveedor que sea también el del juez, el sesgo de «juzgarse a sí mismo» vuelve (hoy el generador usa Cohere primero y el juez lo excluye, pero el generador puede caer a Groq/Gemini y no se registra cuál respondió).
