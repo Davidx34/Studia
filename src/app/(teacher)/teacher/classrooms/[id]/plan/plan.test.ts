@@ -20,6 +20,8 @@ const valid = (): Blueprint => ({
 const render = (props: Partial<Parameters<typeof PlanClient>[0]> = {}) =>
   renderToStaticMarkup(h(PlanClient, { classroomId: 'c1', className: 'Microeconomia', draft: null, published: null, tableMissing: false, modules: [], draftLinks: [], publishedLinks: [], ...props }));
 const stored = (doc: unknown, version = 3) => ({ version, doc, publishedAt: null });
+// El modulo m1 del plan de prueba ya esta enlazado con uno real (100 % para avanzar: sin enlaces no se puede publicar).
+const LINKED = [{ nodeId: 'm1', moduleId: '00000000-0000-4000-8000-000000000001' }];
 
 describe('PlanClient: estados iniciales', () => {
   it('sin plan: formulario del borrador, nombre de la clase por defecto y la advertencia de que aun no cambia lo que ven los estudiantes', () => {
@@ -40,7 +42,7 @@ describe('PlanClient: estados iniciales', () => {
     expect(html).not.toContain('Desarrollar con IA');
   });
   it('con un borrador guardado: lo muestra editable, ya guardado, y Publicar disponible si cumple las reglas', () => {
-    const html = render({ draft: stored(valid()) });
+    const html = render({ draft: stored(valid()), draftLinks: LINKED });
     expect(html).toContain('Explica la elasticidad de la demanda');
     expect(html).toContain('Borrador guardado: version 3.');
     expect(html).toContain('>Guardado<');
@@ -48,6 +50,15 @@ describe('PlanClient: estados iniciales', () => {
     expect(html).not.toContain('Desarrollar con IA');
     const publicar = /<button[^>]*>Publicar<\/button>/.exec(html)![0];
     expect(publicar).not.toContain(' disabled=""');
+  });
+  it('un borrador cuyos modulos NO estan enlazados NO se puede publicar y dice cuales faltan (100 % para avanzar)', () => {
+    const html = render({ draft: stored(valid()), draftLinks: [] });
+    expect(/<button[^>]*>Publicar<\/button>/.exec(html)![0]).toContain(' disabled=""');
+    expect(html).toContain('Enlaza todos los módulos del plan');
+    expect(html).toContain('Faltan: Concepto.');
+    // y un enlace a un modulo que ya no esta en el plan no cuenta
+    const stale = render({ draft: stored(valid()), draftLinks: [{ nodeId: 'viejo', moduleId: '00000000-0000-4000-8000-000000000002' }] });
+    expect(/<button[^>]*>Publicar<\/button>/.exec(stale)![0]).toContain(' disabled=""');
   });
   it('un borrador guardado con reglas incumplidas NO se puede publicar y dice que falta', () => {
     const bad = valid();
@@ -93,12 +104,12 @@ describe('PlanClient: cableado', () => {
       expect(code).not.toMatch(/\.from\(|\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
     }
     // la unica llamada de red del cliente esta en planApi.ts
-    expect(client + panel).not.toMatch(/fetch\(/);
+    expect(client + panel).not.toMatch(/\bfetch\(/);
     expect(client + panel).toContain("from './planApi'");
   });
   it('guardar y publicar piden confirmacion donde duele: publicar tiene un segundo paso y no se habilita con cambios sin guardar', () => {
     expect(client).toContain('confirmPublish');
-    expect(client).toContain('disabled={busy !== null || dirty || savedVersion === null || !publishable}');
+    expect(client).toContain('disabled={busy !== null || dirty || savedVersion === null || !publishable || unlinked.length > 0}');
     expect(client).toContain('disabled={busy !== null || !dirty || blanks.length > 0}');
   });
   it('editar cierra la confirmacion de publicar (no se confirma una version distinta de la revisada)', () => {

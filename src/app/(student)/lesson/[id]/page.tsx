@@ -108,6 +108,8 @@ export default function LessonPage() {
   const [saving, setSaving] = useState(false);
   // Review 360 §3.6: si la generacion falla no se inventan preguntas, se dice.
   const [generationFailed, setGenerationFailed] = useState(false);
+  // 100 % para avanzar: el servidor niega la leccion (403 con code 'locked') y dice que falta; se muestra ese motivo en vez de un error de generacion.
+  const [lockedMessage, setLockedMessage] = useState<string | null>(null);
   const [shortAnswerText, setShortAnswerText] = useState('');
   const [shortAnswerMatchedCount, setShortAnswerMatchedCount] = useState(0);
   const [fillBlankText, setFillBlankText] = useState('');
@@ -171,6 +173,17 @@ export default function LessonPage() {
         showMessage('Otra persona esta preparando esta leccion. Esperamos un momento...', 0);
         await new Promise((r) => setTimeout(r, BUSY_RETRY_MS));
         res = await requestQuestions();
+      }
+
+      if (res.status === 403) {
+        const denied = await res.json().catch(() => null);
+        if (denied?.code === 'locked' && typeof denied.error === 'string') {
+          setLockedMessage(denied.error);
+          setLoading(false);
+          setMood('thinking');
+          showMessage('Primero toca terminar el módulo anterior.');
+          return;
+        }
       }
 
       if (res.ok && res.status !== 202) {
@@ -610,6 +623,22 @@ export default function LessonPage() {
   // Review 360 §3.6: antes de este cambio, un fallo de generacion se disfrazaba
   // de leccion con preguntas de relleno y otorgaba XP igual. Ahora se dice, no
   // se guarda progreso ni XP, y se ofrece reintentar.
+  if (lockedMessage) return (
+    <div role="alert" className="flex flex-col items-center justify-center min-h-64 text-fg p-8 text-center premium-fade-in-up">
+      <TonitoStateClip slot="soft_error" mood="thinking" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={110} />
+      <h2 className="text-xl font-semibold mt-4">Esta lección todavía no se abre</h2>
+      <p className="text-sm text-fg-muted mt-2 max-w-sm">{lockedMessage}</p>
+      <div className="flex flex-wrap justify-center gap-3 mt-6">
+        <Button variant="accent" onClick={() => router.push(`/my-classes/${mod.classroom_id}/course`)}>
+          Ver mi recorrido
+        </Button>
+        <Button variant="secondary" onClick={() => router.push('/dashboard')}>
+          Volver al inicio
+        </Button>
+      </div>
+    </div>
+  );
+
   if (generationFailed) return (
     <div role="alert" className="flex flex-col items-center justify-center min-h-64 text-fg p-8 text-center premium-fade-in-up">
       <TonitoStateClip slot="soft_error" mood="sad" animation="idle" gradient={['#6C5CE7', '#00D2D3']} size={110} />

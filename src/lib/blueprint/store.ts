@@ -8,6 +8,7 @@
 import { guardJsonb } from '@/lib/db/jsonbGuard';
 import { parseBlueprint } from './parse';
 import { checkBlueprint, isPublishable } from './validate';
+import { coverage } from './links';
 import type { Blueprint, Issue } from './types';
 
 export interface BlueprintRow {
@@ -58,19 +59,35 @@ export async function saveDraft(db: BlueprintDb, ctx: { classroomId: string; tea
   return { ok: true, version, created: !draft, issues: prepared.issues, publishable: isPublishable(prepared.issues) };
 }
 
+// Lo unico que publicar necesita saber de los enlaces (LinkDb lo cumple).
+export interface LinkReader {
+  listLinks(blueprintId: string): Promise<{ nodeId: string; moduleId: string }[]>;
+  classModuleIds(classroomId: string): Promise<string[]>;
+}
+
 export type PublishResult =
   | { ok: true; version: number; archivedVersion: number | null; issues: Issue[] }
-  | { ok: false; status: 404 | 422; error: string; issues?: Issue[] };
+  // unlinked: titulos de los modulos del plan sin un modulo real enlazado (solo en el rechazo por enlaces).
+  | { ok: false; status: 404 | 422; error: string; issues?: Issue[]; unlinked?: string[] };
 
 // Publica el borrador. Se vuelve a leer y a revisar lo GUARDADO (no se confia en que antes se haya revisado). Archivar el publicado anterior es lo primero (la base admite un solo publicado
 // por clase) y no se puede deshacer: por eso todo se comprueba antes. Si la publicacion falla despues de archivar, reintentar publica sin problema (ya no hay publicado que archivar).
-export async function publishDraft(db: BlueprintDb, ctx: { classroomId: string }): Promise<PublishResult> {
+//
+// «100 % para avanzar» (decision 2B): un modulo del plan sin un modulo real enlazado no se puede dominar, y como los siguientes esperan al anterior, el curso quedaria atascado para siempre.
+// Por eso NO se publica un plan con modulos sin enlazar (un enlace a un modulo que ya no existe en la clase cuenta como sin enlazar). Se comprueba ANTES de archivar nada.
+export async function publishDraft(db: BlueprintDb, ctx: { classroomId: string }, links: LinkReader): Promise<PublishResult> {
   const rows = await db.list(ctx.classroomId);
   const draft = draftOf(rows);
   if (!draft) return { ok: false, status: 404, error: 'No hay un borrador para publicar.' };
   const prepared = prepareBlueprint(draft.doc, draft.version);
   if (!prepared.ok) return { ok: false, status: 422, error: 'El borrador guardado no es valido.' };
   if (!isPublishable(prepared.issues)) return { ok: false, status: 422, error: 'El plan tiene errores que impiden publicarlo.', issues: prepared.issues };
+  const real = new Set(await links.classModuleIds(ctx.classroomId));
+  const linked = (await links.listLinks(draft.id)).filter((l) => real.has(l.moduleId));
+  const { pending } = coverage(prepared.blueprint, linked);
+  if (pending.length > 0) {
+    return { ok: false, status: 422, error: `No se puede publicar: ${pending.length === 1 ? 'hay 1 módulo del plan sin enlazar' : `hay ${pending.length} módulos del plan sin enlazar`} con un módulo real de la clase. Sin enlace el estudiante no podría dominarlo ni avanzar.`, unlinked: pending.map((m) => m.title || '(sin título)') };
+  }
   const current = publishedOf(rows);
   if (current) await db.archive(current.id);
   await db.publish(draft.id);

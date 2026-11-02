@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prepareBlueprint, publishDraft, saveDraft, type BlueprintDb, type BlueprintRow } from './store';
+import { prepareBlueprint, publishDraft as publishWith, saveDraft, type BlueprintDb, type BlueprintRow, type LinkReader } from './store';
 import type { Blueprint } from './types';
 
 const valid = (): Blueprint => ({
@@ -152,6 +152,18 @@ describe('saveDraft', () => {
   });
 });
 
+// Lectura de enlaces en memoria: por defecto TODO enlazado (m1 y m2 a modulos reales de la clase).
+const reader = (over: { links?: { nodeId: string; moduleId: string }[]; real?: string[]; calls?: string[] } = {}): LinkReader => ({
+  async listLinks(bp) {
+    over.calls?.push(`links(${bp})`);
+    return over.links ?? [{ nodeId: 'm1', moduleId: 'r1' }, { nodeId: 'm2', moduleId: 'r2' }];
+  },
+  async classModuleIds() {
+    return over.real ?? ['r1', 'r2'];
+  },
+});
+const publishDraft = (db: BlueprintDb, c: { classroomId: string }) => publishWith(db, c, reader());
+
 describe('publishDraft', () => {
   it('sin borrador: 404 y no toca nada', async () => {
     const m = memoryDb([{ id: 'p', version: 1, status: 'published', doc: valid() }]);
@@ -204,3 +216,47 @@ describe('publishDraft', () => {
     expect(m.rows.map((x) => x.status)).toEqual(['archived', 'published']);
   });
 });
+
+describe('publishDraft: sin modulos sin enlazar (100 % para avanzar)', () => {
+  const draft = (): BlueprintRow[] => [{ id: 'd', version: 1, status: 'draft', doc: valid() }];
+  it('con un modulo sin enlazar NO se publica: 422 con los titulos, y no se archiva ni se publica nada', async () => {
+    const m = memoryDb([{ id: 'p', version: 1, status: 'published', doc: valid() }, { id: 'd', version: 2, status: 'draft', doc: valid() }]);
+    const r = await publishWith(m.db, ctx, reader({ links: [{ nodeId: 'm1', moduleId: 'r1' }] }));
+    expect(r).toMatchObject({ ok: false, status: 422, unlinked: ['Oferta y demanda'] });
+    expect(!r.ok && r.error).toContain('1 módulo del plan sin enlazar');
+    expect(m.calls).toEqual(['list']);
+    expect(m.rows.map((x) => x.status)).toEqual(['published', 'draft']);
+  });
+  it('sin ningun enlace: los dos modulos se listan, en plural', async () => {
+    const m = memoryDb(draft());
+    const r = await publishWith(m.db, ctx, reader({ links: [] }));
+    expect(r).toMatchObject({ ok: false, status: 422, unlinked: ['Concepto', 'Oferta y demanda'] });
+    expect(!r.ok && r.error).toContain('2 módulos');
+  });
+  it('un enlace a un modulo que ya NO existe en la clase cuenta como sin enlazar', async () => {
+    const m = memoryDb(draft());
+    const r = await publishWith(m.db, ctx, reader({ real: ['r1'] }));
+    expect(r).toMatchObject({ ok: false, status: 422, unlinked: ['Oferta y demanda'] });
+  });
+  it('un enlace de un modulo que ya no esta en el plan no cuenta ni estorba', async () => {
+    const m = memoryDb(draft());
+    const r = await publishWith(m.db, ctx, reader({ links: [{ nodeId: 'm1', moduleId: 'r1' }, { nodeId: 'm2', moduleId: 'r2' }, { nodeId: 'viejo', moduleId: 'r1' }] }));
+    expect(r).toMatchObject({ ok: true });
+  });
+  it('lee los enlaces del BORRADOR (no de otra version) y con todo enlazado publica', async () => {
+    const calls: string[] = [];
+    const m = memoryDb([{ id: 'p', version: 1, status: 'published', doc: valid() }, { id: 'd', version: 2, status: 'draft', doc: valid() }]);
+    const r = await publishWith(m.db, ctx, reader({ calls }));
+    expect(r).toMatchObject({ ok: true, version: 2, archivedVersion: 1 });
+    expect(calls).toEqual(['links(d)']);
+  });
+  it('las reglas del plan se revisan primero: un borrador con errores ni siquiera lee enlaces', async () => {
+    const calls: string[] = [];
+    const m = memoryDb([{ id: 'd', version: 1, status: 'draft', doc: unpublishable() }]);
+    const r = await publishWith(m.db, ctx, reader({ calls, links: [] }));
+    expect(r).toMatchObject({ ok: false, status: 422 });
+    expect(!r.ok && r.unlinked).toBeUndefined();
+    expect(calls).toEqual([]);
+  });
+});
+

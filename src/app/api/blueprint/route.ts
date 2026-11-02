@@ -76,8 +76,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, version: r.version, created: r.created, publishable: r.publishable, issues: r.issues });
     }
 
-    const r = await publishDraft(db, { classroomId });
-    if (!r.ok) return fail(r.status, r.error, r.issues ? { issues: r.issues } : {});
+    const r = await publishDraft(db, { classroomId }, supabaseLinkDb(admin));
+    if (!r.ok) return fail(r.status, r.error, { ...(r.issues ? { issues: r.issues } : {}), ...(r.unlinked ? { unlinked: r.unlinked } : {}) });
     return NextResponse.json({ ok: true, version: r.version, archivedVersion: r.archivedVersion, issues: r.issues });
   } catch (e) {
     console.error('[blueprint] error:', e instanceof Error ? e.message : 'desconocido');

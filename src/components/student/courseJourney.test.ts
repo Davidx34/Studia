@@ -75,8 +75,12 @@ describe('CourseJourney', () => {
     expect(withClass).toContain('href="/my-classes/CLASE-1/course/exam/p1"');
     expect(withClass).toContain('Presentar la evaluación');
   });
-  it('aclara que esta vista no bloquea nada: el mapa de modulos sigue como siempre', () => {
-    expect(render()).toContain('puedes seguir usando el mapa de módulos de la clase como siempre');
+  it('explica la regla del 100 %: los modulos se abren en orden y uno dominado se puede repasar', () => {
+    const html = render();
+    expect(html).toContain('Los módulos se abren en orden');
+    expect(html).toContain('100 % en el anterior');
+    expect(html).toContain('Un módulo dominado se puede repasar');
+    expect(html).not.toContain('como siempre');
   });
   it('sin poder leer los intentos: lo avisa', () => {
     expect(render({}, LINKS, false)).toContain('No pudimos leer tus intentos');

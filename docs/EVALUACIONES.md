@@ -47,7 +47,7 @@ Al cerrar el examen el estudiante ve **todas** las preguntas, marcando cuáles l
 | Calificación y cierre (`gradeSession`, `close_exam_session`) | Califica contra lo servido con los calificadores reales, escribe `exam_attempts` y entrega la retroalimentación 3D; entregar dos veces no da otro intento | **Hecha**; verificada de punta a punta (ver «Rutas del examen») |
 | Pantalla del estudiante (`/my-classes/[id]/course/exam/[examId]`, `examForm.ts`) | Empezar o retomar, contestar los 5 tipos de pregunta, entregar y ver la retroalimentación 3D; enlace desde el recorrido del curso cuando la evaluación está desbloqueada | **Hecha**; ver «Pantalla del estudiante» para lo verificado |
 | Juez de sustento (`examJudge.ts`, `npm run eval:exam-judge`) | Un segundo modelo (**sin Cohere**) que comprueba que la respuesta y **cada afirmación de la explicación** están respaldadas por el material, citando evidencia que el código verifica; integrado en el generador como paso opcional | **Hecha** (ver «Medición del juez»); sin llamador |
-| Cumplimiento del 100 % (2B) | Bloqueo en el servidor al abrir lección/examen + no publicar con módulos sin enlazar (**propuestas aprobadas por el dueño**) | Pendiente |
+| Cumplimiento del 100 % (2B) (`courseGate.ts`, `lessonAccess.ts`, bloqueo al publicar) | El servidor niega abrir una lección o una evaluación que el plan publicado ordena después de algo sin dominar; un plan con módulos sin enlazar no se publica | **Hecho**; ver «Cumplimiento del 100 %» |
 
 ## Datos de producción (2026-11-02, solo lectura)
 De 46 módulos activos, 24 tienen banco de preguntas de lección y 22 no tienen ninguna (el banco se crea la primera vez que alguien abre el módulo). Con 1B esto **ya no bloquea los exámenes** (las preguntas son propias del examen), pero sí importa para el **material**: la generación necesita trozos de material (`material_chunks`) de la clase.
@@ -163,4 +163,22 @@ Lo que **no** se probó: concurrencia real (dos inicios o dos cierres simultáne
 **No verificado:** lector de pantalla real (solo se comprobó que las etiquetas estén asociadas y que el foco se mueva al título); la entrega con dos pestañas a la vez (concurrencia real); preguntas largas o con símbolos raros en pantallas pequeñas.
 
 **Límite conocido:** la evaluación **no se exige** todavía para avanzar (la regla del 100 %, propuesta 2B, es el siguiente paso); hoy el servidor la sirve a cualquier estudiante matriculado cuando el plan está publicado y hay preguntas aprobadas.
+
+## Cumplimiento del 100 % (2B)
+
+Las dos propuestas del dueño, aplicadas en el **servidor** (lo que la pantalla dice «Bloqueado» es lo que el servidor niega: ambas usan la misma cuenta, `buildCourseView`):
+
+1. **No se publica un plan con módulos sin enlazar** (`publishDraft`, comprobado **antes** de archivar nada). Un módulo del plan sin módulo real no se puede dominar y, como los siguientes esperan al anterior, atascaría el curso. Un enlace a un módulo que ya no existe en la clase cuenta como sin enlazar. La respuesta lista los módulos que faltan; la pantalla del profesor deshabilita «Publicar» y dice cuáles faltan.
+2. **Abrir lecciones y evaluaciones exige lo anterior al 100 %.**
+   - **Lecciones:** `/api/generate-questions` (sin preguntas no hay lección ni intento) niega con 403 y `code: 'locked'` antes del repaso, del caché y de la generación: no se gasta nada. La pantalla de la lección muestra el motivo («Sigue: «Uno». Necesitas 100 %…») y lleva al recorrido. El Mapa pasa por el mismo bloqueo.
+   - **Evaluaciones:** `/api/exam` (`start`) exige dominar los módulos del corte; la final, todos los cortes.
+   - **Solo cuentan los intentos terminados y registrados por el servidor** (`lesson_attempts`, `exam_attempts`): el progreso viejo que el navegador se escribía no sirve de prueba (propuesta aprobada).
+
+**Qué NO se toca:** una clase sin plan publicado; un módulo que no está enlazado en el plan; un profesor o quien no está matriculado; un módulo ya dominado (se puede repasar). **Si no se pueden leer los intentos** (falla de infraestructura o sin llave de servicio) **no se bloquea** y se registra (`LESSON_GATE_DEGRADED` / `LESSON_GATE_ERROR`): no se castiga al estudiante por una falla nuestra.
+
+**Hoy no afecta a nadie:** en producción no hay ningún plan publicado (solo uno de prueba archivado), así que ninguna clase real cambia hasta que un profesor publique un plan.
+
+**Verificado:** la lógica pura (`courseGate`: 14 pruebas), `lessonAccess` (9), el bloqueo al publicar (6) y el de las evaluaciones (5), con mutación (21 cambios, 19 detectados y 2 equivalentes). **En el navegador con una sesión de estudiante real** y una clase desechable (ya borrada): el recorrido muestra «Dos» bloqueado; abrir su lección directamente da **403** y la pantalla explica qué falta, sin crear intentos ni generar preguntas; la evaluación del corte da 403 con el motivo y sin sesión; al marcar el módulo 1 al 100 %, la lección 2 **pasa el bloqueo**.
+
+**No verificado:** el bloqueo al publicar **en el navegador del profesor** ni por HTTP (solo pruebas de la lógica y del marcado; hace falta una sesión de profesor); el bloqueo con dos pestañas a la vez; el efecto sobre un estudiante con progreso previo en una clase que ya tuviera un plan publicado (no existe ninguna hoy).
 
