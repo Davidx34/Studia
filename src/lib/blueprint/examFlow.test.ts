@@ -20,7 +20,9 @@ const T1 = 'Los bienes con sustitutos cercanos tienden a tener una demanda más 
 const CH: SourceChunk[] = [{ materialId: MAT, chunkIndex: 0, materialName: 'Guía', text: T0 }, { materialId: MAT, chunkIndex: 1, materialName: 'Guía', text: T1 }];
 const EXP = 'La elasticidad compara cuánto se mueve la cantidad demandada frente a un cambio del precio, y por eso la demanda se llama elástica cuando ese movimiento es grande.';
 const QUOTES = ['mide cuánto cambia la cantidad demandada cuando cambia el precio', 'tienden a tener una demanda más elástica porque el consumidor cambia fácilmente'];
-const good = (n: 1 | 2, tag = '') => ({ type: 'multiple_choice', q: `¿Qué dice el material ${n} ${tag}?`, opts: ['A. Algo distinto', 'B. Lo que el material explica', 'C. Nada que ver'], ok: 1, exp: EXP, source: { chunk: n, quote: QUOTES[n - 1] } });
+// Cada etiqueta aporta palabras propias: la generacion rechaza enunciados casi iguales.
+const stem = (tag: string): string => { const t = tag.replace(/[^A-Za-z0-9]/g, ''); return t ? `alfa${t} beta${t} gama${t} delta${t}` : ''; };
+const good = (n: 1 | 2, tag = '') => ({ type: 'multiple_choice', q: `¿Qué dice el material ${stem(`n${n}${tag}`)}?`, opts: ['A. Algo distinto', 'B. Lo que el material explica', 'C. Nada que ver'], ok: 1, exp: EXP, source: { chunk: n, quote: QUOTES[n - 1] } });
 const reply = (...qs: unknown[]) => JSON.stringify({ questions: qs });
 const judgeSays = (ok: boolean, ev = QUOTES[0], over: Record<string, unknown> = {}) => JSON.stringify({ answerSupported: ok, answerEvidence: ev, claims: [{ claim: 'c', supported: true, evidence: ev }], ambiguous: false, problems: [], ...over });
 const scripted = (replies: (string | null)[]) => {
@@ -277,5 +279,24 @@ describe('retrieveExamChunks', () => {
     expect(await retrieveExamChunks(boom, { classroomId: 'c', query: 'x', embed: async () => null })).toEqual([]);
     const noEmbed = { rpc: async () => ({ data: [R(1)], error: null }) };
     expect(await retrieveExamChunks(noEmbed, { classroomId: 'c', query: 'x', embed: async () => { throw new Error('x'); } })).toEqual([]);
+  });
+});
+
+describe('generateAndStore: no repite lo que ya hay en el banco', () => {
+  const stored = (over: Partial<BankRow>): BankRow => ({ id: 'e1', outcome_id: 'o1', node_id: 'm1', type: 'multiple_choice', q: '¿Qué mide la elasticidad precio de la demanda?', opts: null, ok: null, answers: null, keywords: null, pairs: null, exp: EXP, source_material_id: MAT, source_chunk: 0, source_quote: QUOTES[0], review_status: 'approved', judge_verdict: 'supported', judge_problems: [], ...over });
+  it('las del banco de ESA comprension (en cualquier estado) llegan al generador; las de otra comprension, no', async () => {
+    const x = deps({ gen: [reply(good(1, 'z'))], judge: [judgeSays(true)] });
+    x.d.bank = { ...x.d.bank, listQuestions: async () => [stored({}), stored({ id: 'e2', q: 'Pregunta rechazada vieja sobre otra cosa', review_status: 'rejected' }), stored({ id: 'e3', outcome_id: 'o2', q: 'Pregunta de otra comprension' })] };
+    await generateAndStore(x.d, ctx, { ...input, count: 1 });
+    expect(x.g.prompts[0]).toContain('¿Qué mide la elasticidad precio de la demanda?');
+    expect(x.g.prompts[0]).toContain('Pregunta rechazada vieja sobre otra cosa');
+    expect(x.g.prompts[0]).not.toContain('Pregunta de otra comprension');
+  });
+  it('una pregunta casi igual a la del banco no se guarda', async () => {
+    const x = deps({ gen: [reply({ ...good(1), q: '¿Qué representa la elasticidad precio de la demanda?' }), reply()], judge: [judgeSays(true)] });
+    x.d.bank = { ...x.d.bank, listQuestions: async () => [stored({})] };
+    const r = await generateAndStore(x.d, ctx, { ...input, count: 1 });
+    expect(r).toMatchObject({ ok: true, saved: 0, rejected: 1 });
+    expect(x.m.stored).toHaveLength(0);
   });
 });

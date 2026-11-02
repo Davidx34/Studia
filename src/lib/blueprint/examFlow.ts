@@ -57,7 +57,10 @@ export async function generateAndStore(deps: FlowDeps, ctx: { classroomId: strin
   const chunks = await deps.retrieve(`${outcome.statement}. ${mod.m.title}`);
   if (chunks.length === 0) return { ok: false, status: 422, error: 'No hay material procesado de la clase en que apoyar las preguntas.' };
 
-  const g = await generateExamQuestions({ plan, outcomeId: outcome.id, nodeId: mod.m.id, chunks, count }, deps.model, deps.judge);
+  // Lo que ya hay para esa comprension (en cualquier estado): la IA no debe repetirlo.
+  const existing = (await deps.bank.listQuestions(target.id)).filter((r) => r.outcome_id === outcome.id).map((r) => ({ q: r.q, type: r.type, quote: r.source_quote }));
+
+  const g = await generateExamQuestions({ plan, outcomeId: outcome.id, nodeId: mod.m.id, chunks, count, existing }, deps.model, deps.judge);
   if (!g.ok) {
     if (g.reason === 'noResponse') return { ok: false, status: 503, error: 'La IA no respondio. Intenta de nuevo en un momento.' };
     if (g.reason === 'unparseable') return { ok: false, status: 502, error: 'La IA no devolvio preguntas en un formato utilizable.' };

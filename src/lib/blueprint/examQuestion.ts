@@ -25,6 +25,10 @@ const OPTION_LETTER = /\b(opci[oó]n|alternativa|inciso|respuesta)\s+(correcta\s
 // de completar pedia "el porcentaje de cambio en la cantidad demandada dividido por el porcentaje de cambio en el precio" (15 palabras). Deben ser 1 a 5 palabras y 40 caracteres como mucho.
 export const FILL_ANSWER_LIMITS = { words: 5, chars: 40 } as const;
 
+// Un simbolo de formula SUELTO entre comas o al borde de la frase (restos de una ecuacion que el PDF no conservo): «La pendiente de la recta, − , representa...». El estudiante no puede leerlo.
+// Un signo pegado a un numero o letra («−2», «x = 5») no cuenta; tampoco «(+, −)».
+export const STRAY_SYMBOL = /(?:^|,\s*)[−–=+×÷∑∫√≤≥≠∂]\s*(?:,|\.|$)|(?:^|\s)[−–=+×÷]\s+[−–=+×÷](?=\s|$|[.,])/;
+
 export const EXAM_LIMITS = { question: 600, explanation: 1200, explanationMin: 40, quoteMin: 25, quoteMax: 400 } as const;
 
 export interface ExamQuestionSource {
@@ -99,6 +103,8 @@ export function validateExamQuestion(raw: unknown, ctx: { plan: Blueprint; chunk
   else if (comparable(exp) === comparable(q)) errors.push('La explicacion repite la pregunta.');
 
   if (FRAGMENT_MENTION.test(q) || FRAGMENT_MENTION.test(exp)) errors.push('La pregunta o la explicacion menciona un numero de fragmento: el estudiante no lo ve (la fuente se muestra aparte).');
+
+  if (STRAY_SYMBOL.test(q) || STRAY_SYMBOL.test(exp)) errors.push('La pregunta o la explicacion trae un simbolo de formula suelto (resto de una ecuacion que no se leyo bien): escribela con palabras.');
 
   if (OPTION_LETTER.test(exp)) errors.push('La explicacion senala una opcion por su letra: el examen baraja las opciones entre intentos (di el contenido de la respuesta, no la letra).');
 
