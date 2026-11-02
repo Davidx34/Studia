@@ -27,7 +27,7 @@ describe('/api/blueprint: cableado', () => {
   });
   it('guarda y publica solo con las funciones validadas de store.ts, no escribe tablas por su cuenta', () => {
     expect(route).toContain('saveDraft(db, { classroomId, teacherId: user.id }, body?.blueprint)');
-    expect(route).toContain('publishDraft(db, { classroomId })');
+    expect(route).toContain('publishDraft(db, { classroomId }, supabaseLinkDb(admin))');
     expect(route).not.toMatch(/\.from\(['"]course_blueprints['"]\)/);
   });
   it('un error inesperado responde generico, sin filtrar el mensaje de la base', () => {

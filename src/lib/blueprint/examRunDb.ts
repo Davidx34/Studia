@@ -2,6 +2,7 @@
 // ruta lo convierte en un 500 generico sin filtrar el mensaje); los rechazos ESPERADOS (sesion duplicada, evaluacion dominada, sesion vencida) se devuelven como resultado.
 
 import { supabaseBankDb } from './examBankDb';
+import { loadCourseData } from './studentData';
 import type { CloseResult, CreateResult, NewSession, RunDb, SessionRow } from './examRun';
 
 const COLUMNS = 'id, blueprint_id, classroom_id, student_id, kind, period_id, question_ids, layout, expires_at, closed_at, results, score_percent';
@@ -20,6 +21,8 @@ export function supabaseRunDb(admin: any): RunDb {
       return !!data;
     },
     listQuestions: (blueprintId) => bank.listQuestions(blueprintId),
+    // Con el cliente de servicio como `db`: no hay sesion de estudiante aqui; loadCourseData filtra por el estudiante que se le pasa.
+    courseData: (classroomId, studentId) => loadCourseData({ db: admin, admin, classroomId, studentId }),
     async openSession(blueprintId, studentId, kind, periodId) {
       let q = admin.from('exam_sessions').select(COLUMNS).eq('blueprint_id', blueprintId).eq('student_id', studentId).eq('kind', kind).is('closed_at', null);
       q = periodId === null ? q.is('period_id', null) : q.eq('period_id', periodId);

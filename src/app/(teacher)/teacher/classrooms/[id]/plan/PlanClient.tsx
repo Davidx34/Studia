@@ -17,7 +17,7 @@ import {
   setObjectiveTitle, setOutcomeText, setPeriod, toggleAssessed, toggleObjectiveOutcome,
 } from '@/lib/blueprint/edit';
 import { BLUEPRINT_LIMITS as L, type Blueprint, type Issue } from '@/lib/blueprint/types';
-import type { Link as PlanLink, RealModule } from '@/lib/blueprint/links';
+import { coverage, relevantLinks, type Link as PlanLink, type RealModule } from '@/lib/blueprint/links';
 import LinksPanel from './LinksPanel';
 import { call } from './planApi';
 
@@ -60,6 +60,8 @@ export default function PlanClient({ classroomId, className, draft, published: p
   const publishedPlan = useMemo(() => (published ? read(published.doc) : null), [published]);
   const blanks = useMemo(() => (plan ? blankFields(plan) : []), [plan]);
   const publishable = plan !== null && isPublishable(issues) && blanks.length === 0;
+  // 100 % para avanzar: un modulo sin enlazar no se puede dominar y frenaria el curso; el servidor tampoco publica asi (aqui se dice antes y se explica que falta).
+  const unlinked = useMemo(() => (plan ? coverage(plan, relevantLinks(plan, draftLinks)).pending.map((m) => m.title || '(sin título)') : []), [plan, draftLinks]);
   const weightTotal = plan ? Math.round(plan.periods.reduce((s, p) => s + p.weight, 0) * 100) / 100 : 0;
 
   const edit = (f: (b: Blueprint) => Blueprint) => {
@@ -111,7 +113,7 @@ export default function PlanClient({ classroomId, className, draft, published: p
     setBusy(null);
     setConfirmPublish(false);
     if (!r.ok) {
-      setNotice({ tone: 'error', text: r.data?.error ?? 'No se pudo publicar.', list: Array.isArray(r.data?.issues) ? (r.data.issues as Issue[]).filter((i) => i.severity === 'error').map((i) => i.message) : undefined });
+      setNotice({ tone: 'error', text: r.data?.error ?? 'No se pudo publicar.', list: Array.isArray(r.data?.unlinked) ? (r.data.unlinked as string[]).map((t) => `Sin enlazar: ${t}`) : Array.isArray(r.data?.issues) ? (r.data.issues as Issue[]).filter((i) => i.severity === 'error').map((i) => i.message) : undefined });
       return;
     }
     setPublished({ version: r.data.version, doc: plan, publishedAt: new Date().toISOString() });
@@ -400,7 +402,7 @@ export default function PlanClient({ classroomId, className, draft, published: p
                 {dirty ? 'Guardar borrador' : 'Guardado'}
               </Button>
               {!confirmPublish ? (
-                <Button variant="accent" disabled={busy !== null || dirty || savedVersion === null || !publishable} onClick={() => setConfirmPublish(true)}>
+                <Button variant="accent" disabled={busy !== null || dirty || savedVersion === null || !publishable || unlinked.length > 0} onClick={() => setConfirmPublish(true)}>
                   Publicar
                 </Button>
               ) : (
@@ -416,6 +418,11 @@ export default function PlanClient({ classroomId, className, draft, published: p
               {!confirmPublish && blanks.length > 0 && <span className="text-sm text-fg-muted">Completa los textos vacios para poder guardar.</span>}
               {!confirmPublish && blanks.length === 0 && (dirty || savedVersion === null) && <span className="text-sm text-fg-muted">Guarda el borrador para poder publicarlo.</span>}
               {!confirmPublish && blanks.length === 0 && !dirty && savedVersion !== null && !publishable && <span className="text-sm text-fg-muted">Arregla lo marcado arriba para poder publicar.</span>}
+              {!confirmPublish && blanks.length === 0 && !dirty && savedVersion !== null && publishable && unlinked.length > 0 && (
+                <span className="text-sm text-fg-muted">
+                  Enlaza todos los módulos del plan con un módulo real de la clase para poder publicar (el estudiante necesita contenido para dominarlos y avanzar). Faltan: {unlinked.join(', ')}.
+                </span>
+              )}
             </div>
             {confirmPublish && published !== null && <p className="text-sm text-fg-muted">La version {published.version} que esta publicada pasara a archivada.</p>}
           </Card>

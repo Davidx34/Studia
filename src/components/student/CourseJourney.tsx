@@ -3,7 +3,7 @@ import { CheckCircle2, Clock, Lock, Play } from 'lucide-react';
 import { Badge, Card, type BadgeTone } from '@/components/ui/Card';
 import type { CourseView, ExamState, ModuleState } from '@/lib/blueprint/studentView';
 
-// Recorrido del curso por cortes (solo lectura). Cada estado lleva ICONO y TEXTO, no solo color. No bloquea nada: el mapa de modulos de la clase sigue funcionando igual.
+// Recorrido del curso por cortes (solo lectura). Cada estado lleva ICONO y TEXTO, no solo color. Lo que aqui sale «Bloqueado» tambien lo niega el servidor (courseGate): el mapa de modulos de la clase pasa por el mismo bloqueo.
 const MODULE_STATE: Record<ModuleState, { label: string; tone: BadgeTone; icon: typeof Lock }> = {
   mastered: { label: 'Dominado', tone: 'success', icon: CheckCircle2 },
   available: { label: 'Te toca', tone: 'primary', icon: Play },
@@ -51,7 +51,7 @@ export function CourseJourney({ view, className, version, scoresAvailable, class
           {view.next.text}
         </p>
         {!scoresAvailable && <p className="text-sm text-danger">No pudimos leer tus intentos en este momento: los módulos se muestran sin nota. Intenta de nuevo más tarde.</p>}
-        <p className="text-xs text-fg-muted">Esta vista muestra tu recorrido. Por ahora puedes seguir usando el mapa de módulos de la clase como siempre.</p>
+        <p className="text-xs text-fg-muted">Los módulos se abren en orden: pasas al siguiente cuando logras 100 % en el anterior, y a la evaluación de cada corte cuando dominas todos sus módulos. Un módulo dominado se puede repasar cuando quieras.</p>
       </Card>
 
       {view.periods.map((p) => (

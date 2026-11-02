@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminSupabase, hasServiceRoleKey } from '@/lib/supabase/admin';
 import { isValidQuestion } from '@/lib/lesson/validateQuestion';
 import {
   shuffle,
@@ -24,6 +25,7 @@ import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/que
 import { withGenerationLock } from '@/lib/questions/generationLock';
 import { servableQuestions, drawQuestions } from '@/lib/questions/poolServing';
 import { startLessonAttempt } from '@/lib/grading/lessonAttempt';
+import { checkLessonAccess } from '@/lib/blueprint/lessonAccess';
 import { questionBank } from '@/lib/grading/bankAccess';
 import { markLessonInProgress } from '@/lib/grading/progressStart';
 import { gateGenerated, logGateResult } from '@/lib/jev/runtimeGate';
@@ -120,6 +122,17 @@ export async function POST(req: NextRequest) {
         // Un fallo aqui NO debe pasar callado: la clase generaria con valores por defecto.
         if (cfgError) console.error('[GENERATE_CONFIG_READ_FAILED]', { moduleId, error: cfgError.message });
         dbConfig = cfg ?? null;
+      }
+      // 100 % para avanzar (decision 2B): si el plan publicado de la clase ordena este modulo despues de uno que el estudiante aun no domina, no se sirve la leccion. Va ANTES del repaso, del
+      // cache y de la generacion: no se gasta nada en una leccion que no puede abrir. Solo bloquea a un estudiante matriculado y nunca por una falla al leer (ver lessonAccess).
+      if (modRow?.classroom_id) {
+        const {
+          data: { user: lessonUser },
+        } = await supabase.auth.getUser();
+        if (lessonUser) {
+          const gate = await checkLessonAccess({ db: supabase, admin: hasServiceRoleKey() ? createAdminSupabase() : null, userId: lessonUser.id, classroomId: modRow.classroom_id, moduleId });
+          if (!gate.allowed) return NextResponse.json({ error: gate.message, code: 'locked' }, { status: 403 });
+        }
       }
     }
     const config = resolveConfig(moduleId ? dbConfig : aiConfig);

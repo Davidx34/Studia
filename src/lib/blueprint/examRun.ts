@@ -2,12 +2,15 @@
 //
 // Reglas (docs/EVALUACIONES.md, «Sesion de examen»):
 //   - Solo un ESTUDIANTE MATRICULADO de la clase, y solo sobre un plan PUBLICADO.
+//   - La evaluacion de un corte exige haber dominado (100 %) sus modulos, y la final, todos los cortes (courseGate).
 //   - Empezar sirve preguntas APROBADAS, sin claves (presentQuestion). Si ya hay una sesion abierta y vigente, se RETOMA (mismas preguntas, mismo barajado): recargar la pagina no da otro examen.
 //   - Entregar califica contra lo que SE SIRVIO (gradeSession) y cierra de forma atomica (intento + sesion). La retroalimentacion (decision 3D) solo existe DESPUES de cerrar.
 //   - Entregar dos veces no regala otro intento: la segunda devuelve la misma retroalimentacion.
 // Los mensajes son para el estudiante: dicen que paso, nunca detalles del banco ni de la base.
 
+import { examGate } from './courseGate';
 import { parseBlueprint } from './parse';
+import type { CourseData } from './studentData';
 import type { BankRow } from './examBank';
 import { buildExamFeedback, type ExamFeedback } from './examFeedback';
 import { chunkKey, type ChunkIndex } from './examQuestion';
@@ -42,6 +45,8 @@ export interface RunDb {
   publishedPlan(classroomId: string): Promise<{ id: string; version: number; doc: unknown } | null>;
   isEnrolled(classroomId: string, studentId: string): Promise<boolean>;
   listQuestions(blueprintId: string): Promise<BankRow[]>;
+  // Lo que el estudiante ya hizo en el curso (para la regla «100 % para avanzar»).
+  courseData(classroomId: string, studentId: string): Promise<CourseData>;
   // La sesion ABIERTA (sin cerrar) de esa evaluacion, si hay; el vencimiento lo decide el flujo.
   openSession(blueprintId: string, studentId: string, kind: 'period' | 'final', periodId: string | null): Promise<SessionRow | null>;
   createSession(row: NewSession): Promise<CreateResult>;
@@ -94,6 +99,13 @@ export async function beginExam(db: RunDb, ctx: RunCtx, input: { classroomId: un
   if (!parsed.ok) return { ok: false, status: 422, error: 'Esta evaluación no se puede abrir ahora.' };
   const plan: Blueprint = parsed.blueprint;
   if (exam.kind === 'period' && !plan.periods.some((p) => p.id === exam.periodId)) return { ok: false, status: 404, error: 'Ese corte no existe.' };
+
+  // 100 % para avanzar (decision 2B): la evaluacion de un corte espera a dominar sus modulos, y la final a todos los cortes.
+  const progress = await db.courseData(input.classroomId, ctx.studentId);
+  if (progress.status === 'ok') {
+    const gate = examGate(progress, exam);
+    if (!gate.allowed) return { ok: false, status: 403, error: gate.message };
+  }
 
   const periodId = exam.kind === 'period' ? exam.periodId : null;
   const rows = await db.listQuestions(stored.id);

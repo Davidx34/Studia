@@ -4,6 +4,7 @@ import path from 'path';
 import { beginExam, submitExam, SESSION_HOURS, type CloseResult, type CreateResult, type NewSession, type RunDb, type SessionRow } from './examRun';
 import { supabaseRunDb } from './examRunDb';
 import type { BankRow } from './examBank';
+import type { CourseData } from './studentData';
 import type { Blueprint } from './types';
 
 const seeded = (seed: number) => () => {
@@ -43,7 +44,7 @@ const bank = (): BankRow[] => [
 ];
 
 // Base en memoria con las reglas de la real (sesion abierta unica, dominada, vencimiento, cierre atomico).
-function memory(o: { rows?: BankRow[]; enrolled?: boolean; published?: boolean; docOverride?: unknown } = {}) {
+function memory(o: { rows?: BankRow[]; enrolled?: boolean; published?: boolean; docOverride?: unknown; course?: CourseData } = {}) {
   const rows = o.rows ?? bank();
   const sessions: SessionRow[] = [];
   const attempts: { student: string; score: number; n: number }[] = [];
@@ -53,6 +54,7 @@ function memory(o: { rows?: BankRow[]; enrolled?: boolean; published?: boolean; 
     async publishedPlan() { calls.push('plan'); return o.published === false ? null : { id: 'bp1', version: 1, doc: o.docOverride ?? plan() }; },
     async isEnrolled(_c, s) { calls.push('enrolled'); return o.enrolled !== false && s !== OTHER; },
     async listQuestions() { return rows; },
+    async courseData() { calls.push('course'); return o.course ?? { status: 'noPlan' }; },
     async openSession(_b, s, kind, p) { return sessions.find((x) => x.student_id === s && x.kind === kind && x.period_id === p && x.closed_at === null) ?? null; },
     async createSession(r: NewSession): Promise<CreateResult> {
       calls.push('create');
@@ -221,6 +223,46 @@ describe('beginExam: empezar y retomar', () => {
     m.rows.find((r) => r.id === a.questions[0].id)!.review_status = 'rejected';
     const b = must(await beginExam(m.db, ctx(), START));
     expect(b.questions.map((q) => q.id)).toEqual(a.questions.map((q) => q.id));
+  });
+});
+
+describe('beginExam: 100 % para avanzar', () => {
+  const R1 = 'r1';
+  const R2 = 'r2';
+  const course = (mods: Record<string, number[]> = {}, exams: Record<string, number[]> = {}, scores = true): CourseData => ({
+    status: 'ok', plan: plan(), version: 1, links: [{ nodeId: 'm1', moduleId: R1 }, { nodeId: 'm2', moduleId: R2 }], realTitles: new Map(),
+    moduleAttempts: new Map(Object.entries(mods)), periodExamAttempts: new Map(Object.entries(exams)), finalExamAttempts: [], scoresAvailable: scores,
+  });
+  it('la evaluacion del corte NO se abre sin dominar sus modulos (403 con el motivo) y no crea sesion', async () => {
+    const m = memory({ course: course({ r1: [100] }) }); // falta el modulo 2
+    const r = await beginExam(m.db, ctx(), START);
+    expect(r).toMatchObject({ ok: false, status: 403 });
+    expect((r as any).error).toContain('«Corte 1»');
+    expect((r as any).error).toContain('100 %');
+    expect(m.sessions).toHaveLength(0);
+    expect(m.calls).not.toContain('create');
+  });
+  it('con todos los modulos dominados SI se abre', async () => {
+    const m = memory({ course: course({ r1: [100], r2: [100] }) });
+    expect(must(await beginExam(m.db, ctx(), START)).questions.length).toBeGreaterThan(0);
+  });
+  it('la final espera a los cortes: con el corte sin evaluar, 403', async () => {
+    const m = memory({ course: course({ r1: [100], r2: [100] }) });
+    expect(await beginExam(m.db, ctx(), { classroomId: CLS, kind: 'final' })).toMatchObject({ ok: false, status: 403 });
+    const ok = memory({ course: course({ r1: [100], r2: [100] }, { p1: [100] }) });
+    expect(must(await beginExam(ok.db, ctx(), { classroomId: CLS, kind: 'final' })).questions.length).toBeGreaterThan(0);
+  });
+  it('sin poder leer los intentos no se bloquea; sin plan que leer tampoco', async () => {
+    expect(must(await beginExam(memory({ course: course({}, {}, false) }).db, ctx(), START)).questions.length).toBeGreaterThan(0);
+    expect(must(await beginExam(memory({ course: { status: 'unreadable' } }).db, ctx(), START)).questions.length).toBeGreaterThan(0);
+  });
+  it('el orden: matricula y plan publicado primero, luego el bloqueo, y solo entonces el banco y la sesion', async () => {
+    const m = memory({ enrolled: false, course: course() });
+    await beginExam(m.db, ctx(), START);
+    expect(m.calls).toEqual(['enrolled']);
+    const g = memory({ course: course() });
+    await beginExam(g.db, ctx(), START);
+    expect(g.calls).toEqual(['enrolled', 'plan', 'course']);
   });
 });
 
