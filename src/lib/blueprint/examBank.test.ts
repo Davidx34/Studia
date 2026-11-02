@@ -251,14 +251,14 @@ describe('ruta /api/exam-bank', () => {
     expect(route).not.toMatch(/body\??\.(reviewerId|reviewed_by|userId)/);
   });
   it('valida accion, id de clase y tamano del cuerpo antes de tocar nada', () => {
-    expect(route).toContain("if (body?.action !== 'review') return fail(400, 'accion invalida');");
+    expect(route).toContain("if (action !== 'review' && action !== 'generate') return fail(400, 'accion invalida');");
     expect(route).toContain("if (!UUID_RE.test(classroomId)) return fail(400, 'classroomId invalido');");
     expect(route).toContain('if (text.length > MAX_BODY_CHARS) return fail(413');
     expect(idx('MAX_BODY_CHARS)')).toBeLessThan(idx('JSON.parse'));
     expect(idx('JSON.parse')).toBeLessThan(idx('createServerSupabase()'));
   });
   it('solo revisa con reviewQuestion y no escribe ni lee la tabla por su cuenta', () => {
-    expect(route).toContain('reviewQuestion(supabaseBankDb(createAdminSupabase() as any), { classroomId, reviewerId: user.id }, body?.questionId, body?.decision)');
+    expect(route).toContain('reviewQuestion(supabaseBankDb(admin), { classroomId, reviewerId: user.id }, body?.questionId, body?.decision)');
     expect(route).not.toMatch(/\.from\('exam_questions'\)/);
   });
   it('un error inesperado responde generico, sin filtrar el mensaje de la base', () => {
@@ -270,6 +270,25 @@ describe('ruta /api/exam-bank', () => {
   });
   it('NUNCA devuelve el contenido de una pregunta (solo el nuevo estado)', () => {
     expect(route).toContain('NextResponse.json({ ok: true, status: r.status })');
+  });
+  it('generar: ids y proveedor de IA se comprueban ANTES del cupo, y el cupo ANTES de llamar a la IA; la propiedad antes que todo', () => {
+    expect(route).toContain("if (typeof body?.outcomeId !== 'string' || !ID_RE.test(body.outcomeId) || typeof body?.nodeId !== 'string' || !ID_RE.test(body.nodeId)) return fail(400");
+    expect(route).toContain("if (!hasStudyProvider()) return fail(503, 'No hay un proveedor de IA configurado.');");
+    expect(route).toContain('QUOTA_POLICIES.examGenerate');
+    expect(route).toContain("status: 429, headers: { 'Retry-After'");
+    expect(idx("fail(404, 'Clase no encontrada')")).toBeLessThan(idx('consumeQuota('));
+    expect(idx('ID_RE.test(body.outcomeId)')).toBeLessThan(idx('consumeQuota('));
+    expect(idx('hasStudyProvider()')).toBeLessThan(idx('consumeQuota('));
+    expect(idx('consumeQuota(')).toBeLessThan(idx('generateAndStore('));
+  });
+  it('generar: sin un proveedor distinto del que escribe NO hay juez (se dice, no se finge)', () => {
+    expect(route).toContain('judge: hasJudgeProvider() ? callJudgeModel : undefined,');
+    expect(route).toContain('model: callStudyModel,');
+  });
+  it('generar: la recuperacion del material esta acotada a la clase del profesor y el resumen no incluye contenido', () => {
+    expect(route).toContain('retrieve: (query) => retrieveExamChunks(admin, { classroomId, query }),');
+    expect(route).toContain('const { ok: _ok, ...summary } = r;');
+    expect(route).not.toMatch(/accepted|\.question/);
   });
 });
 

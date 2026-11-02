@@ -21,6 +21,10 @@ const FRAGMENT_MENTION = /\b(fragmento|trozo|chunk|pasaje)\s*(n[.º°o]*\s*)?\d+
 // opcion equivocada. La explicacion debe decir el contenido, no la letra. (Hoy las lecciones NO barajan las opciones de opcion multiple; el examen deberia hacerlo: ver docs/EVALUACIONES.md.)
 const OPTION_LETTER = /\b(opci[oó]n|alternativa|inciso|respuesta)\s+(correcta\s+)?(es\s+)?[«"'“(]?\s*[A-H]\s*[.)»"'”]?(?=[\s,.;:]|$)|['"“«]\s*[A-H][.)]\s/i;
 
+// Completar el espacio se califica por texto EXACTO (sin tildes ni mayusculas): una respuesta esperada que es una frase entera la acierta casi nadie. Medido con material real: una pregunta
+// de completar pedia "el porcentaje de cambio en la cantidad demandada dividido por el porcentaje de cambio en el precio" (15 palabras). Deben ser 1 a 5 palabras y 40 caracteres como mucho.
+export const FILL_ANSWER_LIMITS = { words: 5, chars: 40 } as const;
+
 export const EXAM_LIMITS = { question: 600, explanation: 1200, explanationMin: 40, quoteMin: 25, quoteMax: 400 } as const;
 
 export interface ExamQuestionSource {
@@ -114,6 +118,15 @@ export function validateExamQuestion(raw: unknown, ctx: { plan: Blueprint; chunk
       else if (!quoteIsInChunk(quote, chunk.text)) errors.push('La cita NO aparece en el material citado (puede estar inventada o alterada).');
       else source = { materialId, chunkIndex, quote };
     }
+  }
+
+  if (type === 'fill_blank' && Array.isArray(raw.answers)) {
+    const tooLong = raw.answers.filter((a): a is string => typeof a === 'string').find((a) => a.trim().length > FILL_ANSWER_LIMITS.chars || a.trim().split(/\s+/).length > FILL_ANSWER_LIMITS.words);
+    if (tooLong !== undefined) errors.push(`La respuesta de completar es demasiado larga (maximo ${FILL_ANSWER_LIMITS.words} palabras y ${FILL_ANSWER_LIMITS.chars} caracteres): se califica por texto exacto y casi nadie la acertaria. Usa una pregunta de respuesta corta.`);
+    // La respuesta no puede estar ya escrita en el enunciado (medido con material real: "La pendiente de la recta, ____, mide..." con respuesta "pendiente").
+    const padded = ` ${comparable(q)} `;
+    const leaked = raw.answers.filter((a): a is string => typeof a === 'string').find((a) => comparable(a).length >= 4 && padded.includes(` ${comparable(a)} `));
+    if (leaked !== undefined) errors.push('La pregunta de completar ya contiene la respuesta en su propio enunciado.');
   }
 
   // 5. Que se pueda calificar y no sea ambigua (JEV-1), con los calificadores reales.
