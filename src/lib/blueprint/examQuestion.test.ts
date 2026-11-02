@@ -23,7 +23,7 @@ const good = (over: Record<string, unknown> = {}) => ({
   q: '¿Qué mide la elasticidad precio de la demanda?',
   opts: ['A. El cambio de la cantidad demandada ante un cambio del precio', 'B. El costo de producir un bien', 'C. La utilidad total del consumidor'],
   ok: 0,
-  exp: 'La elasticidad precio de la demanda compara cuánto se mueve la cantidad demandada frente a un cambio del precio; por eso la opción A es la definición, y las otras miden costos o utilidad.',
+  exp: 'La elasticidad precio de la demanda compara cuánto se mueve la cantidad demandada frente a un cambio del precio; por eso esa es la definición, y las otras alternativas miden costos o utilidad.',
   source: { materialId: MAT, chunkIndex: 3, quote: 'mide cuánto cambia la cantidad demandada cuando cambia el precio' },
   ...over,
 });
