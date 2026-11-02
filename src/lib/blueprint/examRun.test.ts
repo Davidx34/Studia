@@ -357,6 +357,15 @@ describe('submitExam', () => {
   });
 });
 
+describe('mensajes para el estudiante', () => {
+  it('llevan tildes (se probo en pantalla: «evaluacion» sin tilde desentona con el resto)', () => {
+    const src = fs.readFileSync(path.join(process.cwd(), 'src/lib/blueprint/examRun.ts'), 'utf8');
+    const messages = Array.from(src.matchAll(/error: '([^']*)'/g)).map((m) => m[1]);
+    expect(messages.length).toBeGreaterThan(10);
+    for (const m of messages) expect(m, m).not.toMatch(/(evaluacion|sesion|pagina|todavia|abrias|hacias|acabo|guardo|entrego|retroalimentacion|valida|cambio mientras)|(esta|estas) (disponible|lista|matriculado)/i);
+  });
+});
+
 // ───────── adaptador
 function fakeAdmin(script: Record<string, any>) {
   const log: { table: string; op: string; args: unknown[] }[] = [];

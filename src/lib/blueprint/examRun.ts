@@ -83,15 +83,15 @@ function present(session: SessionRow, rows: readonly BankRow[]): PresentedQuesti
 
 export async function beginExam(db: RunDb, ctx: RunCtx, input: { classroomId: unknown; kind: unknown; periodId?: unknown }): Promise<StartOutcome> {
   const now = (ctx.now ?? (() => new Date()))();
-  if (typeof input.classroomId !== 'string' || !UUID_RE.test(input.classroomId)) return { ok: false, status: 400, error: 'La clase no es valida.' };
+  if (typeof input.classroomId !== 'string' || !UUID_RE.test(input.classroomId)) return { ok: false, status: 400, error: 'La clase no es válida.' };
   const exam = examOf(input.kind, input.periodId);
-  if (!exam) return { ok: false, status: 400, error: 'La evaluacion no es valida.' };
+  if (!exam) return { ok: false, status: 400, error: 'La evaluación no es válida.' };
 
-  if (!(await db.isEnrolled(input.classroomId, ctx.studentId))) return { ok: false, status: 403, error: 'No estas matriculado en esta clase.' };
+  if (!(await db.isEnrolled(input.classroomId, ctx.studentId))) return { ok: false, status: 403, error: 'No estás matriculado en esta clase.' };
   const stored = await db.publishedPlan(input.classroomId);
-  if (!stored) return { ok: false, status: 404, error: 'Esta evaluacion todavia no esta disponible.' };
+  if (!stored) return { ok: false, status: 404, error: 'Esta evaluación todavía no está disponible.' };
   const parsed = parseBlueprint(stored.doc);
-  if (!parsed.ok) return { ok: false, status: 422, error: 'Esta evaluacion no se puede abrir ahora.' };
+  if (!parsed.ok) return { ok: false, status: 422, error: 'Esta evaluación no se puede abrir ahora.' };
   const plan: Blueprint = parsed.blueprint;
   if (exam.kind === 'period' && !plan.periods.some((p) => p.id === exam.periodId)) return { ok: false, status: 404, error: 'Ese corte no existe.' };
 
@@ -102,22 +102,22 @@ export async function beginExam(db: RunDb, ctx: RunCtx, input: { classroomId: un
   const open = await db.openSession(stored.id, ctx.studentId, exam.kind, periodId);
   if (open && new Date(open.expires_at).getTime() > now.getTime()) {
     const questions = present(open, rows);
-    if (!questions) return { ok: false, status: 409, error: 'Esta evaluacion cambio mientras la hacias. Pide al profesor que la revise.' };
+    if (!questions) return { ok: false, status: 409, error: 'Esta evaluación cambió mientras la hacías. Pide al profesor que la revise.' };
     return { ok: true, sessionId: open.id, expiresAt: open.expires_at, resumed: true, questions };
   }
 
   const started = startExam({ plan, rows, exam, rng: ctx.rng });
-  if (!started.ok) return { ok: false, status: 422, error: 'Esta evaluacion todavia no esta lista: faltan preguntas aprobadas por el profesor.' };
+  if (!started.ok) return { ok: false, status: 422, error: 'Esta evaluación todavía no está lista: faltan preguntas aprobadas por el profesor.' };
 
   const expiresAt = new Date(now.getTime() + SESSION_HOURS * 3600_000).toISOString();
   const created = await db.createSession({ blueprint_id: stored.id, classroom_id: input.classroomId, student_id: ctx.studentId, kind: exam.kind, period_id: periodId, question_ids: started.questionIds, layout: started.layout, expires_at: expiresAt });
   if (!created.ok) {
-    if (created.reason === 'mastered') return { ok: false, status: 409, error: 'Ya dominaste esta evaluacion (100 %): no se repite.' };
-    if (created.reason === 'conflict') return { ok: false, status: 409, error: 'Ya tienes esta evaluacion abierta. Recarga la pagina para retomarla.' };
-    return { ok: false, status: 422, error: 'Esta evaluacion no se puede abrir ahora.' };
+    if (created.reason === 'mastered') return { ok: false, status: 409, error: 'Ya dominaste esta evaluación (100 %): no se repite.' };
+    if (created.reason === 'conflict') return { ok: false, status: 409, error: 'Ya tienes esta evaluación abierta. Recarga la página para retomarla.' };
+    return { ok: false, status: 422, error: 'Esta evaluación no se puede abrir ahora.' };
   }
   const questions = present(created.session, rows);
-  if (!questions) return { ok: false, status: 409, error: 'Esta evaluacion cambio mientras la abrias. Intenta de nuevo.' };
+  if (!questions) return { ok: false, status: 409, error: 'Esta evaluación cambió mientras la abrías. Inténtalo de nuevo.' };
   return { ok: true, sessionId: created.session.id, expiresAt: created.session.expires_at, resumed: false, questions };
 }
 
@@ -151,13 +151,13 @@ async function planOf(db: RunDb, session: SessionRow): Promise<Blueprint | null>
 
 export async function submitExam(db: RunDb, ctx: RunCtx, input: { sessionId: unknown; answers: unknown }): Promise<SubmitOutcome> {
   const now = (ctx.now ?? (() => new Date()))();
-  if (typeof input.sessionId !== 'string' || !UUID_RE.test(input.sessionId)) return { ok: false, status: 400, error: 'La sesion no es valida.' };
+  if (typeof input.sessionId !== 'string' || !UUID_RE.test(input.sessionId)) return { ok: false, status: 400, error: 'La sesión no es válida.' };
   const session = await db.getSession(input.sessionId, ctx.studentId);
-  if (!session) return { ok: false, status: 404, error: 'No encontramos esa evaluacion.' };
+  if (!session) return { ok: false, status: 404, error: 'No encontramos esa evaluación.' };
 
   const rows = await db.listQuestions(session.blueprint_id);
   const plan = await planOf(db, session);
-  if (!plan) return { ok: false, status: 409, error: 'Esta evaluacion ya no esta disponible.' };
+  if (!plan) return { ok: false, status: 409, error: 'Esta evaluación ya no está disponible.' };
 
   // Ya cerrada: la misma retroalimentacion, sin otro intento.
   if (session.closed_at !== null && session.results && session.score_percent !== null) {
@@ -165,20 +165,20 @@ export async function submitExam(db: RunDb, ctx: RunCtx, input: { sessionId: unk
     if (!feedback) return { ok: false, status: 409, error: 'No se pudo recuperar el resultado.' };
     return { ok: true, alreadyClosed: true, attemptNumber: null, scorePercent: session.score_percent, mastered: session.score_percent >= 100, feedback };
   }
-  if (new Date(session.expires_at).getTime() <= now.getTime()) return { ok: false, status: 410, error: 'Se acabo el tiempo de esta evaluacion. Empieza una nueva.' };
+  if (new Date(session.expires_at).getTime() <= now.getTime()) return { ok: false, status: 410, error: 'Se acabó el tiempo de esta evaluación. Empieza una nueva.' };
 
   const served = session.question_ids.map((id) => rows.find((r) => r.id === id));
-  if (served.some((r) => !r)) return { ok: false, status: 409, error: 'Esta evaluacion cambio mientras la hacias. Pide al profesor que la revise.' };
+  if (served.some((r) => !r)) return { ok: false, status: 409, error: 'Esta evaluación cambió mientras la hacías. Pide al profesor que la revise.' };
   const graded = gradeSession({ rows: served as BankRow[], layout: session.layout, answers: input.answers });
 
   const closed = await db.closeSession(session.id, graded.results, graded.scorePercent);
   if (!closed.ok) {
-    if (closed.reason === 'expired') return { ok: false, status: 410, error: 'Se acabo el tiempo de esta evaluacion. Empieza una nueva.' };
-    if (closed.reason === 'mastered') return { ok: false, status: 409, error: 'Ya dominaste esta evaluacion (100 %): no se repite.' };
+    if (closed.reason === 'expired') return { ok: false, status: 410, error: 'Se acabó el tiempo de esta evaluación. Empieza una nueva.' };
+    if (closed.reason === 'mastered') return { ok: false, status: 409, error: 'Ya dominaste esta evaluación (100 %): no se repite.' };
     // 'closed': otra entrega la cerro justo antes; 'missing': desaparecio.
-    return { ok: false, status: 409, error: 'Esta evaluacion ya se entrego. Recarga la pagina.' };
+    return { ok: false, status: 409, error: 'Esta evaluación ya se entregó. Recarga la página.' };
   }
   const feedback = await feedbackOf(db, session, plan, rows, graded.results);
-  if (!feedback) return { ok: false, status: 409, error: 'Se guardo tu resultado pero no se pudo armar la retroalimentacion. Recarga la pagina.' };
+  if (!feedback) return { ok: false, status: 409, error: 'Se guardó tu resultado pero no se pudo armar la retroalimentación. Recarga la página.' };
   return { ok: true, alreadyClosed: false, attemptNumber: closed.attemptNumber, scorePercent: graded.scorePercent, mastered: graded.scorePercent >= 100, feedback };
 }
