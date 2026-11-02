@@ -40,7 +40,7 @@ Al cerrar el examen el estudiante ve **todas** las preguntas, marcando cuáles l
 | `exam.ts` — `composeExam` | Elige qué preguntas entran, por comprensión y repartidas entre módulos; no arma un examen que no cubre todo | **Hecha** (reescrita para 1B) |
 | `examFeedback.ts` | Construye la retroalimentación 3D y los módulos a repasar | **Hecha** |
 | `examGenerate.ts` + `npm run eval:exam-gen` | Generación con IA de preguntas de examen por comprensión y módulo, con todo validado, y su medición con el modelo real | **Hecha** (ver «Medición real»); sin llamador |
-| Banco de preguntas de examen | Tabla nueva (migración, **sin aplicar** hasta tu autorización): solo la lee el servidor (tiene las claves); estado de revisión | Pendiente |
+| Banco de preguntas de examen (migración 088, `examBank.ts`, `/api/exam-bank`) | Tabla `exam_questions` con las claves (solo la lee el profesor dueño; **jamás un estudiante**), estado de revisión (pendiente / aprobada / rechazada) y lo que dijo el juez; guardar lo generado, aprobar/rechazar, y armar el banco que usa `composeExam` | **Hecha, migración SIN aplicar** |
 | Generación con IA | Por comprensión: recuperar los trozos de material relevantes, generar, validar con `validateExamQuestion`, guardar; con cupo por profesor; **`eval` con el modelo real** antes de ofrecerlo | Pendiente |
 | Revisión del profesor | El profesor ve cada pregunta (con su cita y explicación) y la aprueba o rechaza; solo las aprobadas entran a un examen | Pendiente |
 | Sesión de examen | Tabla propia que fija **qué preguntas se sirvieron** a ese estudiante en ese intento | Pendiente |
@@ -95,3 +95,20 @@ De 46 módulos activos, 24 tienen banco de preguntas de lección y 22 no tienen 
 **De extremo a extremo** (`npm run eval:exam-gen -- --juez`, 5 casos): el juez rechazó entre 2 y 4 preguntas por corrida que habían pasado todas las demás validaciones, y la tasa global de preguntas aceptadas bajó de ~70 % a ~63 %. Cuesta **una llamada extra por pregunta aceptada** (más que generarla en tokens de entrada por mandar todo el material); sin medir en dinero.
 
 **Límites que hay que tener presentes:** 24 casos escritos por mí (no apuntes reales), 3 materiales, un solo juez (Gemini u otro de la cadena `judge`, según las llaves); si el generador cae a un proveedor que sea también el del juez, el sesgo de «juzgarse a sí mismo» vuelve (hoy el generador usa Cohere primero y el juez lo excluye, pero el generador puede caer a Groq/Gemini y no se registra cuál respondió).
+
+## Banco de preguntas de examen (migración 088, **sin aplicar**)
+
+**Tabla `exam_questions`.** Cada pregunta pertenece a **una versión del plan** (no se copia entre versiones: los ids de módulo pueden reutilizarse con otro significado al regenerar) y nace **atada** a tres cosas que **la base comprueba**: la comprensión que mide y el módulo donde se ve (el módulo debe estar en un objetivo que contribuye a esa comprensión; los ids viajan como variables de `jsonpath`, no concatenados), el **material de la misma clase** (con la cita) y una explicación de fondo. Un tipo solo puede ser de los 5 que el servidor califica y la **forma de la clave** la exige la base según el tipo (opción correcta dentro del rango, verdadero/falso booleano, respuestas no vacías, ≥ 2 parejas…).
+
+**Seguridad.**
+- La tabla **tiene las claves de calificación**: la lee solo el profesor dueño (para revisar) y el servidor. **No hay ninguna política para estudiantes**: se verificó que un estudiante matriculado, con el plan **publicado** y la pregunta **aprobada**, ve **0 filas**.
+- Nadie escribe desde el navegador (solo `SELECT`); escribe el servidor tras comprobar sesión y propiedad.
+- Una pregunta **nace siempre pendiente** (la base rechaza insertarla aprobada).
+- **El contenido no se edita** (enunciado, clave, explicación, material, cita, veredicto y motivos del juez): lo que el profesor aprobó es lo que se sirve. Para cambiarla se rechaza y se genera otra. Solo cambia la revisión, y revisada ⇔ tiene fecha de revisión.
+- «No juzgada por el juez» (`not_judged`) **no es lo mismo que aprobada**; solo el profesor aprueba, y un examen solo usa las aprobadas.
+
+**Servidor.** `examBank.ts` (base inyectada, probada): guardar lo generado (con el veredicto y los motivos del juez; un enunciado repetido se cuenta y no tira las demás), `reviewQuestion` (el profesor aprueba o rechaza; valida id y decisión antes de tocar nada; la base comprueba que la pregunta es de **esa clase**; `pending` no es una decisión válida), `approvedPool` (solo ids y tipos de las **aprobadas**, lo que consume `composeExam`) y `bankSummary` (por comprensión: aprobadas, pendientes, rechazadas y cuántas piden atención; una comprensión **sin aprobadas** no se puede examinar). `POST /api/exam-bank` con la acción `review` (sesión + dueño de la clase; el revisor sale de la sesión; nunca devuelve el contenido de la pregunta).
+
+**Verificada contra la base real sin aplicarla** (transacción revertida, 28 comprobaciones): pregunta válida; módulo que no enseña la comprensión, inexistente o con caracteres raros; comprensión inexistente; material de otra clase; nace aprobada; enunciado repetido; forma de la clave por tipo (5 casos); explicación y cita cortas; aprobar sin fecha; editar enunciado, clave y veredicto; rechazar después de aprobar; RLS de profesor / **estudiante** / otro usuario / anon; insertar, actualizar y borrar desde el navegador; plan archivado; cascada al borrar el plan. Después se confirmó que no quedó nada (la tabla no existe).
+
+**Todavía no hace nada visible:** nadie guarda preguntas en esta tabla (falta la ruta que genera, con la recuperación del material y el cupo) ni hay pantalla de revisión.
