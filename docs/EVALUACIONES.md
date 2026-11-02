@@ -42,7 +42,7 @@ Al cerrar el examen el estudiante ve **todas** las preguntas, marcando cuáles l
 | `examGenerate.ts` + `npm run eval:exam-gen` | Generación con IA de preguntas de examen por comprensión y módulo, con todo validado, y su medición con el modelo real | **Hecha** (ver «Medición real»); sin llamador |
 | Banco de preguntas de examen (migración 088, `examBank.ts`, `/api/exam-bank`) | Tabla `exam_questions` con las claves (solo la lee el profesor dueño; **jamás un estudiante**), estado de revisión (pendiente / aprobada / rechazada) y lo que dijo el juez; guardar lo generado, aprobar/rechazar, y armar el banco que usa `composeExam` | **Hecha, migración SIN aplicar** |
 | Generación con IA (`examChunks.ts`, `examFlow.ts`, acción `generate` de `/api/exam-bank`) | Por comprensión y módulo: recupera los trozos de material relevantes (búsqueda híbrida real de la clase), genera, valida, pasa el juez y guarda **pendiente**; con cupo por profesor (`examGenerate`: 3/min, 20/h, 80/día). Devuelve solo un resumen, nunca el contenido | **Hecha** (ver «Generación con material real»); sin pantalla |
-| Revisión del profesor | El profesor ve cada pregunta (con su cita y explicación) y la aprueba o rechaza; solo las aprobadas entran a un examen | Pendiente |
+| Revisión del profesor (`examReviewView.ts`, pantalla `/teacher/classrooms/[id]/plan/examen`) | Por comprensión: cada pregunta con su clave, explicación, material y cita, y el aviso del juez; aprobar o rechazar; lo que pide atención (juez sin decidir o sin pasar) va primero; botón para generar más. Se lee con la sesión del profesor (RLS) y se escribe por `/api/exam-bank` | **Hecha**; verificada con pruebas de marcado, **no vista en navegador con datos reales** |
 | Sesión de examen | Tabla propia que fija **qué preguntas se sirvieron** a ese estudiante en ese intento | Pendiente |
 | Calificación y cierre | Reusar los calificadores; escribir `exam_attempts` (el trigger de la 085 asigna el número y bloquea repetir tras un 100 %); entregar la retroalimentación 3D | Pendiente |
 | Pantalla del estudiante | Tomar el examen y ver la retroalimentación | Pendiente |
@@ -111,7 +111,7 @@ De 46 módulos activos, 24 tienen banco de preguntas de lección y 22 no tienen 
 
 **Verificada contra la base real sin aplicarla** (transacción revertida, 28 comprobaciones): pregunta válida; módulo que no enseña la comprensión, inexistente o con caracteres raros; comprensión inexistente; material de otra clase; nace aprobada; enunciado repetido; forma de la clave por tipo (5 casos); explicación y cita cortas; aprobar sin fecha; editar enunciado, clave y veredicto; rechazar después de aprobar; RLS de profesor / **estudiante** / otro usuario / anon; insertar, actualizar y borrar desde el navegador; plan archivado; cascada al borrar el plan. Después se confirmó que no quedó nada (la tabla no existe).
 
-**Todavía sin pantalla:** el profesor aún no puede ver ni aprobar las preguntas desde la interfaz (la acción `review` existe en la ruta); y nada sirve el examen a un estudiante.
+**Pantalla de revisión hecha; nada sirve aún el examen a un estudiante.**
 
 ## Generación con material real (2026-11-02, `scripts/probe-exam-gen.ts`, solo lectura)
 

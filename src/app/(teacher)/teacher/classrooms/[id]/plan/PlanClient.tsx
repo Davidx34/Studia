@@ -4,6 +4,7 @@
 // edita, y recien entonces lo guarda y lo publica. La IA nunca guarda ni publica por si sola. Las reglas se comprueban en vivo (checkBlueprint, el mismo codigo que usa el servidor);
 // el servidor vuelve a validar todo al guardar y al publicar.
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { ListChecks, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -16,7 +17,7 @@ import {
   setObjectiveTitle, setOutcomeText, setPeriod, toggleAssessed, toggleObjectiveOutcome,
 } from '@/lib/blueprint/edit';
 import { BLUEPRINT_LIMITS as L, type Blueprint, type Issue } from '@/lib/blueprint/types';
-import type { Link, RealModule } from '@/lib/blueprint/links';
+import type { Link as PlanLink, RealModule } from '@/lib/blueprint/links';
 import LinksPanel from './LinksPanel';
 import { call } from './planApi';
 
@@ -33,13 +34,13 @@ const read = (doc: unknown): Blueprint | null => {
   return r.ok ? r.blueprint : null;
 };
 
-export default function PlanClient({ classroomId, className, draft, published: publishedInit, tableMissing, modules, draftLinks: draftLinksInit, publishedLinks: publishedLinksInit }: { classroomId: string; className: string; draft: StoredPlan | null; published: StoredPlan | null; tableMissing: boolean; modules: RealModule[]; draftLinks: Link[]; publishedLinks: Link[] }) {
+export default function PlanClient({ classroomId, className, draft, published: publishedInit, tableMissing, modules, draftLinks: draftLinksInit, publishedLinks: publishedLinksInit }: { classroomId: string; className: string; draft: StoredPlan | null; published: StoredPlan | null; tableMissing: boolean; modules: RealModule[]; draftLinks: PlanLink[]; publishedLinks: PlanLink[] }) {
   const initial = draft ? read(draft.doc) : null;
   // El plan publicado vive en el estado: al publicar uno nuevo, "editar una copia" debe partir de ESE y no del que llego con la pagina.
   const [published, setPublished] = useState<StoredPlan | null>(publishedInit);
   // Los enlaces guardados de cada version; viven aqui para no perderse al editar y volver a mostrar el panel.
-  const [draftLinks, setDraftLinks] = useState<Link[]>(draftLinksInit);
-  const [publishedLinks, setPublishedLinks] = useState<Link[]>(publishedLinksInit);
+  const [draftLinks, setDraftLinks] = useState<PlanLink[]>(draftLinksInit);
+  const [publishedLinks, setPublishedLinks] = useState<PlanLink[]>(publishedLinksInit);
   const [plan, setPlan] = useState<Blueprint | null>(initial);
   const [savedVersion, setSavedVersion] = useState<number | null>(draft && initial ? draft.version : null);
   const [dirty, setDirty] = useState(false);
@@ -151,6 +152,11 @@ export default function PlanClient({ classroomId, className, draft, published: p
             {savedVersion ? ` Borrador guardado: version ${savedVersion}.` : ''}
           </p>
         </div>
+        {(published || savedVersion) && (
+          <Link href={`/teacher/classrooms/${classroomId}/plan/examen`} className="ml-auto inline-flex min-h-[44px] items-center text-sm font-semibold text-primary-text underline underline-offset-2">
+            Preguntas de examen
+          </Link>
+        )}
       </header>
 
       <Card className="border-line-strong p-4 text-sm text-fg-muted">
