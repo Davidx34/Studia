@@ -14,6 +14,13 @@ import type { Blueprint } from './types';
 export const EXAM_TYPES = ['multiple_choice', 'true_false', 'fill_blank', 'short_answer', 'match'] as const;
 export type ExamType = (typeof EXAM_TYPES)[number];
 
+// El estudiante NO ve los fragmentos numerados con que se le dio el material a la IA: una explicacion que dice "como se menciona en el fragmento 2" no le dice nada (y la fuente se muestra aparte).
+const FRAGMENT_MENTION = /\b(fragmento|trozo|chunk|pasaje)\s*(n[.º°o]*\s*)?\d+\b|\[\d+\]/i;
+
+// El examen se REPITE (hasta el 100 %) y conviene barajar las opciones entre intentos para que no se memorice la posicion: una explicacion que dice "la respuesta correcta es la B" senalaria la
+// opcion equivocada. La explicacion debe decir el contenido, no la letra. (Hoy las lecciones NO barajan las opciones de opcion multiple; el examen deberia hacerlo: ver docs/EVALUACIONES.md.)
+const OPTION_LETTER = /\b(opci[oó]n|alternativa|inciso|respuesta)\s+(correcta\s+)?(es\s+)?[«"'“(]?\s*[A-H]\s*[.)»"'”]?(?=[\s,.;:]|$)|['"“«]\s*[A-H][.)]\s/i;
+
 export const EXAM_LIMITS = { question: 600, explanation: 1200, explanationMin: 40, quoteMin: 25, quoteMax: 400 } as const;
 
 export interface ExamQuestionSource {
@@ -86,6 +93,10 @@ export function validateExamQuestion(raw: unknown, ctx: { plan: Blueprint; chunk
   if (exp.length < EXAM_LIMITS.explanationMin) errors.push(`Falta la explicacion de fondo (al menos ${EXAM_LIMITS.explanationMin} caracteres: por que esa es la respuesta).`);
   else if (exp.length > EXAM_LIMITS.explanation) errors.push(`La explicacion pasa de ${EXAM_LIMITS.explanation} caracteres.`);
   else if (comparable(exp) === comparable(q)) errors.push('La explicacion repite la pregunta.');
+
+  if (FRAGMENT_MENTION.test(q) || FRAGMENT_MENTION.test(exp)) errors.push('La pregunta o la explicacion menciona un numero de fragmento: el estudiante no lo ve (la fuente se muestra aparte).');
+
+  if (OPTION_LETTER.test(exp)) errors.push('La explicacion senala una opcion por su letra: el examen baraja las opciones entre intentos (di el contenido de la respuesta, no la letra).');
 
   // 4. El material explicito: existe el trozo y la cita esta en el.
   const src = isObj(raw.source) ? raw.source : null;

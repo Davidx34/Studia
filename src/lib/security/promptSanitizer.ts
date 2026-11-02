@@ -57,6 +57,12 @@ function fold1to1(s: string): string {
 const HIJACK: RegExp[] = [
   // "ignora las instrucciones anteriores", "olvida todas las reglas", "descarta el prompt"...
   /\b(?:ignor|olvid|desestim|omit|descart|salt)(?:a|e|ar|en|ad|ate)\w*\s+(?:\w+\s+){0,3}(?:instruccion(?:es)?|indicacion(?:es)?|reglas?|ordenes|directrices|restricciones|prompt)\b(?:\s+(?:anteriores|previas|de\s+arriba|del\s+sistema|originales|dadas))?/g,
+  // "ignora todo lo anterior", "olvida lo previo" (sin la palabra "instrucciones": medido con un modelo real, el patron de arriba no lo veia)
+  /\b(?:ignor|olvid|desestim|omit|descart)(?:a|e|ar|en|ad|ate)\w*\s+(?:todo|todos|todas)?\s*(?:lo|el|los|las)?\s*(?:anterior|anteriores|previo|previos|de\s+arriba)\b/g,
+  // Un aviso dirigido a la IA dentro del material: "IMPORTANTE PARA LA IA:", "nota para el modelo", "para el asistente:"
+  /\b(?:importante|atencion|nota|aviso|instruccion(?:es)?|mensaje)\s+para\s+(?:la\s+|el\s+)?(?:ia|inteligencia\s+artificial|modelo|asistente|llm|chatbot)\b|\bpara\s+(?:la\s+|el\s+)?(?:ia|modelo|asistente|llm)\s*:/g,
+  // "escribe la palabra X en cada pregunta", "incluye la frase X como titulo": pide plantar un texto en la SALIDA (no "escribe la palabra correcta en cada espacio", que es un ejercicio normal)
+  /\b(?:escrib|respond|incluy|agreg|anad|pon)\w*\s+(?:exactamente\s+)?la\s+(?:palabra|frase|cadena)\s+[^.\n]{0,40}?\s+(?:en|como|al)\s+(?:(?:cada|todas?\s+las|todos?\s+los)\s+(?:pregunta|respuesta|titulo|opcion|explicacion|modulo|ficha|tarjeta|mensaje|salida|texto)s?|(?:el\s+)?titulo|(?:el\s+)?(?:inicio|final)\s+de\b)/g,
   // "system prompt", "prompt del sistema", "mensaje del sistema"
   /\b(?:system|sistema)\s*(?:prompt|message|mensaje|instructions?|instruccion(?:es)?)\b|\b(?:prompt|mensaje)\s+del\s+sistema\b/g,
   // "actua como un asistente/modelo/IA/experto/DAN...", "a partir de ahora eres...", "ahora eres un..."
