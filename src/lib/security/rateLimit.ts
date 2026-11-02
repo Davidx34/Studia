@@ -29,6 +29,14 @@ export const QUOTA_POLICIES = {
       { seconds: 86400, limit: 150 },
     ],
   },
+  blueprintGenerate: {
+    bucket: 'blueprint.gen',
+    rules: [
+      { seconds: 60, limit: 2 },
+      { seconds: 3600, limit: 12 },
+      { seconds: 86400, limit: 40 },
+    ],
+  },
   labDesign: {
     bucket: 'lab.design',
     rules: [
