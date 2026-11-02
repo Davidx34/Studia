@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gradeSession, presentQuestion, servedFromRow, startExam, stripOptionLetter, type SessionLayout } from './examSession';
+import { FILL_EXTRA_WORDS, gradeFillBlank, gradeSession, presentQuestion, servedFromRow, startExam, stripOptionLetter, type SessionLayout } from './examSession';
 import type { BankRow } from './examBank';
 import type { Blueprint } from './types';
 
@@ -163,3 +163,65 @@ describe('servedFromRow', () => {
     expect(servedFromRow(MC)).toMatchObject({ id: 'mc', outcomeId: 'o1', nodeId: 'm1', type: 'multiple_choice', q: 'Pregunta mc', exp: 'Explicacion de fondo de la pregunta mc', source: { materialId: 'mat', chunkIndex: 1, quote: 'cita mc' } });
   });
 });
+
+describe('gradeFillBlank: palabra completa, no «contiene»', () => {
+  it('el caso real medido: «inelastica» NO es «elastica»', () => {
+    expect(gradeFillBlank('elástica', ['elástica'])).toBe(true);
+    expect(gradeFillBlank('inelástica', ['elástica'])).toBe(false);
+    expect(gradeFillBlank('la demanda es inelástica', ['elástica'])).toBe(false);
+  });
+  it('sin tildes, mayusculas ni puntuacion; la respuesta puede ir dentro de una frase corta', () => {
+    expect(gradeFillBlank('ELASTICA', ['elástica'])).toBe(true);
+    expect(gradeFillBlank('  Es elástica.  ', ['elástica'])).toBe(true);
+    expect(gradeFillBlank('la demanda es elástica', ['elástica'])).toBe(true);
+  });
+  it('expresiones de varias palabras: en ese orden y seguidas', () => {
+    expect(gradeFillBlank('el costo de oportunidad', ['costo de oportunidad'])).toBe(true);
+    expect(gradeFillBlank('oportunidad de costo', ['costo de oportunidad'])).toBe(false);
+    expect(gradeFillBlank('costo oportunidad', ['costo de oportunidad'])).toBe(false);
+    expect(gradeFillBlank('costo de la oportunidad', ['costo de oportunidad'])).toBe(false);
+  });
+  it('una lista larga de terminos NO pasa (tope de palabras de mas)', () => {
+    expect(FILL_EXTRA_WORDS).toBe(3);
+    expect(gradeFillBlank('uno dos tres elástica', ['elástica'])).toBe(true); // 4 palabras = 1 + 3
+    expect(gradeFillBlank('uno dos tres cuatro elástica', ['elástica'])).toBe(false); // 5 palabras
+    expect(gradeFillBlank('elástica inelástica unitaria perfectamente rigida', ['elástica'])).toBe(false);
+    // el tope cuenta sobre la respuesta MAS LARGA: una expresion de 3 palabras admite 3 de mas
+    expect(gradeFillBlank('a b c costo de oportunidad', ['costo de oportunidad'])).toBe(true);
+    expect(gradeFillBlank('a b c d costo de oportunidad', ['costo de oportunidad'])).toBe(false);
+  });
+  it('vacio, solo signos o respuesta esperada vacia: nunca acierta', () => {
+    expect(gradeFillBlank('', ['elástica'])).toBe(false);
+    expect(gradeFillBlank('   ', ['elástica'])).toBe(false);
+    expect(gradeFillBlank('¿?!', ['elástica'])).toBe(false);
+    expect(gradeFillBlank('algo', [''])).toBe(false);
+    expect(gradeFillBlank('algo', [])).toBe(false);
+    expect(gradeFillBlank('algo', ['elástica', '...'])).toBe(false);
+    // una respuesta esperada que no tiene palabras no se «salta»: no se puede calificar a medias
+    expect(gradeFillBlank('elástica', ['elástica', '...'])).toBe(false);
+    // el tope usa la respuesta mas larga cuando hay varias
+    expect(gradeFillBlank('a b costo de oportunidad elástica', ['elástica', 'costo de oportunidad'])).toBe(true);
+    expect(gradeFillBlank('a b c costo de oportunidad elástica', ['elástica', 'costo de oportunidad'])).toBe(false);
+  });
+  it('si hubiera varias respuestas, hacen falta TODAS (como en el resto de la app)', () => {
+    expect(gradeFillBlank('elástica y rigida', ['elástica', 'rigida'])).toBe(true);
+    expect(gradeFillBlank('elástica', ['elástica', 'rigida'])).toBe(false);
+  });
+  it('numeros y una sola letra tambien se comparan como palabras enteras', () => {
+    expect(gradeFillBlank('x', ['x'])).toBe(true);
+    expect(gradeFillBlank('exceso', ['x'])).toBe(false);
+    expect(gradeFillBlank('el valor es 15', ['15'])).toBe(true);
+    expect(gradeFillBlank('150', ['15'])).toBe(false);
+  });
+  it('gradeSession lo usa: «inelastica» falla y «elastica» acierta; texto que no es cadena, falla', () => {
+    const fb = row({ id: 'fbx', type: 'fill_blank', opts: null, ok: null, answers: ['elástica'] });
+    const g = (text: unknown) => gradeSession({ rows: [fb], layout: {}, answers: { fbx: { text } } }).results.fbx;
+    expect(g('elástica')).toBe(true);
+    expect(g('inelástica')).toBe(false);
+    expect(g(5)).toBe(false);
+    expect(g(undefined)).toBe(false);
+    expect(gradeSession({ rows: [fb], layout: {}, answers: {} }).results.fbx).toBe(false);
+    expect(gradeSession({ rows: [fb], layout: {}, answers: { fbx: 'elástica' } }).results.fbx).toBe(false);
+  });
+});
+

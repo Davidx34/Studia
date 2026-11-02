@@ -84,6 +84,17 @@ describe('preguntas de completar: respuestas cortas y sin pista', () => {
   it('si UNA de varias respuestas aceptadas es larga, se rechaza', () => {
     expect(errs(fill('Es ____.', ['elástica', 'una frase mucho mas larga de lo que se puede pedir aqui']))).toContain('demasiado larga');
   });
+  it('el examen admite UNA respuesta de completar (varias «aceptadas» se calificarian como «todas a la vez»)', () => {
+    expect(errs(fill('Si la elasticidad es mayor que uno, la demanda es ____.', ['elástica', 'elasticas']))).toContain('exactamente UNA respuesta');
+    expect(errs(fill('Si la elasticidad es mayor que uno, la demanda es ____.', []))).toContain('exactamente UNA respuesta');
+    expect(fill('Si la elasticidad es mayor que uno, la demanda es ____.', ['elástica']).ok).toBe(true);
+  });
+  it('y UN solo espacio en blanco', () => {
+    expect(errs(fill('La demanda es elástica cuando el cambio es grande.', ['porcentual']))).toContain('exactamente un espacio');
+    expect(errs(fill('La demanda es ____ cuando el cambio es ____.', ['porcentual']))).toContain('exactamente un espacio');
+    expect(fill('La demanda es elástica cuando el cambio es ______.', ['porcentual']).ok).toBe(true); // mas de tres guiones bajos sigue siendo UN espacio
+    expect(errs(fill('La demanda es __ cuando el cambio es porcentual.', ['elástica']))).toContain('exactamente un espacio'); // dos guiones bajos no son un espacio
+  });
   it('la regla solo aplica a completar (una palabra clave larga en respuesta corta no se toca aqui)', () => {
     const r = validateExamQuestion({ outcomeId: 'o1', nodeId: 'm1', type: 'short_answer', q: '¿Cuándo es elástica la demanda?', keywords: ['cuando la elasticidad precio de la demanda es mayor que uno'], exp: 'Cuando la elasticidad es mayor que uno, la demanda es elástica porque los consumidores reaccionan mucho.', source: { materialId: MAT, chunkIndex: 0, quote: 'mide cuánto cambia la cantidad demandada cuando cambia el precio' } }, { plan: plan(), chunks: chunks() });
     expect(errs(r)).not.toContain('demasiado larga');

@@ -7,6 +7,7 @@
 //      guardan una letra al inicio («A. ...»); al barajar, la letra deja de coincidir con la posicion, asi que se QUITA y la pantalla pone las letras por posicion.
 
 import { gradeAnswer } from '@/lib/grading/gradeAnswer';
+import { normalizeAnswer } from '@/lib/lesson/normalize';
 import { approvedPool, type BankRow } from './examBank';
 import { composeExam, type ComposeResult, type ExamKind } from './exam';
 import type { ServedQuestion } from './examFeedback';
@@ -87,6 +88,22 @@ export function presentQuestion(row: BankRow, layout: QuestionLayout | undefined
   return out;
 }
 
+// COMPLETAR en un examen se califica por PALABRA COMPLETA, no por «contiene». El calificador de las lecciones acepta «inelastica» para la respuesta «elastica» (la contiene) y acepta una lista
+// de todos los terminos del tema (medido): en una evaluacion que se repite hasta el 100 % eso regala puntos. Aqui la respuesta debe aparecer como palabras enteras y el texto no puede ser una
+// lista larga (como mucho 3 palabras mas que la respuesta; «la demanda es elastica» cabe). LIMITE conocido: con 3 palabras de mas todavia se puede «apostar» a dos terminos. Sin tildes ni mayusculas; la puntuacion no cuenta. El examen solo admite UNA respuesta por pregunta de completar (examQuestion).
+export const FILL_EXTRA_WORDS = 3;
+const fillWords = (s: string): string[] => normalizeAnswer(s).replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+
+export function gradeFillBlank(text: string, answers: readonly string[]): boolean {
+  const given = fillWords(text);
+  const wanted = answers.map(fillWords).filter((w) => w.length > 0);
+  if (wanted.length === 0 || wanted.length !== answers.length || given.length === 0) return false;
+  const longest = Math.max(...wanted.map((w) => w.length));
+  if (given.length > longest + FILL_EXTRA_WORDS) return false;
+  const has = (w: string[]) => given.some((_, i) => w.every((x, k) => given[i + k] === x));
+  return wanted.every(has);
+}
+
 export interface GradedExam {
   results: Record<string, boolean>;
   correct: number;
@@ -108,6 +125,11 @@ export function gradeSession(args: { rows: readonly BankRow[]; layout: SessionLa
       const perm = args.layout[row.id]?.opts;
       const sel = a && typeof a === 'object' ? (a as { selectedIndex?: unknown }).selectedIndex : undefined;
       answer = perm && typeof sel === 'number' && Number.isInteger(sel) && sel >= 0 && sel < perm.length ? { selectedIndex: perm[sel] } : undefined;
+    }
+    if (row.type === 'fill_blank') {
+      const text = a && typeof a === 'object' ? (a as { text?: unknown }).text : undefined;
+      results[row.id] = typeof text === 'string' && gradeFillBlank(text, asStrings(row.answers));
+      continue;
     }
     const g = gradeAnswer({ type: row.type, ok: row.ok, answers: row.answers, keywords: row.keywords, pairs: row.pairs }, answer);
     results[row.id] = g.status === 'graded' && g.correct;

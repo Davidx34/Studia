@@ -129,6 +129,9 @@ export function validateExamQuestion(raw: unknown, ctx: { plan: Blueprint; chunk
   if (type === 'fill_blank' && Array.isArray(raw.answers)) {
     const tooLong = raw.answers.filter((a): a is string => typeof a === 'string').find((a) => a.trim().length > FILL_ANSWER_LIMITS.chars || a.trim().split(/\s+/).length > FILL_ANSWER_LIMITS.words);
     if (tooLong !== undefined) errors.push(`La respuesta de completar es demasiado larga (maximo ${FILL_ANSWER_LIMITS.words} palabras y ${FILL_ANSWER_LIMITS.chars} caracteres): se califica por texto exacto y casi nadie la acertaria. Usa una pregunta de respuesta corta.`);
+    // El examen admite UNA respuesta y UN espacio: dos «respuestas aceptadas» se calificarian como «las dos a la vez» y varios espacios no se pueden calificar por separado.
+    if (raw.answers.length !== 1) errors.push('La pregunta de completar debe tener exactamente UNA respuesta (no una lista de alternativas).');
+    if ((q.match(/_{3,}/g) ?? []).length !== 1) errors.push('La pregunta de completar debe tener exactamente un espacio en blanco (____).');
     // La respuesta no puede estar ya escrita en el enunciado (medido con material real: "La pendiente de la recta, ____, mide..." con respuesta "pendiente").
     const padded = ` ${comparable(q)} `;
     const leaked = raw.answers.filter((a): a is string => typeof a === 'string').find((a) => comparable(a).length >= 4 && padded.includes(` ${comparable(a)} `));

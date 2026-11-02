@@ -182,3 +182,14 @@ Las dos propuestas del dueño, aplicadas en el **servidor** (lo que la pantalla 
 
 **No verificado:** el bloqueo al publicar **en el navegador del profesor** ni por HTTP (solo pruebas de la lógica y del marcado; hace falta una sesión de profesor); el bloqueo con dos pestañas a la vez; el efecto sobre un estudiante con progreso previo en una clase que ya tuviera un plan publicado (no existe ninguna hoy).
 
+## Completar en un examen: palabra completa y una sola respuesta
+
+**Defecto hallado** (al revisar qué calificaba `gradeAnswer` para el examen, medido): para la respuesta «elástica», el calificador de las lecciones **acepta «inelástica»** (la *contiene*), acepta «la demanda no es inelástica» y acepta una lista de términos del tema; y con dos «respuestas aceptadas» exige **las dos a la vez** (es la semántica de la app: todas deben aparecer), aunque el generador las trataba como alternativas. En una evaluación que se repite hasta el 100 %, eso regala puntos.
+
+**Arreglo, solo para exámenes** (los calificadores de las lecciones no se tocan: es la decisión abierta del hueco de subcadena):
+- `gradeFillBlank` (en `examSession.ts`): la respuesta debe aparecer como **palabras enteras**, en ese orden y seguidas, sin tildes ni mayúsculas ni puntuación, y el texto no puede pasar de la respuesta más larga **+ 3 palabras** («la demanda es elástica» cabe; una lista no).
+- `validateExamQuestion`: una pregunta de completar tiene **exactamente una respuesta y un solo espacio** (`____`). El prompt lo pide y pide cuidar que el opuesto o la negación no se confundan con la respuesta.
+- Aprovechando la medición con el modelo real: el prompt ahora exige **escribir todo en español** (en una de tres tandas salió una pregunta en inglés a partir de un fragmento en inglés del material; con la regla, 3 de 3 tandas en español).
+
+**Límites que quedan:** con hasta 3 palabras de más todavía se puede «apostar» a dos términos; las preguntas de **respuesta corta** siguen calificándose por «contiene cada palabra clave» (como las lecciones); y las lecciones conservan el hueco. La medición del prompt nuevo es de 3 tandas de una sola clase.
+
