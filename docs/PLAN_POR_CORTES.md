@@ -184,3 +184,17 @@ Debajo del editor, **«Enlazar con los módulos de la clase»**: cada módulo de
 **Todavía no hace nada que vea el estudiante**: los enlaces quedan guardados, pero ninguna pantalla de estudiante los usa aún.
 
 Verificada en un navegador real (servidor simulado): sugerencias, mover un módulo, guardar (el envío lleva solo los enlaces vigentes), editar el plan y volver (los enlaces se conservan), publicar (los enlaces pasan al publicado), escritorio y teléfono sin desbordamiento.
+
+## Vista del estudiante: «Recorrido del curso» (`/my-classes/[id]/course`)
+
+Primera pantalla que ve el **estudiante**. **Solo lectura y aditiva**: no reemplaza el mapa de módulos de la clase ni bloquea nada (decisión por defecto, revísala; el bloqueo real por «100 % para avanzar» sería un cambio aparte que sí cambia lo que puede abrir). Aparece como botón **«Recorrido del curso»** en la página de la clase **solo si hay un plan publicado**.
+
+Qué muestra, con las reglas ya fijadas en `progress.ts`:
+- **Tu nota hasta ahora** (promedio ponderado sobre lo ya calificado: lo que falta **no cuenta como cero**) y **módulos dominados** (X de Y).
+- Por corte: lo que vale del curso, la nota del corte (70 % módulos + 30 % evaluación) y cada módulo con su estado — **Dominado** (algún intento al 100 %), **Te toca** (el primero sin dominar), **Bloqueado** (hay uno anterior sin dominar) o **Pendiente de contenido** (sin módulo real enlazado, que por la regla del 100 % también frena lo que sigue) — con intentos y nota (**promedio de todos sus intentos**). «Abrir»/«Repasar» llevan a la lección real; un módulo bloqueado o pendiente no tiene enlace.
+- **Evaluación de cada corte y evaluación final** (medio corte): se muestra su estado en el recorrido, pero **la app todavía no permite tomarlas** y la pantalla lo dice.
+- Lo siguiente que le toca, en una frase.
+
+Datos (`studentData.ts`): el plan publicado, sus enlaces y los módulos reales se leen con la **sesión del estudiante** (la RLS decide qué ve); un enlace a un módulo que no ve o que está inactivo no cuenta. Los **intentos terminados** de las lecciones los lee el servidor con la llave de servicio (`lesson_attempts` no tiene permisos para el navegador), **siempre filtrados por el estudiante de la sesión y por los módulos enlazados**; sin llave o si falla, se muestran los módulos sin nota y se avisa. Los intentos de evaluación se leen por RLS (hoy no hay ninguno).
+
+Pendiente: tomar las evaluaciones (contenido, calificación en el servidor, `exam_attempts`), y decidir si el avance por dominio **se hace cumplir** en la app (hoy la página de la clase ya bloquea por «módulo anterior completado», que es otro criterio que el 100 %).
