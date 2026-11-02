@@ -14,6 +14,7 @@
     "eval:lab-design": "npx tsx --env-file=.env.local scripts/eval-lab-design.ts",
     "eval:blueprint": "npx tsx --env-file=.env.local scripts/eval-blueprint.ts",
     "eval:exam-gen": "npx tsx --env-file=.env.local scripts/eval-exam-gen.ts",
+    "eval:exam-judge": "npx tsx --env-file=.env.local scripts/eval-exam-judge.ts",
     "eval:rag-sweep": "npx tsx --env-file=.env.local scripts/eval-rag-sweep.ts",
     "eval:generation": "npx tsx --env-file=.env.local scripts/eval-generation.ts",
     "retire:questions": "npx tsx --env-file=.env.local scripts/retire-questions.ts",

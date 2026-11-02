@@ -8,10 +8,12 @@
 //   npx tsx --env-file=.env.local scripts/eval-exam-gen.ts
 //   npx tsx --env-file=.env.local scripts/eval-exam-gen.ts --guardar
 //   npx tsx --env-file=.env.local scripts/eval-exam-gen.ts --preguntas     (imprime las preguntas aceptadas para leerlas)
+//   npx tsx --env-file=.env.local scripts/eval-exam-gen.ts --juez          (pasa cada pregunta por el JUEZ DE SUSTENTO: otro modelo, sin Cohere)
 
 import fs from 'fs';
 import path from 'path';
 import { callStudyModel } from '../src/lib/study/generate';
+import { callJudgeModel, hasJudgeProvider } from '../src/lib/blueprint/examJudgeModel';
 import { generateExamQuestions } from '../src/lib/blueprint/examGenerate';
 import { formatReport } from '../src/lib/evals/common';
 import { runExamGenEval } from '../src/lib/evals/examGenEval';
@@ -19,12 +21,17 @@ import { EXAM_GEN_GOLDEN } from '../src/lib/evals/golden/examGenGolden';
 
 const save = process.argv.includes('--guardar');
 const showQuestions = process.argv.includes('--preguntas');
+const withJudge = process.argv.includes('--juez');
 
 async function main() {
+  if (withJudge && !hasJudgeProvider()) {
+    console.error('--juez necesita un proveedor distinto de Cohere (GEMINI_API_KEY, GROQ_API_KEY...).');
+    process.exit(1);
+  }
   const out: Record<string, unknown> = {};
   let current = '';
-  const generate: typeof generateExamQuestions = async (input, model) => {
-    const r = await generateExamQuestions(input, model);
+  const generate: typeof generateExamQuestions = async (input, model, judge) => {
+    const r = await generateExamQuestions(input, model, judge);
     out[current] = r;
     return r;
   };
@@ -32,7 +39,7 @@ async function main() {
   const report = await runExamGenEval(EXAM_GEN_GOLDEN, (c) => {
     current = c.id;
     return callStudyModel;
-  }, { generate });
+  }, { generate, judge: withJudge ? () => callJudgeModel : undefined });
   console.log(formatReport(report));
 
   if (showQuestions) {

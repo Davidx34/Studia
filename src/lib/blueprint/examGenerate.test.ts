@@ -309,3 +309,73 @@ describe('generateExamQuestions: limites y material hostil', () => {
     expect(JSON.stringify([p, c])).toBe(before);
   });
 });
+
+// ───────── juez de sustento integrado
+const jtext = (...c: string[]) => c;
+const judgeSays = (answerSupported: boolean, evidence = QUOTES[0], over: Record<string, unknown> = {}) =>
+  JSON.stringify({ answerSupported, answerEvidence: evidence, claims: [{ claim: 'ok', supported: true, evidence }], ambiguous: false, problems: [], ...over });
+
+describe('generateExamQuestions con juez de sustento', () => {
+  const withJudge = async (genReplies: (string | null)[], judgeReplies: (string | null)[], over: Partial<Parameters<typeof generateExamQuestions>[0]> = {}) => {
+    const g = scripted(genReplies);
+    const j = scripted(judgeReplies);
+    const r = await generateExamQuestions({ plan: plan(), outcomeId: 'o1', nodeId: 'm1', chunks: chunks(), count: 3, ...over }, g.model, j.model);
+    return { r, gen: g, judge: j };
+  };
+  it('sin juez: judged=false y nada esta "aprobado" por el (se dice)', async () => {
+    const { r } = await run([reply(good(1))], { count: 1 });
+    if (!r.ok) throw new Error('fallo');
+    expect(r).toMatchObject({ judged: false, rejectedByJudge: 0, judgeCalls: 0, needsReview: [] });
+  });
+  it('con juez: una pregunta respaldada entra y se cuenta la llamada', async () => {
+    const { r } = await withJudge([reply(good(1))], [judgeSays(true)], { count: 1 });
+    if (!r.ok) throw new Error('fallo');
+    expect(r).toMatchObject({ judged: true, rejectedByJudge: 0, judgeCalls: 1 });
+    expect(r.accepted).toHaveLength(1);
+  });
+  it('una pregunta NO respaldada se rechaza con los motivos del juez y no entra', async () => {
+    const { r } = await withJudge([reply(good(1))], [judgeSays(false)], { count: 1 });
+    if (!r.ok) throw new Error('fallo');
+    expect(r.accepted).toHaveLength(0);
+    // el generador reintenta una vez (la respuesta de prueba se repite) y el juez vuelve a rechazar: cuenta los dos rechazos
+    expect(r.rejectedByJudge).toBe(r.modelCalls);
+    expect(r.rejectedByJudge).toBeGreaterThanOrEqual(1);
+    expect(r.rejected[0].errors.join(' ')).toContain('no esta respaldada');
+  });
+  it('una pregunta que el juez no puede decidir (ambigua) ENTRA pero queda marcada para revision', async () => {
+    const { r } = await withJudge([reply(good(1))], [judgeSays(true, QUOTES[0], { ambiguous: true })], { count: 1 });
+    if (!r.ok) throw new Error('fallo');
+    expect(r.accepted).toHaveLength(1);
+    expect(r.needsReview).toHaveLength(1);
+    expect(r.needsReview[0]).toMatchObject({ verdict: 'unclear' });
+  });
+  it('un juez que no responde deja las preguntas para revision (NUNCA como aprobadas sin mirar)', async () => {
+    const { r } = await withJudge([reply(good(1))], [null], { count: 1 });
+    if (!r.ok) throw new Error('fallo');
+    expect(r.accepted).toHaveLength(1);
+    expect(r.needsReview).toHaveLength(1);
+    expect(r.needsReview[0].problems[0]).toContain('No se pudo juzgar');
+  });
+  it('el juez recibe el MISMO material que se le dio al generador, no uno distinto', async () => {
+    const { judge } = await withJudge([reply(good(1))], [judgeSays(true)], { count: 1 });
+    for (const t of [T0, T1, T2]) expect(judge.prompts[0]).toContain(t.slice(0, 40));
+  });
+  it('el juez NO se gasta en lo que ya se rechazo antes (cita inventada, repetida, o sobre el presupuesto por cita)', async () => {
+    const bad = good(1, 'x', { source: { chunk: 1, quote: 'frase inventada que no aparece en el material de ningun modo' } });
+    const { judge } = await withJudge([reply(bad, good(1, 'a'), good(1, 'b'), good(1, 'c'))], [judgeSays(true), judgeSays(true)], { count: 3, chunks: [chunks()[0]] });
+    expect(judge.prompts).toHaveLength(2); // solo las 2 que cabian en el presupuesto de la cita
+  });
+  it('si el juez rechaza, el reintento del generador pide las que faltan', async () => {
+    const { r, gen } = await withJudge([reply(good(1)), reply(good(2))], [judgeSays(false), judgeSays(true, QUOTES[1])], { count: 1 });
+    if (!r.ok) throw new Error('fallo');
+    expect(r.accepted).toHaveLength(1);
+    expect(r.modelCalls).toBe(2);
+    expect(gen.prompts[1]).toContain('Tu intento anterior tuvo estos problemas');
+    expect(gen.prompts[1]).toContain('no esta respaldada');
+  });
+  it('el generador y el juez son llamadores DISTINTOS (cada uno recibe su prompt)', async () => {
+    const { gen, judge } = await withJudge([reply(good(1))], [judgeSays(true)], { count: 1 });
+    expect(gen.prompts[0]).toContain('Escribes preguntas de EXAMEN');
+    expect(judge.prompts[0]).toContain('verificador de hechos MUY ESTRICTO');
+  });
+});

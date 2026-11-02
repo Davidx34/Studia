@@ -21,7 +21,7 @@ const producing =
     const count = typeof n === 'function' ? n(c) : n;
     const accepted = Array.from({ length: count }, (_, i) => q(i, types[i % types.length]));
     tweak?.(accepted, c);
-    return { ok: true, accepted, rejected: Array.from({ length: rej }, () => ({ errors: ['La cita NO aparece en el material citado (x)'] })), excludedChunks: [], modelCalls: 1 };
+    return { ok: true, accepted, rejected: Array.from({ length: rej }, () => ({ errors: ['La cita NO aparece en el material citado (x)'] })), excludedChunks: [], judged: false, rejectedByJudge: 0, needsReview: [], modelCalls: 1, judgeCalls: 0 };
   };
 const run = (gen: GenerateFn, cases: ExamGenCase[] = EXAM_GEN_GOLDEN) => runExamGenEval(cases, () => async () => null, { generate: gen });
 const good = () => producing((c) => (isScarce(c) ? 2 : 5), ['multiple_choice', 'true_false', 'fill_blank']);
@@ -75,7 +75,7 @@ describe('eval:exam-gen', () => {
     const gen: GenerateFn = async (input) => {
       const c = EXAM_GEN_GOLDEN.find((x) => x.chunks === input.chunks)!;
       const n = c.id === empty ? 0 : isScarce(c) ? 2 : 5;
-      return { ok: true, accepted: Array.from({ length: n }, (_, i) => q(i, ['multiple_choice', 'true_false'][i % 2])), rejected: [], excludedChunks: [], modelCalls: 1 };
+      return { ok: true, accepted: Array.from({ length: n }, (_, i) => q(i, ['multiple_choice', 'true_false'][i % 2])), rejected: [], excludedChunks: [], judged: false, rejectedByJudge: 0, needsReview: [], modelCalls: 1, judgeCalls: 0 };
     };
     const r = await run(gen);
     expect(r.metrics.typeVariety).toBe(2);
@@ -114,7 +114,7 @@ describe('eval:exam-gen', () => {
     const gen: GenerateFn = async (input) => {
       const c = EXAM_GEN_GOLDEN.find((x) => x.chunks === input.chunks)!;
       const n = isScarce(c) ? 2 : 5;
-      return { ok: true, accepted: Array.from({ length: n }, (_, i) => q(i, ['multiple_choice', 'true_false'][i % 2])), rejected: [], excludedChunks: c.hostile ? [{ materialId: 'x', chunkIndex: 1 }] : [], modelCalls: 1 };
+      return { ok: true, accepted: Array.from({ length: n }, (_, i) => q(i, ['multiple_choice', 'true_false'][i % 2])), rejected: [], excludedChunks: c.hostile ? [{ materialId: 'x', chunkIndex: 1 }] : [], judged: false, rejectedByJudge: 0, needsReview: [], modelCalls: 1, judgeCalls: 0 };
     };
     const r = await run(gen);
     expect(r.metrics.excludedChunks).toBe(1);

@@ -7,6 +7,7 @@
 
 import { extractJsonObject } from '@/lib/study/validate';
 import { fenceMaterial, sanitizeMaterialText } from '@/lib/security/promptSanitizer';
+import { judgeExamQuestion, type JudgeVerdict } from './examJudge';
 import { chunkKey, comparable, EXAM_TYPES, validateExamQuestion, type ChunkIndex, type ExamQuestion } from './examQuestion';
 import type { Blueprint } from './types';
 
@@ -31,7 +32,9 @@ export interface Rejected {
 export type GenerateExamResult =
   // excludedChunks: trozos que el sanitizador marco como INTENTO DE SECUESTRO (ordenes dirigidas a la IA dentro del material): no se le dan al modelo. Citar la frase no basta para frenarlo
   // (medido con un modelo real: obedecio el resto de la orden), asi que el trozo entero se deja fuera y se informa para que el profesor lo revise.
-  | { ok: true; accepted: ExamQuestion[]; rejected: Rejected[]; excludedChunks: { materialId: string; chunkIndex: number }[]; modelCalls: number }
+  // judged: si se paso el JUEZ DE SUSTENTO. Sin juez, ninguna pregunta esta comprobada contra el material mas alla de su cita (NO es lo mismo que "aprobada").
+  // needsReview: preguntas aceptadas por las que el juez no pudo decidir (ambiguas o no juzgables): el profesor debe mirarlas con atencion.
+  | { ok: true; accepted: ExamQuestion[]; rejected: Rejected[]; excludedChunks: { materialId: string; chunkIndex: number }[]; judged: boolean; rejectedByJudge: number; needsReview: { question: ExamQuestion; verdict: JudgeVerdict; problems: string[] }[]; modelCalls: number; judgeCalls: number }
   | { ok: false; reason: 'noChunks' | 'unknownTarget' | 'noResponse' | 'unparseable'; message: string; modelCalls: number };
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -62,7 +65,7 @@ function prompt(plan: Blueprint, outcomeId: string, nodeId: string, shown: Sourc
     .join('\n');
 }
 
-export async function generateExamQuestions(input: { plan: Blueprint; outcomeId: string; nodeId: string; chunks: readonly SourceChunk[]; count: number }, model: ModelCaller): Promise<GenerateExamResult> {
+export async function generateExamQuestions(input: { plan: Blueprint; outcomeId: string; nodeId: string; chunks: readonly SourceChunk[]; count: number }, model: ModelCaller, judge?: ModelCaller): Promise<GenerateExamResult> {
   const { plan, outcomeId, nodeId } = input;
   const owner = plan.periods.flatMap((p) => p.objectives).find((ob) => ob.modules.some((m) => m.id === nodeId));
   if (!plan.outcomes.some((o) => o.id === outcomeId) || !owner || !owner.outcomeIds.includes(outcomeId)) {
@@ -81,7 +84,10 @@ export async function generateExamQuestions(input: { plan: Blueprint; outcomeId:
   const rejected: Rejected[] = [];
   const seen = new Set<string>();
   const perQuote = new Map<string, number>();
+  const needsReview: { question: ExamQuestion; verdict: JudgeVerdict; problems: string[] }[] = [];
   let calls = 0;
+  let judgeCalls = 0;
+  let rejectedByJudge = 0;
   let feedback: string[] = [];
   let gotText = false;
   let parsedAny = false;
@@ -127,6 +133,18 @@ export async function generateExamQuestions(input: { plan: Blueprint; outcomeId:
         reasons.add(`Cada cita del material sostiene como maximo ${GEN_LIMITS.maxPerQuote} preguntas: usa partes distintas del material`);
         continue;
       }
+      // El juez de sustento va DESPUES de lo barato (validacion, repetidas, presupuesto por cita): solo se gasta en preguntas que ya podrian entrar.
+      if (judge) {
+        const j = await judgeExamQuestion(v.question, shown, judge);
+        judgeCalls += j.modelCalls;
+        if (j.verdict === 'unsupported') {
+          rejectedByJudge++;
+          rejected.push({ errors: j.problems, q: v.question.q.slice(0, 120) });
+          j.problems.forEach((e) => reasons.add(e));
+          continue;
+        }
+        if (j.verdict === 'unclear') needsReview.push({ question: v.question, verdict: j.verdict, problems: j.problems });
+      }
       perQuote.set(quoteKey, (perQuote.get(quoteKey) ?? 0) + 1);
       seen.add(key);
       accepted.push(v.question);
@@ -136,5 +154,5 @@ export async function generateExamQuestions(input: { plan: Blueprint; outcomeId:
 
   if (!gotText) return { ok: false, reason: 'noResponse', message: 'La IA no respondio.', modelCalls: calls };
   if (!parsedAny) return { ok: false, reason: 'unparseable', message: 'La IA no devolvio preguntas en el formato pedido.', modelCalls: calls };
-  return { ok: true, accepted, rejected, excludedChunks, modelCalls: calls };
+  return { ok: true, accepted, rejected, excludedChunks, judged: !!judge, rejectedByJudge, needsReview, modelCalls: calls, judgeCalls };
 }
