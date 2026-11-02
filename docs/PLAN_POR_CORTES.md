@@ -143,3 +143,15 @@ Código: `src/lib/blueprint/generate.ts` (puro, el modelo se inyecta).
 *Por qué es aceptable hoy:* la descripción la escribe el propio profesor, el resultado es un **borrador** que él revisa y nunca se publica solo, y se muestra como texto. *Cuándo deja de serlo:* si el motor empieza a alimentarse de material de terceros (los `topics` de la memoria de la clase). Entonces hay que cerrarlo con una **defensa de salida** (detectar texto copiado del insumo y repetido en muchos títulos) y volver a hacerlo compuerta, no con más prompt.
 
 Observaciones leyendo los planes (a ojo, una sola corrida): los cortes de «Biología celular» repiten objetivos (ciclo celular y síntesis de proteínas aparecen en dos cortes, algo permitido porque una comprensión puede evaluarse en varios); el último corte de «Cálculo diferencial» tiene un solo objetivo de tres módulos.
+
+## Pantalla del profesor: pestaña «Plan del curso» (`/teacher/classrooms/[id]/plan`)
+
+Primer uso real de todo lo anterior. Flujo: **borrador del curso** (nombre, descripción, nº de cortes, comprensiones opcionales) → **«Desarrollar con IA»** (`generate`) o **«Empezar en blanco»** → **editar** el plan (comprensiones, cortes con su peso y lo que evalúa cada uno, objetivos y módulos; las reglas de `checkBlueprint` se muestran **en vivo**, el mismo código que usa el servidor) → **«Guardar borrador»** (`save`) → **«Publicar»** (`publish`, con un segundo paso de confirmación).
+
+- La pantalla **lee** con la sesión del profesor (RLS de la 085) y **escribe solo** por `/api/blueprint`; el navegador no toca la base.
+- Lo que la IA devuelve es un borrador **sin guardar**: nada se guarda ni se publica solo.
+- Publicar **no cambia todavía lo que ven los estudiantes** (se dice en la propia pantalla): los módulos del plan aún no se enlazan con `content_modules` ni hay pantalla de estudiante.
+- Con un plan publicado y sin borrador, «Editar una copia» crea una **versión nueva**; el publicado no cambia hasta publicar la nueva (archiva el anterior).
+- `src/lib/blueprint/edit.ts`: operaciones puras sobre el plan (mantienen las relaciones consistentes: quitar una comprensión la saca de cortes y objetivos; dejar de evaluarla en un corte la saca de los objetivos de ese corte; ids únicos; órdenes renumerados) y `blankFields` (textos vacíos con mensajes claros, mismo criterio que el servidor).
+
+**Verificada en un navegador real** (con el servidor simulado, sin sesión de profesor): generar → editar → guardar → publicar → «Editar una copia», escritorio y teléfono (375 px) sin desbordamiento. Eso encontró **tres defectos que las pruebas unitarias no veían** y que quedaron corregidos: (1) un título vacío no lo marcaba la revisión en vivo y el servidor lo rechazaba al guardar; (2) tras publicar no se ofrecía «Editar una copia»; (3) dos botones distintos tenían el mismo nombre accesible («Quitar el módulo 1 del objetivo 1»).

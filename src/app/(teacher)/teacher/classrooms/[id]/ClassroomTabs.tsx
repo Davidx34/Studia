@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, FileText, Map, BarChart3, Brain, Target, ImagePlus, Sparkles, FlaskConical } from 'lucide-react';
+import { Users, FileText, Map, BarChart3, Brain, Target, ImagePlus, Sparkles, FlaskConical, ListChecks } from 'lucide-react';
 
 export default function ClassroomTabs({ classroomId }: { classroomId: string }) {
   const pathname = usePathname();
@@ -14,6 +14,7 @@ export default function ClassroomTabs({ classroomId }: { classroomId: string }) 
     { href: `${base}/modules`, label: 'Módulos', icon: Map },
     { href: `${base}/media`, label: 'Medios', icon: ImagePlus },
     { href: `${base}/objectives`, label: 'Objetivos', icon: Target },
+    { href: `${base}/plan`, label: 'Plan del curso', icon: ListChecks },
     { href: `${base}/progress`, label: 'Progreso', icon: BarChart3 },
 
     { href: `${base}/brain`, label: 'Configurar IA', icon: Brain },
