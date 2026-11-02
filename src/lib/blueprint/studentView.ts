@@ -121,9 +121,9 @@ function describeNext(plan: Blueprint, next: ReturnType<typeof courseProgress>['
   }
   if (next.type === 'periodExam') {
     const p = plan.periods.find((x) => x.id === next.periodId);
-    return { kind: 'periodExam', text: `Ya dominas los módulos de «${p?.name ?? 'este corte'}»: sigue su evaluación (todavía no está disponible en la app).`, periodId: next.periodId };
+    return { kind: 'periodExam', text: `Ya dominas los módulos de «${p?.name ?? 'este corte'}»: sigue su evaluación.`, periodId: next.periodId };
   }
-  if (next.type === 'finalExam') return { kind: 'finalExam', text: 'Terminaste todos los cortes: sigue la evaluación final (todavía no está disponible en la app).' };
+  if (next.type === 'finalExam') return { kind: 'finalExam', text: 'Terminaste todos los cortes: sigue la evaluación final.' };
   return { kind: 'done', text: '¡Completaste el curso!' };
 }
 

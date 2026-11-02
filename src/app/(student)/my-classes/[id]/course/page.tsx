@@ -49,7 +49,7 @@ export default async function StudentCoursePage({ params }: { params: { id: stri
   return (
     <div className="theme-scope space-y-4">
       {back}
-      <CourseJourney view={view} className={classroom.name ?? ''} version={data.version} scoresAvailable={data.scoresAvailable} />
+      <CourseJourney view={view} className={classroom.name ?? ''} version={data.version} scoresAvailable={data.scoresAvailable} classroomId={params.id} />
     </div>
   );
 }

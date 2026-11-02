@@ -45,7 +45,7 @@ Al cerrar el examen el estudiante ve **todas** las preguntas, marcando cuáles l
 | Revisión del profesor (`examReviewView.ts`, pantalla `/teacher/classrooms/[id]/plan/examen`) | Por comprensión: cada pregunta con su clave, explicación, material y cita, y el aviso del juez; aprobar o rechazar; lo que pide atención (juez sin decidir o sin pasar) va primero; botón para generar más. Se lee con la sesión del profesor (RLS) y se escribe por `/api/exam-bank` | **Hecha**; verificada con pruebas de marcado, **no vista en navegador con datos reales** |
 | Sesión de examen (`examSession.ts`, `examRun.ts`, migración 089 **aplicada**) | Qué preguntas se sirven y cómo se barajan, lo que ve el estudiante sin claves, empezar/retomar y entregar | **Hecha** (rutas `/api/exam`); sin pantalla |
 | Calificación y cierre (`gradeSession`, `close_exam_session`) | Califica contra lo servido con los calificadores reales, escribe `exam_attempts` y entrega la retroalimentación 3D; entregar dos veces no da otro intento | **Hecha**; verificada de punta a punta (ver «Rutas del examen») |
-| Pantalla del estudiante | Tomar el examen y ver la retroalimentación | Pendiente |
+| Pantalla del estudiante (`/my-classes/[id]/course/exam/[examId]`, `examForm.ts`) | Empezar o retomar, contestar los 5 tipos de pregunta, entregar y ver la retroalimentación 3D; enlace desde el recorrido del curso cuando la evaluación está desbloqueada | **Hecha**; ver «Pantalla del estudiante» para lo verificado |
 | Juez de sustento (`examJudge.ts`, `npm run eval:exam-judge`) | Un segundo modelo (**sin Cohere**) que comprueba que la respuesta y **cada afirmación de la explicación** están respaldadas por el material, citando evidencia que el código verifica; integrado en el generador como paso opcional | **Hecha** (ver «Medición del juez»); sin llamador |
 | Cumplimiento del 100 % (2B) | Bloqueo en el servidor al abrir lección/examen + no publicar con módulos sin enlazar (**propuestas aprobadas por el dueño**) | Pendiente |
 
@@ -151,4 +151,12 @@ Lo que **no** se probó: concurrencia real (dos inicios o dos cierres simultáne
 **Qué salió mal y por qué importa:** para esa prueba publiqué el plan de prueba de la clase y, al terminar, **no pude devolverlo a borrador**: la base (085) solo permite `draft → published → archived`. Hubo que **archivarlo**; el profesor tendrá que crear un borrador nuevo (v2). Mientras estuvo publicado, un estudiante matriculado pudo verlo. Las pruebas que exijan un plan publicado deben hacerse en una transacción revertida o en una clase desechable.
 
 **No verificado:** la ruta **por HTTP** con una sesión de estudiante real (se ejercitó el flujo con el adaptador real, no el `POST`); concurrencia real (dos entregas simultáneas: lo cubren `FOR UPDATE` y los rechazos `closed`, pero no se ejercitó con dos conexiones); la pantalla del estudiante.
+
+## Pantalla del estudiante
+
+`/my-classes/[id]/course/exam/[examId]` (`examId` = el id del corte o `final`): la página lee el plan **publicado** con la sesión del estudiante (RLS) y `ExamClient` habla solo con `/api/exam`. Fases: introducción → respondiendo → resultado. Retomar tras recargar usa el borrador guardado en la pestaña (`sessionStorage`, validado contra las preguntas de la sesión, así que un borrador alterado no se cuela). Entregar con preguntas sin contestar pide confirmación y dice que cuentan como incorrectas. El resultado muestra el puntaje, qué repasar y **cada pregunta** marcada correcta/incorrecta con texto e icono (no solo color), la explicación, el corte, el módulo y el material con su cita; si no llegó al 100 % ofrece intentar de nuevo. Desde el recorrido del curso, una evaluación desbloqueada lleva a esta pantalla (y se quitó el aviso «todavía no está disponible en la app»).
+
+**Verificado:** la lógica del formulario (15 pruebas; mutación: 14 cambios, 12 detectados y 2 equivalentes), el enlace del recorrido y el marcado inicial, más `tsc`, la suite completa y el presupuesto de errores.
+
+**Límite conocido:** la evaluación **no se exige** todavía para avanzar (la regla del 100 %, propuesta 2B, es el siguiente paso); hoy el servidor la sirve a cualquier estudiante matriculado cuando el plan está publicado y hay preguntas aprobadas.
 

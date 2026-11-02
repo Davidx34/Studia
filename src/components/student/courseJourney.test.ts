@@ -57,7 +57,7 @@ describe('CourseJourney', () => {
     expect(html).toContain('Tu nota hasta ahora');
     expect(html).toContain('no cuenta como cero');
   });
-  it('dice cuanto vale cada corte, la evaluacion del corte (30 %) y la final (medio corte), y que las evaluaciones aun no estan disponibles', () => {
+  it('dice cuanto vale cada corte, la evaluacion del corte (30 %) y la final (medio corte), ', () => {
     const html = render();
     expect(html).toContain('Vale 40 % del curso');
     expect(html).toContain('Vale 60 % del curso');
@@ -66,9 +66,14 @@ describe('CourseJourney', () => {
     expect(html).toContain('vale medio corte (25 % del curso)');
     expect(html).toContain('se desbloquea al terminar todos los cortes');
   });
-  it('con los modulos dominados, la evaluacion del corte dice que NO esta disponible todavia en la app', () => {
+  it('con los modulos dominados, la evaluacion del corte esta desbloqueada y lleva a su pantalla (si se conoce la clase)', () => {
     const html = render({ [id(1)]: [100], [id(2)]: [100] });
-    expect(html).toContain('Desbloqueada (todavía no está disponible en la app)');
+    expect(html).toContain('Desbloqueada');
+    expect(html).not.toContain('no está disponible');
+    expect(html).not.toContain('/course/exam/');
+    const withClass = renderToStaticMarkup(h(CourseJourney, { view: buildCourseView({ plan: plan(), links: LINKS, moduleAttempts: new Map(Object.entries({ [id(1)]: [100], [id(2)]: [100] })) }), className: 'Micro', version: 1, scoresAvailable: true, classroomId: 'CLASE-1' }));
+    expect(withClass).toContain('href="/my-classes/CLASE-1/course/exam/p1"');
+    expect(withClass).toContain('Presentar la evaluación');
   });
   it('aclara que esta vista no bloquea nada: el mapa de modulos sigue como siempre', () => {
     expect(render()).toContain('puedes seguir usando el mapa de módulos de la clase como siempre');

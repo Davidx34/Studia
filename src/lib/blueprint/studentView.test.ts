@@ -80,7 +80,8 @@ describe('buildCourseView: evaluaciones, notas y lo siguiente', () => {
     expect(v.periods[0].exam.state).toBe('available');
     expect(v.periods[1].modules[0].state).toBe('locked');
     expect(v.next.kind).toBe('periodExam');
-    expect(v.next.text).toContain('todavía no está disponible en la app');
+    expect(v.next.text).toContain('sigue su evaluación');
+    expect(v.next.text).not.toContain('no está disponible');
   });
   it('con la evaluacion del corte al 100 % se abre el siguiente corte', () => {
     const v = buildCourseView({ plan: plan(), links: ALL, moduleAttempts: done1, periodExamAttempts: att({ p1: [100] }) });
