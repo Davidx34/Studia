@@ -12,7 +12,7 @@ const MODULE_STATE: Record<ModuleState, { label: string; tone: BadgeTone; icon: 
 };
 const EXAM_STATE: Record<ExamState, string> = {
   locked: 'Se desbloquea al dominar los módulos',
-  available: 'Desbloqueada (todavía no está disponible en la app)',
+  available: 'Desbloqueada',
   mastered: 'Dominada',
 };
 
@@ -20,7 +20,8 @@ const fmt = (n: number | null) => (n === null ? '—' : `${Math.round(n * 10) / 
 const linkBtn =
   'inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg';
 
-export function CourseJourney({ view, className, version, scoresAvailable }: { view: CourseView; className: string; version: number; scoresAvailable: boolean }) {
+// classroomId: con el, las evaluaciones desbloqueadas llevan a su pantalla; sin el, solo se muestra su estado.
+export function CourseJourney({ view, className, version, scoresAvailable, classroomId }: { view: CourseView; className: string; version: number; scoresAvailable: boolean; classroomId?: string }) {
   return (
     <div className="space-y-6">
       <header>
@@ -97,6 +98,12 @@ export function CourseJourney({ view, className, version, scoresAvailable }: { v
             <span className="font-semibold text-fg">Evaluación del corte</span> (vale 30 % del corte): {EXAM_STATE[p.exam.state]}
             {p.exam.attempts > 0 && ` · ${p.exam.attempts} ${p.exam.attempts === 1 ? 'intento' : 'intentos'} · nota ${fmt(p.exam.score)}`}
           </p>
+          {p.exam.state === 'available' && classroomId && (
+            <Link href={`/my-classes/${classroomId}/course/exam/${p.id}`} className={`${linkBtn} bg-primary text-on-primary hover:brightness-110`}>
+              <Play aria-hidden="true" className="h-4 w-4" /> {p.exam.attempts > 0 ? 'Volver a intentar la evaluación' : 'Presentar la evaluación'}
+              <span className="sr-only"> del corte {p.name}</span>
+            </Link>
+          )}
         </section>
       ))}
 
@@ -106,6 +113,11 @@ export function CourseJourney({ view, className, version, scoresAvailable }: { v
           Comprueba todo el curso y vale medio corte ({Math.round(view.finalExam.weight * 100) / 100} % del curso): {view.finalExam.state === 'locked' ? 'se desbloquea al terminar todos los cortes' : EXAM_STATE[view.finalExam.state]}
           {view.finalExam.attempts > 0 && ` · ${view.finalExam.attempts} ${view.finalExam.attempts === 1 ? 'intento' : 'intentos'} · nota ${fmt(view.finalExam.score)}`}
         </p>
+        {view.finalExam.state === 'available' && classroomId && (
+          <Link href={`/my-classes/${classroomId}/course/exam/final`} className={`${linkBtn} bg-primary text-on-primary hover:brightness-110`}>
+            <Play aria-hidden="true" className="h-4 w-4" /> {view.finalExam.attempts > 0 ? 'Volver a intentar la evaluación final' : 'Presentar la evaluación final'}
+          </Link>
+        )}
       </section>
     </div>
   );
