@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkLinks, coverage, MAX_LINKS, planModules, similarity, suggestLinks, SUGGEST_MIN, tokens } from './links';
+import { applySuggestions, checkLinks, coverage, MAX_LINKS, planModules, relevantLinks, setLink, similarity, suggestLinks, SUGGEST_MIN, tokens } from './links';
 import type { Blueprint } from './types';
 
 const bp = (): Blueprint => ({
@@ -167,5 +167,55 @@ describe('coverage', () => {
   });
   it('un enlace a un nodo que ya no existe no cuenta como cubierto', () => {
     expect(coverage(bp(), [{ nodeId: 'fantasma', moduleId: id(1) }]).linked).toBe(0);
+  });
+});
+
+describe('setLink', () => {
+  const L = [{ nodeId: 'm1', moduleId: id(1) }, { nodeId: 'm2', moduleId: id(2) }];
+  it('agrega el enlace de un nodo sin tocar los demas', () => {
+    expect(setLink(L, 'm3', id(3))).toEqual([...L, { nodeId: 'm3', moduleId: id(3) }]);
+  });
+  it('cambiar el modulo de un nodo REEMPLAZA su enlace (no queda duplicado)', () => {
+    expect(setLink(L, 'm1', id(3))).toEqual([{ nodeId: 'm2', moduleId: id(2) }, { nodeId: 'm1', moduleId: id(3) }]);
+  });
+  it('un modulo real que ya servia a otro nodo MUDA a este (nunca queda repetido)', () => {
+    const r = setLink(L, 'm3', id(1));
+    expect(r.filter((l) => l.moduleId === id(1))).toEqual([{ nodeId: 'm3', moduleId: id(1) }]);
+    expect(r.find((l) => l.nodeId === 'm1')).toBeUndefined();
+  });
+  it('null desenlaza ese nodo y solo ese', () => {
+    expect(setLink(L, 'm1', null)).toEqual([{ nodeId: 'm2', moduleId: id(2) }]);
+    expect(setLink(L, 'm9', null)).toEqual(L);
+  });
+  it('el resultado siempre pasa checkLinks (nada que el servidor rechace por repetido)', () => {
+    let l: typeof L = [];
+    const ops: [string, string | null][] = [['m1', id(1)], ['m2', id(1)], ['m3', id(2)], ['m1', id(2)], ['m3', null], ['m2', id(3)]];
+    for (const [n, m] of ops) {
+      l = setLink(l, n, m);
+      expect(checkLinks(l, bp(), [id(1), id(2), id(3)]).ok).toBe(true);
+    }
+  });
+  it('no cambia la lista original', () => {
+    const before = JSON.stringify(L);
+    setLink(L, 'm1', id(3));
+    expect(JSON.stringify(L)).toBe(before);
+  });
+});
+
+describe('applySuggestions y relevantLinks', () => {
+  it('aplicar las sugerencias agrega lo sugerido y conserva lo ya enlazado', () => {
+    const cur = [{ nodeId: 'm2', moduleId: id(3) }];
+    const out = applySuggestions(cur, suggestLinks(bp(), REAL, cur));
+    expect(out).toContainEqual({ nodeId: 'm2', moduleId: id(3) });
+    expect(out.length).toBe(1 + suggestLinks(bp(), REAL, cur).length);
+    expect(checkLinks(out, bp(), REAL.map((r) => r.id)).ok).toBe(true);
+  });
+  it('sin sugerencias no cambia nada', () => {
+    const cur = [{ nodeId: 'm1', moduleId: id(1) }];
+    expect(applySuggestions(cur, [])).toEqual(cur);
+  });
+  it('relevantLinks descarta los enlaces de nodos que el plan ya no tiene', () => {
+    const l = [{ nodeId: 'm1', moduleId: id(1) }, { nodeId: 'viejo', moduleId: id(2) }];
+    expect(relevantLinks(bp(), l)).toEqual([{ nodeId: 'm1', moduleId: id(1) }]);
   });
 });

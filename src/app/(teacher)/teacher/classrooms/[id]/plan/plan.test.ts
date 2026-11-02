@@ -18,7 +18,7 @@ const valid = (): Blueprint => ({
 });
 
 const render = (props: Partial<Parameters<typeof PlanClient>[0]> = {}) =>
-  renderToStaticMarkup(h(PlanClient, { classroomId: 'c1', className: 'Microeconomia', draft: null, published: null, tableMissing: false, ...props }));
+  renderToStaticMarkup(h(PlanClient, { classroomId: 'c1', className: 'Microeconomia', draft: null, published: null, tableMissing: false, modules: [], draftLinks: [], publishedLinks: [], ...props }));
 const stored = (doc: unknown, version = 3) => ({ version, doc, publishedAt: null });
 
 describe('PlanClient: estados iniciales', () => {
@@ -83,10 +83,18 @@ describe('PlanClient: cableado', () => {
   const client = src('src/app/(teacher)/teacher/classrooms/[id]/plan/PlanClient.tsx');
   const page = src('src/app/(teacher)/teacher/classrooms/[id]/plan/page.tsx');
 
-  it('el navegador nunca escribe la base: solo llama a /api/blueprint', () => {
-    expect(client).toContain("fetch('/api/blueprint'");
-    expect(client).not.toMatch(/supabase/i);
-    expect(client).not.toMatch(/\.from\(|\.insert\(|\.update\(|\.upsert\(/);
+  it('el navegador nunca escribe la base: todo el cliente (pantalla, panel de enlaces y llamada) solo habla con /api/blueprint', () => {
+    const dir = 'src/app/(teacher)/teacher/classrooms/[id]/plan';
+    const api = src(`${dir}/planApi.ts`);
+    const panel = src(`${dir}/LinksPanel.tsx`);
+    expect(api).toContain("fetch('/api/blueprint'");
+    for (const code of [client, panel, api]) {
+      expect(code).not.toMatch(/supabase/i);
+      expect(code).not.toMatch(/\.from\(|\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
+    }
+    // la unica llamada de red del cliente esta en planApi.ts
+    expect(client + panel).not.toMatch(/fetch\(/);
+    expect(client + panel).toContain("from './planApi'");
   });
   it('guardar y publicar piden confirmacion donde duele: publicar tiene un segundo paso y no se habilita con cambios sin guardar', () => {
     expect(client).toContain('confirmPublish');
