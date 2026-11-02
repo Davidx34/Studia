@@ -103,3 +103,21 @@ El plan se **lee** desde el navegador con la sesión y la RLS de la migración 0
 - `{ action: 'publish', classroomId }` — vuelve a leer y revisar lo **guardado**; si tiene errores de reglas responde 422 con `issues` y no toca nada. Si pasa, **archiva el publicado anterior y luego publica** el borrador.
 - Archivar y publicar son dos escrituras (supabase-js no tiene transacciones y la base admite un solo publicado por clase). Si la segunda falla, la clase queda un momento sin plan publicado; **reintentar publica sin problema** (ya no hay publicado que archivar) y el borrador no se pierde. Si esto importa más adelante, se resuelve con una función SQL (migración nueva) que haga las dos en una transacción.
 - Código: `src/lib/blueprint/store.ts` (lógica con la base inyectada), `storeDb.ts` (adaptador de Supabase), `src/app/api/blueprint/route.ts`.
+
+## Motor "hacia atrás" con IA (`generate` en `POST /api/blueprint`)
+
+`{ action: 'generate', classroomId, brief }` desarrolla el **borrador del profesor** en un plan completo, de adelante hacia atrás. **No guarda nada**: devuelve `blueprint`, `issues` y `publishable` para que el profesor lo revise, lo edite y lo guarde con `save` (así no pisa un borrador que ya editó).
+
+`brief`: `{ title, description?, periods (1–12), weights?, outcomes?, topics? }`.
+
+**Lo que decide el código, no la IA:** cuántos cortes; cuánto pesa cada uno (si el profesor no da pesos se reparten por igual sumando exactamente 100: 3 cortes → 33,34 / 33,33 / 33,33); las comprensiones finales si el profesor las escribió (la IA no puede cambiarlas); los ids (la IA habla de posiciones). Además el código garantiza que toda comprensión la evalúe algún corte y que ningún corte quede sin evaluar nada.
+
+**Lo que propone la IA** (dos pasos, cada uno con un reintento guiado por el error exacto):
+1. las comprensiones (si no vienen) y qué comprensión evalúa cada corte;
+2. por corte, los objetivos (1–5) y sus módulos (1–6), cada objetivo ligado a las comprensiones que ese corte evalúa.
+
+El resultado pasa por `parseBlueprint` + `checkBlueprint` como cualquier plan. Si la IA deja un corte sin cubrir algo, **se devuelve el borrador con el aviso** (por ejemplo `assessedWithoutObjective`): no se inventa contenido ni se arregla en silencio. Un corte que la IA no logra desarrollar queda sin objetivos y se señala; si ninguno sale, responde 503.
+
+**Seguridad y costo:** lo que escribe el profesor entra a la IA saneado (`sanitizeForPrompt`, aplanado a una línea) y declarado como dato; la salida de la IA se trata como dato (se lee, se recorta a los límites, se valida). Cupo por profesor (`blueprintGenerate`: 2/min, 12/h, 40/día; usa el contador de la migración 080, sin migración nueva), consumido **después** de validar el borrador y **antes** de llamar a la IA; cada generación son 1 + N llamadas (N = cortes).
+
+Código: `src/lib/blueprint/generate.ts` (puro, el modelo se inyecta).
