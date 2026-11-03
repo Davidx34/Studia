@@ -187,9 +187,19 @@ Las dos propuestas del dueño, aplicadas en el **servidor** (lo que la pantalla 
 **Defecto hallado** (al revisar qué calificaba `gradeAnswer` para el examen, medido): para la respuesta «elástica», el calificador de las lecciones **acepta «inelástica»** (la *contiene*), acepta «la demanda no es inelástica» y acepta una lista de términos del tema; y con dos «respuestas aceptadas» exige **las dos a la vez** (es la semántica de la app: todas deben aparecer), aunque el generador las trataba como alternativas. En una evaluación que se repite hasta el 100 %, eso regala puntos.
 
 **Arreglo, solo para exámenes** (los calificadores de las lecciones no se tocan: es la decisión abierta del hueco de subcadena):
-- `gradeFillBlank` (en `examSession.ts`): la respuesta debe aparecer como **palabras enteras**, en ese orden y seguidas, sin tildes ni mayúsculas ni puntuación, y el texto no puede pasar de la respuesta más larga **+ 3 palabras** («la demanda es elástica» cabe; una lista no).
+- `gradeFillBlank` (en `examSession.ts`): la respuesta debe aparecer como palabras, en ese orden y seguidas (cada una igual o con una terminación de hasta 3 letras: «elásticas», «precios»; nunca con otro comienzo: «inelástica»), sin tildes ni mayúsculas ni puntuación, y el texto no puede pasar de la respuesta más larga **+ 3 palabras** («la demanda es elástica» cabe; una lista no).
 - `validateExamQuestion`: una pregunta de completar tiene **exactamente una respuesta y un solo espacio** (`____`). El prompt lo pide y pide cuidar que el opuesto o la negación no se confundan con la respuesta.
 - Aprovechando la medición con el modelo real: el prompt ahora exige **escribir todo en español** (en una de tres tandas salió una pregunta en inglés a partir de un fragmento en inglés del material; con la regla, 3 de 3 tandas en español).
 
 **Límites que quedan:** con hasta 3 palabras de más todavía se puede «apostar» a dos términos; las preguntas de **respuesta corta** siguen calificándose por «contiene cada palabra clave» (como las lecciones); y las lecciones conservan el hueco. La medición del prompt nuevo es de 3 tandas de una sola clase.
+
+## El hueco de «contiene» en las lecciones: decidido y cerrado
+
+**Decisión (delegada por el dueño):** las lecciones usan la **misma idea** que el examen, pero más suave para no romper lo que ya funcionaba. Una función única, `containsExpected` (`lesson/normalize.ts`), la usan el calificador del servidor (`gradeAnswer`) y el del navegador (que duplicaba el `includes`): **contiene, sin tildes ni mayúsculas, pero la aparición no puede empezar a mitad de una palabra**. «inelástica» ya no vale por «elástica» (ni «desventaja» por «ventaja», ni «microeconomía» por «economía»); «precios» sigue valiendo por «precio» (plural, género, conjugación). Una respuesta esperada vacía nunca se cumple.
+
+**Por qué esa y no «palabra completa» como en el examen:** en lecciones no hay tope de intentos ni un 100 % que defender cada vez, y la palabra completa estricta rechazaría plurales y conjugaciones que hoy se aceptan. En el **examen** (`gradeFillBlank`) se acepta la palabra con una terminación de hasta 3 letras («elásticas», «precios»), nunca con otro comienzo, y con tope de 3 palabras de más.
+
+**Medido antes de decidir:** en producción **ningún estudiante ha contestado nunca** una pregunta de completar o de respuesta corta (0 respuestas registradas), así que no hay evidencia de que la regla vieja le sirva a nadie ni se rompe a nadie; y la **respuesta perfecta de las 233 preguntas de ese tipo del banco sigue acertando**.
+
+**Límites que quedan:** una respuesta de **un solo carácter** (16 preguntas del banco; `selfGrade` ya avisa) todavía se cumple con cualquier palabra que *empiece* por esa letra; un sufijo numérico («150» por «15») sigue valiendo; y respuesta corta sigue siendo «contiene cada palabra clave» (no entiende el significado).
 
