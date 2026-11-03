@@ -212,3 +212,9 @@ Prueba con la base real y una clase desechable ya borrada (módulo enlazado y do
 
 **No verificado:** concurrencia **por HTTP** con varias pestañas reales; carga sostenida (solo 20 y 10 solicitudes simultáneas).
 
+## Re-medición del generador con material de fórmulas (2026-11-03)
+
+La medición inicial del tema «restricción presupuestaria» (PDF con fórmulas) daba **1 a 2 válidas de 5**, con rechazos correctos por citas empalmadas o hechas de restos de fórmula. Tras las mejoras posteriores (orientación de cita en el prompt, una sola respuesta por completar, símbolos sueltos rechazados, español obligatorio, sin casi-duplicados) se **volvió a medir con el modelo real, sin juez**: «restricción presupuestaria» **7, 6 y 7 válidas de 8** pedidas (3 tandas) y «función de utilidad» **8 y 7 de 8** (2 tandas). Se descartó rediseñar la cita (que el modelo señale el número de frase y el código copie el texto): con este rendimiento no compensa.
+
+**Límites:** son 5 tandas de una clase y de dos temas; sin juez (el juez rechazó entre 0 y 1 por tanda en las mediciones anteriores); una pregunta válida **no** es una pregunta buena: la calidad pedagógica sigue sin medirse y la revisión del profesor sigue siendo obligatoria.
+
