@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FILL_EXTRA_WORDS, gradeFillBlank, gradeSession, presentQuestion, servedFromRow, startExam, stripOptionLetter, type SessionLayout } from './examSession';
+import { FILL_EXTRA_WORDS, INFLECTION_LETTERS, gradeFillBlank, gradeSession, presentQuestion, servedFromRow, startExam, stripOptionLetter, type SessionLayout } from './examSession';
 import type { BankRow } from './examBank';
 import type { Blueprint } from './types';
 
@@ -169,6 +169,20 @@ describe('gradeFillBlank: palabra completa, no «contiene»', () => {
     expect(gradeFillBlank('elástica', ['elástica'])).toBe(true);
     expect(gradeFillBlank('inelástica', ['elástica'])).toBe(false);
     expect(gradeFillBlank('la demanda es inelástica', ['elástica'])).toBe(false);
+  });
+  it('plural, genero o terminacion corta SI valen (hasta 3 letras de mas y palabras de 4 letras o mas)', () => {
+    expect(INFLECTION_LETTERS).toBe(3);
+    expect(gradeFillBlank('elásticas', ['elástica'])).toBe(true);
+    expect(gradeFillBlank('los precios', ['precio'])).toBe(true);
+    expect(gradeFillBlank('costos de oportunidades', ['costo de oportunidad'])).toBe(true); // cada palabra con su terminacion
+    expect(gradeFillBlank('elásticamente', ['elástica'])).toBe(false); // 5 letras de mas
+    expect(gradeFillBlank('elásticaaaaa', ['elástica'])).toBe(false);
+    expect(gradeFillBlank('exceso', ['x'])).toBe(false);
+    expect(gradeFillBlank('los', ['lo'])).toBe(false); // menos de 4 letras: solo igual
+    expect(gradeFillBlank('solo', ['sol'])).toBe(false); // 3 letras: solo igual
+    expect(gradeFillBlank('sol', ['sol'])).toBe(true);
+    // la frase se acaba antes que la respuesta esperada: no acierta ni tira
+    expect(gradeFillBlank('el costo', ['costo oportunidad'])).toBe(false);
   });
   it('sin tildes, mayusculas ni puntuacion; la respuesta puede ir dentro de una frase corta', () => {
     expect(gradeFillBlank('ELASTICA', ['elástica'])).toBe(true);

@@ -1,4 +1,4 @@
-import { normalizeAnswer } from '@/lib/lesson/normalize';
+import { containsExpected } from '@/lib/lesson/normalize';
 
 // Calificacion de una respuesta, como funcion PURA (sin base de datos ni red), para poder probarla y reutilizarla.
 // La usan el "modo sombra" (/api/lesson/shadow) y la calificacion en el servidor (/api/lesson/answer).
@@ -29,8 +29,7 @@ export type GradeResult =
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
 function contained(text: string, expected: string[]): { correct: boolean; matched: number; total: number } {
-  const norm = normalizeAnswer(text);
-  const matched = expected.filter((e) => norm.includes(normalizeAnswer(e))).length;
+  const matched = expected.filter((e) => containsExpected(text, e)).length;
   // Sin claves no se puede afirmar nada: no puntua.
   return { correct: expected.length > 0 && matched === expected.length, matched, total: expected.length };
 }

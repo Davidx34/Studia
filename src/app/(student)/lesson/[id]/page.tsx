@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { evaluateAchievements } from '@/lib/achievements/evaluate';
-import { normalizeAnswer } from '@/lib/lesson/normalize';
+import { containsExpected } from '@/lib/lesson/normalize';
 import { finishLessonOnServer } from '@/lib/grading/finishClient';
 import { closeLesson, noticeFor, type SaveOutcome } from '@/lib/grading/saveOutcome';
 import type { MatchVerdict } from '@/components/LessonQuestionMatch';
@@ -359,8 +359,7 @@ export default function LessonPage() {
       reactToResult(r.correct);
       return;
     }
-    const norm = normalizeAnswer(shortAnswerText);
-    const matched = (q.keywords || []).filter((k) => norm.includes(normalizeAnswer(k))).length;
+    const matched = (q.keywords || []).filter((k) => containsExpected(shortAnswerText, k)).length;
     setShortAnswerMatchedCount(matched);
     const allKeywordsMatched = (q.keywords?.length || 0) > 0 && matched === (q.keywords?.length ?? 0);
     reactToResult(allKeywordsMatched);
@@ -392,9 +391,8 @@ export default function LessonPage() {
       }
       return;
     }
-    const norm = normalizeAnswer(fillBlankText);
     const total = q.answers?.length || 0;
-    const matched = (q.answers || []).filter((a) => norm.includes(normalizeAnswer(a))).length;
+    const matched = (q.answers || []).filter((a) => containsExpected(fillBlankText, a)).length;
     const allMatched = total > 0 && matched === total;
 
     if (allMatched) {

@@ -89,10 +89,15 @@ export function presentQuestion(row: BankRow, layout: QuestionLayout | undefined
 }
 
 // COMPLETAR en un examen se califica por PALABRA COMPLETA, no por «contiene». El calificador de las lecciones acepta «inelastica» para la respuesta «elastica» (la contiene) y acepta una lista
-// de todos los terminos del tema (medido): en una evaluacion que se repite hasta el 100 % eso regala puntos. Aqui la respuesta debe aparecer como palabras enteras y el texto no puede ser una
+// de todos los terminos del tema (medido): en una evaluacion que se repite hasta el 100 % eso regala puntos. Aqui la respuesta debe aparecer como palabras (enteras o con una terminacion corta) y el texto no puede ser una
 // lista larga (como mucho 3 palabras mas que la respuesta; «la demanda es elastica» cabe). LIMITE conocido: con 3 palabras de mas todavia se puede «apostar» a dos terminos. Sin tildes ni mayusculas; la puntuacion no cuenta. El examen solo admite UNA respuesta por pregunta de completar (examQuestion).
 export const FILL_EXTRA_WORDS = 3;
 const fillWords = (s: string): string[] => normalizeAnswer(s).replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+
+// Una palabra del estudiante vale por la esperada si es IGUAL o es la esperada con una terminacion de hasta 3 letras (plural, genero: «elasticas», «precios»). Nunca si empieza distinto
+// («inelastica») ni, en palabras de menos de 4 letras, con terminacion (una «x» no vale por «exceso»).
+export const INFLECTION_LETTERS = 3;
+const sameWord = (given: string, wanted: string): boolean => given === wanted || (wanted.length >= 4 && given.startsWith(wanted) && given.length - wanted.length <= INFLECTION_LETTERS);
 
 export function gradeFillBlank(text: string, answers: readonly string[]): boolean {
   const given = fillWords(text);
@@ -100,7 +105,7 @@ export function gradeFillBlank(text: string, answers: readonly string[]): boolea
   if (wanted.length === 0 || wanted.length !== answers.length || given.length === 0) return false;
   const longest = Math.max(...wanted.map((w) => w.length));
   if (given.length > longest + FILL_EXTRA_WORDS) return false;
-  const has = (w: string[]) => given.some((_, i) => w.every((x, k) => given[i + k] === x));
+  const has = (w: string[]) => given.some((_, i) => w.every((x, k) => given[i + k] !== undefined && sameWord(given[i + k], x)));
   return wanted.every(has);
 }
 
