@@ -180,7 +180,7 @@ Las dos propuestas del dueño, aplicadas en el **servidor** (lo que la pantalla 
 
 **Verificado:** la lógica pura (`courseGate`: 14 pruebas), `lessonAccess` (9), el bloqueo al publicar (6) y el de las evaluaciones (5), con mutación (21 cambios, 19 detectados y 2 equivalentes). **En el navegador con una sesión de estudiante real** y una clase desechable (ya borrada): el recorrido muestra «Dos» bloqueado; abrir su lección directamente da **403** y la pantalla explica qué falta, sin crear intentos ni generar preguntas; la evaluación del corte da 403 con el motivo y sin sesión; al marcar el módulo 1 al 100 %, la lección 2 **pasa el bloqueo**.
 
-**No verificado:** el bloqueo al publicar **en el navegador del profesor** ni por HTTP (solo pruebas de la lógica y del marcado; hace falta una sesión de profesor); el bloqueo con dos pestañas a la vez; el efecto sobre un estudiante con progreso previo en una clase que ya tuviera un plan publicado (no existe ninguna hoy).
+**Bloqueo al publicar, verificado contra la base real** (piezas reales del servidor, clase desechable ya borrada): guardar el borrador; publicar **sin enlaces** → 422 con los dos módulos que faltan; enlazar uno y publicar → 422 con el que falta, y el plan sigue en borrador; enlazar los dos y publicar → publicado. **No verificado:** el bloqueo al publicar **en el navegador del profesor** ni por HTTP (solo la lógica contra la base y el marcado de la pantalla; hace falta una sesión de profesor); el bloqueo con dos pestañas a la vez; el efecto sobre un estudiante con progreso previo en una clase que ya tuviera un plan publicado (no existe ninguna hoy).
 
 ## Completar en un examen: palabra completa y una sola respuesta
 
