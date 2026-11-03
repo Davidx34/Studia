@@ -150,7 +150,7 @@ Lo que **no** se probó: concurrencia real (dos inicios o dos cierres simultáne
 
 **Qué salió mal y por qué importa:** para esa prueba publiqué el plan de prueba de la clase y, al terminar, **no pude devolverlo a borrador**: la base (085) solo permite `draft → published → archived`. Hubo que **archivarlo**; el profesor tendrá que crear un borrador nuevo (v2). Mientras estuvo publicado, un estudiante matriculado pudo verlo. Las pruebas que exijan un plan publicado deben hacerse en una transacción revertida o en una clase desechable.
 
-**No verificado:** la ruta **por HTTP** con una sesión de estudiante real (se ejercitó el flujo con el adaptador real, no el `POST`); concurrencia real (dos entregas simultáneas: lo cubren `FOR UPDATE` y los rechazos `closed`, pero no se ejercitó con dos conexiones); la pantalla del estudiante.
+**No verificado:** la ruta **por HTTP** con una sesión de estudiante real (se ejercitó el flujo con el adaptador real, no el `POST`); la pantalla del estudiante.
 
 ## Pantalla del estudiante
 
@@ -202,4 +202,13 @@ Las dos propuestas del dueño, aplicadas en el **servidor** (lo que la pantalla 
 **Medido antes de decidir:** en producción **ningún estudiante ha contestado nunca** una pregunta de completar o de respuesta corta (0 respuestas registradas), así que no hay evidencia de que la regla vieja le sirva a nadie ni se rompe a nadie; y la **respuesta perfecta de las 233 preguntas de ese tipo del banco sigue acertando**.
 
 **Límites que quedan:** una respuesta de **un solo carácter** (16 preguntas del banco; `selfGrade` ya avisa) todavía se cumple con cualquier palabra que *empiece* por esa letra; un sufijo numérico («150» por «15») sigue valiendo; y respuesta corta sigue siendo «contiene cada palabra clave» (no entiende el significado).
+
+## Concurrencia (verificada contra la base real)
+
+Prueba con la base real y una clase desechable ya borrada (módulo enlazado y dominado, 6 preguntas aprobadas), **a nivel de flujo + adaptador** (no por HTTP):
+- **20 inicios simultáneos** de la misma evaluación: **1 sola sesión** en la base y las 20 respuestas con las mismas preguntas. Antes de este cambio, 17 recibían la sesión y 3 un 409 «recarga la página»; ahora quien pierde la carrera **retoma la sesión ganadora** (el índice único y el bloqueo asesor de la 089 ya garantizaban la única sesión).
+- **10 entregas simultáneas** de la misma sesión: **1 solo intento** escrito (83,33 %) y las 10 devuelven el **mismo resultado y retroalimentación** (9 como «ya entregada»). Antes, las 9 perdedoras recibían un 409; ahora reciben el resultado de la entrega ganadora (la suya no suma otro intento ni cambia la nota).
+- La garantía de fondo sigue siendo de la base (`FOR UPDATE` en `close_exam_session`, trigger de la 085, índice único de la sesión abierta); el flujo solo traduce la carrera en una respuesta útil.
+
+**No verificado:** concurrencia **por HTTP** con varias pestañas reales; carga sostenida (solo 20 y 10 solicitudes simultáneas).
 

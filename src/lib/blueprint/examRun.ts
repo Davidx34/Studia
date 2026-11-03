@@ -125,7 +125,13 @@ export async function beginExam(db: RunDb, ctx: RunCtx, input: { classroomId: un
   const created = await db.createSession({ blueprint_id: stored.id, classroom_id: input.classroomId, student_id: ctx.studentId, kind: exam.kind, period_id: periodId, question_ids: started.questionIds, layout: started.layout, expires_at: expiresAt });
   if (!created.ok) {
     if (created.reason === 'mastered') return { ok: false, status: 409, error: 'Ya dominaste esta evaluación (100 %): no se repite.' };
-    if (created.reason === 'conflict') return { ok: false, status: 409, error: 'Ya tienes esta evaluación abierta. Recarga la página para retomarla.' };
+    if (created.reason === 'conflict') {
+      // Otro inicio (doble clic, dos pestañas) gano la carrera: se RETOMA su sesion, que es la que quedo en la base.
+      const winner = await db.openSession(stored.id, ctx.studentId, exam.kind, periodId);
+      const resumed = winner && new Date(winner.expires_at).getTime() > now.getTime() ? present(winner, rows) : null;
+      if (winner && resumed) return { ok: true, sessionId: winner.id, expiresAt: winner.expires_at, resumed: true, questions: resumed };
+      return { ok: false, status: 409, error: 'Ya tienes esta evaluación abierta. Recarga la página para retomarla.' };
+    }
     return { ok: false, status: 422, error: 'Esta evaluación no se puede abrir ahora.' };
   }
   const questions = present(created.session, rows);
@@ -172,11 +178,14 @@ export async function submitExam(db: RunDb, ctx: RunCtx, input: { sessionId: unk
   if (!plan) return { ok: false, status: 409, error: 'Esta evaluación ya no está disponible.' };
 
   // Ya cerrada: la misma retroalimentacion, sin otro intento.
-  if (session.closed_at !== null && session.results && session.score_percent !== null) {
-    const feedback = await feedbackOf(db, session, plan, rows, session.results);
+  const closedResult = async (done: SessionRow): Promise<SubmitOutcome | null> => {
+    if (done.closed_at === null || !done.results || done.score_percent === null) return null;
+    const feedback = await feedbackOf(db, done, plan, rows, done.results);
     if (!feedback) return { ok: false, status: 409, error: 'No se pudo recuperar el resultado.' };
-    return { ok: true, alreadyClosed: true, attemptNumber: null, scorePercent: session.score_percent, mastered: session.score_percent >= 100, feedback };
-  }
+    return { ok: true, alreadyClosed: true, attemptNumber: null, scorePercent: done.score_percent, mastered: done.score_percent >= 100, feedback };
+  };
+  const already = await closedResult(session);
+  if (already) return already;
   if (new Date(session.expires_at).getTime() <= now.getTime()) return { ok: false, status: 410, error: 'Se acabó el tiempo de esta evaluación. Empieza una nueva.' };
 
   const served = session.question_ids.map((id) => rows.find((r) => r.id === id));
@@ -187,7 +196,13 @@ export async function submitExam(db: RunDb, ctx: RunCtx, input: { sessionId: unk
   if (!closed.ok) {
     if (closed.reason === 'expired') return { ok: false, status: 410, error: 'Se acabó el tiempo de esta evaluación. Empieza una nueva.' };
     if (closed.reason === 'mastered') return { ok: false, status: 409, error: 'Ya dominaste esta evaluación (100 %): no se repite.' };
-    // 'closed': otra entrega la cerro justo antes; 'missing': desaparecio.
+    // 'closed': otra entrega (doble clic, dos pestañas) la cerro justo antes: se devuelve SU resultado, no un error (ese es el que cuenta; esta entrega no suma otro intento).
+    if (closed.reason === 'closed') {
+      const winner = await db.getSession(session.id, ctx.studentId);
+      const result = winner ? await closedResult(winner) : null;
+      if (result) return result;
+    }
+    // 'missing': desaparecio (o el cierre no se pudo releer).
     return { ok: false, status: 409, error: 'Esta evaluación ya se entregó. Recarga la página.' };
   }
   const feedback = await feedbackOf(db, session, plan, rows, graded.results);

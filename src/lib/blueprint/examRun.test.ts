@@ -172,6 +172,28 @@ describe('beginExam: empezar y retomar', () => {
     expect(m.sessions).toHaveLength(1);
     expect(m.calls.filter((c) => c === 'create')).toHaveLength(1);
   });
+  it('carrera entre dos inicios: el que pierde RETOMA la sesion ganadora (misma sesion, mismas preguntas)', async () => {
+    const m = memory();
+    const first = must(await beginExam(m.db, ctx(), START));
+    // el segundo inicio no vio la sesion abierta al leer, pero al crear la base dice «conflicto»
+    const realOpen = m.db.openSession;
+    let reads = 0;
+    m.db.openSession = async (...a) => (reads++ === 0 ? null : realOpen(...a));
+    const second = must(await beginExam(m.db, ctx(), START));
+    expect(second.resumed).toBe(true);
+    expect(second.sessionId).toBe(first.sessionId);
+    expect(second.questions).toEqual(first.questions);
+    expect(m.sessions).toHaveLength(1);
+  });
+  it('carrera: si la sesion ganadora ya vencio o no se puede leer, 409 con el mensaje de siempre', async () => {
+    const m = memory();
+    m.db.createSession = async () => ({ ok: false, reason: 'conflict' });
+    expect(await beginExam(m.db, ctx(), START)).toMatchObject({ ok: false, status: 409, error: expect.stringContaining('abierta') });
+    const old = memory();
+    old.db.createSession = async () => ({ ok: false, reason: 'conflict' });
+    old.db.openSession = async () => ({ id: 'x', blueprint_id: 'bp1', classroom_id: CLS, student_id: STUDENT, kind: 'period', period_id: 'p1', question_ids: ['a0'], layout: {}, expires_at: new Date(NOW.getTime() - 1).toISOString(), closed_at: null, results: null, score_percent: null });
+    expect(await beginExam(old.db, ctx(), START)).toMatchObject({ ok: false, status: 409 });
+  });
   it('la sesion de otro estudiante no se retoma', async () => {
     const m = memory();
     must(await beginExam(m.db, ctx(), START));
@@ -344,6 +366,29 @@ describe('submitExam', () => {
     const { m, r } = await started();
     m.db.closeSession = async () => ({ ok: false, reason: 'mastered' });
     expect(await submitExam(m.db, ctx(), { sessionId: r.sessionId, answers: {} })).toMatchObject({ ok: false, status: 409, error: expect.stringContaining('dominaste') });
+  });
+  it('si otra entrega cerro la sesion justo antes (carrera), devuelve SU resultado, sin otro intento ni error', async () => {
+    const { m, r } = await started();
+    // la primera entrega gana la carrera
+    const winner = must(await submitExam(m.db, ctx(), { sessionId: r.sessionId, answers: play(r.questions, m.rows, [r.questions[0].id]) }));
+    expect(winner.alreadyClosed).toBe(false);
+    // la perdedora leyo la sesion ANTES de que se cerrara (la ve abierta) y al cerrar la base le dice «ya cerrada»
+    const stale = { ...m.sessions[0], closed_at: null, results: null, score_percent: null };
+    let reads = 0;
+    const loserDb: RunDb = {
+      ...m.db,
+      getSession: async (id, s) => (reads++ === 0 ? stale : m.db.getSession(id, s)),
+      closeSession: async () => ({ ok: false, reason: 'closed' }),
+    };
+    const loser = must(await submitExam(loserDb, ctx(), { sessionId: r.sessionId, answers: {} }));
+    expect(loser).toMatchObject({ alreadyClosed: true, attemptNumber: null, scorePercent: winner.scorePercent });
+    expect(loser.feedback.items.map((i) => i.correct)).toEqual(winner.feedback.items.map((i) => i.correct));
+    expect(m.attempts).toHaveLength(1);
+  });
+  it('si el cierre dice «ya cerrada» pero la sesion no se puede releer cerrada, 409 (no se inventa un resultado)', async () => {
+    const { m, r } = await started();
+    m.db.closeSession = async () => ({ ok: false, reason: 'closed' });
+    expect(await submitExam(m.db, ctx(), { sessionId: r.sessionId, answers: {} })).toMatchObject({ ok: false, status: 409 });
   });
   it('el id de sesion mal formado (400), ajeno o inexistente (404)', async () => {
     const { m, r } = await started();
