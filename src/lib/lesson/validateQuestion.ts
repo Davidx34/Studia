@@ -4,6 +4,8 @@
 // valida ANTES de intentar renderizar, para poder mostrar un error amigable
 // y dejar saltar a la siguiente en vez de una pantalla rota o vacia.
 
+import { isGradedGameType } from '@/lib/grading/gameGrading';
+
 export interface ValidationResult {
   valid: boolean;
   error?: string;
@@ -12,6 +14,8 @@ export interface ValidationResult {
 // Pregunta servida con calificacion en el servidor (serverGraded): llega SIN la respuesta correcta, las palabras
 // esperadas ni los pares (eso se revela al responder). Solo se exige lo que hace falta para MOSTRARLA.
 function validateServerGraded(q: any): ValidationResult {
+  // Los minijuegos no siempre traen «q» (su enunciado vive en game_data): se validan aparte, con la forma que les deja sanitizeGameData.
+  if (isGradedGameType(q.type)) return validateServerGradedGame(q);
   if (!q.q) return { valid: false, error: 'Falta el texto de la pregunta.' };
   switch (q.type) {
     case 'multiple_choice':
@@ -26,6 +30,40 @@ function validateServerGraded(q: any): ValidationResult {
     case 'fill_blank':
     case 'short_answer':
       return { valid: true };
+    default:
+      return { valid: false, error: 'Tipo de pregunta no reconocido.' };
+  }
+}
+
+// Minijuego servido SIN la solucion (sanitizeGameData): se exige lo que hace falta para MOSTRARLO, con los mismos minimos que el validador del navegador (que ve la solucion). Antes de esto,
+// con SERVER_GRADING_GAMES=on cada minijuego se rechazaba como «Tipo de pregunta no reconocido»: la pantalla mostraba «pregunta no valida», la pregunta quedaba sin responder y la leccion no
+// se podia cerrar en el servidor («No pudimos guardar tu resultado»).
+const arr = (v: unknown): v is unknown[] => Array.isArray(v);
+function validateServerGradedGame(q: any): ValidationResult {
+  const gd = q.game_data && typeof q.game_data === 'object' ? q.game_data : {};
+  switch (q.type) {
+    case 'el_descifrador':
+      if (!gd.initial_clue) return { valid: false, error: 'El Descifrador: falta la pista inicial.' };
+      if (!arr(gd.mask) || !gd.mask.some((m: unknown) => m === null)) return { valid: false, error: 'El Descifrador: falta la palabra oculta.' };
+      if (typeof gd.hint_count !== 'number' || gd.hint_count < 3) return { valid: false, error: 'El Descifrador: faltan pistas.' };
+      return { valid: true };
+    case 'linea_del_tiempo':
+      return arr(gd.items) && gd.items.length > 0 ? { valid: true } : { valid: false, error: 'Línea del Tiempo: no hay eventos para ordenar.' };
+    case 'categorias_rapidas':
+      if (!arr(gd.categories) || gd.categories.length === 0) return { valid: false, error: 'Categorías Rápidas: no hay categorías.' };
+      if (!arr(gd.items) || gd.items.length === 0) return { valid: false, error: 'Categorías Rápidas: no hay elementos para clasificar.' };
+      return { valid: true };
+    case 'flashcard_rapida':
+      return arr(gd.cards) && gd.cards.length > 0 ? { valid: true } : { valid: false, error: 'Flashcard Rápida: no hay cartas para emparejar.' };
+    case 'impostor_cognitivo':
+      return arr(gd.statements) && gd.statements.length === 3 ? { valid: true } : { valid: false, error: 'El Impostor Cognitivo: deben ser exactamente 3 afirmaciones.' };
+    case 'alquimia_conceptual':
+      if (!gd.element_a || !gd.element_b || !gd.alchemy_enigma) return { valid: false, error: 'Alquimia Conceptual: faltan los conceptos o el enigma.' };
+      return arr(gd.bridge_options) && gd.bridge_options.length === 3 ? { valid: true } : { valid: false, error: 'Alquimia Conceptual: deben ser exactamente 3 opciones de puente.' };
+    case 'cuarto_crisis':
+      return gd.crisis_scenario && arr(gd.interventions) && gd.interventions.length > 0 ? { valid: true } : { valid: false, error: 'Cuarto de Crisis: falta el escenario o las intervenciones.' };
+    case 'juicio_conocimiento':
+      return gd.case_file && arr(gd.expert_testimony) && gd.expert_testimony.length >= 2 ? { valid: true } : { valid: false, error: 'El Juicio al Conocimiento: falta el testimonio.' };
     default:
       return { valid: false, error: 'Tipo de pregunta no reconocido.' };
   }
