@@ -218,3 +218,9 @@ La medición inicial del tema «restricción presupuestaria» (PDF con fórmulas
 
 **Límites:** son 5 tandas de una clase y de dos temas; sin juez (el juez rechazó entre 0 y 1 por tanda en las mediciones anteriores); una pregunta válida **no** es una pregunta buena: la calidad pedagógica sigue sin medirse y la revisión del profesor sigue siendo obligatoria.
 
+
+## 100 % para avanzar también en clases sin plan publicado (2026-11-04)
+
+Un estudiante terminó un módulo con 2/5 y el mapa le dejó seguir. Causa: la regla del 100 % (`courseGate`) solo actúa cuando la clase tiene un **plan publicado**; sin plan, el flujo anterior marca `student_progress.status = 'completed'` con **cualquier nota** (`finish_lesson`) y el mapa desbloquea el siguiente módulo. Ahora `buildNodes` (`src/lib/map/mapSections.ts`) solo cuenta un módulo como completado si `best_score >= 100`; con menos queda «en curso» (se repite) y no desbloquea el siguiente.
+
+**Límites:** el bloqueo sin plan es **visual** (mapa); la ruta de la lección no lo exige en el servidor para clases sin plan (con plan sí). Los conteos de «módulos completados» de tableros y reportes siguen usando el estado de la base (incluye módulos terminados con menos de 100). **No verificado en el navegador.**

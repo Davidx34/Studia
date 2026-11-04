@@ -39,15 +39,18 @@ const idsOf = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
 // Estado de cada modulo: completado / en curso segun el progreso; si no, disponible o bloqueado segun sus prerrequisitos. (La misma regla de siempre.)
 export function buildNodes(modules: ModuleRow[], progress: ProgressRow[]): NodeWithClass[] {
   const progressMap = new Map(progress.map((p) => [p.module_id, p]));
-  const completed = new Set(progress.filter((p) => p.status === 'completed').map((p) => p.module_id));
-  const current = progress.find((p) => p.status === 'in_progress')?.module_id ?? null;
+  // Politica «100 % para avanzar» tambien SIN plan publicado: terminar la leccion con menos de 100 deja el modulo «en curso» (se repite) y NO desbloquea el siguiente.
+  // (finish_lesson marca 'completed' con cualquier nota; la nota maxima se guarda en best_score.)
+  const isDone = (p: ProgressRow | undefined) => p?.status === 'completed' && (p.best_score ?? 0) >= 100;
+  const completed = new Set(progress.filter((p) => isDone(p)).map((p) => p.module_id));
+  const current = progress.find((p) => p.status === 'in_progress' || (p.status === 'completed' && !isDone(p)))?.module_id ?? null;
 
   return modules.map((m) => {
     const p = progressMap.get(m.id);
     const prereqs = idsOf(m.prerequisites);
     let status: NodeStatus;
-    if (p?.status === 'completed') status = 'completed';
-    else if (p?.status === 'in_progress') status = 'in_progress';
+    if (isDone(p)) status = 'completed';
+    else if (p?.status === 'in_progress' || p?.status === 'completed') status = 'in_progress';
     else status = prereqs.length === 0 || prereqs.every((pid) => completed.has(pid)) ? 'available' : 'locked';
 
     return {
