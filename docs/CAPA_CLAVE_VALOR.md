@@ -32,5 +32,5 @@ Crear una base en Upstash y poner en Vercel `UPSTASH_REDIS_REST_URL` y `UPSTASH_
 ## Límites conocidos
 
 - Una escritura o un borrado hecho **mientras Redis está caído** queda solo en el respaldo en memoria; al volver, Redis puede conservar una copia vieja de esa clave. Las claves por versión son inmutables, así que no importa aquí; para otro uso habría que tenerlo en cuenta.
-- `rateLimit.ts` y `ai/gateway/persist.ts` **no** usan esta capa todavía (las tablas de las migraciones 080 y 083 no están aplicadas en producción). `incrWithWindow` ya está listo para cuando se decida.
+- `rateLimit.ts` y `ai/gateway/persist.ts` **no** usan esta capa todavía (las migraciones 080 y 083 ya están aplicadas en producción: 080 el 2026-11-03, con el límite de uso por profesor ya real en la base; 083 el 2026-11-03, opt-in con `AI_HEALTH_PERSIST=1`). `incrWithWindow` ya está listo para cuando se decida.
 - Otras lecturas de `class_memory` (panel del profesor, constructor) no pasan por el caché: solo piden `status`/`version` o escriben.
