@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { Check, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { MathText } from '@/components/MathText';
 import type { ReviewGroup, ReviewItem } from '@/lib/blueprint/examReviewView';
 
 const SELECT = 'w-full min-h-[44px] rounded-xl border border-line-strong bg-surface-2 px-3 py-2 text-base text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -107,13 +108,15 @@ export default function ExamBankClient({ classroomId, tableMissing, groups: init
                     <span>· {i.typeLabel}</span>
                     <span>· {i.periodName ? `${i.periodName} · ` : ''}{i.moduleTitle}</span>
                   </div>
-                  <p className="text-base font-medium text-fg">{i.q}</p>
+                  <p className="text-base font-medium text-fg">
+                    <MathText content={i.q} />
+                  </p>
                   {i.options.length > 0 && (
                     <ul className="space-y-1 text-sm">
                       {i.options.map((o, k) => (
                         <li key={k} className={o.correct ? 'font-semibold text-fg' : 'text-fg-muted'}>
                           {o.correct ? '✔ ' : '• '}
-                          {o.text}
+                          <MathText content={o.text} />
                           {o.correct && <span className="sr-only"> (respuesta correcta)</span>}
                         </li>
                       ))}
@@ -122,11 +125,11 @@ export default function ExamBankClient({ classroomId, tableMissing, groups: init
                   {i.key && <p className="text-sm text-fg">Clave: {i.key}</p>}
                   <p className="text-sm text-fg-muted">
                     <span className="font-semibold text-fg">Explicacion: </span>
-                    {i.exp}
+                    <MathText content={i.exp} />
                   </p>
                   <p className="text-sm text-fg-muted">
                     <span className="font-semibold text-fg">Material: </span>
-                    {i.materialName} — «{i.quote}»
+                    {i.materialName} — «<MathText content={i.quote} />»
                   </p>
                   <p className={`text-sm ${i.attention ? 'font-semibold text-danger' : 'text-fg-muted'}`}>{i.verdictLabel}</p>
                   {i.problems.length > 0 && (

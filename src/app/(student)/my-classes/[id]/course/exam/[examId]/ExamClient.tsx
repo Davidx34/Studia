@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { MathText } from '@/components/MathText';
 import { answeredCount, buildPayload, isAnswered, restoreDraft, withAnswer, withMatch, type FormState } from '@/lib/blueprint/examForm';
 import type { ExamFeedback } from '@/lib/blueprint/examFeedback';
 import type { PresentedQuestion } from '@/lib/blueprint/examSession';
@@ -188,16 +189,18 @@ export default function ExamClient({ classroomId, kind, periodId, title, backHre
                     {i.correct ? <CheckCircle2 aria-hidden="true" className="h-5 w-5" /> : <XCircle aria-hidden="true" className="h-5 w-5" />}
                     Pregunta {i.position}: {i.correct ? 'Correcta' : 'Incorrecta'}
                   </p>
-                  <p className="text-base font-medium text-fg">{i.question}</p>
+                  <p className="text-base font-medium text-fg">
+                    <MathText content={i.question} />
+                  </p>
                   <p className="text-sm text-fg-muted">
                     <span className="font-semibold text-fg">Por qué: </span>
-                    {i.explanation}
+                    <MathText content={i.explanation} />
                   </p>
                   {i.where && (
                     <p className="text-sm text-fg-muted">
                       <span className="font-semibold text-fg">Dónde se vio: </span>
                       {i.where.periodName} · {i.where.moduleTitle}. <span className="font-semibold text-fg">Material: </span>
-                      {i.where.materialName} — «{i.where.quote}»
+                      {i.where.materialName} — «<MathText content={i.where.quote} />»
                     </p>
                   )}
                 </Card>
@@ -237,7 +240,7 @@ export default function ExamClient({ classroomId, kind, periodId, title, backHre
             <fieldset disabled={busy} className="space-y-3">
               <legend className="text-base font-medium text-fg">
                 <span className="mr-2 text-fg-muted">{n + 1}.</span>
-                {q.q}
+                <MathText content={q.q} />
                 {!isAnswered(q, answers[q.id]) && <span className="sr-only"> (sin contestar)</span>}
               </legend>
 
@@ -249,7 +252,7 @@ export default function ExamClient({ classroomId, kind, periodId, title, backHre
                       <label key={k} className={`flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl border p-3 text-base text-fg ${on ? 'border-primary bg-surface-2' : 'border-line'}`}>
                         <input type="radio" name={`q-${q.id}`} checked={on} onChange={() => change(withAnswer(answers, q.id, { selectedIndex: k }))} className="mt-1 h-4 w-4" />
                         <span>
-                          <span className="font-semibold">{LETTERS[k] ?? k + 1}.</span> {o}
+                          <span className="font-semibold">{LETTERS[k] ?? k + 1}.</span> <MathText content={o} />
                         </span>
                       </label>
                     );
@@ -291,7 +294,9 @@ export default function ExamClient({ classroomId, kind, periodId, title, backHre
                     const cur = (answers[q.id] as any)?.defs?.[k] ?? '';
                     return (
                       <label key={k} className="block text-sm text-fg-muted">
-                        <span className="font-semibold text-fg">{t}</span>
+                        <span className="font-semibold text-fg">
+                          <MathText content={t} />
+                        </span>
                         <select className={FIELD} value={cur} onChange={(e) => change(withMatch(answers, q, k, e.target.value))}>
                           <option value="">Elige la definición…</option>
                           {(q.defs ?? []).map((d, j) => (
