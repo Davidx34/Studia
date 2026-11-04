@@ -58,3 +58,14 @@ Con ellas, los **ocho** minijuegos del catálogo se califican en el servidor (de
 - La Ñ es una letra distinta de la N. Las letras con tilde en la palabra se muestran tal cual y no cuentan como letras que adivinar (en el navegador antiguo contaban como su letra base, lo que hacía imposible ganar una palabra con tilde; los datos nuevos no las llevan).
 
 **Límite (el mismo que en las categorías):** un cliente modificado puede sondear todas las letras o todas las combinaciones de cartas y obtener la solución sin jugar; es el mismo ensayo y error que los juegos permiten, y lo que no se puede es **registrar** un resultado sin haberlo logrado.
+
+## Defecto hallado al activar `SERVER_GRADING_GAMES=on` en producción (2026-11-04)
+
+**Qué pasó.** Con la variable encendida, una lección con un minijuego terminó con «No pudimos guardar tu resultado». En la base: intento «en progreso», 5 preguntas servidas y solo 4 respondidas; la que faltaba era un Descifrador.
+
+**Causa.** El validador del navegador para preguntas servidas **sin la solución** (`validateServerGraded`, `lesson/validateQuestion.ts`) solo conocía los tipos clásicos: **cualquier minijuego** caía en «Tipo de pregunta no reconocido». La pantalla mostraba «pregunta no válida», el juego no se podía jugar, la pregunta quedaba sin responder y el servidor (con razón) no cerraba la lección. Es decir, con la variable encendida **todas las lecciones que sorteaban un minijuego quedaban sin poder registrarse**, y con el 100 % para avanzar eso bloquea el módulo. Ninguna prueba lo vio porque el validador y el sanitizador del servidor nunca se probaron juntos (y las pantallas de los juegos nunca se habían probado con sesiones reales, como decía este mismo documento).
+
+**Arreglo.** `validateServerGradedGame`: valida los ocho juegos con la forma que deja `sanitizeGameData` y los mismos mínimos que el validador del navegador (que además exige la solución). Prueba nueva (`validateServerGames.test.ts`) que **acopla los dos lados**: pasa datos de juego por el sanitizador real del servidor y exige que el validador los acepte, para los ocho juegos (con la forma real de la base para flashcard); un juego nuevo sin su caso rompe la prueba.
+
+**Mientras no esté desplegado el arreglo, `SERVER_GRADING_GAMES` debe estar apagada** (las lecciones con juegos no se pueden cerrar con ella encendida).
+
