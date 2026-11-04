@@ -5,6 +5,7 @@
 // y dejar saltar a la siguiente en vez de una pantalla rota o vacia.
 
 import { isGradedGameType } from '@/lib/grading/gameGrading';
+import { fillBlankQuality, hasDroppedSymbols, shortAnswerQuality } from './typability';
 
 export interface ValidationResult {
   valid: boolean;
@@ -73,6 +74,12 @@ export function isValidQuestion(q: any): ValidationResult {
   if (!q || typeof q !== 'object') return { valid: false, error: 'La pregunta no tiene datos.' };
   if (q.serverGraded === true) return validateServerGraded(q);
 
+  // Una formula que se perdio al leer el PDF deja huecos («donde  y  son»): la pregunta no se entiende. Solo las clasicas (los juegos llevan su texto en game_data).
+  if (['multiple_choice', 'true_false', 'fill_blank', 'match', 'short_answer'].includes(q.type)) {
+    const texts: unknown[] = [q.q, ...(Array.isArray(q.opts) ? q.opts : []), ...(Array.isArray(q.pairs) ? q.pairs.flatMap((p: any) => [p?.term, p?.def]) : [])];
+    if (texts.some(hasDroppedSymbols)) return { valid: false, error: 'La pregunta tiene huecos donde faltan simbolos o una formula.' };
+  }
+
   switch (q.type) {
     case 'multiple_choice':
       if (!q.q || !Array.isArray(q.opts) || q.opts.length === 0) {
@@ -93,6 +100,10 @@ export function isValidQuestion(q: any): ValidationResult {
       if (!q.q || !Array.isArray(q.answers) || q.answers.length === 0) {
         return { valid: false, error: 'Falta la oración o la respuesta esperada.' };
       }
+      {
+        const quality = fillBlankQuality(q.q, q.answers);
+        if (!quality.ok) return { valid: false, error: quality.error };
+      }
       return { valid: true };
 
     case 'match':
@@ -104,6 +115,10 @@ export function isValidQuestion(q: any): ValidationResult {
     case 'short_answer':
       if (!q.q || !Array.isArray(q.keywords) || q.keywords.length === 0) {
         return { valid: false, error: 'Falta la pregunta o las palabras clave esperadas.' };
+      }
+      {
+        const quality = shortAnswerQuality(q.q, q.keywords);
+        if (!quality.ok) return { valid: false, error: quality.error };
       }
       return { valid: true };
 
