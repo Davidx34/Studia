@@ -26,7 +26,7 @@ Sin `SERVER_GRADING_GAMES`, los juegos se sirven y se califican en el navegador 
 
 - La política `students_read_lesson_questions` todavía deja leer `lesson_questions` completa con la llave pública, así que **un estudiante que consulte la base directamente aún puede ver las soluciones**. Cerrarlo es la Fase 2 del plan (`finish_lesson`, lectura cerrada); esta entrega solo evita que la solución viaje en la respuesta de la lección.
 - El temporizador del Cuarto de Crisis no se vigila en el servidor.
-- Las pantallas de los juegos no se probaron en un navegador con sesiones reales (necesitan inicio de sesión y datos): se cubren con pruebas del servidor, de la entrega de la lección con una base simulada y pruebas estáticas de los componentes.
+- ~~Las pantallas de los juegos no se probaron en un navegador con sesiones reales~~: se probaron el 2026-11-04 (ver «Verificación en el navegador»).
 
 ## Segunda entrega: línea del tiempo y categorías
 
@@ -68,4 +68,25 @@ Con ellas, los **ocho** minijuegos del catálogo se califican en el servidor (de
 **Arreglo.** `validateServerGradedGame`: valida los ocho juegos con la forma que deja `sanitizeGameData` y los mismos mínimos que el validador del navegador (que además exige la solución). Prueba nueva (`validateServerGames.test.ts`) que **acopla los dos lados**: pasa datos de juego por el sanitizador real del servidor y exige que el validador los acepte, para los ocho juegos (con la forma real de la base para flashcard); un juego nuevo sin su caso rompe la prueba.
 
 **Mientras no esté desplegado el arreglo, `SERVER_GRADING_GAMES` debe estar apagada** (las lecciones con juegos no se pueden cerrar con ella encendida).
+
+## Verificación en el navegador (2026-11-04, con el arreglo #219)
+
+Servidor local con `SERVER_GRADING=on` y `SERVER_GRADING_GAMES=on` contra la base real, **sesión de estudiante real**, y una **clase desechable ya borrada** cuyo módulo solo tenía preguntas de juego (una de cada tipo, copiadas de las reales; flashcard, juicio y categorías de preguntas ya rechazadas, sin otro uso). Lo que se comprobó, **para los ocho juegos**:
+
+| Juego | Qué se probó | Resultado |
+|---|---|---|
+| Alquimia conceptual | elegir el puente | correcta y registrada |
+| Flashcard rápida | sondeos de pares hasta 4/4 | correcta y registrada (`matches`) |
+| Juicio al conocimiento | un fallo y un acierto | **ambos** registrados (el fallo revela la explicación) |
+| Categorías rápidas | sondeos con un fallo y aciertos hasta clasificar todo | el sondeo fallido no cierra ni gasta intento; cierra al clasificar |
+| Cuarto de crisis | elegir intervención | correcta y registrada |
+| El Descifrador | sondeo de letras, pista y cierre con `letters` | correcta y registrada |
+| Línea del tiempo | un orden **equivocado** y luego el correcto | el fallo no revela el orden; `tries: 2`, final correcto y años revelados |
+| Impostor cognitivo | elegir al impostor | correcta y registrada |
+
+Dos lecciones completas terminaron con **«Terminar módulo»** → 100 %, `status: finished`, `graded_count = servidas = finales`, y cada resultado de juego quedó en `question_attempts` con su `game_type`. El síntoma original («No pudimos guardar tu resultado») no se repitió.
+
+**Cosas vistas que NO son defectos del arreglo:** en modo desarrollo React lanza la carga de la lección dos veces y se crean **dos intentos** (uno queda «en progreso»; en producción no ocurre esa doble carga). Un clic mío en el flashcard fue ignorado mientras el servidor respondía un sondeo (el juego bloquea mientras espera).
+
+**NO verificado:** producción desplegada (solo servidor local contra la base real); móvil y modo claro de las pantallas de los juegos; que todos los datos de juego reales de las clases tengan la forma esperada (se copió un ejemplo por tipo, no se revisaron las 70 preguntas); el temporizador de Categorías y Cuarto de crisis sigue siendo del navegador (límite conocido).
 
