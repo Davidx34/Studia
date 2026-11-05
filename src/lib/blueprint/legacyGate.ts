@@ -1,7 +1,7 @@
 // «100 % para avanzar» en clases SIN plan publicado (o con un modulo que el plan no enlaza): el servidor tambien niega la leccion si algun prerrequisito del modulo (content_modules.prerequisites,
 // los mismos que dibuja el mapa) no esta al 100 %. Es la regla de `buildNodes` (mapa) llevada al servidor: sin esto el bloqueo era solo visual y se saltaba abriendo la URL.
 //
-// Dominado = una leccion TERMINADA con 100 % (lesson_attempts) O student_progress.best_score >= 100 (lo que escribe finish_lesson y el progreso anterior al servidor). Cualquier falla al leer
+// Un modulo que el estudiante ya empezo (student_progress en curso o completado) NO se bloquea: coincide con el mapa. Dominado = una leccion TERMINADA con 100 % (lesson_attempts) O student_progress.best_score >= 100 (lo que escribe finish_lesson y el progreso anterior al servidor). Cualquier falla al leer
 // NO bloquea (igual que courseGate): se registra y se deja pasar.
 
 import type { Gate } from './courseGate';
@@ -36,15 +36,19 @@ export async function checkLegacyAccess(args: { db: any; admin: any | null; user
     }
     const [att, prog] = await Promise.all([
       args.admin.from('lesson_attempts').select('module_id, score_percent').eq('student_id', args.userId).eq('status', 'finished').in('module_id', prereqs),
-      args.admin.from('student_progress').select('module_id, best_score').eq('student_id', args.userId).in('module_id', prereqs),
+      args.admin.from('student_progress').select('module_id, status, best_score').eq('student_id', args.userId).in('module_id', [args.moduleId, ...prereqs]),
     ]);
     if (att.error || prog.error) {
       console.error('[LESSON_GATE_ERROR] dominio', { moduleId: args.moduleId, error: String((att.error ?? prog.error).message ?? '').slice(0, 120) });
       return OPEN;
     }
+    const progress = (prog.data ?? []) as { module_id: string; status: string | null; best_score: number | string | null }[];
+    // Lo que el estudiante YA empezo o termino no se bloquea (igual que el mapa: «en curso» / «completado» siguen abiertos). No abre un hueco: student_progress solo lo escribe el servidor
+    // (migracion 086) cuando la leccion se sirvio, es decir, despues de pasar esta misma puerta; lo anterior a la regla es avance legitimo que no se le quita.
+    if (progress.some((r) => r.module_id === args.moduleId && (r.status === 'in_progress' || r.status === 'completed'))) return OPEN;
     const mastered = new Set<string>();
     for (const r of (att.data ?? []) as { module_id: string; score_percent: number | string | null }[]) if (Number(r.score_percent) >= 100) mastered.add(r.module_id);
-    for (const r of (prog.data ?? []) as { module_id: string; best_score: number | string | null }[]) if (Number(r.best_score) >= 100) mastered.add(r.module_id);
+    for (const r of progress) if (Number(r.best_score) >= 100) mastered.add(r.module_id);
     const gate = legacyGate(prereqs, mastered);
     if (gate.allowed) return gate;
     const { data: titleRows } = await args.db.from('content_modules').select('id, title').in('id', prereqs.filter((p) => !mastered.has(p)));

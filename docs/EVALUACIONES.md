@@ -268,3 +268,7 @@ El estudiante reportó que «el formato de las fórmulas falla». Medición de s
 ## Migración 090: pg_trgm y pg_net fuera de `public` (2026-11-05, sin aplicar)
 
 Quita lo que le queda al aviso `extension_in_public`. pg_trgm es reubicable (sin índices ni funciones propias que lo usen); pg_net no lo es y se recrea en `extensions` (cola vacía, `cron.job` vacío, sus funciones viven en el esquema `net`, que no cambia). Probada en una transacción revertida. Espera «aplica la 090».
+
+## Corrección: la puerta del servidor no bloquea lo ya empezado (2026-11-05)
+
+`scripts/check-gate-consistency.ts` (solo lectura) compara con datos reales el veredicto del servidor con el estado del mapa para cada (estudiante matriculado, módulo con prerrequisitos). Antes de esta corrección, de 52 pares el servidor negaba 49 y **14 eran incoherentes**: el mapa mostraba «en curso» o «completado» (estudiantes con avance anterior a la regla) pero el servidor habría negado abrirlos. Ahora un módulo con `student_progress` en curso o completado no se bloquea (igual que el mapa); no abre un hueco porque ese progreso solo lo escribe el servidor tras pasar la misma puerta (migración 086). Resultado real: 35 negados = 35 bloqueados en el mapa, 0 incoherencias.
