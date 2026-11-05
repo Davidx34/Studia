@@ -225,6 +225,19 @@ Un estudiante terminó un módulo con 2/5 y el mapa le dejó seguir. Causa: la r
 
 **Límites:** el bloqueo sin plan es **visual** (mapa); la ruta de la lección no lo exige en el servidor para clases sin plan (con plan sí). Los conteos de «módulos completados» de tableros y reportes siguen usando el estado de la base (incluye módulos terminados con menos de 100). **No verificado en el navegador.**
 
+## Fórmulas que se veían mal (2026-11-04)
+
+El estudiante reportó que «el formato de las fórmulas falla». Medición de solo lectura en la base real: de **392 campos con `$`** (preguntas de lección), **70** tenían texto que KaTeX no podía dibujar. Causas y arreglo (`src/lib/lesson/latex.ts`, usado por `MathText`):
+
+1. **LaTeX corrupto** (26 preguntas guardadas, la última del 11 de octubre): al leer el JSON de la IA, `\frac` quedó como «salto de página + rac» y `\beta` como «retroceso + eta». Se **repara al mostrar** (solo combinaciones conocidas), sin tocar la base.
+2. **Dinero leído como fórmula**: «ingreso de $100 y precios $10 y $20» se dibujaba como matemática. Ahora se usan las reglas de Pandoc (el `$` que abre no lleva espacio a la derecha; el que cierra no lleva espacio a la izquierda ni dígito a la derecha) y un `$` que parece abrir otra fórmula antes de cerrar la primera aborta la primera. `\$` es un dólar literal.
+3. **Dentro de la fórmula**: la casilla `___` se escapa, un `%` sin escapar (comentario para KaTeX) se escapa.
+4. **Pantallas de examen** (estudiante y revisión del profesor) pintaban enunciado, opciones, explicación y cita como texto plano; ahora usan `MathText`.
+
+**Resultado medido:** de 70 campos que fallaban quedan 3 (antes de arreglar el `%`; el resto de lo restante es LaTeX genuinamente mal escrito, p. ej. `x^^*`). Si KaTeX falla, `MathText` muestra el texto original con sus delimitadores en vez de un error.
+
+**Límites:** no se corrigen fórmulas que se perdieron ya en el PDF de origen; un salto de línea real antes de «nabla» al empezar línea se toma por `\nabla`; **no verificado visualmente en el navegador** (sí con KaTeX en pruebas de renderizado).
+
 ## Calidad de las preguntas de completar y respuesta corta (2026-11-04)
 
 **Qué reportó el dueño al probar una lección real (Microeconomía):** (1) las fórmulas se ven mal; (2) las respuestas cortas no son claras y la respuesta **no se puede escribir** (pide una fórmula con «≤»); (3) terminó con 2/5 y pudo seguir al siguiente módulo (ver abajo).
