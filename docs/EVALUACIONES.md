@@ -224,3 +224,22 @@ La medición inicial del tema «restricción presupuestaria» (PDF con fórmulas
 Un estudiante terminó un módulo con 2/5 y el mapa le dejó seguir. Causa: la regla del 100 % (`courseGate`) solo actúa cuando la clase tiene un **plan publicado**; sin plan, el flujo anterior marca `student_progress.status = 'completed'` con **cualquier nota** (`finish_lesson`) y el mapa desbloquea el siguiente módulo. Ahora `buildNodes` (`src/lib/map/mapSections.ts`) solo cuenta un módulo como completado si `best_score >= 100`; con menos queda «en curso» (se repite) y no desbloquea el siguiente.
 
 **Límites:** el bloqueo sin plan es **visual** (mapa); la ruta de la lección no lo exige en el servidor para clases sin plan (con plan sí). Los conteos de «módulos completados» de tableros y reportes siguen usando el estado de la base (incluye módulos terminados con menos de 100). **No verificado en el navegador.**
+
+## Calidad de las preguntas de completar y respuesta corta (2026-11-04)
+
+**Qué reportó el dueño al probar una lección real (Microeconomía):** (1) las fórmulas se ven mal; (2) las respuestas cortas no son claras y la respuesta **no se puede escribir** (pide una fórmula con «≤»); (3) terminó con 2/5 y pudo seguir al siguiente módulo (ver abajo).
+
+**Lo que mostraban los datos reales de esas 5 preguntas:**
+- Completar: «La restricción presupuestaria se define como _____, donde  y  son las cantidades de bienes… y  e  son sus precios.» con la respuesta `pxx + pyy ≤ W`: los símbolos de la fórmula **se perdieron al leer el PDF** (quedaron espacios dobles) y la respuesta es imposible de teclear.
+- Respuesta corta: palabras clave «restricción presupuestaria», «precio» y «desplazamiento»; las dos primeras **ya estaban en el enunciado** y una respuesta correcta como «se desplaza hacia adentro» no cumplía la tercera.
+- En todo el banco servible (523 preguntas): **55 % de las palabras clave de respuesta corta ya estaban en el enunciado** (104 de 189), 10 respuestas de completar eran fórmulas o símbolos y 12 ya estaban escritas en la oración.
+
+**Qué se hizo (`lesson/typability.ts`, aplicado por `isValidQuestion` y por el validador del examen):**
+- Una respuesta (completar) o palabra clave (respuesta corta) debe poder **escribirse con el teclado**: letras, números y signos de palabra; sin `≤ ≥ < > = + * / ^ _ { }`, sin LaTeX, máximo 6 palabras y 60 caracteres. Si la respuesta natural es una fórmula, la pregunta debe ser de opción múltiple.
+- Una palabra clave **no puede estar ya en el enunciado**; la respuesta corta lleva de 1 a 5 palabras clave; una respuesta de completar no puede estar ya escrita en la oración.
+- Una pregunta con **huecos de fórmula perdida** («donde  y  son», paréntesis o `$ $` vacíos, comas sueltas) en el enunciado, las opciones o los pares **no se genera ni se sirve**.
+- Como `isValidQuestion` también filtra lo que ya existe, las preguntas malas **dejan de servirse sin tocar la base**: de 523 preguntas servibles se apartan 77 (15 %): 49 de 65 de respuesta corta, 26 de 86 de completar, 1 de emparejar y 1 de opción múltiple. Siguen en la base; el profesor puede verlas.
+- El prompt de generación de las lecciones pide ahora: respuesta corta con 1–3 conceptos claros en el enunciado, palabras clave escribibles, que no estén en el enunciado y en forma de raíz cuando hay variantes (`desplaz`); completar con una sola respuesta escribible de ≤ 3 palabras; si lo natural es una fórmula, usar opción múltiple.
+
+**Límites:** son reglas de forma, no de significado: una respuesta corta sigue calificándose por palabras clave (no entiende paráfrasis); el banco se reducirá en respuestas cortas hasta que se regeneren; la causa de los huecos (el PDF pierde las fórmulas al extraer el texto) **no se arregla aquí**: solo se evita servir lo que quedó roto.
+
