@@ -179,7 +179,7 @@ describe('serpentine (camino que serpentea)', () => {
 
 describe('buildNodes (estado de cada modulo)', () => {
   const progress: ProgressRow[] = [
-    { module_id: 'm1', status: 'completed', best_score: 90, completion_percentage: 100 },
+    { module_id: 'm1', status: 'completed', best_score: 100, completion_percentage: 100 },
     { module_id: 'm2', status: 'in_progress', best_score: null, completion_percentage: 40 },
   ];
 
@@ -191,10 +191,21 @@ describe('buildNodes (estado de cada modulo)', () => {
 
   it('marca el modulo en curso, el puntaje y el avance; y tolera datos faltantes', () => {
     const out = buildNodes([mod('m1'), mod('m2', { difficulty_level: null, order_index: null, map_position_x: null, map_position_y: null, prerequisites: null })], progress);
-    expect(out[0].node.score).toBe(90);
+    expect(out[0].node.score).toBe(100);
     expect(out[1].node.isCurrent).toBe(true);
     expect(out[1].node.completionPct).toBe(40);
     expect(out[1].node).toMatchObject({ difficulty: 1, order: 0, x: 500, y: 200, prerequisites: [] });
+  });
+
+  it('100 % para avanzar sin plan: terminar con 40 % deja el modulo en curso y NO desbloquea el siguiente', () => {
+    const out = buildNodes([mod('m1'), mod('m2', { prerequisites: ['m1'] })], [{ module_id: 'm1', status: 'completed', best_score: 40, completion_percentage: 100 }]);
+    const st = Object.fromEntries(out.map((o) => [o.node.id, o.node.status]));
+    expect(st).toEqual({ m1: 'in_progress', m2: 'locked' });
+    expect(out[0].node.isCurrent).toBe(true);
+    // sin nota guardada tampoco cuenta como completado; con 100 si desbloquea
+    expect(buildNodes([mod('m1'), mod('m2', { prerequisites: ['m1'] })], [{ module_id: 'm1', status: 'completed', best_score: null, completion_percentage: 100 }])[1].node.status).toBe('locked');
+    expect(buildNodes([mod('m1'), mod('m2', { prerequisites: ['m1'] })], [{ module_id: 'm1', status: 'completed', best_score: 100, completion_percentage: 100 }])[1].node.status).toBe('available');
+    expect(buildNodes([mod('m1'), mod('m2', { prerequisites: ['m1'] })], [{ module_id: 'm1', status: 'completed', best_score: 99.9, completion_percentage: 100 }])[1].node.status).toBe('locked');
   });
 
   it('conserva la clase de cada modulo', () => {
@@ -210,7 +221,7 @@ describe('buildMapSections (una seccion por clase)', () => {
   ];
   const items = buildNodes(
     [mod('a', { classroom_id: 'c1' }), mod('b', { classroom_id: 'c1' }), mod('c', { classroom_id: 'c2' }), mod('g1'), mod('x', { classroom_id: 'c9' })],
-    [{ module_id: 'a', status: 'completed', best_score: 80, completion_percentage: 100 }],
+    [{ module_id: 'a', status: 'completed', best_score: 100, completion_percentage: 100 }],
   );
 
   it('una seccion por clase en orden alfabetico, cada una con la plantilla de su profesor', () => {
