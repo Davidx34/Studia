@@ -30,6 +30,7 @@ Herramienta: [grafana/k6](https://github.com/grafana/k6) (scripts en JavaScript,
 |---|---|---|---|
 | `01-public.js` | `/login`, `/manifest.json`, `/offline`: borde de Vercel + middleware | No | No |
 | `02-student-pages.js` | dashboard, mis clases, mapa y página de la clase (páginas del servidor que consultan Supabase) | No | Sí |
+| `04-auth-hop.js` | cookie de sesión FALSA: mide el salto Next.js → Supabase Auth que el middleware hace en cada petición (sin cuentas, sin escribir) | No | No |
 | `03-lesson-flow.js` | pedir lección → responder cada pregunta → cerrar (`/api/generate-questions`, `/api/lesson/answer`, `/api/lesson/finish`) | **Sí** | Sí |
 
 Perfiles (`-e PROFILE=...`; `-e TARGET_VUS=N` cambia el pico):

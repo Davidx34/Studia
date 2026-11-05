@@ -45,6 +45,17 @@ describe('checkLegacyAccess', () => {
     expect(await checkLegacyAccess({ ...base, db: mkDb([id(1)]), admin: mkAdmin([], [{ module_id: id(1), best_score: '100' }]) })).toEqual({ allowed: true });
     expect((await checkLegacyAccess({ ...base, db: mkDb([id(1)]), admin: mkAdmin([{ module_id: id(1), score_percent: 99.9 }], []) })).allowed).toBe(false);
   });
+  it('un modulo YA empezado o terminado no se bloquea (coincide con el mapa), aunque el prerrequisito no este al 100 %', async () => {
+    const mk = (status: string) => mkAdmin([], [{ module_id: id(2), status, best_score: 40 }]);
+    for (const st of ['in_progress', 'completed']) expect(await checkLegacyAccess({ ...base, db: mkDb([id(1)]), admin: mk(st) }), st).toEqual({ allowed: true });
+    // 'locked' (valor por defecto de la base) o sin fila: sigue la regla normal
+    expect((await checkLegacyAccess({ ...base, db: mkDb([id(1)]), admin: mk('locked') })).allowed).toBe(false);
+    expect((await checkLegacyAccess({ ...base, db: mkDb([id(1)]), admin: mkAdmin([], []) })).allowed).toBe(false);
+  });
+  it('el 100 % del PROPIO modulo no cuenta como dominio del prerrequisito', async () => {
+    const g = await checkLegacyAccess({ ...base, db: mkDb([id(1)]), admin: mkAdmin([], [{ module_id: id(2), status: 'locked', best_score: 100 }]) });
+    expect(g.allowed).toBe(false);
+  });
   it('un modulo sin prerrequisitos (o que se tiene a si mismo) abre sin leer intentos', async () => {
     const admin = { from: vi.fn() };
     expect(await checkLegacyAccess({ ...base, db: mkDb([]), admin })).toEqual({ allowed: true });
