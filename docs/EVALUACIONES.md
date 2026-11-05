@@ -260,3 +260,11 @@ El estudiante reportó que «el formato de las fórmulas falla». Medición de s
 ## «Completados» cuenta solo lo dominado en las pantallas del estudiante (2026-11-05)
 
 `src/lib/progress/mastery.ts` define **dominado** = terminado con `best_score >= 100`. Lo usan el mapa, la página de la clase (conteo, tarjetas «Completado» y bloqueo del módulo siguiente; un módulo terminado con menos queda «En curso») y el panel del estudiante (total y avance por clase). **No cambia** (decisión: informan lo que el estudiante hizo, no lo que domina): logros, racha y actividad semanal del estudiante, y los tableros/reportes del profesor, que siguen contando módulos terminados. **No verificado en el navegador.**
+
+## Efecto real de la regla de «se puede escribir» sobre el banco guardado (2026-11-05, solo lectura)
+
+`scripts/measure-validity.ts` (no escribe nada) corre el validador actual sobre las preguntas no rechazadas de `lesson_questions`: de **523**, **77 (14,7 %)** ya no se sirven. Por tipo: **respuesta corta 49 de 65**, **completar 26 de 86**, emparejar 1, opción múltiple 1, el resto 0. Motivos principales: la respuesta ya está en el enunciado (12), no se puede escribir con teclado (10), huecos con símbolos perdidos (6) y palabras clave presentes en el enunciado (≈20). De 24 módulos con banco, **14 pierden preguntas** (p. ej. 30→21), **1 queda con menos de 5 válidas** (un módulo de 5 que pasa a 3) y ninguno queda en cero. Las filas **no se tocan**; la reposición (`scripts/replenish-pools.ts`) genera con las reglas nuevas. **Límite:** la regla de «palabra clave ya en el enunciado» es estricta; algunas de estas preguntas podrían ser aceptables para un profesor.
+
+## Migración 090: pg_trgm y pg_net fuera de `public` (2026-11-05, sin aplicar)
+
+Quita lo que le queda al aviso `extension_in_public`. pg_trgm es reubicable (sin índices ni funciones propias que lo usen); pg_net no lo es y se recrea en `extensions` (cola vacía, `cron.job` vacío, sus funciones viven en el esquema `net`, que no cambia). Probada en una transacción revertida. Espera «aplica la 090».
