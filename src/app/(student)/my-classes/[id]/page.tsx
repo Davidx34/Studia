@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { isMastered, isRetry } from '@/lib/progress/mastery';
 import Link from 'next/link';
 import { BookOpen, BrainCircuit, CheckCircle2, Dumbbell, FlaskConical, ListChecks, Lock, Play } from 'lucide-react';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -88,7 +89,7 @@ export default async function StudentClassPage({ params }: { params: { id: strin
   const hasPlan = !planCount.error && (planCount.count ?? 0) > 0;
 
   const teacher = (classroom as any).profiles;
-  const completedCount = Array.from(progressMap.values()).filter((p: any) => p.status === 'completed').length;
+  const completedCount = Array.from(progressMap.values()).filter((p: any) => isMastered(p)).length;
   const total = modules?.length ?? 0;
   const pct = total > 0 ? (completedCount / total) * 100 : 0;
 
@@ -140,9 +141,9 @@ export default async function StudentClassPage({ params }: { params: { id: strin
             {modules.map((module: any, index: number) => {
               const progress = progressMap.get(module.id);
               const prevProgress = index > 0 ? progressMap.get((modules[index - 1] as any).id) : null;
-              const isLocked = index > 0 && (prevProgress as any)?.status !== 'completed';
-              const isCompleted = progress?.status === 'completed';
-              const isInProgress = progress?.status === 'in_progress';
+              const isLocked = index > 0 && !isMastered(prevProgress);
+              const isCompleted = isMastered(progress);
+              const isInProgress = progress?.status === 'in_progress' || isRetry(progress);
               return (
                 <li key={module.id}>
                   <Card className={`h-full p-4 flex flex-col ${isLocked ? 'bg-surface-2' : isCompleted ? 'border-success/60' : ''}`}>

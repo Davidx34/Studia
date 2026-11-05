@@ -61,7 +61,8 @@ export default async function DashboardPage() {
     .from('student_progress')
     .select('*', { count: 'exact', head: true })
     .eq('student_id', user.id)
-    .eq('status', 'completed');
+    .eq('status', 'completed')
+    .gte('best_score', 100);
 
   // Progreso semanal: modulos completados por dia en los ultimos 7 dias
   const sevenDaysAgo = new Date();
@@ -139,6 +140,7 @@ export default async function DashboardPage() {
         .select('module_id, status')
         .eq('student_id', user.id)
         .eq('status', 'completed')
+        .gte('best_score', 100)
         .in('module_id', moduleIds);
       for (const r of progressRows ?? []) {
         completedModuleIds.add((r as any).module_id);

@@ -256,3 +256,7 @@ El estudiante reportó que «el formato de las fórmulas falla». Medición de s
 
 **Límites:** son reglas de forma, no de significado: una respuesta corta sigue calificándose por palabras clave (no entiende paráfrasis); el banco se reducirá en respuestas cortas hasta que se regeneren; la causa de los huecos (el PDF pierde las fórmulas al extraer el texto) **no se arregla aquí**: solo se evita servir lo que quedó roto.
 
+
+## «Completados» cuenta solo lo dominado en las pantallas del estudiante (2026-11-05)
+
+`src/lib/progress/mastery.ts` define **dominado** = terminado con `best_score >= 100`. Lo usan el mapa, la página de la clase (conteo, tarjetas «Completado» y bloqueo del módulo siguiente; un módulo terminado con menos queda «En curso») y el panel del estudiante (total y avance por clase). **No cambia** (decisión: informan lo que el estudiante hizo, no lo que domina): logros, racha y actividad semanal del estudiante, y los tableros/reportes del profesor, que siguen contando módulos terminados. **No verificado en el navegador.**
