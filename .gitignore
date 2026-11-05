@@ -59,3 +59,7 @@ poses-out/
 
 # Conjuntos dorados con material REAL de clases (el repositorio es publico): solo en tu maquina
 evals/golden/local/
+
+# Prueba de carga (k6): cuentas de prueba y resultados, solo en tu maquina
+loadtest/users.json
+loadtest/results/
