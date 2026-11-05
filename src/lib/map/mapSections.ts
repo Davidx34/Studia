@@ -2,6 +2,7 @@
 // que eligio su profesor. Los modulos generales (sin clase) van en su propia seccion. Sin React ni red, para poder probarlo.
 
 import { normalizeMapTemplate, type MapTemplateId } from './mapTemplates';
+import { isMastered } from '@/lib/progress/mastery';
 import type { MapNode, NodeStatus } from './types';
 
 export interface ModuleRow {
@@ -41,7 +42,7 @@ export function buildNodes(modules: ModuleRow[], progress: ProgressRow[]): NodeW
   const progressMap = new Map(progress.map((p) => [p.module_id, p]));
   // Politica «100 % para avanzar» tambien SIN plan publicado: terminar la leccion con menos de 100 deja el modulo «en curso» (se repite) y NO desbloquea el siguiente.
   // (finish_lesson marca 'completed' con cualquier nota; la nota maxima se guarda en best_score.)
-  const isDone = (p: ProgressRow | undefined) => p?.status === 'completed' && (p.best_score ?? 0) >= 100;
+  const isDone = (p: ProgressRow | undefined) => isMastered(p);
   const completed = new Set(progress.filter((p) => isDone(p)).map((p) => p.module_id));
   const current = progress.find((p) => p.status === 'in_progress' || (p.status === 'completed' && !isDone(p)))?.module_id ?? null;
 
