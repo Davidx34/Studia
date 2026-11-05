@@ -223,7 +223,7 @@ La medición inicial del tema «restricción presupuestaria» (PDF con fórmulas
 
 Un estudiante terminó un módulo con 2/5 y el mapa le dejó seguir. Causa: la regla del 100 % (`courseGate`) solo actúa cuando la clase tiene un **plan publicado**; sin plan, el flujo anterior marca `student_progress.status = 'completed'` con **cualquier nota** (`finish_lesson`) y el mapa desbloquea el siguiente módulo. Ahora `buildNodes` (`src/lib/map/mapSections.ts`) solo cuenta un módulo como completado si `best_score >= 100`; con menos queda «en curso» (se repite) y no desbloquea el siguiente.
 
-**Límites:** el bloqueo sin plan es **visual** (mapa); la ruta de la lección no lo exige en el servidor para clases sin plan (con plan sí). Los conteos de «módulos completados» de tableros y reportes siguen usando el estado de la base (incluye módulos terminados con menos de 100). **No verificado en el navegador.**
+**Servidor (2026-11-05):** `/api/generate-questions` también niega la lección (403 `locked`) cuando falta un prerrequisito del mapa (`content_modules.prerequisites`) sin 100 % — en clases sin plan publicado y en módulos que el plan no enlaza (`src/lib/blueprint/legacyGate.ts`). Dominado = lección terminada al 100 % o `student_progress.best_score >= 100`. Sin llave de servicio o con falla de lectura no bloquea (se registra `LESSON_GATE_*`). Solo bloquea a estudiantes matriculados. **Límites:** un estudiante que ya había avanzado con menos de 100 % bajo la regla vieja queda detrás de ese módulo hasta repetirlo; los conteos de «completados» en tableros y reportes siguen usando el estado de la base; **no verificado en el navegador ni contra la base real**.
 
 ## Fórmulas que se veían mal (2026-11-04)
 
