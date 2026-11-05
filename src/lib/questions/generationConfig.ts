@@ -176,9 +176,9 @@ function minigameRulesFor(ids: readonly string[]): string {
 // Reglas por tipo base; solo se incluyen las de los tipos activos.
 const CLASSIC_RULES: Record<string, string> = {
   short_answer:
-    '- short_answer: la pregunta debe ser especifica y acotada (nunca vaga tipo "¿que es importante?"), con una respuesta esperada clara. "keywords" debe tener entre 2 y 5 palabras u expresiones concretas que se esperan en la respuesta.',
+    '- short_answer: la pregunta debe ser especifica y acotada (nunca vaga tipo "¿que es importante?") y pedir de 1 a 3 conceptos concretos que el enunciado deje claros (por ejemplo "Menciona dos factores que..."). "keywords" lleva de 1 a 4 palabras u expresiones cortas que un estudiante ESCRIBIRIA con el teclado: SIN formulas ni simbolos matematicos (nada de <=, =, ^, LaTeX), y NINGUNA puede aparecer ya en el enunciado (eso regala el punto). Pon la raiz de la palabra cuando haya variantes (por ejemplo "desplaz" en vez de "desplazamiento"). Si la respuesta natural es una formula, usa multiple_choice.',
   fill_blank:
-    '- fill_blank: "q" debe tener UN SOLO espacio en blanco marcado con "___", y "answers" debe tener exactamente 1 palabra o frase corta que lo completa (no varios blancos en la misma oracion).',
+    '- fill_blank: "q" debe tener UN SOLO espacio en blanco marcado con "___", y "answers" debe tener exactamente 1 palabra o frase corta (maximo 3 palabras) que lo completa y que se pueda ESCRIBIR con el teclado: nunca una formula, un simbolo (<=, =, ^) ni LaTeX como respuesta, y la respuesta NO debe estar ya en la oracion. Si lo que se quiere preguntar es una formula, usa multiple_choice.',
   match:
     '- match: "pairs" debe tener entre 3 y 4 pares concepto-definicion, cada uno claramente distinto de los demas para evitar ambiguedad.',
 };

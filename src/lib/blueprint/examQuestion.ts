@@ -9,6 +9,7 @@
 // Ademas tiene que pasar la auto-calificacion (JEV-1): simulada la jugada perfecta con los calificadores reales, sale correcta y cualquier otra, incorrecta.
 
 import { selfGrade } from '@/lib/jev/selfGrade';
+import { hasDroppedSymbols, isTypable, shortAnswerQuality } from '@/lib/lesson/typability';
 import type { Blueprint } from './types';
 
 export const EXAM_TYPES = ['multiple_choice', 'true_false', 'fill_blank', 'short_answer', 'match'] as const;
@@ -129,6 +130,9 @@ export function validateExamQuestion(raw: unknown, ctx: { plan: Blueprint; chunk
   if (type === 'fill_blank' && Array.isArray(raw.answers)) {
     const tooLong = raw.answers.filter((a): a is string => typeof a === 'string').find((a) => a.trim().length > FILL_ANSWER_LIMITS.chars || a.trim().split(/\s+/).length > FILL_ANSWER_LIMITS.words);
     if (tooLong !== undefined) errors.push(`La respuesta de completar es demasiado larga (maximo ${FILL_ANSWER_LIMITS.words} palabras y ${FILL_ANSWER_LIMITS.chars} caracteres): se califica por texto exacto y casi nadie la acertaria. Usa una pregunta de respuesta corta.`);
+    // Lo que se pide ESCRIBIR tiene que poder teclearse: nada de formulas ni simbolos (≤, =, ^, LaTeX).
+    const untypable = raw.answers.find((a) => !isTypable(a));
+    if (untypable !== undefined) errors.push('La respuesta de completar no se puede escribir con el teclado (formula o simbolos): usa una pregunta de opcion multiple.');
     // El examen admite UNA respuesta y UN espacio: dos «respuestas aceptadas» se calificarian como «las dos a la vez» y varios espacios no se pueden calificar por separado.
     if (raw.answers.length !== 1) errors.push('La pregunta de completar debe tener exactamente UNA respuesta (no una lista de alternativas).');
     if ((q.match(/_{3,}/g) ?? []).length !== 1) errors.push('La pregunta de completar debe tener exactamente un espacio en blanco (____).');
@@ -137,6 +141,15 @@ export function validateExamQuestion(raw: unknown, ctx: { plan: Blueprint; chunk
     const leaked = raw.answers.filter((a): a is string => typeof a === 'string').find((a) => comparable(a).length >= 4 && padded.includes(` ${comparable(a)} `));
     if (leaked !== undefined) errors.push('La pregunta de completar ya contiene la respuesta en su propio enunciado.');
   }
+
+  if (type === 'short_answer') {
+    const quality = shortAnswerQuality(q, raw.keywords);
+    if (!quality.ok) errors.push(quality.error ?? 'Palabras clave no validas.');
+  }
+
+  // Una formula perdida al leer el PDF deja huecos («donde  y  son»): el estudiante no entiende la pregunta.
+  const visible: unknown[] = [q, ...(Array.isArray(raw.opts) ? raw.opts : []), ...(Array.isArray(raw.pairs) ? raw.pairs.flatMap((p: any) => [p?.term, p?.def]) : [])];
+  if (visible.some(hasDroppedSymbols)) errors.push('La pregunta tiene huecos donde faltan simbolos o una formula.');
 
   // 5. Que se pueda calificar y no sea ambigua (JEV-1), con los calificadores reales.
   if (typeof type === 'string' && (EXAM_TYPES as readonly string[]).includes(type) && q.length > 0) {
