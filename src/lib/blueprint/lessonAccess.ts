@@ -5,11 +5,14 @@
 // intentos) NO bloquea: se registra y se deja pasar; un estudiante no debe quedar fuera por un problema de infraestructura.
 
 import { lessonGate, type Gate } from './courseGate';
+import { checkLegacyAccess } from './legacyGate';
 import { loadCourseData, type CourseData } from './studentData';
 
 type Load = (args: { db: any; admin: any | null; classroomId: string; studentId: string }) => Promise<CourseData>;
 
-export async function checkLessonAccess(args: { db: any; admin: any | null; userId: string; classroomId: string; moduleId: string }, load: Load = loadCourseData): Promise<Gate> {
+type Legacy = (args: { db: any; admin: any | null; userId: string; moduleId: string }) => Promise<Gate>;
+
+export async function checkLessonAccess(args: { db: any; admin: any | null; userId: string; classroomId: string; moduleId: string }, load: Load = loadCourseData, legacy: Legacy = checkLegacyAccess): Promise<Gate> {
   try {
     const { data: enrollment, error } = await args.db.from('class_enrollments').select('id').eq('classroom_id', args.classroomId).eq('student_id', args.userId).maybeSingle();
     if (error) {
@@ -18,7 +21,10 @@ export async function checkLessonAccess(args: { db: any; admin: any | null; user
     }
     if (!enrollment) return { allowed: true };
     const data = await load({ db: args.db, admin: args.admin, classroomId: args.classroomId, studentId: args.userId });
+    // Sin plan publicado (o un modulo que el plan no enlaza): rige la misma regla con los prerrequisitos del mapa.
+    if (data.status === 'noPlan') return await legacy({ db: args.db, admin: args.admin, userId: args.userId, moduleId: args.moduleId });
     if (data.status !== 'ok') return { allowed: true };
+    if (!data.links.some((l) => l.moduleId === args.moduleId)) return await legacy({ db: args.db, admin: args.admin, userId: args.userId, moduleId: args.moduleId });
     if (!data.scoresAvailable) console.error('[LESSON_GATE_DEGRADED] no se pudieron leer los intentos; no se bloquea', { moduleId: args.moduleId });
     return lessonGate(data, args.moduleId);
   } catch (e) {

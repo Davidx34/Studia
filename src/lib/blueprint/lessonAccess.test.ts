@@ -47,9 +47,28 @@ describe('checkLessonAccess', () => {
     await checkLessonAccess({ ...base, db: c.db, moduleId: id(1) }, async () => ok());
     expect(c.calls).toEqual([['from', 'class_enrollments'], ['classroom_id', 'c1'], ['student_id', 'u1']]);
   });
-  it('sin plan publicado o ilegible: no se bloquea', async () => {
+  it('plan ilegible: no se bloquea', async () => {
     const c = client({ data: { id: 'e' } });
-    for (const status of ['noPlan', 'unreadable'] as const) expect(await checkLessonAccess({ ...base, db: c.db, moduleId: id(2) }, async () => ({ status }))).toEqual({ allowed: true });
+    const legacy = vi.fn(async () => ({ allowed: false as const, message: 'x' }));
+    expect(await checkLessonAccess({ ...base, db: c.db, moduleId: id(2) }, async () => ({ status: 'unreadable' }), legacy)).toEqual({ allowed: true });
+    expect(legacy).not.toHaveBeenCalled();
+  });
+  it('sin plan publicado: manda la regla del mapa (prerrequisitos), no abre todo', async () => {
+    const c = client({ data: { id: 'e' } });
+    const deny = vi.fn(async () => ({ allowed: false as const, message: 'Primero domina «A» al 100 %.' }));
+    const g = await checkLessonAccess({ ...base, db: c.db, moduleId: id(2) }, async () => ({ status: 'noPlan' }), deny);
+    expect(g).toEqual({ allowed: false, message: 'Primero domina «A» al 100 %.' });
+    expect(deny).toHaveBeenCalledWith({ db: c.db, admin: base.admin, userId: 'u1', moduleId: id(2) });
+    expect(await checkLessonAccess({ ...base, db: c.db, moduleId: id(2) }, async () => ({ status: 'noPlan' }), async () => ({ allowed: true }))).toEqual({ allowed: true });
+  });
+  it('con plan, un modulo que el plan NO enlaza tambien cae en la regla del mapa', async () => {
+    const c = client({ data: { id: 'e' } });
+    const deny = vi.fn(async () => ({ allowed: false as const, message: 'no' }));
+    expect((await checkLessonAccess({ ...base, db: c.db, moduleId: id(9) }, async () => ok(), deny)).allowed).toBe(false);
+    expect(deny).toHaveBeenCalledOnce();
+    const never = vi.fn(async () => ({ allowed: true as const }));
+    await checkLessonAccess({ ...base, db: c.db, moduleId: id(1) }, async () => ok(), never);
+    expect(never).not.toHaveBeenCalled(); // un modulo enlazado lo decide el plan
   });
   it('si no se pueden leer los intentos: no se bloquea y se registra', async () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
