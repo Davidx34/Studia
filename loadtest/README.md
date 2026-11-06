@@ -24,6 +24,15 @@ Herramienta: [grafana/k6](https://github.com/grafana/k6) (scripts en JavaScript,
 3. En esa clase: 1–3 módulos con banco de preguntas **ya lleno** y sin prerrequisitos (o con cuentas que ya los dominen: si no, el 403 `locked` se cuenta en `lesson_locked`).
 4. `SERVER_GRADING` activo (si no, `/api/lesson/answer` responde 503 y el escenario lo marca).
 
+## Cuentas de prueba: panel /dev (interruptor, registro y creación)
+
+Las cuentas de prueba se crean desde el panel de desarrollador (`/dev/dashboard` → **Cuentas de prueba**; entra con el correo y la contraseña del panel, que solo tú conoces: `DEV_PASSWORD` en `.env.local`/Vercel). Requiere la migración **091** aplicada.
+
+- **Registro:** cuántas cuentas **reales** y cuántas **de prueba** (por rol). Es de prueba la que está en el registro del panel o la que tiene correo `.test` (dominio reservado).
+- **Interruptor (APAGADO por defecto):** mientras esté apagado no se crea ninguna cuenta. Botón **DETENER**: se lee antes de cada cuenta, así que apagarlo corta un lote en marcha.
+- **Crear:** 1 a 20 por lote, tope de 20 cuentas de prueba en total, solo estudiantes, correos `carga01@studia-carga.test`… Las contraseñas se muestran **una sola vez** y **no se guardan**; el botón *Descargar users.json* produce el archivo para `loadtest/users.json`. Eso es lo único que se necesita compartir: nunca las credenciales del panel.
+- Si Supabase Auth rechaza el dominio `.test`, el lote se detiene con el motivo en pantalla (no insiste).
+
 ## Escenarios
 
 | Archivo | Qué hace | Escribe | Necesita sesión |
