@@ -12,7 +12,7 @@ import { check, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import { Counter, Trend } from 'k6/metrics';
 import { BASE_URL, env, required, stagesFor } from './lib/config.js';
-import { pickUser, sessionFor } from './lib/auth.js';
+import { loginAll, pickUser, sessionFromSetup } from './lib/auth.js';
 
 const users = new SharedArray('users', () => JSON.parse(open(env('USERS_FILE', './users.json'))));
 const moduleIds = required('MODULE_IDS').split(',').map((s) => s.trim()).filter(Boolean);
@@ -40,10 +40,10 @@ export const options = {
 };
 
 // Respuesta valida segun el tipo (ver gradeAnswer). Los juegos y emparejar/linea del tiempo necesitan la forma exacta de cada pregunta: se omiten (se cuentan).
-function answerFor(q) {
+function answerFor(q, attempt) {
   switch (q.type) {
     case 'multiple_choice':
-      return { selectedIndex: Math.floor(Math.random() * 4) };
+      return { selectedIndex: (Math.floor(Math.random() * 4) + attempt) % 4 };
     case 'true_false':
       return { selected: Math.random() < 0.5 };
     case 'fill_blank':
@@ -54,8 +54,12 @@ function answerFor(q) {
   }
 }
 
-export default function () {
-  const s = sessionFor(pickUser(users, exec.vu.idInTest));
+export function setup() {
+  return loginAll(Array.from(users)); // un inicio de sesion por cuenta, una sola vez (ver lib/auth.js)
+}
+
+export default function (sessions) {
+  const s = sessionFromSetup(sessions, pickUser(users, exec.vu.idInTest), exec.vu.idInTest);
   if (!s) return sleep(5);
   const base = BASE_URL();
   const headers = { Cookie: s.header, 'Content-Type': 'application/json' };
@@ -75,14 +79,17 @@ export default function () {
   if (!check(body, { 'start trae preguntas': (b) => Array.isArray(b.questions) && b.questions.length > 0, 'start trae attemptId (SERVER_GRADING activo)': (b) => typeof b.attemptId === 'string' })) return sleep(5);
 
   for (const q of body.questions) {
-    const answer = answerFor(q);
-    if (!answer || !q.id) {
+    if (!answerFor(q, 0) || !q.id) {
       questionsSkipped.add(1);
       continue;
     }
-    sleep(THINK * (0.5 + Math.random()));
-    const r = http.post(`${base}/api/lesson/answer`, JSON.stringify({ attemptId, questionId: q.id, answer }), { headers, tags: { name: 'lesson_answer' } });
-    check(r, { 'answer 200': (x) => x.status === 200 });
+    // Una respuesta mala NO cierra la pregunta (quedan intentos): como el estudiante real, se vuelve a intentar hasta que el servidor la da por cerrada (`final`), maximo 5 veces.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      sleep(THINK * (0.5 + Math.random()));
+      const r = http.post(`${base}/api/lesson/answer`, JSON.stringify({ attemptId, questionId: q.id, answer: answerFor(q, attempt) }), { headers, tags: { name: 'lesson_answer' } });
+      check(r, { 'answer 200': (x) => x.status === 200 });
+      if (r.status !== 200 || r.json('final') === true) break;
+    }
   }
 
   const fin = http.post(`${base}/api/lesson/finish`, JSON.stringify({ attemptId, elapsedSeconds: Math.round((Date.now() - t0) / 1000) }), { headers, tags: { name: 'lesson_finish' } });

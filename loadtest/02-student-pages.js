@@ -1,4 +1,4 @@
-// 02 — Estudiantes navegando (SOLO LECTURA): dashboard, mis clases, mapa y la pagina de una clase. Cada una es una pagina renderizada en el servidor que consulta Supabase, asi que mide
+// 02 — Estudiantes navegando (SOLO LECTURA): dashboard, mapa y la pagina de una clase (/my-classes solo existe como /my-classes/<id>). Cada una es una pagina renderizada en el servidor que consulta Supabase, asi que mide
 // funciones de Vercel + conexiones/consultas de la base. Requiere cuentas de PRUEBA (users.json). No escribe nada.
 //
 //   k6 run -e BASE_URL=https://TU-PREVIEW.vercel.app -e SUPABASE_URL=https://REF.supabase.co -e SUPABASE_ANON_KEY=... \
@@ -8,7 +8,7 @@ import exec from 'k6/execution';
 import { check, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import { BASE_URL, env, stagesFor } from './lib/config.js';
-import { pickUser, sessionFor } from './lib/auth.js';
+import { loginAll, pickUser, sessionFromSetup } from './lib/auth.js';
 
 const users = new SharedArray('users', () => JSON.parse(open(env('USERS_FILE', './users.json'))));
 const classIds = env('CLASS_IDS', '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -18,7 +18,6 @@ export const options = {
   thresholds: {
     http_req_failed: ['rate<0.01'],
     'http_req_duration{name:dashboard}': ['p(95)<2500'],
-    'http_req_duration{name:my_classes}': ['p(95)<2500'],
     'http_req_duration{name:map}': ['p(95)<2500'],
     'http_req_duration{name:class_page}': ['p(95)<2500'],
     login_failures: ['count==0'],
@@ -33,13 +32,15 @@ function visit(base, path, name, cookie) {
   return res;
 }
 
-export default function () {
-  const s = sessionFor(pickUser(users, exec.vu.idInTest));
+export function setup() {
+  return loginAll(Array.from(users)); // un inicio de sesion por cuenta, una sola vez (ver lib/auth.js)
+}
+
+export default function (sessions) {
+  const s = sessionFromSetup(sessions, pickUser(users, exec.vu.idInTest), exec.vu.idInTest);
   if (!s) return sleep(5);
   const base = BASE_URL();
   visit(base, '/dashboard', 'dashboard', s.header);
-  sleep(2 + Math.random() * 3);
-  visit(base, '/my-classes', 'my_classes', s.header);
   sleep(2 + Math.random() * 3);
   visit(base, '/map', 'map', s.header);
   if (classIds.length > 0) {
