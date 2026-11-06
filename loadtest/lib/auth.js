@@ -19,9 +19,32 @@ export function pickUser(users, vuId) {
 
 let cache = null; // por VU
 
+// Un inicio de sesion REAL por cuenta, UNA vez, en setup(): un estudiante inicia sesion una vez y navega. Con 100 usuarios virtuales entrando de golpe, iniciar sesion en cada VU
+// topa con el limite de Auth por IP (429) y la prueba mediria eso en vez de la app. Devuelve {email, session, header} por cuenta (o null si fallo).
+export function loginAll(users) {
+  return users.map((u) => {
+    const r = login(u);
+    return r;
+  });
+}
+
+export function sessionFromSetup(sessions, user, vuId) {
+  const mine = sessions[(vuId - 1) % sessions.length];
+  const now = Math.floor(Date.now() / 1000);
+  if (mine && mine.session.expires_at - 120 > now) return mine;
+  return sessionFor(user); // vencida (perfil soak) o fallo en setup: renovacion individual
+}
+
 export function sessionFor(user) {
   const now = Math.floor(Date.now() / 1000);
   if (cache && cache.email === user.email && cache.session.expires_at - 120 > now) return cache;
+  const fresh = login(user);
+  if (fresh) cache = fresh;
+  return fresh;
+}
+
+function login(user) {
+  const now = Math.floor(Date.now() / 1000);
   const supabaseUrl = required('SUPABASE_URL');
   const res = http.post(`${supabaseUrl}/auth/v1/token?grant_type=password`, JSON.stringify({ email: user.email, password: user.password }), {
     headers: { apikey: required('SUPABASE_ANON_KEY'), 'Content-Type': 'application/json' },
@@ -34,6 +57,5 @@ export function sessionFor(user) {
   }
   const session = res.json();
   if (!session.expires_at) session.expires_at = now + (session.expires_in || 3600);
-  cache = { email: user.email, session, header: cookieHeader(authCookies(authCookieName(supabaseUrl), session, encodeB64Url)) };
-  return cache;
+  return { email: user.email, session, header: cookieHeader(authCookies(authCookieName(supabaseUrl), session, encodeB64Url)) };
 }
