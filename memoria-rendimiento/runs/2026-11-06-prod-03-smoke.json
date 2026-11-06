@@ -1,0 +1,50 @@
+{
+  "id": "2026-11-06-prod-03-smoke",
+  "date": "2026-11-06",
+  "target": "produccion",
+  "scenario": "03-lesson-flow",
+  "profile": "smoke",
+  "note": "linea base ANTES de #231",
+  "vusMax": 1,
+  "http": {
+    "requests": 16,
+    "perSecond": 0.41,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 20,
+    "fails": 0
+  },
+  "thresholdsFailed": [
+    "http_req_duration{name:lesson_answer} p(95)<1000"
+  ],
+  "timings": {
+    "lesson_start": {
+      "avg": 1867.85,
+      "med": 1867.85,
+      "p90": 2076.17,
+      "p95": 2102.21,
+      "max": 2128.25
+    },
+    "lesson_answer": {
+      "avg": 932.4,
+      "med": 873.75,
+      "p90": 1114.24,
+      "p95": 1339.71,
+      "max": 1565.18
+    },
+    "lesson_finish": {
+      "avg": 476.21,
+      "med": 476.21,
+      "p90": 504.5,
+      "p95": 508.03,
+      "max": 511.57
+    }
+  },
+  "counters": {
+    "lessons_finished": 2,
+    "unexpected_generation": 0,
+    "login_failures": 0,
+    "iterations": 2
+  }
+}

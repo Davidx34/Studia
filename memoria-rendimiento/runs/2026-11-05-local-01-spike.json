@@ -1,0 +1,38 @@
+{
+  "id": "2026-11-05-local-01-spike",
+  "date": "2026-11-05",
+  "target": "local (next start, portatil)",
+  "scenario": "01-public",
+  "profile": "spike",
+  "note": "300 VUs; 0 % de errores",
+  "vusMax": 300,
+  "http": {
+    "requests": 58407,
+    "perSecond": 253.67,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 58407,
+    "fails": 0
+  },
+  "thresholdsFailed": [],
+  "timings": {
+    "login": {
+      "avg": 5.54,
+      "med": 3.84,
+      "p90": 10.5,
+      "p95": 14.24,
+      "max": 74.62
+    },
+    "manifest": {
+      "avg": 13.7,
+      "med": 9.3,
+      "p90": 27.34,
+      "p95": 36.63,
+      "max": 204.55
+    }
+  },
+  "counters": {
+    "iterations": 19469
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "id": "2026-11-06-prod-02-smoke",
+  "date": "2026-11-06",
+  "target": "produccion",
+  "scenario": "02-student-pages",
+  "profile": "smoke",
+  "note": "linea base ANTES de #231: dashboard ~2,7 s con 1 usuario",
+  "vusMax": 1,
+  "http": {
+    "requests": 7,
+    "perSecond": 0.21,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 7,
+    "fails": 0
+  },
+  "thresholdsFailed": [
+    "http_req_duration{name:dashboard} p(95)<2500"
+  ],
+  "timings": {
+    "dashboard": {
+      "avg": 2743.56,
+      "med": 2743.56,
+      "p90": 3796.56,
+      "p95": 3928.18,
+      "max": 4059.81
+    },
+    "class_page": {
+      "avg": 1129.42,
+      "med": 1129.42,
+      "p90": 1145.22,
+      "p95": 1147.19,
+      "max": 1149.17
+    },
+    "map": {
+      "avg": 771.86,
+      "med": 771.86,
+      "p90": 889.08,
+      "p95": 903.73,
+      "max": 918.38
+    }
+  },
+  "counters": {
+    "login_failures": 0,
+    "iterations": 2
+  }
+}

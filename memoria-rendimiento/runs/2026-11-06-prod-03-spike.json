@@ -1,0 +1,52 @@
+{
+  "id": "2026-11-06-prod-03-spike",
+  "date": "2026-11-06",
+  "target": "produccion",
+  "scenario": "03-lesson-flow",
+  "profile": "spike",
+  "note": "100 VUs, 34 req/s, pausa 0,4 s; 0 errores; inicio p95 3,2 s, respuesta p95 1,56 s: la latencia se degrada",
+  "vusMax": 100,
+  "http": {
+    "requests": 8188,
+    "perSecond": 34.06,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 10256,
+    "fails": 0
+  },
+  "thresholdsFailed": [
+    "http_req_duration{name:lesson_answer} p(95)<1000",
+    "http_req_duration{name:lesson_answer} p(99)<2500",
+    "http_req_duration{name:lesson_start} p(95)<3000"
+  ],
+  "timings": {
+    "lesson_start": {
+      "avg": 1030.5,
+      "med": 716.76,
+      "p90": 2092.89,
+      "p95": 3208.96,
+      "max": 6063.83
+    },
+    "lesson_answer": {
+      "avg": 697.24,
+      "med": 532.44,
+      "p90": 1003.92,
+      "p95": 1565.4,
+      "max": 5861.85
+    },
+    "lesson_finish": {
+      "avg": 366.49,
+      "med": 296.96,
+      "p90": 438.41,
+      "p95": 578.9,
+      "max": 4519.62
+    }
+  },
+  "counters": {
+    "lessons_finished": 1034,
+    "unexpected_generation": 0,
+    "login_failures": 0,
+    "iterations": 1034
+  }
+}
