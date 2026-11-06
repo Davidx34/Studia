@@ -49,3 +49,10 @@ Panel de Supabase → Authentication → Sign In / Providers → Email → activ
 
 ## Tablas con RLS y sin políticas (intencional)
 `ai_provider_health`, `ai_usage_windows`, `lesson_attempt_answers`, `lesson_attempts`, `material_chunk_embeddings`, `pending_registrations`, `test_account_control`, `test_accounts`: solo las lee y escribe el servidor con la llave de servicio; el navegador no debe tocarlas (RLS activado sin políticas = nadie más puede).
+
+## Aplicación en producción (2026-11-06, tras el merge del #236 y el «aplica todas» del dueño)
+092, 093 y 094 aplicadas una por una. **Comprobación real:** la huella de lo que ve cada uno de los 33 actores (32 usuarios + anónimo) en las 50 tablas fue **idéntica antes y después** (`06d9253e…`). Políticas 98 → 85, 0 grupos múltiples, 0 `auth.uid()` sin envolver; los avisos `auth_rls_initplan` y `multiple_permissive_policies` desaparecieron del linter.
+
+**Defecto encontrado en mi propia migración 094:** `exam_sessions` ya tenía un índice con el mismo nombre (`idx_exam_sessions_blueprint`, solo sobre `blueprint_id`, de la 089), así que `CREATE INDEX IF NOT EXISTS` no creó el compuesto y el linter sigue listando esa clave foránea. Los otros 7 índices sí se crearon. Corrección: migración **095** (índice compuesto con nombre nuevo). La prueba previa contaba nombres de índice en vez de comprobar su definición: por eso no lo detectó.
+
+Quedan: 42 `unused_index` (INFO; los 7 nuevos aparecen «sin uso» porque son recientes) y los avisos de seguridad aceptados o de acción del dueño descritos arriba.

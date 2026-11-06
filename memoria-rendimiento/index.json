@@ -229,6 +229,13 @@
       "pr": 230,
       "what": "instrumento: login una vez en setup()",
       "fixed": "853 logins rechazados por limite de Auth"
+    },
+    {
+      "id": "S1",
+      "pr": 236,
+      "what": "migraciones 092-094: RLS initplan, fusion de politicas permisivas (98->85), 8 indices FK (7 efectivos)",
+      "measured": "no se midio latencia; verificado equivalencia de filas visibles (huella identica en 33 actores x 50 tablas)",
+      "conditions": "produccion 2026-11-06"
     }
   ],
   "findings": [
@@ -260,8 +267,8 @@
     },
     {
       "id": "H13",
-      "status": "open",
-      "text": "avisos de seguridad de Supabase (migraciones 092+)"
+      "status": "partly-closed",
+      "text": "avisos de Supabase: 092-094 aplicadas (98->85 politicas, 0 duplicadas, huella de filas visibles identica); 095 pendiente (indice exam_sessions)"
     }
   ],
   "baselines": {

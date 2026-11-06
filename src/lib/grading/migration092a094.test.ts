@@ -43,6 +43,13 @@ describe('migraciones 092 a 094 (avisos de Supabase)', () => {
     expect(c.replace(/CREATE INDEX IF NOT EXISTS \w+ ON public\.\w+ \([^)]+\);/g, '').trim()).toBe('');
   });
 
+  it('095 corrige la 094 en exam_sessions: indice compuesto con nombre NUEVO (el viejo idx_exam_sessions_blueprint solo cubria blueprint_id)', () => {
+    const c = code('095_indice_exam_sessions_blueprint.sql');
+    expect(c).toContain('CREATE INDEX IF NOT EXISTS idx_exam_sessions_blueprint_classroom ON public.exam_sessions (blueprint_id, classroom_id);');
+    expect(c).not.toContain('idx_exam_sessions_blueprint ON');
+    const earlier = fs.readFileSync(path.join(dir, '089_exam_sessions.sql'), 'utf8');
+    expect(earlier).toMatch(/idx_exam_sessions_blueprint\s+ON public\.exam_sessions \(blueprint_id\)/);
+  });
   it('el documento deja claro por que NO se revocan las 13 funciones SECURITY DEFINER', () => {
     const d = fs.readFileSync(path.join(process.cwd(), 'docs/SEGURIDAD_SUPABASE_2026-11-06.md'), 'utf8');
     expect(d).toContain('NO se revocan');
