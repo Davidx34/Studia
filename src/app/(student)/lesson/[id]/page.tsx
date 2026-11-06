@@ -784,7 +784,7 @@ export default function LessonPage() {
     if (q.type === 'fill_blank') return (
       <div className="space-y-4">
         <p className="text-fg-muted text-sm">Escribe las palabras que faltan en los espacios</p>
-        <div className="bg-surface-2 p-4 rounded-xl text-fg text-lg"><MathText content={q.q} /></div>
+        {/* El enunciado con el hueco ya se muestra arriba (encabezado de la pregunta): repetirlo aqui duplicaba la oracion. */}
         <textarea
           aria-label="Palabras que faltan"
           className="w-full min-h-[96px] bg-surface-2 text-fg text-base rounded-xl p-4 border border-line-strong placeholder:text-fg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
