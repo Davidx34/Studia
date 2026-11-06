@@ -82,6 +82,12 @@ Responde SOLO con JSON valido:
   return questions ?? [];
 }
 
+// getUser de Supabase hace un viaje de red cada vez: se memoiza por peticion.
+function memoizeGetUser(client: { auth: { getUser: () => PromiseLike<any> } }) {
+  let p: PromiseLike<any> | null = null;
+  return () => (p ??= client.auth.getUser());
+}
+
 export async function POST(req: NextRequest) {
   // Declarados fuera del try para poder usarlos en el manejo de errores.
   let moduleId: string | undefined;
@@ -105,6 +111,7 @@ export async function POST(req: NextRequest) {
     // El usuario PUEDE ver el modulo (RLS de content_modules: un estudiante ve los de SUS clases, un profesor los suyos). Es lo que autoriza leer y escribir el banco de preguntas con
     // la llave de servicio mas abajo: el banco ya no se abre a los estudiantes con la llave publica (migracion 086).
     let moduleVisible = false;
+    let authedClient: { auth: { getUser: () => PromiseLike<any> } } = supabase as any;
     if (moduleId && supabase) {
       const { data: modRow } = await supabase
         .from('content_modules')
@@ -114,25 +121,28 @@ export async function POST(req: NextRequest) {
       moduleVisible = !!modRow;
       moduleChosen = modRow?.minigame_types ?? null;
       if (modRow?.classroom_id) {
-        const { data: cfg, error: cfgError } = await supabase
-          .from('classroom_ai_config')
-          .select('*')
-          .eq('classroom_id', modRow.classroom_id)
-          .maybeSingle();
+        const classroomId: string = modRow.classroom_id;
+        // Una sola consulta a Auth por peticion: antes se llamaba tres veces (aqui y dentro de startLessonAttempt y markLessonInProgress), cada una un viaje de red.
+        const getUserOnce = memoizeGetUser(supabase);
+        authedClient = { auth: { getUser: getUserOnce } };
+        // La configuracion de la clase y la puerta del 100 % (matricula, plan, prerrequisitos) son independientes entre si: se leen a la vez. La puerta se aplica ANTES de usar nada de lo leido.
+        const gatePromise = (async () => {
+          const {
+            data: { user: lessonUser },
+          } = await getUserOnce();
+          if (!lessonUser) return null;
+          // 100 % para avanzar (decision 2B): si el plan publicado de la clase ordena este modulo despues de uno que el estudiante aun no domina, no se sirve la leccion. Va ANTES del repaso, del
+          // cache y de la generacion: no se gasta nada en una leccion que no puede abrir. Solo bloquea a un estudiante matriculado y nunca por una falla al leer (ver lessonAccess).
+          return checkLessonAccess({ db: supabase, admin: hasServiceRoleKey() ? createAdminSupabase() : null, userId: lessonUser.id, classroomId, moduleId });
+        })();
+        const [{ data: cfg, error: cfgError }, gate] = await Promise.all([
+          supabase.from('classroom_ai_config').select('*').eq('classroom_id', classroomId).maybeSingle(),
+          gatePromise,
+        ]);
         // Un fallo aqui NO debe pasar callado: la clase generaria con valores por defecto.
         if (cfgError) console.error('[GENERATE_CONFIG_READ_FAILED]', { moduleId, error: cfgError.message });
         dbConfig = cfg ?? null;
-      }
-      // 100 % para avanzar (decision 2B): si el plan publicado de la clase ordena este modulo despues de uno que el estudiante aun no domina, no se sirve la leccion. Va ANTES del repaso, del
-      // cache y de la generacion: no se gasta nada en una leccion que no puede abrir. Solo bloquea a un estudiante matriculado y nunca por una falla al leer (ver lessonAccess).
-      if (modRow?.classroom_id) {
-        const {
-          data: { user: lessonUser },
-        } = await supabase.auth.getUser();
-        if (lessonUser) {
-          const gate = await checkLessonAccess({ db: supabase, admin: hasServiceRoleKey() ? createAdminSupabase() : null, userId: lessonUser.id, classroomId: modRow.classroom_id, moduleId });
-          if (!gate.allowed) return NextResponse.json({ error: gate.message, code: 'locked' }, { status: 403 });
-        }
+        if (gate && !gate.allowed) return NextResponse.json({ error: gate.message, code: 'locked' }, { status: 403 });
       }
     }
     const config = resolveConfig(moduleId ? dbConfig : aiConfig);
@@ -161,8 +171,8 @@ export async function POST(req: NextRequest) {
       if (validCached.length >= MIN_CACHE_SIZE) {
         const picked = drawQuestions(validCached, SERVE_COUNT);
         // Con calificacion en el servidor las preguntas clasicas salen SIN claves y con un intento abierto.
-        const served = await startLessonAttempt(supabase, moduleId, picked);
-        await markLessonInProgress(supabase, moduleId);
+        // Intento y progreso son escrituras independientes: se hacen a la vez.
+        const [served] = await Promise.all([startLessonAttempt(authedClient, moduleId, picked), markLessonInProgress(authedClient, moduleId)]);
         return NextResponse.json({ ...served, cached: true });
       }
     }
@@ -266,8 +276,7 @@ export async function POST(req: NextRequest) {
 
     // El estudiante solo ve SERVE_COUNT, aunque se hayan generado/guardado mas.
     const toServe = moduleId ? shuffle(generatedWithIds).slice(0, SERVE_COUNT) : generatedWithIds;
-    const served = moduleId && supabase ? await startLessonAttempt(supabase, moduleId, toServe) : { questions: toServe };
-    if (moduleId && supabase) await markLessonInProgress(supabase, moduleId);
+    const [served] = moduleId && supabase ? await Promise.all([startLessonAttempt(authedClient, moduleId, toServe), markLessonInProgress(authedClient, moduleId)]) : [{ questions: toServe }];
     return NextResponse.json({ ...served, cached: false });
     });
 

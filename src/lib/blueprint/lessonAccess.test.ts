@@ -93,7 +93,7 @@ describe('generate-questions: el bloqueo corre ANTES de servir o generar', () =>
     expect(route).toContain('checkLessonAccess(');
     expect(idx('checkLessonAccess(')).toBeGreaterThan(-1);
     expect(idx('checkLessonAccess(')).toBeLessThan(idx('generateRemediationQuestions(supabase'));
-    expect(idx('checkLessonAccess(')).toBeLessThan(idx('startLessonAttempt(supabase, moduleId, picked)'));
+    expect(idx('checkLessonAccess(')).toBeLessThan(idx('startLessonAttempt(authedClient, moduleId, picked)'));
     expect(idx('checkLessonAccess(')).toBeLessThan(idx('withGenerationLock('));
   });
   it('un bloqueo responde 403 con el motivo y un codigo que la pantalla reconoce', () => {

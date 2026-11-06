@@ -141,11 +141,15 @@ describe('POST /api/generate-questions: el banco de preguntas solo se abre con l
     expect(route).not.toMatch(/\bsupabase\s*\.from\('lesson_questions'\)/);
   });
   it('marca "en progreso" al servir, en el camino del cache y en el de la generacion (no en el repaso)', () => {
-    expect(route.match(/markLessonInProgress\(supabase, moduleId\)/g)).toHaveLength(2);
+    expect(route.match(/markLessonInProgress\(authedClient, moduleId\)/g)).toHaveLength(2);
     const remediation = route.slice(route.indexOf('Modo repaso dirigido'), route.indexOf('// 1. Intentar servir del cache'));
     expect(remediation).not.toContain('markLessonInProgress');
-    // se marca justo antes de responder con las preguntas servidas
-    for (const m of route.matchAll(/markLessonInProgress\(supabase, moduleId\);\s*(?:return NextResponse\.json\(\{ \.\.\.served, cached: (true|false) \}\))/g)) expect(m[1]).toMatch(/true|false/);
+    // intento y progreso se escriben a la vez (Promise.all) y justo despues se responde con las preguntas servidas
+    const both = [...route.matchAll(/Promise\.all\(\[startLessonAttempt\(authedClient, moduleId, (picked|toServe)\), markLessonInProgress\(authedClient, moduleId\)\]\)/g)];
+    expect(both.map((m) => m[1]).sort()).toEqual(['picked', 'toServe']);
+    // una sola consulta a Auth por peticion: el cliente que se pasa a las dos funciones memoiza getUser
+    expect(route).toContain('memoizeGetUser(supabase)');
+    expect(route.match(/\.auth\.getUser\(\)/g)).toHaveLength(1); // solo dentro de memoizeGetUser
   });
   it('la generacion sigue pidiendo acceso (forbidden) antes de gastar IA', () => {
     expect(route).toContain("outcome.status === 'forbidden'");
