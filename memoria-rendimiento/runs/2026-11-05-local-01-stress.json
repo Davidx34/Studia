@@ -1,0 +1,38 @@
+{
+  "id": "2026-11-05-local-01-stress",
+  "date": "2026-11-05",
+  "target": "local (next start, portatil)",
+  "scenario": "01-public",
+  "profile": "stress",
+  "note": "hasta 400 VUs; 0 % de errores",
+  "vusMax": 400,
+  "http": {
+    "requests": 133596,
+    "perSecond": 222.31,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 133596,
+    "fails": 0
+  },
+  "thresholdsFailed": [],
+  "timings": {
+    "login": {
+      "avg": 6.89,
+      "med": 3.99,
+      "p90": 11.2,
+      "p95": 17.23,
+      "max": 179.76
+    },
+    "manifest": {
+      "avg": 16.61,
+      "med": 7.88,
+      "p90": 29.92,
+      "p95": 45.71,
+      "max": 505.14
+    }
+  },
+  "counters": {
+    "iterations": 44532
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "id": "2026-11-06-prod-03-aula",
+  "date": "2026-11-06",
+  "target": "produccion",
+  "scenario": "03-lesson-flow",
+  "profile": "aula",
+  "note": "20 VUs entran en 10 s; 0 errores; respuesta p95 0,59 s",
+  "vusMax": 20,
+  "http": {
+    "requests": 1986,
+    "perSecond": 5.62,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 2484,
+    "fails": 0
+  },
+  "thresholdsFailed": [],
+  "timings": {
+    "lesson_finish": {
+      "avg": 284.95,
+      "med": 275.22,
+      "p90": 345.82,
+      "p95": 369.45,
+      "max": 574.49
+    },
+    "lesson_start": {
+      "avg": 635.25,
+      "med": 610.24,
+      "p90": 774.71,
+      "p95": 842.13,
+      "max": 1897.39
+    },
+    "lesson_answer": {
+      "avg": 442.28,
+      "med": 423.24,
+      "p90": 531.84,
+      "p95": 588.28,
+      "max": 2616.71
+    }
+  },
+  "counters": {
+    "lessons_finished": 249,
+    "unexpected_generation": 0,
+    "login_failures": 0,
+    "iterations": 248
+  }
+}

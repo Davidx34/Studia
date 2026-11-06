@@ -1,0 +1,312 @@
+{
+  "runs": [
+    {
+      "id": "2026-11-05-local-01-load",
+      "date": "2026-11-05",
+      "target": "local (next start, portatil)",
+      "scenario": "01-public",
+      "profile": "load",
+      "vusMax": 50,
+      "failedRate": 0,
+      "perSecond": 60.38,
+      "thresholdsFailed": 0,
+      "file": "runs/2026-11-05-local-01-load.json",
+      "note": "50 VUs; paginas casi estaticas: no miden capacidad real"
+    },
+    {
+      "id": "2026-11-05-local-01-smoke",
+      "date": "2026-11-05",
+      "target": "local (next start, portatil)",
+      "scenario": "01-public",
+      "profile": "smoke",
+      "vusMax": 1,
+      "failedRate": 0,
+      "perSecond": 1.55,
+      "thresholdsFailed": 0,
+      "file": "runs/2026-11-05-local-01-smoke.json",
+      "note": "humo del escenario publico"
+    },
+    {
+      "id": "2026-11-05-local-01-spike",
+      "date": "2026-11-05",
+      "target": "local (next start, portatil)",
+      "scenario": "01-public",
+      "profile": "spike",
+      "vusMax": 300,
+      "failedRate": 0,
+      "perSecond": 253.67,
+      "thresholdsFailed": 0,
+      "file": "runs/2026-11-05-local-01-spike.json",
+      "note": "300 VUs; 0 % de errores"
+    },
+    {
+      "id": "2026-11-05-local-01-stress",
+      "date": "2026-11-05",
+      "target": "local (next start, portatil)",
+      "scenario": "01-public",
+      "profile": "stress",
+      "vusMax": 400,
+      "failedRate": 0,
+      "perSecond": 222.31,
+      "thresholdsFailed": 0,
+      "file": "runs/2026-11-05-local-01-stress.json",
+      "note": "hasta 400 VUs; 0 % de errores"
+    },
+    {
+      "id": "2026-11-05-local-04-load",
+      "date": "2026-11-05",
+      "target": "local (next start, portatil)",
+      "scenario": "04-auth-hop",
+      "profile": "load",
+      "vusMax": 30,
+      "failedRate": 0,
+      "perSecond": 40.84,
+      "thresholdsFailed": 0,
+      "file": "runs/2026-11-05-local-04-load.json",
+      "note": "30 VUs, 8 min, 41 req/s; una peticion aislada de 21 s sin explicar"
+    },
+    {
+      "id": "2026-11-05-local-04-smoke",
+      "date": "2026-11-05",
+      "target": "local (next start, portatil)",
+      "scenario": "04-auth-hop",
+      "profile": "smoke",
+      "vusMax": 1,
+      "failedRate": 0,
+      "perSecond": 1.61,
+      "thresholdsFailed": 0,
+      "file": "runs/2026-11-05-local-04-smoke.json",
+      "note": "cookie falsa: salto Next a Supabase Auth ~60 ms mediana"
+    },
+    {
+      "id": "2026-11-06-local-03-smoke-con-sesion",
+      "date": "2026-11-06",
+      "target": "local (next start, portatil)",
+      "scenario": "03-lesson-flow",
+      "profile": "smoke",
+      "vusMax": 1,
+      "failedRate": 0.07,
+      "perSecond": 0.34,
+      "thresholdsFailed": 4,
+      "file": "runs/2026-11-06-local-03-smoke-con-sesion.json",
+      "note": "primera corrida con sesion; descubrio que finish da 409 si quedan intentos (el escenario no reintentaba)"
+    },
+    {
+      "id": "2026-11-06-prod-02-load",
+      "date": "2026-11-06",
+      "target": "produccion",
+      "scenario": "02-student-pages",
+      "profile": "load",
+      "vusMax": 10,
+      "failedRate": 0,
+      "perSecond": 1.64,
+      "thresholdsFailed": 0,
+      "file": "runs/2026-11-06-prod-02-load.json",
+      "note": "10 VUs, 8 min; 0 errores; dashboard p95 1,23 s"
+    },
+    {
+      "id": "2026-11-06-prod-02-smoke",
+      "date": "2026-11-06",
+      "target": "produccion",
+      "scenario": "02-student-pages",
+      "profile": "smoke",
+      "vusMax": 1,
+      "failedRate": 0,
+      "perSecond": 0.21,
+      "thresholdsFailed": 1,
+      "file": "runs/2026-11-06-prod-02-smoke.json",
+      "note": "linea base ANTES de #231: dashboard ~2,7 s con 1 usuario"
+    },
+    {
+      "id": "2026-11-06-prod-03-aula",
+      "date": "2026-11-06",
+      "target": "produccion",
+      "scenario": "03-lesson-flow",
+      "profile": "aula",
+      "vusMax": 20,
+      "failedRate": 0,
+      "perSecond": 5.62,
+      "thresholdsFailed": 0,
+      "file": "runs/2026-11-06-prod-03-aula.json",
+      "note": "20 VUs entran en 10 s; 0 errores; respuesta p95 0,59 s"
+    },
+    {
+      "id": "2026-11-06-prod-03-load",
+      "date": "2026-11-06",
+      "target": "produccion",
+      "scenario": "03-lesson-flow",
+      "profile": "load",
+      "vusMax": 10,
+      "failedRate": 0,
+      "perSecond": 2.18,
+      "thresholdsFailed": 2,
+      "file": "runs/2026-11-06-prod-03-load.json",
+      "note": "10 VUs; respuesta p95 1,33 s (funciones frias al inicio)"
+    },
+    {
+      "id": "2026-11-06-prod-03-smoke",
+      "date": "2026-11-06",
+      "target": "produccion",
+      "scenario": "03-lesson-flow",
+      "profile": "smoke",
+      "vusMax": 1,
+      "failedRate": 0,
+      "perSecond": 0.41,
+      "thresholdsFailed": 1,
+      "file": "runs/2026-11-06-prod-03-smoke.json",
+      "note": "linea base ANTES de #231"
+    },
+    {
+      "id": "2026-11-06-prod-03-spike",
+      "date": "2026-11-06",
+      "target": "produccion",
+      "scenario": "03-lesson-flow",
+      "profile": "spike",
+      "vusMax": 100,
+      "failedRate": 0,
+      "perSecond": 34.06,
+      "thresholdsFailed": 3,
+      "file": "runs/2026-11-06-prod-03-spike.json",
+      "note": "100 VUs, 34 req/s, pausa 0,4 s; 0 errores; inicio p95 3,2 s, respuesta p95 1,56 s: la latencia se degrada"
+    },
+    {
+      "id": "2026-11-06-prod-03-spike-invalida",
+      "date": "2026-11-06",
+      "target": "produccion",
+      "scenario": "03-lesson-flow",
+      "profile": "spike",
+      "vusMax": 100,
+      "failedRate": 0.12,
+      "perSecond": 29.21,
+      "thresholdsFailed": 4,
+      "file": "runs/2026-11-06-prod-03-spike-invalida.json",
+      "note": "INVALIDA: 853 logins rechazados por Supabase Auth (limite por IP) al iniciar sesion en cada VU; corregido en #230"
+    },
+    {
+      "id": "2026-11-06-prod-03-stress",
+      "date": "2026-11-06",
+      "target": "produccion",
+      "scenario": "03-lesson-flow",
+      "profile": "stress",
+      "vusMax": 60,
+      "failedRate": 0,
+      "perSecond": 6.84,
+      "thresholdsFailed": 0,
+      "file": "runs/2026-11-06-prod-03-stress.json",
+      "note": "hasta 60 VUs, 6,8 req/s; 0 errores; sin degradacion (limite por la pausa de 3 s)"
+    }
+  ],
+  "optimizations": [
+    {
+      "id": "O1",
+      "pr": 231,
+      "what": "dashboard en paralelo",
+      "before_ms": 2660,
+      "after_ms": 1480,
+      "change_pct": -44.4,
+      "conditions": "local, 1 usuario"
+    },
+    {
+      "id": "O2",
+      "pr": 231,
+      "what": "lesson/answer en paralelo",
+      "before_ms": 1250,
+      "after_ms": 1020,
+      "change_pct": -18.4,
+      "conditions": "local, 1 usuario"
+    },
+    {
+      "id": "O3",
+      "pr": 233,
+      "what": "generate-questions: 1 getUser, config+puerta juntas, intento+progreso juntos",
+      "before_ms": 1890,
+      "after_ms": 1300,
+      "change_pct": -31.2,
+      "conditions": "local, 1 usuario"
+    },
+    {
+      "id": "I1",
+      "pr": 230,
+      "what": "instrumento: login una vez en setup()",
+      "fixed": "853 logins rechazados por limite de Auth"
+    }
+  ],
+  "findings": [
+    {
+      "id": "H1",
+      "status": "open",
+      "text": "degradacion cerca de 34 req/s (100 VUs sin pausa): inicio p95 3,2 s",
+      "run": "2026-11-06-prod-03-spike"
+    },
+    {
+      "id": "H3",
+      "status": "open",
+      "text": "abrir leccion aun con varios viajes en serie"
+    },
+    {
+      "id": "H4",
+      "status": "hypothesis",
+      "text": "verificar el JWT localmente en vez de auth.getUser() en middleware y rutas"
+    },
+    {
+      "id": "H8",
+      "status": "open",
+      "text": "sin medir: examenes, laboratorio, minijuegos, IA, soak"
+    },
+    {
+      "id": "H9",
+      "status": "open",
+      "text": "ai_provider_health sin filas"
+    },
+    {
+      "id": "H13",
+      "status": "open",
+      "text": "avisos de seguridad de Supabase (migraciones 092+)"
+    }
+  ],
+  "baselines": {
+    "nota": "Numeros a vencer. Produccion salvo que diga local. Condiciones en cada corrida.",
+    "produccion_aula_20vus_pausa3s": {
+      "run": "2026-11-06-prod-03-aula",
+      "lesson_start_p95_ms": 842,
+      "lesson_answer_p95_ms": 588,
+      "lesson_finish_p95_ms": 369,
+      "failedRate": 0
+    },
+    "produccion_pico_100vus_pausa0.4s": {
+      "run": "2026-11-06-prod-03-spike",
+      "req_per_s": 34,
+      "lesson_start_p95_ms": 3200,
+      "lesson_answer_p95_ms": 1560,
+      "failedRate": 0
+    },
+    "produccion_1usuario": {
+      "dashboard_avg_ms": [
+        541,
+        869
+      ],
+      "answer_p95_ms": [
+        584,
+        1190
+      ],
+      "start_avg_ms": [
+        803,
+        1190
+      ],
+      "nota": "tras #231, antes de #233; 2 corridas"
+    },
+    "local_1usuario_antes_de_233": {
+      "dashboard_avg_ms": 1480,
+      "answer_avg_ms": 1020,
+      "start_avg_ms": 1890
+    },
+    "local_1usuario_despues_de_233": {
+      "start_avg_ms": 1300
+    },
+    "rtt_portatil_a_supabase_ms": [
+      230,
+      310
+    ],
+    "supabase_max_connections": 60
+  }
+}

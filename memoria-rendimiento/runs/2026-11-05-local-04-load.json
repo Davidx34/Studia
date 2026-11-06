@@ -1,0 +1,31 @@
+{
+  "id": "2026-11-05-local-04-load",
+  "date": "2026-11-05",
+  "target": "local (next start, portatil)",
+  "scenario": "04-auth-hop",
+  "profile": "load",
+  "note": "30 VUs, 8 min, 41 req/s; una peticion aislada de 21 s sin explicar",
+  "vusMax": 30,
+  "http": {
+    "requests": 19644,
+    "perSecond": 40.84,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 9822,
+    "fails": 0
+  },
+  "thresholdsFailed": [],
+  "timings": {
+    "dashboard_token_falso": {
+      "avg": 64.45,
+      "med": 100.24,
+      "p90": 119.73,
+      "p95": 129.48,
+      "max": 21308.65
+    }
+  },
+  "counters": {
+    "iterations": 9822
+  }
+}

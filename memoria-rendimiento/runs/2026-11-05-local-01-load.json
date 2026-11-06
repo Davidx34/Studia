@@ -1,0 +1,38 @@
+{
+  "id": "2026-11-05-local-01-load",
+  "date": "2026-11-05",
+  "target": "local (next start, portatil)",
+  "scenario": "01-public",
+  "profile": "load",
+  "note": "50 VUs; paginas casi estaticas: no miden capacidad real",
+  "vusMax": 50,
+  "http": {
+    "requests": 29133,
+    "perSecond": 60.38,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 29133,
+    "fails": 0
+  },
+  "thresholdsFailed": [],
+  "timings": {
+    "login": {
+      "avg": 4.92,
+      "med": 4.58,
+      "p90": 6.98,
+      "p95": 7.99,
+      "max": 64.91
+    },
+    "manifest": {
+      "avg": 6.27,
+      "med": 5.41,
+      "p90": 9.92,
+      "p95": 12.11,
+      "max": 143.97
+    }
+  },
+  "counters": {
+    "iterations": 9711
+  }
+}

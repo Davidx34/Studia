@@ -1,0 +1,39 @@
+{
+  "fecha": "2026-11-06",
+  "fuente": "SQL de solo lectura sobre produccion",
+  "version_postgres": "17.6",
+  "max_connections": 60,
+  "base": {
+    "tamano": "47 MB",
+    "tablas": 50,
+    "politicas": 98,
+    "perfiles": 32,
+    "perfiles_reales": 2,
+    "perfiles_de_prueba": 30
+  },
+  "lecciones": {
+    "intentos_total": 2770,
+    "respuestas_total": 13769,
+    "tam_lesson_attempt_answers": "2736 kB",
+    "tam_lesson_attempts": "984 kB"
+  },
+  "datos_de_prueba": {
+    "intentos": 2736,
+    "terminados": 2731,
+    "abiertos": 5,
+    "respuestas": 13675,
+    "respuestas_duplicadas": 0,
+    "question_attempts": 13671
+  },
+  "integridad": "cada intento tiene exactamente 5 respuestas; respuestas finales = question_attempts; 0 duplicadas",
+  "avisos_supabase_antes_de_092": {
+    "rls_enabled_no_policy": 8,
+    "security_definer_ejecutable_por_authenticated": 13,
+    "auth_rls_initplan": 19,
+    "multiple_permissive_policies": 110,
+    "unindexed_foreign_keys": 8,
+    "unused_index": 38,
+    "auth_leaked_password_protection": "desactivada"
+  },
+  "extensiones": "vector, pg_trgm y pg_net en el esquema extensions (migraciones 081 y 090)"
+}

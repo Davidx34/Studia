@@ -1,0 +1,46 @@
+{
+  "id": "2026-11-06-prod-02-load",
+  "date": "2026-11-06",
+  "target": "produccion",
+  "scenario": "02-student-pages",
+  "profile": "load",
+  "note": "10 VUs, 8 min; 0 errores; dashboard p95 1,23 s",
+  "vusMax": 10,
+  "http": {
+    "requests": 805,
+    "perSecond": 1.64,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 805,
+    "fails": 0
+  },
+  "thresholdsFailed": [],
+  "timings": {
+    "dashboard": {
+      "avg": 965.7,
+      "med": 909.66,
+      "p90": 1093.5,
+      "p95": 1231.68,
+      "max": 4575.47
+    },
+    "map": {
+      "avg": 510.82,
+      "med": 480.77,
+      "p90": 609.7,
+      "p95": 655.12,
+      "max": 2754.19
+    },
+    "class_page": {
+      "avg": 714,
+      "med": 670.34,
+      "p90": 860.12,
+      "p95": 974.62,
+      "max": 2425.91
+    }
+  },
+  "counters": {
+    "login_failures": 0,
+    "iterations": 265
+  }
+}

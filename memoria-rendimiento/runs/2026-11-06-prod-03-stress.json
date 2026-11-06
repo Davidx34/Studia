@@ -1,0 +1,48 @@
+{
+  "id": "2026-11-06-prod-03-stress",
+  "date": "2026-11-06",
+  "target": "produccion",
+  "scenario": "03-lesson-flow",
+  "profile": "stress",
+  "note": "hasta 60 VUs, 6,8 req/s; 0 errores; sin degradacion (limite por la pausa de 3 s)",
+  "vusMax": 60,
+  "http": {
+    "requests": 4281,
+    "perSecond": 6.84,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 5357,
+    "fails": 0
+  },
+  "thresholdsFailed": [],
+  "timings": {
+    "lesson_answer": {
+      "avg": 445.86,
+      "med": 427.45,
+      "p90": 534.67,
+      "p95": 591.88,
+      "max": 3067.23
+    },
+    "lesson_finish": {
+      "avg": 279.63,
+      "med": 263.12,
+      "p90": 341.74,
+      "p95": 376.67,
+      "max": 1096.89
+    },
+    "lesson_start": {
+      "avg": 598.54,
+      "med": 569.12,
+      "p90": 713.7,
+      "p95": 767.17,
+      "max": 2899.75
+    }
+  },
+  "counters": {
+    "lessons_finished": 538,
+    "unexpected_generation": 0,
+    "login_failures": 0,
+    "iterations": 537
+  }
+}

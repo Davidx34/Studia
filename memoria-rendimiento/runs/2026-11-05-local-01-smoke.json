@@ -1,0 +1,38 @@
+{
+  "id": "2026-11-05-local-01-smoke",
+  "date": "2026-11-05",
+  "target": "local (next start, portatil)",
+  "scenario": "01-public",
+  "profile": "smoke",
+  "note": "humo del escenario publico",
+  "vusMax": 1,
+  "http": {
+    "requests": 48,
+    "perSecond": 1.55,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 48,
+    "fails": 0
+  },
+  "thresholdsFailed": [],
+  "timings": {
+    "login": {
+      "avg": 12.85,
+      "med": 10.58,
+      "p90": 14.3,
+      "p95": 24.96,
+      "max": 52.7
+    },
+    "manifest": {
+      "avg": 8.4,
+      "med": 8.53,
+      "p90": 10.58,
+      "p95": 11.1,
+      "max": 11.53
+    }
+  },
+  "counters": {
+    "iterations": 16
+  }
+}

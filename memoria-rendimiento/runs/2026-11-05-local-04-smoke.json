@@ -1,0 +1,31 @@
+{
+  "id": "2026-11-05-local-04-smoke",
+  "date": "2026-11-05",
+  "target": "local (next start, portatil)",
+  "scenario": "04-auth-hop",
+  "profile": "smoke",
+  "note": "cookie falsa: salto Next a Supabase Auth ~60 ms mediana",
+  "vusMax": 1,
+  "http": {
+    "requests": 50,
+    "perSecond": 1.61,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 25,
+    "fails": 0
+  },
+  "thresholdsFailed": [],
+  "timings": {
+    "dashboard_token_falso": {
+      "avg": 102.69,
+      "med": 62.11,
+      "p90": 302.68,
+      "p95": 309.62,
+      "max": 1035
+    }
+  },
+  "counters": {
+    "iterations": 25
+  }
+}
