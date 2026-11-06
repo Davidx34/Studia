@@ -34,31 +34,20 @@ export async function POST(req: NextRequest) {
 
     const admin: any = createAdminSupabase();
 
-    // El intento tiene que ser del llamador, estar abierto y haber servido esta pregunta.
-    const { data: attempt } = await admin
-      .from('lesson_attempts')
-      .select('id, module_id, question_ids, status')
-      .eq('id', attemptId)
-      .eq('student_id', user.id)
-      .maybeSingle();
+    // Las tres lecturas son independientes entre si (solo dependen de los ids de la peticion): se lanzan juntas en vez de una tras otra (cada una paga un viaje a la base). Las
+    // comprobaciones de abajo siguen en el mismo orden, asi que las respuestas de error no cambian; si el intento no es del llamador, lo leido de mas se descarta sin usarse.
+    const [{ data: attempt }, { data: question }, { data: prev }] = await Promise.all([
+      // El intento tiene que ser del llamador, estar abierto y haber servido esta pregunta.
+      admin.from('lesson_attempts').select('id, module_id, question_ids, status').eq('id', attemptId).eq('student_id', user.id).maybeSingle(),
+      admin.from('lesson_questions').select('id, type, q, opts, ok, answers, pairs, keywords, exp, concept_tag, game_data').eq('id', questionId).maybeSingle(),
+      admin.from('lesson_attempt_answers').select('tries, correct, final').eq('attempt_id', attemptId).eq('question_id', questionId).maybeSingle(),
+    ]);
     if (!attempt || !(attempt.question_ids as string[]).includes(questionId)) return fail(404, 'Intento no encontrado');
     if (attempt.status !== 'in_progress') return fail(409, 'Este intento ya termino');
 
-    const { data: question } = await admin
-      .from('lesson_questions')
-      .select('id, type, q, opts, ok, answers, pairs, keywords, exp, concept_tag, game_data')
-      .eq('id', questionId)
-      .maybeSingle();
     // Un minijuego solo se califica aqui si SERVER_GRADING_GAMES esta activo: si no, se sirvio con su solucion y lo califica el navegador.
     const isGame = isGradedGameType(question?.type);
     if (!question || !(isGame ? serverGradingGamesEnabled() : isServerGradedType(question.type))) return fail(404, 'Pregunta no encontrada');
-
-    const { data: prev } = await admin
-      .from('lesson_attempt_answers')
-      .select('tries, correct, final')
-      .eq('attempt_id', attemptId)
-      .eq('question_id', questionId)
-      .maybeSingle();
 
     // Modulo y clase del intento (una sola lectura: la usan la pista de fuente y el registro de metricas).
     let modulePromise: Promise<{ classroom_id: string | null; source_material_ids: string[] | null } | null> | null = null;
