@@ -1,3 +1,4 @@
+import { loadActivePlaybookBlock } from '@/lib/aiLearning/playbook';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminSupabase, hasServiceRoleKey } from '@/lib/supabase/admin';
@@ -111,6 +112,7 @@ export async function POST(req: NextRequest) {
     // El usuario PUEDE ver el modulo (RLS de content_modules: un estudiante ve los de SUS clases, un profesor los suyos). Es lo que autoriza leer y escribir el banco de preguntas con
     // la llave de servicio mas abajo: el banco ya no se abre a los estudiantes con la llave publica (migracion 086).
     let moduleVisible = false;
+    let playbookBlock = '';
     let authedClient: { auth: { getUser: () => PromiseLike<any> } } = supabase as any;
     if (moduleId && supabase) {
       const { data: modRow } = await supabase
@@ -135,10 +137,13 @@ export async function POST(req: NextRequest) {
           // cache y de la generacion: no se gasta nada en una leccion que no puede abrir. Solo bloquea a un estudiante matriculado y nunca por una falla al leer (ver lessonAccess).
           return checkLessonAccess({ db: supabase, admin: hasServiceRoleKey() ? createAdminSupabase() : null, userId: lessonUser.id, classroomId, moduleId });
         })();
-        const [{ data: cfg, error: cfgError }, gate] = await Promise.all([
+        const [{ data: cfg, error: cfgError }, gate, pb] = await Promise.all([
           supabase.from('classroom_ai_config').select('*').eq('classroom_id', classroomId).maybeSingle(),
           gatePromise,
+          // Reglas de estilo activas de la clase (fase 3 de «IA que aprende»); si no hay llave de servicio o falla, '' y todo sigue igual.
+          loadActivePlaybookBlock(hasServiceRoleKey() ? createAdminSupabase() : null, classroomId),
         ]);
+        playbookBlock = pb;
         // Un fallo aqui NO debe pasar callado: la clase generaria con valores por defecto.
         if (cfgError) console.error('[GENERATE_CONFIG_READ_FAILED]', { moduleId, error: cfgError.message });
         dbConfig = cfg ?? null;
@@ -215,6 +220,7 @@ export async function POST(req: NextRequest) {
       classicCount: TOTAL_QUESTIONS,
       minigames: minigameTypes,
       conceptBlock: conceptTaxonomyPromptBlock(closedConcepts),
+      playbookBlock,
     });
 
     const questions = await callCohere(built.prompt, built.total);

@@ -197,6 +197,8 @@ export interface BuildPromptInput {
   minigames: readonly string[];
   // Bloque de la taxonomia cerrada de conceptos; vacio usa la instruccion generica.
   conceptBlock?: string;
+  // Reglas de estilo aprendidas de la clase (playbook activo, revisado por el profesor); vacio = sin cambios.
+  playbookBlock?: string;
 }
 
 export interface BuiltPrompt {
@@ -260,7 +262,9 @@ ${classicRules || minigames.length > 0 ? '\nREGLAS ADICIONALES POR TIPO:\n' + cl
 
 NOTACION MATEMATICA: si el contenido requiere formulas, ecuaciones o simbolos matematicos (ej: funciones, derivadas, condiciones de optimizacion), escribelos en LaTeX: usa $...$ para notacion inline (ej: $U(x,y) = x^{0.5}y^{0.5}$) y $$...$$ para ecuaciones en bloque. No uses LaTeX si el tema no lo requiere.
 
-${input.conceptBlock || GENERIC_CONCEPT_TAG_BLOCK}
+${input.conceptBlock || GENERIC_CONCEPT_TAG_BLOCK}${input.playbookBlock ? `
+
+${input.playbookBlock}` : ''}
 
 ${ANTI_HALLUCINATION_BLOCK}
 
