@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TestAccountsTab from './TestAccountsTab';
+import AiLearningTab from './AiLearningTab';
 import {
   Users,
   BarChart3,
   Activity,
   ScrollText,
   FlaskConical,
+  Brain,
   LogOut,
   Loader2,
   Plus,
@@ -18,7 +20,7 @@ import {
   XCircle,
 } from 'lucide-react';
 
-type Tab = 'users' | 'test' | 'analytics' | 'health' | 'logs';
+type Tab = 'users' | 'test' | 'ai' | 'analytics' | 'health' | 'logs';
 
 interface PendingRegistration {
   id: string;
@@ -63,6 +65,7 @@ interface SystemHealth {
 const TABS: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: 'users', label: 'Usuarios', icon: Users },
   { id: 'test', label: 'Cuentas de prueba', icon: FlaskConical },
+  { id: 'ai', label: 'IA que aprende', icon: Brain },
   { id: 'analytics', label: 'Analíticas', icon: BarChart3 },
   { id: 'health', label: 'Estado del sistema', icon: Activity },
   { id: 'logs', label: 'Logs', icon: ScrollText },
@@ -121,6 +124,7 @@ export default function DevDashboardClient() {
       <div className="p-6 max-w-5xl mx-auto">
         {tab === 'users' && <UsersTab />}
         {tab === 'test' && <TestAccountsTab />}
+        {tab === 'ai' && <AiLearningTab />}
         {tab === 'analytics' && <AnalyticsTab />}
         {tab === 'health' && <HealthTab />}
         {tab === 'logs' && <LogsTab />}
