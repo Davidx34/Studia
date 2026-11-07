@@ -222,7 +222,16 @@
       "before_ms": 1890,
       "after_ms": 1300,
       "change_pct": -31.2,
-      "conditions": "local, 1 usuario"
+      "conditions": "local, 1 usuario",
+      "prod_after_ms": [
+        575,
+        787
+      ],
+      "prod_before_ms": [
+        803,
+        1190
+      ],
+      "prod_note": "1 usuario, tras #233, sin comparacion controlada"
     },
     {
       "id": "I1",
@@ -262,8 +271,8 @@
     },
     {
       "id": "H9",
-      "status": "open",
-      "text": "ai_provider_health sin filas"
+      "status": "closed-by-code-reading",
+      "text": "0 filas en ai_provider_health es esperado: solo se escribe al abrirse un cortacircuitos de proveedor (no se provoco un fallo)"
     },
     {
       "id": "H13",
@@ -314,6 +323,20 @@
       230,
       310
     ],
-    "supabase_max_connections": 60
+    "supabase_max_connections": 60,
+    "produccion_1usuario_tras_233": {
+      "start_avg_ms": [
+        575,
+        787
+      ],
+      "answer_p95_ms": [
+        500,
+        932
+      ],
+      "dashboard_avg_ms": [
+        500,
+        905
+      ]
+    }
   }
 }
