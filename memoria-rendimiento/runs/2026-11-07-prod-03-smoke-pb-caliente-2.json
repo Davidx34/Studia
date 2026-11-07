@@ -1,0 +1,48 @@
+{
+  "id": "2026-11-07-prod-03-smoke-pb-caliente-2",
+  "date": "2026-11-07",
+  "target": "produccion",
+  "scenario": "03-lesson-flow",
+  "profile": "smoke",
+  "note": "tras #244; segunda tanda, funcion caliente",
+  "vusMax": 1,
+  "http": {
+    "requests": 35,
+    "perSecond": 0.53,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 39,
+    "fails": 0
+  },
+  "thresholdsFailed": [],
+  "timings": {
+    "lesson_answer": {
+      "avg": 507.4,
+      "med": 520.06,
+      "p90": 571.74,
+      "p95": 586.13,
+      "max": 600.51
+    },
+    "lesson_finish": {
+      "avg": 377.07,
+      "med": 377.07,
+      "p90": 401.54,
+      "p95": 404.6,
+      "max": 407.66
+    },
+    "lesson_start": {
+      "avg": 650.78,
+      "med": 650.78,
+      "p90": 694.63,
+      "p95": 700.11,
+      "max": 705.59
+    }
+  },
+  "counters": {
+    "lessons_finished": 2,
+    "unexpected_generation": 0,
+    "login_failures": 0,
+    "iterations": 1
+  }
+}

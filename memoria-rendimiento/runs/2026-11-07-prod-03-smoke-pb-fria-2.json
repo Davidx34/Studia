@@ -1,0 +1,50 @@
+{
+  "id": "2026-11-07-prod-03-smoke-pb-fria-2",
+  "date": "2026-11-07",
+  "target": "produccion",
+  "scenario": "03-lesson-flow",
+  "profile": "smoke",
+  "note": "tras #244 (lectura de playbook en generate-questions); primera tanda tras inactividad",
+  "vusMax": 1,
+  "http": {
+    "requests": 35,
+    "perSecond": 0.54,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 39,
+    "fails": 0
+  },
+  "thresholdsFailed": [
+    "http_req_duration{name:lesson_answer} p(95)<1000"
+  ],
+  "timings": {
+    "lesson_finish": {
+      "avg": 733.71,
+      "med": 733.71,
+      "p90": 1047.41,
+      "p95": 1086.62,
+      "max": 1125.83
+    },
+    "lesson_start": {
+      "avg": 708.88,
+      "med": 708.88,
+      "p90": 720.13,
+      "p95": 721.54,
+      "max": 722.94
+    },
+    "lesson_answer": {
+      "avg": 778.64,
+      "med": 585.71,
+      "p90": 1120.24,
+      "p95": 1449.69,
+      "max": 1779.14
+    }
+  },
+  "counters": {
+    "lessons_finished": 2,
+    "unexpected_generation": 0,
+    "login_failures": 0,
+    "iterations": 2
+  }
+}
