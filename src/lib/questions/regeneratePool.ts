@@ -13,6 +13,7 @@ import { getRagContext, normalizeGeneratedQuestion, callCohere, hasGenerationPro
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
 import { resolveQuestionCount, countServable, planFill } from '@/lib/questions/poolPlan';
 import { resolveConfig, resolveMinigames, enforceAllowedTypes, buildGenerationPrompt } from '@/lib/questions/generationConfig';
+import { loadActivePlaybookBlock } from '@/lib/aiLearning/playbook';
 import { gateGenerated, logGateResult } from '@/lib/jev/runtimeGate';
 
 export interface RegeneratePoolResult {
@@ -94,6 +95,8 @@ export async function regenerateModulePool(
   // taxonomia ya creada; si el profesor regenera antes de que exista, la crea.
   const closedConcepts = await getOrCreateModuleConcepts(supabase, moduleId, moduleRow.title);
   const conceptBlock = conceptTaxonomyPromptBlock(closedConcepts);
+  // Reglas de estilo activas de la clase (fase 3 de «IA que aprende»). Corre como el profesor dueno: la RLS de ai_playbooks se lo permite.
+  const playbookBlock = await loadActivePlaybookBlock(supabase, moduleRow.classroom_id);
 
   // Minijuegos de la tanda activa: la lista de la CLASE es la de permitidos; si el
   // profesor fijo una lista para este modulo se usa esa (recortada a lo permitido),
@@ -125,6 +128,7 @@ export async function regenerateModulePool(
       classicCount: count,
       minigames,
       conceptBlock,
+      playbookBlock,
     });
     return { raw: await callCohere(built.prompt, built.total), requested: new Set(built.requestedTypes) };
   }
