@@ -233,7 +233,7 @@
     {
       "id": "S1",
       "pr": 236,
-      "what": "migraciones 092-094: RLS initplan, fusion de politicas permisivas (98->85), 8 indices FK (7 efectivos)",
+      "what": "migraciones 092-094: RLS initplan, fusion de politicas permisivas (98->85), 8 indices FK (7 efectivos); 095 crea el indice compuesto de exam_sessions que la 094 omitio por colision de nombre",
       "measured": "no se midio latencia; verificado equivalencia de filas visibles (huella identica en 33 actores x 50 tablas)",
       "conditions": "produccion 2026-11-06"
     }
@@ -267,8 +267,8 @@
     },
     {
       "id": "H13",
-      "status": "partly-closed",
-      "text": "avisos de Supabase: 092-094 aplicadas (98->85 politicas, 0 duplicadas, huella de filas visibles identica); 095 pendiente (indice exam_sessions)"
+      "status": "closed",
+      "text": "avisos de Supabase resueltos o aceptados: 092-095 aplicadas; 0 claves foraneas sin indice, 0 politicas duplicadas, 0 initplan; quedan 43 indices sin uso (INFO) y los aceptados/accion del dueno"
     }
   ],
   "baselines": {
