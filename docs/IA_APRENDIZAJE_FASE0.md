@@ -1,0 +1,44 @@
+# IA que aprende con cada curso — Fase 0 (línea base) y Fase 1 (registro de señales)
+
+Fecha de las mediciones: 2026-11-06, base de producción, solo lectura. Excluye la clase sintética `[CARGA]`. El diseño completo (propuesta del dueño) está en `IA_APRENDIZAJE_CONTINUO.md` (fuera de este PR).
+
+## Fase 0: qué hay hoy
+
+| Medida | Valor | Lectura |
+|---|---|---|
+| Clases reales | 3 (2 con intentos de estudiantes) | Muy pocas para cualquier benchmark global |
+| Preguntas en el banco | 775 (513 de respaldo) | |
+| Veredictos del juez IA | 266 aprobadas, 197 rechazadas, 37 en revisión humana | |
+| Veredictos sin procedencia (anteriores a la migración 044) | 48 aprobadas, 40 rechazadas | Irrecuperable: no se sabe quién las decidió |
+| Sin juzgar (`pending`) | 171, todas de «5to grado · Sección A» | Cola sin procesar |
+| Decisiones del profesor | 16 (1 aprobada, 15 rechazadas) | **Es toda la verdad humana disponible** |
+| Intentos de estudiantes en clases reales | 200, de 3 estudiantes, 142 preguntas | Acierto global 61,5 % |
+| Preguntas con ≥5 intentos | **0** | La dificultad por pregunta aún no se puede estimar |
+
+### Acuerdo juez ↔ profesor (muestra de 15 rechazos del profesor)
+La razón de cada rechazo del profesor guarda el veredicto que tenía el juez en ese momento (`[juez actual: …]`):
+
+| Veredicto del juez cuando el profesor rechazó | Preguntas |
+|---|---|
+| fail (acuerdo) | 12 (80 %) |
+| pass (el juez dejó pasar algo que el profesor rechazó) | 2 |
+| review | 1 |
+
+**Cuidado al interpretar:** n = 15, todas de una sola clase (Microeconomía), y el profesor solo actúa sobre lo que se le muestra (sobre todo la cola de revisión humana), así que hay sesgo de selección. Sirve como línea base, **no** como conclusión sobre la calidad del juez. Tampoco se puede medir el caso contrario («el juez rechaza y el profesor aprobaría») porque hay una sola aprobación del profesor y no guarda el veredicto previo del juez.
+
+### Hallazgo de fondo
+`lesson_questions.review_status` guarda solo el **último** veredicto. Cuando el profesor corrige al juez, el veredicto del juez desaparece (sobrevive solo como texto dentro de `review_reason`). Sin historial no se puede calibrar al juez, que es el requisito de la fase 2. Eso es lo que resuelve la fase 1.
+
+## Fase 1: migración 096 (aditiva, no cambia el producto)
+
+- `ai_feedback_events`: registro solo de añadir de cada cambio de `review_status`/`reviewed_by` (quién: `judge`/`teacher`/`unknown`; veredicto nuevo y anterior; razón). Lo llena un **trigger**, así captura a todos los escritores sin tocar el código de la app.
+- Respaldo inicial: un evento por cada pregunta ya veredictada (`source='backfill'`). Incluye también las preguntas de la clase `[CARGA]`; filtrar por `classroom_id` al analizar.
+- `question_stats` + `recompute_question_stats()`: aciertos, intentos y estudiantes distintos por pregunta, recalculable; excluye `[CARGA]`. Con <5 intentos la tasa es ruido: usar `attempts` como umbral.
+- Seguridad: RLS activado sin políticas y sin permisos para `anon`/`authenticated`; la función solo para `service_role`.
+
+**Verificado (transacción revertida, antes de aplicar):** crea las tablas, 644 eventos de respaldo (266/37/197 del juez, 1/15 del profesor, 88/40 sin procedencia más las de `[CARGA]`), el trigger registra `teacher: pending→approved` al cambiar una pregunta, `recompute_question_stats()` devuelve 142 filas (= preguntas con intentos reales), `anon` y `authenticated` no pueden leer ni ejecutar, `service_role` sí ejecuta. Nada quedó en producción.
+
+**No verificado:** que el trigger no añada latencia apreciable cuando el juez califica lotes grandes (cada fila cambiada = un `INSERT`); es un insert por pregunta, se medirá en la primera corrida real del juez. Aún nadie llama a `recompute_question_stats()`: falta una tarea periódica o un botón (fase 2).
+
+## Siguiente paso
+Aplicar la 096 tras el merge. Para la fase 2 (calibrar al juez) falta volumen: hoy hay 16 decisiones humanas. Conviene que el profesor revise la cola de `human_review` (37 preguntas) y las 171 sin juzgar de 5.º grado para generar más señal.
