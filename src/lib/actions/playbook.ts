@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { sanitizeRules, MAX_RULES } from '@/lib/aiLearning/playbook';
+import { mergeRules } from '@/lib/aiLearning/carryOver';
 
 export interface PlaybookActionResult {
   ok: boolean;
@@ -58,4 +59,28 @@ export async function deactivatePlaybook(classroomId: string): Promise<PlaybookA
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/teacher/classrooms/${classroomId}/playbook`);
   return { ok: true };
+}
+
+/**
+ * Trae al cuaderno de ESTA clase las reglas de otra clase del MISMO profesor (fase 6). Entra como borrador nuevo: las reglas actuales mandan, sin duplicados, tope de 10.
+ * La RLS de ai_playbooks solo deja leer clases del propio profesor; aqui ademas se comprueba que el origen no sea esta misma clase.
+ */
+export async function importPlaybook(targetClassroomId: string, sourcePlaybookId: string): Promise<PlaybookActionResult & { added?: number; skipped?: number }> {
+  const { supabase } = await requireUser();
+  const db = supabase as any;
+  const { data: src } = await db.from('ai_playbooks').select('id, classroom_id, version, rules').eq('id', sourcePlaybookId).maybeSingle();
+  if (!src) return { ok: false, error: 'No se encontró el cuaderno de origen.' };
+  if (src.classroom_id === targetClassroomId) return { ok: false, error: 'El origen es esta misma clase.' };
+  const { data: own } = await db.from('classrooms').select('id').eq('id', targetClassroomId).maybeSingle();
+  if (!own) return { ok: false, error: 'Clase no encontrada.' };
+  const { data: current } = await db.from('ai_playbooks').select('rules').eq('classroom_id', targetClassroomId).eq('status', 'active').maybeSingle();
+  const merged = mergeRules(current?.rules ?? [], src.rules);
+  if (merged.added === 0) return { ok: false, error: 'No hay reglas nuevas para importar (ya están en tu cuaderno o llegaste al máximo de 10).' };
+  const { data: last } = await db.from('ai_playbooks').select('version').eq('classroom_id', targetClassroomId).order('version', { ascending: false }).limit(1).maybeSingle();
+  const { error } = await db
+    .from('ai_playbooks')
+    .insert({ classroom_id: targetClassroomId, version: (last?.version ?? 0) + 1, status: 'draft', origin: 'teacher', rules: merged.rules, note: `Importado de otra clase (versión ${src.version})` });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/teacher/classrooms/${targetClassroomId}/playbook`);
+  return { ok: true, added: merged.added, skipped: merged.skipped };
 }

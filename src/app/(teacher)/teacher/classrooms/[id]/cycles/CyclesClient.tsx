@@ -30,7 +30,14 @@ const STATUS_LABEL: Record<Status, string> = { pending: 'Pendiente', accepted: '
 const ACTION_LABEL = { accepted: 'Aceptar', rejected: 'Rechazar', postponed: 'Posponer' } as const;
 const fmt = (d: string) => new Date(d).toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' });
 
-export default function CyclesClient({ classroomId, cycles }: { classroomId: string; cycles: Cycle[] }) {
+interface CarryItem {
+  text: string;
+  evidence: string;
+  status: 'accepted' | 'postponed';
+  from: string;
+}
+
+export default function CyclesClient({ classroomId, cycles, checklist = [] }: { classroomId: string; cycles: Cycle[]; checklist?: CarryItem[] }) {
   const [label, setLabel] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -85,6 +92,21 @@ export default function CyclesClient({ classroomId, cycles }: { classroomId: str
           </p>
         )}
       </div>
+
+      {checklist.length > 0 && (
+        <div className="rounded-2xl border border-line bg-surface p-5 space-y-2" data-testid="cycle-checklist">
+          <h3 className="text-base font-semibold text-fg">Para este ciclo</h3>
+          <p className="text-xs text-fg-muted">Lo que aceptaste o pospusiste en la retrospectiva de «{checklist[0].from}».</p>
+          <ul className="space-y-1.5">
+            {checklist.map((c, i) => (
+              <li key={i} className="text-sm text-fg">
+                <span className="text-xs text-fg-muted">{c.status === 'accepted' ? 'Aceptada' : 'Pospuesta'} · </span>
+                {c.text} <span className="text-fg-muted">— {c.evidence}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {cycles.length === 0 && <p className="text-sm text-fg-muted">Aún no hay ciclos cerrados.</p>}
       {cycles.map((c) => (

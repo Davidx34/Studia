@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { BookMarked } from 'lucide-react';
-import { savePlaybookDraft, activatePlaybook, deactivatePlaybook } from '@/lib/actions/playbook';
+import { savePlaybookDraft, activatePlaybook, deactivatePlaybook, importPlaybook } from '@/lib/actions/playbook';
 
 interface Version {
   id: string;
@@ -16,7 +16,15 @@ interface Version {
 
 const STATUS_LABEL = { draft: 'Borrador', active: 'Activa', retired: 'Retirada' } as const;
 
-export default function PlaybookClient({ classroomId, versions }: { classroomId: string; versions: Version[] }) {
+interface Source {
+  id: string;
+  className: string;
+  version: number;
+  status: string;
+  rules: { text: string }[];
+}
+
+export default function PlaybookClient({ classroomId, versions, sources = [] }: { classroomId: string; versions: Version[]; sources?: Source[] }) {
   const active = versions.find((v) => v.status === 'active');
   const [text, setText] = useState((active ?? versions[0])?.rules.map((r) => r.text).join('\n') ?? '');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -81,6 +89,47 @@ export default function PlaybookClient({ classroomId, versions }: { classroomId:
           </p>
         )}
       </div>
+
+      {sources.length > 0 && (
+        <div className="rounded-2xl border border-line bg-surface p-5 space-y-3">
+          <h3 className="text-sm font-semibold text-fg">Traer reglas de otra de tus clases</h3>
+          <p className="text-sm text-fg-muted">Se agregan a tus reglas actuales como un borrador nuevo (sin repetir, máximo 10). Tú decides si lo activas. Solo ves clases tuyas.</p>
+          <ul className="space-y-2">
+            {sources.map((s) => (
+              <li key={s.id} className="rounded-xl border border-line p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-fg">
+                    {s.className} · versión {s.version}
+                    {s.status === 'active' ? ' (activa)' : ''}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      start(async () => {
+                        const r = await importPlaybook(classroomId, s.id);
+                        setMsg(
+                          r.ok
+                            ? { ok: true, text: `Se importaron ${r.added} regla(s)${r.skipped ? ` (${r.skipped} ya estaban o no cabían)` : ''}. Revisa el borrador abajo y actívalo si te sirve.` }
+                            : { ok: false, text: r.error ?? 'No se pudo importar.' },
+                        );
+                      })
+                    }
+                    className="px-3 py-1.5 rounded-lg border border-line text-xs text-fg disabled:opacity-50"
+                  >
+                    Traer reglas
+                  </button>
+                </div>
+                <ul className="mt-2 list-disc pl-5 text-sm text-fg-muted space-y-0.5">
+                  {s.rules.map((r, i) => (
+                    <li key={i}>{r.text}</li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-fg">Versiones</h3>

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { nextCycleChecklist } from '@/lib/aiLearning/carryOver';
 import CyclesClient from './CyclesClient';
 
 // Fase 4 de «IA que aprende»: ciclos cerrados y su retrospectiva.
@@ -16,5 +17,7 @@ export default async function CyclesPage({ params }: { params: { id: string } })
   ]);
   const byCycle = new Map<string, any>((retros ?? []).map((r: any) => [r.cycle_id, r]));
   const items = (cycles ?? []).map((c: any) => ({ ...c, retro: byCycle.get(c.id) ?? null }));
-  return <CyclesClient classroomId={params.id} cycles={items} />;
+  // Fase 6: tareas para el ciclo actual = lo aceptado/pospuesto de la ultima retrospectiva (items viene del mas nuevo al mas viejo).
+  const checklist = nextCycleChecklist(items.filter((c: any) => c.retro).map((c: any) => ({ label: c.label, suggestions: c.retro.suggestions })));
+  return <CyclesClient classroomId={params.id} cycles={items} checklist={checklist} />;
 }
