@@ -11,7 +11,7 @@
 //
 // Funciones puras (reciben el entorno), para poder probarlas.
 
-export type GeminiRole = 'judge' | 'pdf' | 'chunks' | 'topics';
+export type GeminiRole = 'judge' | 'pdf' | 'chunks' | 'topics' | 'research';
 export type AiProfile = 'free' | 'paid';
 
 type Env = Record<string, string | undefined>;
@@ -28,12 +28,15 @@ export const DEFAULT_MODELS: Record<AiProfile, Record<GeminiRole, string[]>> = {
     pdf: ['gemini-3.5-flash-lite', 'gemini-3.5-flash'],
     chunks: ['gemini-3.5-flash-lite'],
     topics: ['gemini-3.5-flash-lite'],
+    // Ruta de investigacion (busqueda con Google): probado con la llave del proyecto el 2026-11-07, ambos devuelven fuentes; el flash es mas lento (~11 s) y el lite mas rapido (~3 s).
+    research: ['gemini-3.5-flash-lite', 'gemini-3.5-flash'],
   },
   paid: {
     judge: ['gemini-3.5-flash'],
     pdf: ['gemini-3.5-flash-lite', 'gemini-3.5-flash'],
     chunks: ['gemini-3.5-flash-lite'],
     topics: ['gemini-3.5-flash-lite'],
+    research: ['gemini-3.5-flash-lite', 'gemini-3.5-flash'],
   },
 };
 
