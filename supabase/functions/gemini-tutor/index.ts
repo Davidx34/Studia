@@ -131,7 +131,10 @@ async function callGemini(systemPrompt: string, userMessage: string): Promise<st
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      // Los Llama 3.x ya no existen en la cuenta de Groq del proyecto (404 model_not_found, 2026-11-07): se usa gpt-oss-120b con razonamiento bajo y sin devolverlo.
+      model: 'openai/gpt-oss-120b',
+      reasoning_effort: 'low',
+      include_reasoning: false,
       messages: [
         {
           role: 'user',
@@ -139,7 +142,7 @@ async function callGemini(systemPrompt: string, userMessage: string): Promise<st
         },
       ],
       temperature: 0.7,
-      max_tokens: 600,
+      max_tokens: 1200,
     }),
   });
 
