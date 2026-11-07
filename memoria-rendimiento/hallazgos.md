@@ -12,7 +12,7 @@ Estado: **A** = abierto, **C** = cerrado, **H** = hipótesis por probar. Fuente:
 | H6 | A | Las mediciones locales están infladas por ≈250 ms de viaje portátil→Supabase | RTT medido 0,23–0,31 s | Comparar siempre local con local, producción con producción |
 | H7 | A | Conexiones a la base 11–14 de 60 durante las corridas: sin presión | consulta `pg_stat_activity` | Vigilar si crece con exámenes/laboratorio |
 | H8 | A | **Sin medir:** exámenes por cortes, laboratorio, minijuegos, generación con IA, resistencia larga (`soak`) | — | Plan en la conversación del 2026-11-06 (escenarios 05–07) |
-| H9 | A | `ai_provider_health` tiene 0 filas (¿`AI_HEALTH_PERSIST` guarda?) | SQL 2026-11-06 | Provocar un fallo controlado de proveedor y revisar |
+| H9 | C (por lectura de código) | `ai_provider_health` tiene 0 filas (¿`AI_HEALTH_PERSIST` guarda?) | SQL 2026-11-06 | Por el código (`persist.ts`) solo se escribe una fila cuando un proveedor de IA abre su cortacircuitos (fallos) y se borran a las 24 h: 0 filas es lo esperado si no hubo fallos. **No se provocó un fallo** para confirmarlo |
 | H10 | A | 17 módulos reales «completados» con <100 % aparecen «en curso» con la regla nueva | SQL 2026-11-06 | Informar; no es un defecto |
 | H11 | C | `finish` responde 409 si quedan intentos de una pregunta (el escenario no reintentaba) | `2026-11-06-local-03-smoke-con-sesion` | Corregido en el escenario (#230) |
 | H12 | C | «Completar frase» mostraba la oración dos veces | navegador 2026-11-06 | Corregido en #234 |
