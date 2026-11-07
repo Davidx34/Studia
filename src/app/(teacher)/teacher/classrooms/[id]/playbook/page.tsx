@@ -15,5 +15,18 @@ export default async function PlaybookPage({ params }: { params: { id: string } 
     .eq('classroom_id', params.id)
     .order('version', { ascending: false })
     .limit(50);
-  return <PlaybookClient classroomId={params.id} versions={data ?? []} />;
+  // Cuadernos de OTRAS clases del mismo profesor (la RLS no deja ver los de nadie mas): el activo, o la version mas reciente si no hay activo.
+  const { data: others } = await (supabase as any)
+    .from('ai_playbooks')
+    .select('id, classroom_id, version, status, rules, classrooms(name)')
+    .neq('classroom_id', params.id)
+    .order('version', { ascending: false })
+    .limit(100);
+  const byClass = new Map<string, any>();
+  for (const o of others ?? []) {
+    const prev = byClass.get(o.classroom_id);
+    if (!prev || (o.status === 'active' && prev.status !== 'active')) byClass.set(o.classroom_id, o);
+  }
+  const sources = Array.from(byClass.values()).map((o) => ({ id: o.id, className: o.classrooms?.name ?? 'Otra clase', version: o.version, status: o.status, rules: o.rules }));
+  return <PlaybookClient classroomId={params.id} versions={data ?? []} sources={sources} />;
 }
