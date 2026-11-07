@@ -69,3 +69,14 @@ Aplicar la 096 tras el merge. Para la fase 2 (calibrar al juez) falta volumen: h
 - **«Para este ciclo»:** en «Ciclos» se muestra como lista de tareas lo **aceptado y pospuesto** de la retrospectiva más reciente (aceptado primero). Lo rechazado **no** se arrastra: es lo que el profesor dijo que no quiere. Pendiente tampoco.
 - **Qué NO hace:** no copia nada entre profesores (eso es la fase 7, con consentimiento y asesoría legal); no aplica solo ninguna regla ni sugerencia; no importa retrospectivas completas ni estadísticas de otra clase.
 - Lógica pura en `src/lib/aiLearning/carryOver.ts` (con tests): `mergeRules` y `nextCycleChecklist`.
+
+## Fase 7: memoria global anónima — migración 099
+Autorizada por el dueño («en la fase 7 te doy permiso de todo… todo lo que se hace es legal»). **Nota:** la validez legal del consentimiento y del tratamiento de datos de menores la responde el dueño con su asesoría; este documento no la certifica. Lo que sí hace el código es registrar el consentimiento (quién, cuándo, qué versión del texto) para que sea trazable.
+- **Qué viaja:** solo agregados por (materia, nivel, banda de edad, tipo de pregunta): tasa de acierto, intentos, nº de clases y de profesores. `global_benchmarks` **no tiene** columnas de clase, profesor, estudiante ni pregunta (hay un test).
+- **Opt-in por clase** (apagado por defecto, revocable). La revocación se refleja de inmediato: el agregado se recalcula desde cero con las clases que aportan.
+- **Taxonomía cerrada** (listas CHECK en la base y en `benchmark.ts`, con un test que las compara): 10 materias, 5 niveles, 5 bandas de edad.
+- **Umbral de anonimato:** por defecto 5 clases, 3 profesores, 50 intentos. Se puede bajar, **pero no por debajo de un piso fijo** (3 clases, 2 profesores, 20 intentos) que la función y la tabla imponen; por debajo no hay anonimato real. «Usar más volumen» se logra con más clases aportando, no bajando el piso.
+- **Reciprocidad:** solo ve la referencia quien aporta, y solo las filas de su estrato.
+- **Prior, no meta:** nunca reemplaza datos propios ni cambia nada solo.
+- **Hoy no se publica nada:** hay 3 clases reales de 3 profesores y ninguna aporta; con los umbrales por defecto harían falta 5 clases de 3 profesores en un mismo estrato.
+- **Decisión que tomé por mi cuenta (pregunta 5 del documento de diseño):** el opt-in lo decide cada profesor por clase; el colegio como entidad queda fuera hasta que exista esa figura en el producto.

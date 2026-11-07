@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, FileText, Map, BarChart3, Brain, Target, ImagePlus, Sparkles, FlaskConical, ListChecks, BookMarked, History } from 'lucide-react';
+import { Users, FileText, Map, BarChart3, Brain, Target, ImagePlus, Sparkles, FlaskConical, ListChecks, BookMarked, History, Globe } from 'lucide-react';
 
 export default function ClassroomTabs({ classroomId }: { classroomId: string }) {
   const pathname = usePathname();
@@ -19,6 +19,7 @@ export default function ClassroomTabs({ classroomId }: { classroomId: string }) 
 
     { href: `${base}/brain`, label: 'Configurar IA', icon: Brain },
     { href: `${base}/cycles`, label: 'Ciclos', icon: History },
+    { href: `${base}/global`, label: 'Memoria global', icon: Globe },
     { href: `${base}/playbook`, label: 'Estilo de la IA', icon: BookMarked },
     { href: `${base}/lab`, label: 'Laboratorio', icon: FlaskConical },
     // Al final: se prepara cuando todo lo demas ya esta cargado y procesado.
