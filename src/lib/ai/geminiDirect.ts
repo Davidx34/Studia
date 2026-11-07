@@ -31,7 +31,7 @@ export interface GeminiAttempt {
 }
 
 export type GeminiOutcome =
-  | { ok: true; text: string; model: string; usage: { prompt?: number; output?: number; thinking?: number }; attempts: GeminiAttempt[] }
+  | { ok: true; text: string; model: string; usage: { prompt?: number; output?: number; thinking?: number }; attempts: GeminiAttempt[]; grounding?: unknown }
   | { ok: false; reason: GeminiFailure; status?: number; attempts: GeminiAttempt[] };
 
 // Cola de respaldo por defecto: modelos que respondieron con la llave del proyecto el 2026-10-26.
@@ -89,6 +89,8 @@ export interface GeminiRequest {
   role: GeminiRole;
   parts: unknown[];
   generationConfig?: Record<string, unknown>;
+  // Herramientas de Gemini (p. ej. [{ google_search: {} }] para busqueda con fuentes). Solo se envian si se piden.
+  tools?: unknown[];
   // 'off' (por defecto): se apaga el "pensar" con el ajuste que corresponde a cada modelo. 'default': no se envia ajuste.
   thinking?: 'off' | 'default';
   // Reintentos por 429 de minuto, 5xx y timeout, solo para el primer modelo; los de respaldo reintentan una vez como maximo.
@@ -142,7 +144,7 @@ export async function geminiGenerate(req: GeminiRequest): Promise<GeminiOutcome>
         res = await doFetch(`${BASE_URL}/models/${model}:generateContent?key=${key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ role: 'user', parts: req.parts }], generationConfig: { ...(req.generationConfig ?? {}), ...thinkingCfg } }),
+          body: JSON.stringify({ contents: [{ role: 'user', parts: req.parts }], generationConfig: { ...(req.generationConfig ?? {}), ...thinkingCfg }, ...(req.tools?.length ? { tools: req.tools } : {}) }),
           signal: AbortSignal.timeout(req.timeoutMs ?? 120_000),
         });
       } catch (e: any) {
@@ -164,7 +166,7 @@ export async function geminiGenerate(req: GeminiRequest): Promise<GeminiOutcome>
           warnOnce(`fallback:${req.role}:${model}`, `[GEMINI] ${req.role}: se uso ${model} porque ${first?.model ?? models[0]} no respondio (${first?.kind === 'skipped' ? 'descartado antes: no disponible' : (first?.kind ?? 'error')})`);
         }
         const u = data?.usageMetadata ?? {};
-        return { ok: true, text, model, usage: { prompt: u.promptTokenCount, output: u.candidatesTokenCount, thinking: u.thoughtsTokenCount }, attempts };
+        return { ok: true, text, model, usage: { prompt: u.promptTokenCount, output: u.candidatesTokenCount, thinking: u.thoughtsTokenCount }, attempts, ...(req.tools?.length ? { grounding: data?.candidates?.[0]?.groundingMetadata } : {}) };
       }
 
       const body = await res.text().catch(() => '');
