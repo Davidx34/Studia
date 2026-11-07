@@ -1,0 +1,48 @@
+{
+  "id": "2026-11-07-prod-03-soak",
+  "date": "2026-11-06",
+  "target": "produccion",
+  "scenario": "03-lesson-flow",
+  "profile": "soak",
+  "note": "30 min, 15 VUs, tras #233; 1109 lecciones, 0 errores",
+  "vusMax": 15,
+  "http": {
+    "requests": 8770,
+    "perSecond": 4.14,
+    "failedRate": 0
+  },
+  "checks": {
+    "passes": 10988,
+    "fails": 0
+  },
+  "thresholdsFailed": [],
+  "timings": {
+    "lesson_start": {
+      "avg": 556.76,
+      "med": 449.92,
+      "p90": 573.43,
+      "p95": 641.12,
+      "max": 11273.33
+    },
+    "lesson_answer": {
+      "avg": 437.04,
+      "med": 360.42,
+      "p90": 462.01,
+      "p95": 520.6,
+      "max": 12512.08
+    },
+    "lesson_finish": {
+      "avg": 301.35,
+      "med": 263.37,
+      "p90": 336.45,
+      "p95": 369.42,
+      "max": 9953.44
+    }
+  },
+  "counters": {
+    "lessons_finished": 1109,
+    "unexpected_generation": 0,
+    "login_failures": 0,
+    "iterations": 1109
+  }
+}

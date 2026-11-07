@@ -194,6 +194,19 @@
       "thresholdsFailed": 0,
       "file": "runs/2026-11-06-prod-03-stress.json",
       "note": "hasta 60 VUs, 6,8 req/s; 0 errores; sin degradacion (limite por la pausa de 3 s)"
+    },
+    {
+      "id": "2026-11-07-prod-03-soak",
+      "date": "2026-11-06",
+      "target": "produccion",
+      "scenario": "03-lesson-flow",
+      "profile": "soak",
+      "vusMax": 15,
+      "failedRate": 0,
+      "perSecond": 4.14,
+      "thresholdsFailed": 0,
+      "file": "runs/2026-11-07-prod-03-soak.json",
+      "note": "30 min, 15 VUs, tras #233; 1109 lecciones, 0 errores"
     }
   ],
   "optimizations": [
