@@ -510,6 +510,9 @@ export default function LessonPage() {
               .single();
             setRemediationRowId(row?.id ?? null);
           }
+          // Con un puntaje bajo casi siempre hay conceptos debiles y se ofrece el repaso: antes se salia aqui SIN poner en cola la escena del resultado, asi que la animacion de puntaje bajo
+          // («Buen intento…», module_complete_low) no se veia nunca. Ahora la escena se muestra primero y el ofrecimiento del repaso aparece al terminarla (la escena va antes en el render).
+          setCinematicQueue(queue);
           setRemediationPhase('offered');
           setModuleFinishing(false);
           return;

@@ -207,10 +207,14 @@ Deno.serve(async (req) => {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        // Los Llama 3.x YA NO existen en la cuenta de Groq del proyecto (404 «model_not_found», verificado 2026-11-07); los modelos disponibles son openai/gpt-oss-120b, openai/gpt-oss-20b y
+        // qwen/qwen3.8-27b (ver src/lib/ai/gateway/providers.ts). gpt-oss razona: con esfuerzo bajo y sin devolver el razonamiento responde en ~1 s, y max_tokens cuenta tambien lo razonado.
+        model: 'openai/gpt-oss-120b',
+        reasoning_effort: 'low',
+        include_reasoning: false,
         stream: true,
         temperature: 0.8,
-        max_tokens: 500,
+        max_tokens: 800,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message },
