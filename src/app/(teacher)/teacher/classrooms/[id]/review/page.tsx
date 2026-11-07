@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminSupabase, hasServiceRoleKey } from '@/lib/supabase/admin';
+import { calibrateJudge, type FeedbackEvent } from '@/lib/aiLearning/judgeCalibration';
 import ReviewClient from './ReviewClient';
 
 // Fase 1.3 (post-auditoria, Protocolo 7.5): pagina de revision humana.
@@ -37,5 +39,22 @@ export default async function ReviewPage({ params }: { params: { id: string } })
     moduleTitle: titleByModule.get(q.module_id) ?? 'Módulo',
   }));
 
-  return <ReviewClient classroomId={params.id} questions={questions} />;
+  // Fase 2 de «IA que aprende»: acuerdo del juez con TUS decisiones. ai_feedback_events es solo de servidor, asi que se lee con la llave de servicio
+  // y SOLO si la clase es del profesor que mira. Si algo falla, la pagina funciona igual (la tarjeta simplemente no aparece).
+  let calibration = null;
+  try {
+    const { data: own } = await supabase.from('classrooms').select('id').eq('id', params.id).eq('teacher_id', user.id).maybeSingle();
+    if (own && hasServiceRoleKey()) {
+      const { data: events } = await (createAdminSupabase() as any)
+        .from('ai_feedback_events')
+        .select('question_id, signal, verdict, reason, created_at')
+        .eq('classroom_id', params.id)
+        .limit(10000);
+      calibration = calibrateJudge((events ?? []) as FeedbackEvent[]);
+    }
+  } catch {
+    calibration = null;
+  }
+
+  return <ReviewClient classroomId={params.id} questions={questions} calibration={calibration} />;
 }

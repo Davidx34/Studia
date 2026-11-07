@@ -42,3 +42,10 @@ La razón de cada rechazo del profesor guarda el veredicto que tenía el juez en
 
 ## Siguiente paso
 Aplicar la 096 tras el merge. Para la fase 2 (calibrar al juez) falta volumen: hoy hay 16 decisiones humanas. Conviene que el profesor revise la cola de `human_review` (37 preguntas) y las 171 sin juzgar de 5.º grado para generar más señal.
+
+## Fase 2: calibración del juez (sin cambiar el comportamiento del pipeline)
+- `src/lib/aiLearning/judgeCalibration.ts` (puro, con tests): por pregunta empareja la última decisión del profesor con el último veredicto del juez anterior a ella (o, en datos previos a la 096, con la etiqueta `[juez actual: …]` de la razón). Calcula acuerdo, falsos «pass» (el juez aprobó y el profesor rechazó) y falsos «fail», y la cota inferior de Wilson al 95 %.
+- Estado: `insufficient` (menos de 20 pares decisivos: **no concluye**), `trusted` (cota inferior ≥ 80 %) o `degraded`. Los veredictos `review` no cuentan a favor ni en contra.
+- Panel: tarjeta «Acuerdo del juez con tus decisiones» arriba de la cola de revisión del profesor (`/teacher/classrooms/[id]/review`). Se lee con la llave de servicio solo si la clase es del profesor que mira; si algo falla, la página funciona igual sin la tarjeta.
+- **Con los datos de hoy el estado es `insufficient`**: 14 pares decisivos (12 acuerdos, 2 falsos «pass»), 1 «review», 1 aprobación sin veredicto previo. Necesita ≥ 20.
+- **No se aplicó el peso al pipeline todavía** (p. ej. mandar a revisión humana lo que el juez rechaza cuando esté `degraded`): con 14 pares sería actuar sobre ruido. Se decide cuando el estado deje de ser `insufficient`.
