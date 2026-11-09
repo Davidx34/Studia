@@ -1,0 +1,213 @@
+{
+  "fecha": "2026-11-09",
+  "alcance": "clases reales (sin [CARGA])",
+  "preguntas": {
+    "total": 871,
+    "retiradasPorForma": 77,
+    "sinJuzgar": 171,
+    "conVeredicto": 623,
+    "aprobadas": 319
+  },
+  "aprobacionJuez": {
+    "rate": 0.5120385232744783,
+    "ci": {
+      "low": 0.4728336480131708,
+      "high": 0.5510958423078288
+    }
+  },
+  "estados": {
+    "rejected/ai_judge": 199,
+    "pending/sin_procedencia": 171,
+    "rejected/sin_procedencia": 117,
+    "approved/ai_judge": 286,
+    "approved/sin_procedencia": 33,
+    "human_review/ai_judge": 50,
+    "rejected/teacher": 15
+  },
+  "porTipo": {
+    "short_answer": {
+      "n": 66,
+      "ok": 25
+    },
+    "multiple_choice": {
+      "n": 227,
+      "ok": 133
+    },
+    "fill_blank": {
+      "n": 133,
+      "ok": 77
+    },
+    "el_descifrador": {
+      "n": 6,
+      "ok": 2
+    },
+    "match": {
+      "n": 128,
+      "ok": 72
+    },
+    "cuarto_crisis": {
+      "n": 6,
+      "ok": 1
+    },
+    "true_false": {
+      "n": 12,
+      "ok": 6
+    },
+    "alquimia_conceptual": {
+      "n": 4,
+      "ok": 0
+    },
+    "juicio_conocimiento": {
+      "n": 7,
+      "ok": 0
+    },
+    "impostor_cognitivo": {
+      "n": 12,
+      "ok": 2
+    },
+    "categorias_rapidas": {
+      "n": 9,
+      "ok": 0
+    },
+    "linea_del_tiempo": {
+      "n": 8,
+      "ok": 1
+    },
+    "flashcard_rapida": {
+      "n": 5,
+      "ok": 0
+    }
+  },
+  "porDia": {
+    "2026-08-09": {
+      "n": 130,
+      "ok": 33
+    },
+    "2026-11-07": {
+      "n": 96,
+      "ok": 75
+    },
+    "2026-10-11": {
+      "n": 206,
+      "ok": 93
+    },
+    "2026-09-19": {
+      "n": 38,
+      "ok": 0
+    },
+    "2026-10-27": {
+      "n": 153,
+      "ok": 118
+    }
+  },
+  "errores": {
+    "total": 304,
+    "byCategory": {
+      "error_conceptual_o_calculo": 99,
+      "sin_motivo": 40,
+      "otro": 14,
+      "anclaje_material": 43,
+      "duplicada": 3,
+      "ambiguedad_respuesta_unica": 26,
+      "segunda_opinion_fallida": 41,
+      "respuesta_no_evaluable": 10,
+      "formato_minijuego": 20,
+      "no_autocontenida": 6,
+      "redaccion_confusa": 2
+    },
+    "byOrigin": {
+      "generador": 209,
+      "pipeline": 40,
+      "infraestructura": 41,
+      "sin_clasificar": 14
+    },
+    "unclassifiedShare": 0.046
+  },
+  "erroresPorTipo": {
+    "short_answer": {
+      "error_conceptual_o_calculo": 7,
+      "sin_motivo": 10,
+      "anclaje_material": 13,
+      "respuesta_no_evaluable": 3,
+      "otro": 1,
+      "no_autocontenida": 2,
+      "ambiguedad_respuesta_unica": 1,
+      "segunda_opinion_fallida": 4
+    },
+    "multiple_choice": {
+      "otro": 4,
+      "error_conceptual_o_calculo": 38,
+      "ambiguedad_respuesta_unica": 20,
+      "segunda_opinion_fallida": 15,
+      "sin_motivo": 4,
+      "respuesta_no_evaluable": 2,
+      "anclaje_material": 8,
+      "no_autocontenida": 2,
+      "duplicada": 1
+    },
+    "el_descifrador": {
+      "error_conceptual_o_calculo": 1,
+      "otro": 1,
+      "formato_minijuego": 1,
+      "anclaje_material": 1
+    },
+    "match": {
+      "duplicada": 1,
+      "sin_motivo": 5,
+      "anclaje_material": 10,
+      "segunda_opinion_fallida": 10,
+      "error_conceptual_o_calculo": 25,
+      "otro": 3,
+      "ambiguedad_respuesta_unica": 2
+    },
+    "cuarto_crisis": {
+      "sin_motivo": 4,
+      "formato_minijuego": 1
+    },
+    "true_false": {
+      "segunda_opinion_fallida": 5,
+      "error_conceptual_o_calculo": 1
+    },
+    "alquimia_conceptual": {
+      "sin_motivo": 1,
+      "anclaje_material": 2,
+      "formato_minijuego": 1
+    },
+    "fill_blank": {
+      "segunda_opinion_fallida": 7,
+      "sin_motivo": 10,
+      "respuesta_no_evaluable": 5,
+      "otro": 5,
+      "duplicada": 1,
+      "anclaje_material": 6,
+      "error_conceptual_o_calculo": 15,
+      "no_autocontenida": 2,
+      "redaccion_confusa": 2,
+      "ambiguedad_respuesta_unica": 3
+    },
+    "juicio_conocimiento": {
+      "sin_motivo": 2,
+      "anclaje_material": 1,
+      "formato_minijuego": 2,
+      "error_conceptual_o_calculo": 2
+    },
+    "impostor_cognitivo": {
+      "sin_motivo": 4,
+      "formato_minijuego": 1,
+      "error_conceptual_o_calculo": 5
+    },
+    "categorias_rapidas": {
+      "formato_minijuego": 7,
+      "anclaje_material": 1,
+      "error_conceptual_o_calculo": 1
+    },
+    "linea_del_tiempo": {
+      "formato_minijuego": 2,
+      "error_conceptual_o_calculo": 4,
+      "anclaje_material": 1
+    },
+    "flashcard_rapida": {
+      "formato_minijuego": 5
+    }
+  }
+}
