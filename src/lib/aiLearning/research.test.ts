@@ -71,16 +71,36 @@ describe('resolveSources', () => {
     expect(calls.every((c) => c.redirect === 'manual')).toBe(true);
     expect(calls[1].method).toBe('HEAD');
   });
-  it('404 = broken; 403 = unchecked (bloquea robots); sin respuesta con URL = broken', async () => {
-    const mk = (st: number) => (async (url: string) => (url.includes('vertexaisearch') ? res(302, { location: 'https://a.example.org/x' }) : res(st))) as unknown as typeof fetch;
-    const c = [{ uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/B', title: 't' }];
-    expect((await resolveSources(c, { fetchImpl: mk(404) }))[0].reach).toBe('broken');
-    expect((await resolveSources(c, { fetchImpl: mk(403) }))[0].reach).toBe('unchecked');
-    const dead = (async (url: string) => {
-      if (url.includes('vertexaisearch')) return res(302, { location: 'https://a.example.org/x' });
-      throw new Error('ENOTFOUND');
-    }) as unknown as typeof fetch;
-    expect((await resolveSources(c, { fetchImpl: dead }))[0]).toMatchObject({ reach: 'broken', url: 'https://a.example.org/x' });
+  const c1 = [{ uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/B', title: 't' }];
+  const redirectThen = (handler: (url: string, init: any) => Response | Promise<Response>) =>
+    (async (url: string, init: any) => (url.includes('vertexaisearch') ? res(302, { location: 'https://a.example.org/x' }) : handler(url, init))) as unknown as typeof fetch;
+
+  it('404 = broken; 403 en HEAD y en GET = unchecked (bloquea robots)', async () => {
+    expect((await resolveSources(c1, { fetchImpl: redirectThen(() => res(404)) }))[0].reach).toBe('broken');
+    expect((await resolveSources(c1, { fetchImpl: redirectThen(() => res(403)) }))[0].reach).toBe('unchecked');
+  });
+  it('si HEAD no concluye (405 o error) se intenta un GET de 1 byte y su resultado manda', async () => {
+    const methods: string[] = [];
+    const f405 = redirectThen((_u, init) => (methods.push(init.method), init.method === 'HEAD' ? res(405) : res(206)));
+    expect((await resolveSources(c1, { fetchImpl: f405 }))[0].reach).toBe('ok');
+    expect(methods).toEqual(['HEAD', 'GET']);
+    const fErr = redirectThen((_u, init) => {
+      if (init.method === 'HEAD') throw new Error('socket hang up');
+      return res(200);
+    });
+    expect((await resolveSources(c1, { fetchImpl: fErr }))[0].reach).toBe('ok');
+  });
+  it('un tiempo agotado o una conexion cortada NO prueban que el enlace este roto (caso real stlouisfed.org)', async () => {
+    const slow = redirectThen(() => {
+      throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+    });
+    expect((await resolveSources(c1, { fetchImpl: slow }))[0]).toMatchObject({ reach: 'unchecked', url: 'https://a.example.org/x' });
+  });
+  it('un dominio que no existe (DNS) SI es roto', async () => {
+    const dns = redirectThen(() => {
+      throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND', message: 'getaddrinfo ENOTFOUND a.example.org' } });
+    });
+    expect((await resolveSources(c1, { fetchImpl: dns }))[0]).toMatchObject({ reach: 'broken', url: 'https://a.example.org/x' });
   });
   it('NO sigue a una redireccion hacia una direccion interna', async () => {
     const calls: string[] = [];

@@ -116,9 +116,31 @@ export interface ResolveDeps {
   timeoutMs?: number;
 }
 
+const statusReach = (st: number): Reach | null => (st >= 200 && st < 400 ? 'ok' : st === 404 || st === 410 ? 'broken' : null);
+const isDnsFailure = (e: unknown): boolean => /ENOTFOUND|EAI_AGAIN|getaddrinfo/i.test(`${(e as any)?.cause?.code ?? ''} ${(e as any)?.cause?.message ?? ''} ${(e as any)?.message ?? ''}`);
+
+/**
+ * Comprueba una URL publica. Solo se afirma «roto» con evidencia: 404/410 o un dominio que no existe (DNS). Un tiempo agotado, una conexion cortada o un 403/405 NO prueban que el enlace este roto
+ * (muchos sitios descartan o bloquean a los robots: caso real stlouisfed.org, que respondia 200 a curl y colgaba otras peticiones), asi que quedan como «unchecked».
+ * Primero HEAD; si no concluye, un GET de 1 byte (sin leer el cuerpo ni seguir redirecciones).
+ */
+async function probe(doFetch: typeof fetch, url: string, timeout: number): Promise<Reach> {
+  for (const method of ['HEAD', 'GET'] as const) {
+    try {
+      const r = await doFetch(url, { method, redirect: 'manual', headers: method === 'GET' ? { Range: 'bytes=0-0' } : undefined, signal: AbortSignal.timeout(timeout) });
+      if (method === 'GET') void r.body?.cancel().catch(() => {});
+      const reach = statusReach(r.status);
+      if (reach) return reach;
+    } catch (e) {
+      if (isDnsFailure(e)) return 'broken';
+    }
+  }
+  return 'unchecked';
+}
+
 /**
  * Resuelve cada fuente a su URL real y comprueba si responde. Los enlaces de Google (redirect) se resuelven leyendo UNA redireccion sin seguirla; luego un HEAD con redireccion manual a la URL
- * publica. 2xx/3xx = ok; 404/410 o sin respuesta = broken; 401/403/405/429 = unchecked (el sitio bloquea robots; no significa que este roto).
+ * publica (HEAD y, si no concluye, GET de 1 byte). 2xx/3xx = ok; 404/410 o dominio inexistente = broken; todo lo demas (403/405/429, tiempo agotado, conexion cortada) = unchecked: no prueba que este roto.
  */
 export async function resolveSources(chunks: GroundingChunk[], deps: ResolveDeps = {}): Promise<ResolvedSource[]> {
   const doFetch = deps.fetchImpl ?? fetch;
@@ -135,13 +157,9 @@ export async function resolveSources(chunks: GroundingChunk[], deps: ResolveDeps
         target = loc ? safePublicUrl(new URL(loc, first).toString()) : null;
         if (!target) return { n, title: c.title, url: null, reach: 'unchecked' };
       } else target = first;
-      const h = await doFetch(target, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(timeout) });
-      const st = h.status;
-      const reach: Reach = st >= 200 && st < 400 ? 'ok' : st === 404 || st === 410 ? 'broken' : 'unchecked';
-      return { n, title: c.title, url: target, reach };
+      return { n, title: c.title, url: target, reach: await probe(doFetch, target, timeout) };
     } catch {
-      // Sin respuesta: si ya tenemos la URL real se marca rota; si no, no se pudo comprobar.
-      return { n, title: c.title, url: target, reach: target ? 'broken' : 'unchecked' };
+      return { n, title: c.title, url: target, reach: 'unchecked' };
     }
   };
   return Promise.all(chunks.slice(0, 12).map(one));
