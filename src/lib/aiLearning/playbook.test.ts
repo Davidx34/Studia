@@ -56,8 +56,8 @@ describe('integracion con el prompt', () => {
   });
   it('los dos generadores pasan el playbook al constructor', () => {
     const r = (f: string) => fs.readFileSync(path.join(process.cwd(), f), 'utf8');
-    expect(r('src/app/api/generate-questions/route.ts')).toMatch(/playbookBlock,\s*\n\s*\}\);/);
-    expect(r('src/lib/questions/regeneratePool.ts')).toMatch(/playbookBlock,\s*\n\s*\}\);/);
+    expect(r('src/app/api/generate-questions/route.ts')).toMatch(/playbookBlock,\s*\n\s*useDoctrine: doctrineEnabled\(\),\s*\n\s*\}\);/);
+    expect(r('src/lib/questions/regeneratePool.ts')).toMatch(/playbookBlock,\s*\n\s*useDoctrine: doctrineEnabled\(\),\s*\n\s*\}\);/);
   });
 });
 

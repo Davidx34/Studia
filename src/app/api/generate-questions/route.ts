@@ -1,4 +1,5 @@
 import { loadActivePlaybookBlock } from '@/lib/aiLearning/playbook';
+import { doctrineEnabled } from '@/lib/aiLearning/doctrine';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminSupabase, hasServiceRoleKey } from '@/lib/supabase/admin';
@@ -221,6 +222,7 @@ export async function POST(req: NextRequest) {
       minigames: minigameTypes,
       conceptBlock: conceptTaxonomyPromptBlock(closedConcepts),
       playbookBlock,
+      useDoctrine: doctrineEnabled(),
     });
 
     const questions = await callCohere(built.prompt, built.total);

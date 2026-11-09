@@ -1,0 +1,123 @@
+import type { Principle } from '../types';
+
+// Evaluacion y redaccion de preguntas. Es el dominio mas conectado con los errores medidos en la linea base (memoria-calidad/baseline-2026-11-09.json).
+export const EVALUACION: Principle[] = [
+  {
+    id: 'alineacion_objetivo_evaluacion',
+    domain: 'evaluacion',
+    title: 'Alinear objetivos, evidencia y actividades',
+    essence:
+      'El diseño hacia atrás parte de lo que el estudiante debe poder hacer, define qué evidencia lo demostraría y solo entonces planifica las actividades. Así lo evaluado coincide con lo enseñado.',
+    apply: 'Toda pregunta debe responder a un objetivo del curso; si no sirve a ningún objetivo, descártala.',
+    limits: 'Es un marco de diseño respaldado sobre todo por la práctica profesional, no por ensayos controlados.',
+    evidence: 'moderada',
+    sources: ['wiggins2005', 'anderson2001'],
+    tasks: ['generar_pregunta', 'planificar', 'juzgar'],
+    tags: ['objetivos', 'alineacion', 'anclaje'],
+  },
+  {
+    id: 'niveles_cognitivos',
+    domain: 'evaluacion',
+    title: 'Evaluar varios niveles de pensamiento',
+    essence:
+      'La taxonomía revisada distingue procesos (recordar, comprender, aplicar, analizar, evaluar, crear) y tipos de conocimiento. Evaluar solo el recuerdo deja fuera gran parte de lo que importa.',
+    apply: 'Mezcla niveles: además de definiciones, incluye preguntas de aplicar (usar el concepto en un caso) y de analizar (comparar, explicar por qué), e indica el nivel buscado.',
+    limits: 'Los niveles no son una jerarquía estricta; una pregunta de «aplicar» mal planteada puede quedar en simple recuerdo.',
+    evidence: 'moderada',
+    sources: ['anderson2001'],
+    tasks: ['generar_pregunta', 'juzgar', 'planificar', 'investigar'],
+    tags: ['nivel_alto', 'profundidad', 'aplicar'],
+  },
+  {
+    id: 'redaccion_opcion_multiple',
+    domain: 'evaluacion',
+    title: 'Redactar bien las preguntas de opción múltiple',
+    essence:
+      'La revisión de guías de redacción reúne 31 recomendaciones: una sola opción correcta, un enunciado que plantee el problema completo, opciones plausibles y homogéneas, evitar «todas las anteriores» y las negaciones innecesarias, y no dar pistas por la longitud o el orden de las opciones.',
+    apply: 'En opción múltiple: una sola correcta; enunciado completo y en positivo; de 3 a 4 opciones plausibles de forma y longitud parecidas; sin «todas» ni «ninguna de las anteriores».',
+    limits: 'Algunas guías descansan en el consenso de los manuales y no en experimentos propios.',
+    evidence: 'moderada',
+    sources: ['haladyna2002', 'downing2006'],
+    tasks: ['generar_pregunta', 'juzgar', 'investigar'],
+    tags: ['opcion_multiple', 'una_correcta', 'enunciado'],
+  },
+  {
+    id: 'distractores_de_errores_reales',
+    domain: 'evaluacion',
+    title: 'Distractores que salen de errores reales',
+    essence:
+      'Las mejores opciones incorrectas reflejan errores que los estudiantes realmente cometen, y así la pregunta diagnostica además de calificar.',
+    apply: 'Escribe cada distractor a partir de un error típico documentado en el material o en respuestas anteriores, y explica por qué falla cada uno.',
+    avoid: 'No inventes errores que nadie comete.',
+    limits: 'Sin datos de errores reales usa solo los que el material describe.',
+    evidence: 'moderada',
+    sources: ['haladyna2002', 'ambrose2010'],
+    tasks: ['generar_pregunta'],
+    tags: ['opcion_multiple', 'errores', 'distractores'],
+  },
+  {
+    id: 'clave_defendible',
+    domain: 'evaluacion',
+    title: 'Una clave que se pueda defender con la fuente',
+    essence:
+      'La respuesta correcta debe poder defenderse con la fuente. Si un experto razonable puede discutirla, la pregunta es un riesgo para la validez de la evaluación.',
+    apply: 'Verifica la clave contra el material antes de entregarla; si hay un cálculo, resuélvelo paso a paso y escribe el resultado exacto; si el material no lo respalda, no generes la pregunta.',
+    limits: 'Verificar contra el material no garantiza que el material sea correcto.',
+    evidence: 'moderada',
+    sources: ['haladyna2002', 'downing2006'],
+    tasks: ['generar_pregunta', 'juzgar'],
+    tags: ['clave', 'calculo', 'anclaje', 'verificar'],
+  },
+  {
+    id: 'respuesta_corta_verificable',
+    domain: 'evaluacion',
+    title: 'Respuestas cortas y verificables',
+    essence:
+      'Las respuestas construidas se califican de forma más objetiva cuando la respuesta esperada es breve y concreta; las respuestas abiertas con muchas variantes dificultan una calificación justa.',
+    apply: 'En respuesta corta y completar espera de 1 a 3 palabras o una cifra verificable, acepta variantes razonables y evita que la respuesta ya esté escrita en el enunciado.',
+    limits: 'Una calificación por palabras clave no entiende paráfrasis; para ideas complejas usa opción múltiple o revisión humana.',
+    evidence: 'limitada',
+    sources: ['downing2006', 'haladyna2002'],
+    tasks: ['generar_pregunta', 'juzgar', 'investigar'],
+    tags: ['respuesta_corta', 'completar', 'verificable'],
+  },
+  {
+    id: 'evaluacion_formativa',
+    domain: 'evaluacion',
+    title: 'Evaluar para decidir el siguiente paso',
+    essence:
+      'Evaluar durante el aprendizaje para ajustar la enseñanza mejora los resultados cuando la información se usa: el profesor adapta y el estudiante recibe indicaciones sobre cómo mejorar.',
+    apply: 'Trata cada resultado como información para decidir qué repasar y a quién ayudar, no solo como una nota.',
+    limits: 'El tamaño de efecto que suele citarse no se verificó aquí; los efectos varían mucho según cómo se implemente.',
+    evidence: 'moderada',
+    sources: ['blackwiliam1998', 'wiliam2011'],
+    tasks: ['interpretar_resultados', 'planificar', 'retroalimentar'],
+    tags: ['formativa', 'decision'],
+  },
+  {
+    id: 'pruebas_de_bajo_riesgo',
+    domain: 'evaluacion',
+    title: 'Pruebas frecuentes de bajo riesgo',
+    essence:
+      'Las pruebas frecuentes y de bajo riesgo no solo miden: fortalecen la memoria (efecto de la prueba) y muestran al estudiante lo que aún no sabe.',
+    apply: 'Ofrece práctica frecuente de bajo riesgo con retroalimentación y reserva el peso fuerte de la nota para evaluaciones planificadas.',
+    limits: 'Si la ansiedad ante la prueba es alta el beneficio puede reducirse; cuida el tono del mensaje.',
+    evidence: 'fuerte',
+    sources: ['roediger2006', 'dunlosky2013'],
+    tasks: ['planificar', 'generar_pregunta'],
+    tags: ['evaluacion', 'bajo_riesgo'],
+  },
+  {
+    id: 'cobertura_y_dificultad',
+    domain: 'evaluacion',
+    title: 'Cubrir los objetivos con dificultad variada',
+    essence:
+      'Una buena evaluación cubre los objetivos en proporción a su importancia y mezcla preguntas de dificultad distinta. Si casi todos aciertan o casi nadie acierta, la pregunta no distingue entre quien domina y quien no.',
+    apply: 'Reparte las preguntas según los objetivos, evita que todas tengan la misma dificultad y marca para revisión las que casi nadie o casi todos aciertan.',
+    limits: 'La dificultad solo se estima con suficientes respuestas reales (decenas por pregunta).',
+    evidence: 'limitada',
+    sources: ['downing2006', 'wiggins2005'],
+    tasks: ['interpretar_resultados', 'planificar', 'juzgar'],
+    tags: ['dificultad', 'cobertura', 'discriminacion'],
+  },
+];

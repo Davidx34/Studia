@@ -16,6 +16,8 @@ interface Suggestion {
   text: string;
   evidence: string;
   status: Status;
+  /** Principios de la doctrina que fundamentan la sugerencia, con sus fuentes. */
+  basis?: { title: string; cites: string[] }[];
 }
 interface Cycle {
   id: string;
@@ -139,6 +141,11 @@ export default function CyclesClient({ classroomId, cycles, checklist = [] }: { 
                       <li key={s.id} className="rounded-xl border border-line p-3">
                         <p className="text-sm text-fg">{s.text}</p>
                         <p className="text-xs text-fg-muted mt-0.5">Basado en: {s.evidence}</p>
+                        {s.basis && s.basis.length > 0 && (
+                          <p className="text-xs text-fg-muted mt-0.5" data-testid="suggestion-basis">
+                            Fundamento: {s.basis.map((b) => `${b.title} (${b.cites.join('; ')})`).join(' · ')}
+                          </p>
+                        )}
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <span className="text-xs text-fg-muted">{STATUS_LABEL[s.status]}</span>
                           {(['accepted', 'rejected', 'postponed'] as const)
