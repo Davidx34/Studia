@@ -13,6 +13,7 @@
 
 import type { Database } from '@/types/database.generated';
 import { sanitizeLogged } from '@/lib/security/promptSanitizer';
+import { doctrineBlock, tagsForGeneration } from '@/lib/aiLearning/doctrine';
 import {
   jsonFormats,
   typeInstructionLine,
@@ -199,6 +200,8 @@ export interface BuildPromptInput {
   conceptBlock?: string;
   // Reglas de estilo aprendidas de la clase (playbook activo, revisado por el profesor); vacio = sin cambios.
   playbookBlock?: string;
+  // Doctrina pedagogica global (src/lib/aiLearning/doctrine): criterios y conducta de referencia segun los tipos pedidos y la profundidad. APAGADA por defecto: solo se enciende con una medicion A/B favorable.
+  useDoctrine?: boolean;
 }
 
 export interface BuiltPrompt {
@@ -240,6 +243,8 @@ export function buildGenerationPrompt(input: BuildPromptInput): BuiltPrompt {
     .filter(Boolean)
     .join('\n');
 
+  const doctrine = input.useDoctrine ? doctrineBlock({ task: 'generar_pregunta', tags: tagsForGeneration(requestedTypes, c.depth) }) : '';
+
   const classicRules = c.classicTypes
     .map((t) => CLASSIC_RULES[t.jsonType])
     .filter(Boolean)
@@ -264,7 +269,9 @@ NOTACION MATEMATICA: si el contenido requiere formulas, ecuaciones o simbolos ma
 
 ${input.conceptBlock || GENERIC_CONCEPT_TAG_BLOCK}${input.playbookBlock ? `
 
-${input.playbookBlock}` : ''}
+${input.playbookBlock}` : ''}${doctrine ? `
+
+${doctrine}` : ''}
 
 ${ANTI_HALLUCINATION_BLOCK}
 

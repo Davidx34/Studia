@@ -64,6 +64,19 @@ export interface Retrospective {
   suggestions: Suggestion[];
 }
 
+/**
+ * Principios de la doctrina que fundamentan cada tipo de sugerencia (se muestran junto a la sugerencia; no cambian lo que la IA genera). Se calcula al mostrar, no se guarda: asi las
+ * retrospectivas viejas tambien muestran su fundamento y una revision de la doctrina se refleja en todas.
+ */
+export const SUGGESTION_PRINCIPLES: Record<SuggestionKind, string[]> = {
+  reinforce_module: ['evaluacion_formativa', 'instruccion_en_pasos', 'aprendizaje_para_el_dominio'],
+  reinforce_concept: ['practica_recuperacion', 'practica_espaciada', 'conocimiento_previo'],
+  review_question: ['clave_defendible', 'cobertura_y_dificultad'],
+  review_judge: ['comparar_con_intervalo', 'muestras_pequenas'],
+  review_pending: ['evaluacion_formativa'],
+  collect_more_data: ['muestras_pequenas'],
+};
+
 const round = (n: number, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
 const pct = (r: number) => `${Math.round(r * 100)} %`;
 

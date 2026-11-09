@@ -14,6 +14,7 @@ import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/que
 import { resolveQuestionCount, countServable, planFill } from '@/lib/questions/poolPlan';
 import { resolveConfig, resolveMinigames, enforceAllowedTypes, buildGenerationPrompt } from '@/lib/questions/generationConfig';
 import { loadActivePlaybookBlock } from '@/lib/aiLearning/playbook';
+import { doctrineEnabled } from '@/lib/aiLearning/doctrine';
 import { gateGenerated, logGateResult } from '@/lib/jev/runtimeGate';
 
 export interface RegeneratePoolResult {
@@ -129,6 +130,7 @@ export async function regenerateModulePool(
       minigames,
       conceptBlock,
       playbookBlock,
+      useDoctrine: doctrineEnabled(),
     });
     return { raw: await callCohere(built.prompt, built.total), requested: new Set(built.requestedTypes) };
   }
