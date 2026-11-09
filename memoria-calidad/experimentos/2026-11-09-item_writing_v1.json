@@ -1,0 +1,96 @@
+{
+  "id": "2026-11-09-item_writing_v1",
+  "fecha": "2026-11-09T15:22:33.532Z",
+  "reglas": "item_writing_v1",
+  "generador": "gemini:gemini-3.5-flash-lite",
+  "modulos": 4,
+  "repeticiones": 3,
+  "preguntasPorLlamada": 8,
+  "bloqueB": "REGLAS DE ESTILO APRENDIDAS EN ESTA CLASE (revisadas por el profesor; no contradicen el material ni las instrucciones de arriba):\n1. Antes de fijar la respuesta correcta, verifícala contra el material; si hay un cálculo, resuélvelo paso a paso y escribe el resultado exacto.\n2. Cada pregunta debe poder responderse solo con lo que dice el material; no introduzcas conceptos, fórmulas ni datos que el material no explique.\n3. Deja una sola respuesta correcta; las demás opciones deben ser claramente incorrectas y no verdades parciales.\n4. Incluye en el enunciado todos los datos, símbolos y condiciones necesarios; la pregunta debe entenderse sin ver el material.\n5. En respuesta corta y completar, la respuesta esperada debe ser breve (1 a 3 palabras) y verificable; si la respuesta natural es una explicación o una fórmula, usa opción múltiple.",
+  "brazos": {
+    "A": {
+      "pedidas": 96,
+      "generadas": 56,
+      "validasForma": 56,
+      "pass": 43,
+      "fail": 2,
+      "reviewGenerador": 1,
+      "excluidasInfra": 10,
+      "porCategoria": {
+        "otro": 1,
+        "error_conceptual_o_calculo": 2
+      }
+    },
+    "B": {
+      "pedidas": 96,
+      "generadas": 40,
+      "validasForma": 40,
+      "pass": 33,
+      "fail": 1,
+      "reviewGenerador": 1,
+      "excluidasInfra": 5,
+      "porCategoria": {
+        "ambiguedad_respuesta_unica": 1,
+        "otro": 1
+      }
+    }
+  },
+  "comparacionPasanJuez": {
+    "a": {
+      "successes": 43,
+      "n": 46,
+      "rate": 0.9347826086956522,
+      "ci": {
+        "low": 0.8249699089621864,
+        "high": 0.9775725455336565
+      }
+    },
+    "b": {
+      "successes": 33,
+      "n": 35,
+      "rate": 0.9428571428571428,
+      "ci": {
+        "low": 0.8139261926062996,
+        "high": 0.9841871703859559
+      }
+    },
+    "diff": 0.00807453416149062,
+    "diffCi": {
+      "low": -0.12777158697262864,
+      "high": 0.12540739485398708
+    },
+    "decision": "sin_evidencia",
+    "minPerArm": 30
+  },
+  "comparacionFormaValida": {
+    "a": {
+      "successes": 56,
+      "n": 56,
+      "rate": 1,
+      "ci": {
+        "low": 0.9358038555118847,
+        "high": 1
+      }
+    },
+    "b": {
+      "successes": 40,
+      "n": 40,
+      "rate": 1,
+      "ci": {
+        "low": 0.9123754607496077,
+        "high": 1
+      }
+    },
+    "diff": 0,
+    "diffCi": {
+      "low": -0.08762453925039226,
+      "high": 0.06419614448811528
+    },
+    "decision": "sin_evidencia",
+    "minPerArm": 30
+  },
+  "llamadasSinRespuesta": 12,
+  "incompleto": true,
+  "motivoIncompleto": "Se agotaron los creditos prepagados de Gemini (HTTP 402) a mitad del experimento: 12 de 36 llamadas previstas fallaron (brazo A hizo 7 llamadas y brazo B 5), asi que los brazos no quedaron igualados. NO es una conclusion; hay que repetirlo completo.",
+  "lectura": "Con techo alto: el generador base ya aprueba ~93% en estos modulos, asi que aunque las reglas ayudaran, el margen de mejora es pequeno y haria falta mucha mas muestra. Sin evidencia de efecto (IC95% de la diferencia: -12.8 a +12.5 pp)."
+}

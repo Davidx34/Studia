@@ -63,3 +63,8 @@ Conocimiento de **esencia** (principios, no textos) con fuentes de universidades
 4. Nuevas memorias (errores comunes, ejemplos, profesor) con su migración.
 5. Monitor de regresión y reversión.
 Cada PR: pruebas, medición donde cambie el comportamiento, y «Verificado / NO verificado».
+
+## 8. Resultado del primer experimento (2026-11-09) — INCOMPLETO
+`item_writing_v1` vs generación base, brazos intercalados, mismos módulos, mismo juez. **Resultado: sin evidencia** (brazo A 43 de 46 pasan = 93,5 %; brazo B 33 de 35 = 94,3 %; diferencia +0,8 pp, IC95 % −12,8 a +12,5 pp). **No es concluyente por dos razones:** (1) el experimento se **interrumpió** a mitad: se agotaron los créditos prepagados de Gemini (HTTP 402, «Your prepayment credits are depleted») y 12 de las 36 llamadas previstas fallaron, de modo que los brazos no quedaron igualados (7 llamadas contra 5); (2) **efecto techo**: el generador actual ya aprueba ~93 % en estos módulos, así que el margen de mejora es pequeño y detectarlo exige mucha más muestra. Hay que **repetirlo completo** cuando haya créditos, y con módulos donde la línea base sea más baja. Archivo: `memoria-calidad/experimentos/2026-11-09-item_writing_v1.json` (marcado `incompleto`).
+
+**Lección operativa (ya corregida):** el arnés ahora evalúa en **pares** (mismo módulo y repetición; solo cuenta un par si responden los dos brazos) y se **detiene** tras 3 pares fallidos seguidos marcando el resultado como incompleto. Probado con los créditos agotados: se detuvo solo a los 3 pares.

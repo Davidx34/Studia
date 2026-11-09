@@ -76,43 +76,70 @@ async function main() {
   const stats: Record<Arm, ArmStats> = { A: newStats(), B: newStats() };
   let sinRespuesta = 0;
 
-  for (let rep = 0; rep < reps; rep++) {
-    for (const mm of mods) {
-      for (const arm of ['A', 'B'] as Arm[]) {
-        const built = buildGenerationPrompt({ config: mm.config, moduleTitle: mm.title, context: mm.context, classicCount: count, minigames: [], conceptBlock: mm.conceptBlock, playbookBlock: arm === 'B' ? block : '' });
-        sharedHealth.reset();
-        const raw = (await callCohere(built.prompt, built.total).catch(() => null)) ?? [];
-        const s = stats[arm];
-        s.pedidas += built.total;
-        if (raw.length === 0) {
-          sinRespuesta++;
+  // Los brazos se evaluan en PARES (mismo modulo y repeticion): un par solo cuenta si AMBOS brazos respondieron, para que nunca queden desiguales. Ante 3 fallos de generacion seguidos
+  // (cuota agotada, credito prepagado agotado, proveedor caido) el experimento se DETIENE y queda marcado como incompleto en vez de seguir y producir una comparacion desigual.
+  const MAX_FALLOS_SEGUIDOS = 3;
+  let fallosSeguidos = 0;
+  let parAbortado: string | null = null;
+  let pares = 0;
+
+  const runArm = async (arm: Arm, mm: (typeof mods)[number], rep: number): Promise<ArmStats | null> => {
+    const built = buildGenerationPrompt({ config: mm.config, moduleTitle: mm.title, context: mm.context, classicCount: count, minigames: [], conceptBlock: mm.conceptBlock, playbookBlock: arm === 'B' ? block : '' });
+    sharedHealth.reset();
+    const raw = (await callCohere(built.prompt, built.total).catch(() => null)) ?? [];
+    if (raw.length === 0) return null;
+    const s = newStats();
+    s.pedidas = built.total;
+    s.generadas = raw.length;
+    const { kept } = enforceAllowedTypes(raw.map(normalizeGeneratedQuestion), new Set(built.requestedTypes));
+    const validas = kept.filter((q: any) => isValidQuestion(q).valid).map((q: any, i: number) => ({ ...q, id: `${arm}-${rep}-${mm.id.slice(0, 4)}-${i}` }));
+    s.validasForma = validas.length;
+    const veredictos = validas.length ? await judgeQuestionsBatch(validas, mm.context) : new Map();
+    for (const q of validas) {
+      const v = veredictos.get(q.id);
+      if (v?.verdict === 'pass') s.pass++;
+      else {
+        const cat = classifyReason(v?.reason ?? null);
+        if (CATEGORIES[cat].origin === 'infraestructura' || !v) {
+          s.excluidasInfra++;
           continue;
         }
-        s.generadas += raw.length;
-        const { kept } = enforceAllowedTypes(raw.map(normalizeGeneratedQuestion), new Set(built.requestedTypes));
-        const validas = kept.filter((q: any) => isValidQuestion(q).valid).map((q: any, i: number) => ({ ...q, id: `${arm}-${rep}-${mm.id.slice(0, 4)}-${i}` }));
-        s.validasForma += validas.length;
-        const veredictos = validas.length ? await judgeQuestionsBatch(validas, mm.context) : new Map();
-        for (const q of validas) {
-          const v = veredictos.get(q.id);
-          if (v?.verdict === 'pass') s.pass++;
-          else {
-            const cat = classifyReason(v?.reason ?? null);
-            const origen = CATEGORIES[cat].origin;
-            if (origen === 'infraestructura' || !v) {
-              s.excluidasInfra++;
-              continue;
-            }
-            s.porCategoria[cat] = (s.porCategoria[cat] ?? 0) + 1;
-            if (v.verdict === 'fail') s.fail++;
-            else s.reviewGenerador++;
-          }
-        }
-        console.log(`  rep ${rep + 1} ${mm.title.slice(0, 34).padEnd(34)} brazo ${arm}: validas ${validas.length} | acum pass ${s.pass} fail ${s.fail} rev ${s.reviewGenerador} infra ${s.excluidasInfra}`);
-        if (pausa > 0) await new Promise((r) => setTimeout(r, pausa * 1000));
+        s.porCategoria[cat] = (s.porCategoria[cat] ?? 0) + 1;
+        if (v.verdict === 'fail') s.fail++;
+        else s.reviewGenerador++;
       }
     }
+    return s;
+  };
+  const add = (t: ArmStats, d: ArmStats) => {
+    for (const k of ['pedidas', 'generadas', 'validasForma', 'pass', 'fail', 'reviewGenerador', 'excluidasInfra'] as const) t[k] += d[k];
+    for (const [c, nn] of Object.entries(d.porCategoria)) t.porCategoria[c] = (t.porCategoria[c] ?? 0) + nn;
+  };
+
+  outer: for (let rep = 0; rep < reps; rep++) {
+    for (const mm of mods) {
+      const a = await runArm('A', mm, rep);
+      const b = await runArm('B', mm, rep);
+      if (!a || !b) {
+        sinRespuesta += (a ? 0 : 1) + (b ? 0 : 1);
+        fallosSeguidos++;
+        console.log(`  rep ${rep + 1} ${mm.title.slice(0, 34).padEnd(34)} PAR DESCARTADO (A ${a ? 'ok' : 'sin respuesta'}, B ${b ? 'ok' : 'sin respuesta'}) | fallos seguidos ${fallosSeguidos}`);
+        if (fallosSeguidos >= MAX_FALLOS_SEGUIDOS) {
+          parAbortado = `${MAX_FALLOS_SEGUIDOS} pares seguidos sin respuesta de la generacion (cuota o credito agotado, o proveedor caido)`;
+          break outer;
+        }
+      } else {
+        fallosSeguidos = 0;
+        pares++;
+        add(stats.A, a);
+        add(stats.B, b);
+        console.log(`  rep ${rep + 1} ${mm.title.slice(0, 34).padEnd(34)} par ok | A pass ${stats.A.pass} fail ${stats.A.fail} rev ${stats.A.reviewGenerador} | B pass ${stats.B.pass} fail ${stats.B.fail} rev ${stats.B.reviewGenerador} | infra A${stats.A.excluidasInfra} B${stats.B.excluidasInfra}`);
+      }
+      if (pausa > 0) await new Promise((r) => setTimeout(r, pausa * 1000));
+    }
   }
+  if (parAbortado) console.log(`
+*** EXPERIMENTO INTERRUMPIDO: ${parAbortado}. Se cuentan solo los pares completos (${pares}); el resultado es INCOMPLETO. ***`);
 
   const n = (s: ArmStats) => s.pass + s.fail + s.reviewGenerador; // denominador: con veredicto atribuible al generador
   const cmpPass = compareProportions({ successes: stats.A.pass, n: n(stats.A) }, { successes: stats.B.pass, n: n(stats.B) });
@@ -134,7 +161,7 @@ async function main() {
     const id = `${new Date().toISOString().slice(0, 10)}-${reglas}`;
     fs.writeFileSync(
       path.join(dir, `${id}.json`),
-      JSON.stringify({ id, fecha: new Date().toISOString(), reglas, generador: gen, modulos: mods.length, repeticiones: reps, preguntasPorLlamada: count, bloqueB: block, brazos: stats, comparacionPasanJuez: cmpPass, comparacionFormaValida: cmpForma, llamadasSinRespuesta: sinRespuesta }, null, 2) + '\n',
+      JSON.stringify({ id, fecha: new Date().toISOString(), reglas, generador: gen, modulos: mods.length, repeticiones: reps, preguntasPorLlamada: count, bloqueB: block, brazos: stats, comparacionPasanJuez: cmpPass, comparacionFormaValida: cmpForma, llamadasSinRespuesta: sinRespuesta, paresCompletos: pares, paresPrevistos: reps * mods.length, incompleto: !!parAbortado || pares < reps * mods.length, motivoIncompleto: parAbortado }, null, 2) + '\n',
     );
     console.log(`Guardado: memoria-calidad/experimentos/${id}.json`);
   }
