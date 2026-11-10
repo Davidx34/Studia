@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { History } from 'lucide-react';
-import { closeCycle, setSuggestionStatus } from '@/lib/actions/cycles';
+import { addSuggestionToPlaybook, closeCycle, setSuggestionStatus } from '@/lib/actions/cycles';
 
 type Status = 'pending' | 'accepted' | 'rejected' | 'postponed';
 interface Finding {
@@ -13,6 +13,7 @@ interface Finding {
 }
 interface Suggestion {
   id: string;
+  kind?: string;
   text: string;
   evidence: string;
   status: Status;
@@ -148,6 +149,16 @@ export default function CyclesClient({ classroomId, cycles, checklist = [] }: { 
                         )}
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <span className="text-xs text-fg-muted">{STATUS_LABEL[s.status]}</span>
+                          {s.status === 'accepted' && s.kind === 'reinforce_concept' && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => run(() => addSuggestionToPlaybook(classroomId, c.retro!.id, s.id), 'Agregada al cuaderno como borrador. Revísala en «Estilo de la IA».')}
+                              className="px-2.5 py-1 rounded-lg border border-line text-xs text-fg disabled:opacity-50"
+                            >
+                              Agregar al cuaderno
+                            </button>
+                          )}
                           {(['accepted', 'rejected', 'postponed'] as const)
                             .filter((st) => st !== s.status)
                             .map((st) => (

@@ -13,6 +13,9 @@ import { regenerateModulePool, type RegeneratePoolResult } from '@/lib/questions
 import { MINIGAME_RULES } from '@/lib/questions/cohereGeneration';
 import { getRagContext } from '@/lib/questions/cohereGeneration';
 import { judgeQuestionsBatch } from '@/lib/questions/judge';
+import { createAdminSupabase, hasServiceRoleKey } from '@/lib/supabase/admin';
+import { loadClassroomCalibration } from '@/lib/aiLearning/calibrationLoader';
+import { guardVerdict, guardedReason } from '@/lib/aiLearning/judgeGuard';
 
 async function requireUser() {
   const supabase = await createServerSupabase();
@@ -174,6 +177,8 @@ export interface JudgeModuleResult extends ActionResult {
   approved: number;
   rejected: number;
   humanReview: number;
+  /** Aprobadas por el juez que pasaron a revision humana porque su acuerdo con el profesor esta por debajo del umbral (control de calibracion). */
+  calibrationGuarded?: number;
   judgeUnavailable: number; // GEMINI_API_KEY ausente o Gemini fallo -- se dejan en human_review para que el profesor las vea, nunca se pierden silenciosamente
 }
 
@@ -187,7 +192,7 @@ export async function judgeModuleQuestionPool(
   moduleId: string,
   classroomId: string
 ): Promise<JudgeModuleResult> {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
 
   const { data: pending, error: fetchError } = await supabase
     .from('lesson_questions')
@@ -201,7 +206,15 @@ export async function judgeModuleQuestionPool(
   const context = await getRagContext(supabase, moduleId);
   const verdicts = await judgeQuestionsBatch(pending, context);
 
-  let approved = 0, rejected = 0, humanReview = 0, judgeUnavailable = 0;
+  let approved = 0, rejected = 0, humanReview = 0, judgeUnavailable = 0, calibrationGuarded = 0;
+
+  // Control de calibracion: si se midio (con muestra suficiente) que el juez NO coincide con las decisiones de este profesor, lo que aprueba pasa a revision humana en vez de publicarse solo.
+  // La tabla de senales es de servidor: solo se lee con la llave de servicio y SOLO si la clase es de este profesor. Sin calibracion (o ante cualquier fallo) no se hace nada.
+  let calibration = null;
+  if (hasServiceRoleKey()) {
+    const { data: own } = await supabase.from('classrooms').select('id').eq('id', classroomId).eq('teacher_id', user.id).maybeSingle();
+    if (own) calibration = await loadClassroomCalibration(createAdminSupabase() as any, classroomId);
+  }
 
   // Migracion 044: cada veredicto queda firmado con quien lo produjo
   // (reviewed_by) y por que (review_reason). Antes, una fila 'rejected' era
@@ -229,8 +242,15 @@ export async function judgeModuleQuestionPool(
       continue;
     }
     if (result.verdict === 'pass') {
-      approved++;
-      updates.push({ id: q.id, review_status: 'approved', review_reason: result.reason });
+      const guard = guardVerdict('pass', calibration);
+      if (guard.guarded) {
+        calibrationGuarded++;
+        humanReview++;
+        updates.push({ id: q.id, review_status: 'human_review', review_reason: guardedReason(result.reason) });
+      } else {
+        approved++;
+        updates.push({ id: q.id, review_status: 'approved', review_reason: result.reason });
+      }
     } else if (result.verdict === 'fail') {
       rejected++;
       // is_backup=true saca la pregunta de circulacion activa de inmediato
@@ -271,7 +291,7 @@ export async function judgeModuleQuestionPool(
   revalidatePath(`/teacher/classrooms/${classroomId}/objectives`);
   revalidatePath(`/teacher/classrooms/${classroomId}/review`);
 
-  return { ok: true, total: pending.length, approved, rejected, humanReview, judgeUnavailable };
+  return { ok: true, total: pending.length, approved, rejected, humanReview, judgeUnavailable, calibrationGuarded };
 }
 
 // Usadas desde la pagina de revision (/teacher/classrooms/[id]/review) para

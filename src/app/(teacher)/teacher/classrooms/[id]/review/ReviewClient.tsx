@@ -6,6 +6,7 @@ import { ArrowLeft, Check, X, AlertTriangle } from 'lucide-react';
 import { approveReviewQuestion, rejectReviewQuestion } from '@/lib/actions/learning-objectives';
 import RespuestaCorrecta from './RespuestaCorrecta';
 import JudgeAgreementCard from './JudgeAgreementCard';
+import FlaggedCard, { type FlaggedQuestion } from './FlaggedCard';
 import type { Calibration } from '@/lib/aiLearning/judgeCalibration';
 
 interface ReviewQuestion {
@@ -30,7 +31,7 @@ interface ReviewQuestion {
 // "no hace falta que sea bonita, que sea funcional". Una fila por pregunta,
 // con Aprobar/Rechazar; al resolverse desaparece de la lista (revalidatePath
 // la vuelve a traer sin esa fila).
-export default function ReviewClient({ classroomId, questions, calibration }: { classroomId: string; questions: ReviewQuestion[]; calibration?: Calibration | null }) {
+export default function ReviewClient({ classroomId, questions, calibration, flagged = [], statsSummary = null }: { classroomId: string; questions: ReviewQuestion[]; calibration?: Calibration | null; flagged?: FlaggedQuestion[]; statsSummary?: { total: number; belowMinimum: number } | null }) {
   const [resolved, setResolved] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +71,7 @@ export default function ReviewClient({ classroomId, questions, calibration }: { 
       </div>
 
       {calibration && <JudgeAgreementCard c={calibration} />}
+      {statsSummary && <FlaggedCard classroomId={classroomId} flagged={flagged} summary={statsSummary} />}
 
       <div className="rounded-2xl border border-line shadow-card bg-surface backdrop-blur-xl p-5 flex items-start gap-4">
         <div className="w-10 h-10 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center flex-shrink-0">
