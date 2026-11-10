@@ -1,0 +1,255 @@
+{
+  "id": "2026-11-10-base+item_writing_v1+doctrina",
+  "fecha": "2026-11-10T14:26:53.213Z",
+  "brazos": [
+    {
+      "id": "A",
+      "nombre": "base"
+    },
+    {
+      "id": "R",
+      "nombre": "reglas:item_writing_v1"
+    },
+    {
+      "id": "D",
+      "nombre": "doctrina:2026-11-v1"
+    }
+  ],
+  "reglas": "item_writing_v1",
+  "bloqueReglas": "REGLAS DE ESTILO APRENDIDAS EN ESTA CLASE (revisadas por el profesor; no contradicen el material ni las instrucciones de arriba):\n1. Antes de fijar la respuesta correcta, verifícala contra el material; si hay un cálculo, resuélvelo paso a paso y escribe el resultado exacto.\n2. Cada pregunta debe poder responderse solo con lo que dice el material; no introduzcas conceptos, fórmulas ni datos que el material no explique.\n3. Deja una sola respuesta correcta; las demás opciones deben ser claramente incorrectas y no verdades parciales.\n4. Incluye en el enunciado todos los datos, símbolos y condiciones necesarios; la pregunta debe entenderse sin ver el material.\n5. En respuesta corta y completar, la respuesta esperada debe ser breve (1 a 3 palabras) y verificable; si la respuesta natural es una explicación o una fórmula, usa opción múltiple.",
+  "doctrina": true,
+  "doctrinaVersion": "2026-11-v1",
+  "generador": "gemini:gemini-3.5-flash-lite",
+  "modulos": 5,
+  "repeticiones": 3,
+  "preguntasPorLlamada": 8,
+  "estadisticas": {
+    "A": {
+      "pedidas": 120,
+      "generadas": 120,
+      "validasForma": 118,
+      "pass": 116,
+      "fail": 0,
+      "reviewGenerador": 2,
+      "excluidasInfra": 0,
+      "porCategoria": {
+        "respuesta_no_evaluable": 2
+      }
+    },
+    "R": {
+      "pedidas": 120,
+      "generadas": 120,
+      "validasForma": 113,
+      "pass": 102,
+      "fail": 0,
+      "reviewGenerador": 0,
+      "excluidasInfra": 11,
+      "porCategoria": {}
+    },
+    "D": {
+      "pedidas": 120,
+      "generadas": 120,
+      "validasForma": 116,
+      "pass": 101,
+      "fail": 0,
+      "reviewGenerador": 2,
+      "excluidasInfra": 13,
+      "porCategoria": {
+        "otro": 1,
+        "error_conceptual_o_calculo": 1
+      }
+    }
+  },
+  "fiabilidadGeneracion": {
+    "A": {
+      "llamadas": 16,
+      "ok": 15
+    },
+    "R": {
+      "llamadas": 15,
+      "ok": 15
+    },
+    "D": {
+      "llamadas": 15,
+      "ok": 15
+    }
+  },
+  "comparaciones": {
+    "R": {
+      "pasanJuez": {
+        "a": {
+          "successes": 116,
+          "n": 118,
+          "rate": 0.9830508474576272,
+          "ci": {
+            "low": 0.9403013738539171,
+            "high": 0.9953396551542378
+          }
+        },
+        "b": {
+          "successes": 102,
+          "n": 102,
+          "rate": 1,
+          "ci": {
+            "low": 0.9637042523922542,
+            "high": 1
+          }
+        },
+        "diff": 0.016949152542372836,
+        "diffCi": {
+          "low": -0.02137050414984535,
+          "high": 0.0596986261460829
+        },
+        "decision": "sin_evidencia",
+        "minPerArm": 30
+      },
+      "formaValida": {
+        "a": {
+          "successes": 118,
+          "n": 120,
+          "rate": 0.9833333333333333,
+          "ci": {
+            "low": 0.9412628731870861,
+            "high": 0.9954175314588487
+          }
+        },
+        "b": {
+          "successes": 113,
+          "n": 120,
+          "rate": 0.9416666666666667,
+          "ci": {
+            "low": 0.8844727405319686,
+            "high": 0.9714593533686271
+          }
+        },
+        "diff": -0.04166666666666663,
+        "diffCi": {
+          "low": -0.10012325766407265,
+          "high": 0.009884548622966859
+        },
+        "decision": "sin_evidencia",
+        "minPerArm": 30
+      },
+      "generacionLegible": {
+        "a": {
+          "successes": 15,
+          "n": 16,
+          "rate": 0.9375,
+          "ci": {
+            "low": 0.7167073163197013,
+            "high": 0.9888809426916687
+          }
+        },
+        "b": {
+          "successes": 15,
+          "n": 15,
+          "rate": 1,
+          "ci": {
+            "low": 0.7961107336956521,
+            "high": 1
+          }
+        },
+        "diff": 0.0625,
+        "diffCi": {
+          "low": -0.14776372532134457,
+          "high": 0.2832926836802987
+        },
+        "decision": "muestra_insuficiente",
+        "minPerArm": 30
+      }
+    },
+    "D": {
+      "pasanJuez": {
+        "a": {
+          "successes": 116,
+          "n": 118,
+          "rate": 0.9830508474576272,
+          "ci": {
+            "low": 0.9403013738539171,
+            "high": 0.9953396551542378
+          }
+        },
+        "b": {
+          "successes": 101,
+          "n": 103,
+          "rate": 0.9805825242718447,
+          "ci": {
+            "low": 0.9319464805299942,
+            "high": 0.9946588866678016
+          }
+        },
+        "diff": -0.002468323185782495,
+        "diffCi": {
+          "low": -0.05263284795641569,
+          "high": 0.04253902589963479
+        },
+        "decision": "sin_evidencia",
+        "minPerArm": 30
+      },
+      "formaValida": {
+        "a": {
+          "successes": 118,
+          "n": 120,
+          "rate": 0.9833333333333333,
+          "ci": {
+            "low": 0.9412628731870861,
+            "high": 0.9954175314588487
+          }
+        },
+        "b": {
+          "successes": 116,
+          "n": 120,
+          "rate": 0.9666666666666667,
+          "ci": {
+            "low": 0.9174184205147198,
+            "high": 0.9869626598330794
+          }
+        },
+        "diff": -0.016666666666666607,
+        "diffCi": {
+          "low": -0.0673758137052381,
+          "high": 0.030043620803312028
+        },
+        "decision": "sin_evidencia",
+        "minPerArm": 30
+      },
+      "generacionLegible": {
+        "a": {
+          "successes": 15,
+          "n": 16,
+          "rate": 0.9375,
+          "ci": {
+            "low": 0.7167073163197013,
+            "high": 0.9888809426916687
+          }
+        },
+        "b": {
+          "successes": 15,
+          "n": 15,
+          "rate": 1,
+          "ci": {
+            "low": 0.7961107336956521,
+            "high": 1
+          }
+        },
+        "diff": 0.0625,
+        "diffCi": {
+          "low": -0.14776372532134457,
+          "high": 0.2832926836802987
+        },
+        "decision": "muestra_insuficiente",
+        "minPerArm": 30
+      }
+    }
+  },
+  "gruposCompletos": 15,
+  "gruposDescartados": 0,
+  "gruposPrevistos": 15,
+  "incompleto": false,
+  "motivoIncompleto": null,
+  "advertencias": [
+    "Orden de juicio FIJO (base, reglas, doctrina) en este experimento: las exclusiones por infraestructura (segunda opinion no disponible) cayeron casi todas en los ultimos brazos (base 0, reglas 11, doctrina 13). Corregido despues rotando el orden; este resultado debe leerse con esa reserva.",
+    "Efecto techo: aun en los 5 modulos de peor aprobacion historica (29-50%), el generador actual aprueba ~98% ante el juez; la metrica esta saturada y no puede mostrar mejora."
+  ],
+  "lectura": "SIN EVIDENCIA de efecto de las reglas ni de la doctrina sobre la aprobacion del juez (IC95% de la diferencia incluye 0: reglas -2,1 a +6,0 pp; doctrina -5,3 a +4,3 pp). No es evidencia de que no sirvan: la metrica esta en el techo (base 98,3%). La doctrina permanece APAGADA."
+}
