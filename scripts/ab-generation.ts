@@ -21,19 +21,28 @@ import { playbookPromptBlock } from '../src/lib/aiLearning/playbook';
 import { RULE_SETS, ruleSetNames, toPlaybookRules } from '../src/lib/aiLearning/experimentRules';
 import { CATEGORIES, classifyReason } from '../src/lib/aiLearning/errorTaxonomy';
 import { compareProportions } from '../src/lib/aiLearning/proportion';
+import { DOCTRINE_VERSION } from '../src/lib/aiLearning/doctrine';
 
 const args = process.argv.slice(2);
 const val = (f: string) => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined);
-const reglas = val('--reglas') ?? 'item_writing_v1';
+// Brazo B = base + (--reglas <conjunto>) y/o (--doctrina). Al menos uno de los dos.
+const reglas = val('--reglas');
+const doctrina = args.includes('--doctrina');
 const nModulos = Number(val('--modulos') ?? 4);
 const reps = Number(val('--reps') ?? 2);
 const count = Number(val('--count') ?? 8);
 const pausa = Number(val('--pausa') ?? 15);
 const gen = val('--gen') ?? 'gemini:gemini-3.5-flash-lite';
 const guardar = args.includes('--guardar');
+// --peores N: usa los N modulos con MENOR aprobacion historica del juez (con al menos 15 preguntas juzgadas): donde hay margen para mejorar, para evitar el efecto techo.
+const peores = Number(val('--peores') ?? 0);
 const pct = (x: number | null) => (x === null ? '-' : `${(x * 100).toFixed(1)}%`);
 
-if (!RULE_SETS[reglas]) {
+if (!reglas && !doctrina) {
+  console.error('Indica --reglas <conjunto> y/o --doctrina para el brazo B.');
+  process.exit(1);
+}
+if (reglas && !RULE_SETS[reglas]) {
   console.error(`Conjunto desconocido: ${reglas}. Disponibles: ${ruleSetNames().join(', ')}`);
   process.exit(1);
 }
@@ -59,7 +68,28 @@ async function main() {
 
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data: rev } = await db.from('lesson_questions').select('module_id').eq('reviewed_by', 'teacher');
-  const ids = val('--ids')?.split(',') ?? Array.from(new Set((rev ?? []).map((r: any) => r.module_id as string))).slice(0, nModulos);
+  let ids: string[];
+  if (val('--ids')) ids = val('--ids')!.split(',');
+  else if (peores > 0) {
+    const { data: mm } = await db.from('content_modules').select('id, classrooms(name)');
+    const reales = new Set((mm ?? []).filter((m: any) => !String(m.classrooms?.name ?? '').startsWith('[CARGA]')).map((m: any) => m.id));
+    const rows: any[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data } = await db.from('lesson_questions').select('module_id, review_status, review_reason').neq('review_status', 'pending').range(from, from + 999);
+      rows.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+    const por = new Map<string, { n: number; ok: number }>();
+    for (const r of rows) {
+      if (!reales.has(r.module_id) || String(r.review_reason ?? '').startsWith('[validador de forma]')) continue;
+      const t = por.get(r.module_id) ?? { n: 0, ok: 0 };
+      t.n++;
+      if (r.review_status === 'approved') t.ok++;
+      por.set(r.module_id, t);
+    }
+    ids = Array.from(por.entries()).filter(([, t]) => t.n >= 15).sort((a, b) => a[1].ok / a[1].n - b[1].ok / b[1].n).slice(0, peores).map(([id]) => id);
+    console.log('Modulos elegidos por menor aprobacion historica: ' + ids.map((id) => `${id.slice(0, 4)} (${Math.round((100 * por.get(id)!.ok) / por.get(id)!.n)}% de ${por.get(id)!.n})`).join(', '));
+  } else ids = Array.from(new Set((rev ?? []).map((r: any) => r.module_id as string))).slice(0, nModulos);
   if (ids.length === 0) return console.log('No hay modulos candidatos. Usa --ids <id,id>.');
 
   const mods: { id: string; title: string; config: any; context: string; conceptBlock: string }[] = [];
@@ -70,8 +100,9 @@ async function main() {
     const { data: concepts } = await db.from('classroom_concepts').select('tag, label').eq('module_id', id);
     mods.push({ id, title: m.title, config: resolveConfig(cfg), context: await getRagContext(db, id), conceptBlock: conceptTaxonomyPromptBlock(concepts ?? []) });
   }
-  const block = playbookPromptBlock(toPlaybookRules(reglas));
-  console.log(`Experimento: ${reglas} | modulos: ${mods.length} | repeticiones: ${reps} | preguntas por llamada: ${count} (sin minijuegos) | generador: ${gen}\nBloque B (${block.length} caracteres):\n${block}\n`);
+  const block = reglas ? playbookPromptBlock(toPlaybookRules(reglas)) : '';
+  const nombre = [reglas, doctrina ? 'doctrina' : null].filter(Boolean).join('+');
+  console.log(`Experimento: ${nombre} (doctrina ${DOCTRINE_VERSION}) | modulos: ${mods.length} | repeticiones: ${reps} | preguntas por llamada: ${count} (sin minijuegos) | generador: ${gen}\nBloque B (${block.length} caracteres):\n${block}\n`);
 
   const stats: Record<Arm, ArmStats> = { A: newStats(), B: newStats() };
   let sinRespuesta = 0;
@@ -84,7 +115,7 @@ async function main() {
   let pares = 0;
 
   const runArm = async (arm: Arm, mm: (typeof mods)[number], rep: number): Promise<ArmStats | null> => {
-    const built = buildGenerationPrompt({ config: mm.config, moduleTitle: mm.title, context: mm.context, classicCount: count, minigames: [], conceptBlock: mm.conceptBlock, playbookBlock: arm === 'B' ? block : '' });
+    const built = buildGenerationPrompt({ config: mm.config, moduleTitle: mm.title, context: mm.context, classicCount: count, minigames: [], conceptBlock: mm.conceptBlock, playbookBlock: arm === 'B' ? block : '', useDoctrine: arm === 'B' && doctrina });
     sharedHealth.reset();
     const raw = (await callCohere(built.prompt, built.total).catch(() => null)) ?? [];
     if (raw.length === 0) return null;
@@ -148,7 +179,7 @@ async function main() {
   console.log('\n=== RESULTADO ===');
   for (const arm of ['A', 'B'] as Arm[]) {
     const s = stats[arm];
-    console.log(`Brazo ${arm}${arm === 'B' ? ' (con reglas)' : ' (base)'}: generadas ${s.generadas} | validas de forma ${s.validasForma} | con veredicto ${n(s)} | pasan ${s.pass} (${pct(n(s) ? s.pass / n(s) : null)}) | excluidas por infraestructura ${s.excluidasInfra}`);
+    console.log(`Brazo ${arm}${arm === 'B' ? ` (${nombre})` : ' (base)'}: generadas ${s.generadas} | validas de forma ${s.validasForma} | con veredicto ${n(s)} | pasan ${s.pass} (${pct(n(s) ? s.pass / n(s) : null)}) | excluidas por infraestructura ${s.excluidasInfra}`);
     console.log(`   errores: ${JSON.stringify(s.porCategoria)}`);
   }
   console.log(`Pasan el juez: B - A = ${cmpPass.diff === null ? '-' : (cmpPass.diff * 100).toFixed(1) + ' pp'}  IC95% [${pct(cmpPass.diffCi?.low ?? null)}, ${pct(cmpPass.diffCi?.high ?? null)}]  => ${cmpPass.decision.toUpperCase()}`);
@@ -158,10 +189,10 @@ async function main() {
   if (guardar) {
     const dir = path.join(process.cwd(), 'memoria-calidad', 'experimentos');
     fs.mkdirSync(dir, { recursive: true });
-    const id = `${new Date().toISOString().slice(0, 10)}-${reglas}`;
+    const id = `${new Date().toISOString().slice(0, 10)}-${nombre}`;
     fs.writeFileSync(
       path.join(dir, `${id}.json`),
-      JSON.stringify({ id, fecha: new Date().toISOString(), reglas, generador: gen, modulos: mods.length, repeticiones: reps, preguntasPorLlamada: count, bloqueB: block, brazos: stats, comparacionPasanJuez: cmpPass, comparacionFormaValida: cmpForma, llamadasSinRespuesta: sinRespuesta, paresCompletos: pares, paresPrevistos: reps * mods.length, incompleto: !!parAbortado || pares < reps * mods.length, motivoIncompleto: parAbortado }, null, 2) + '\n',
+      JSON.stringify({ id, fecha: new Date().toISOString(), reglas: reglas ?? null, doctrina, doctrinaVersion: doctrina ? DOCTRINE_VERSION : null, generador: gen, modulos: mods.length, repeticiones: reps, preguntasPorLlamada: count, bloqueB: block, brazos: stats, comparacionPasanJuez: cmpPass, comparacionFormaValida: cmpForma, llamadasSinRespuesta: sinRespuesta, paresCompletos: pares, paresPrevistos: reps * mods.length, incompleto: !!parAbortado || pares < reps * mods.length, motivoIncompleto: parAbortado }, null, 2) + '\n',
     );
     console.log(`Guardado: memoria-calidad/experimentos/${id}.json`);
   }
