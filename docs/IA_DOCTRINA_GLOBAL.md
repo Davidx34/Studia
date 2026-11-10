@@ -48,3 +48,6 @@ Regla del sistema: **nada cambia el comportamiento de la IA sin evidencia.** Que
 - Repetir el experimento A/B con la doctrina cuando haya créditos de Gemini, en módulos con línea base más baja.
 - Más principios (la doctrina crece por dominios): diferenciación y accesibilidad, evaluación de proyectos y rúbricas, lectura y comprensión, ciencias y matemáticas por área.
 - Verificar las 5 fuentes pendientes.
+
+## Actualización 2026-11-10: primer experimento con la doctrina
+Corrido el A/B de tres brazos (base, reglas, doctrina; 120 preguntas por brazo): **sin evidencia de efecto** (doctrina −0,2 pp, IC −5,3 a +4,3 pp), con la métrica en el techo (base 98,3 %). **La doctrina sigue apagada.** Que no haya mejora medible **no la invalida** como contenido de referencia ni como material de transparencia (la pantalla «Doctrina» y el «Fundamento» de las sugerencias siguen activos); solo significa que **no hay evidencia para meterla al prompt de generación**. Detalle y qué medir ahora en `docs/IA_ARQUITECTURA_DE_MEMORIAS.md` §9.

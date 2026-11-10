@@ -69,6 +69,23 @@ Cada PR: pruebas, medición donde cambie el comportamiento, y «Verificado / NO 
 
 **Lección operativa (ya corregida):** el arnés ahora evalúa en **pares** (mismo módulo y repetición; solo cuenta un par si responden los dos brazos) y se **detiene** tras 3 pares fallidos seguidos marcando el resultado como incompleto. Probado con los créditos agotados: se detuvo solo a los 3 pares.
 
+## 9. Segundo experimento (2026-11-10) — COMPLETO, y lo que enseña
+Tres brazos corriendo juntos (base, reglas `item_writing_v1`, doctrina `2026-11-v1`), **15 grupos completos de 15**, 5 módulos de peor aprobación histórica (29–50 %) × 3 repeticiones, **120 preguntas por brazo**, mismo contexto y mismo juez; 0 grupos descartados; generación legible 15/16 (base; un reintento), 15/15 (reglas), 15/15 (doctrina).
+
+| Brazo | Pasan el juez | Diferencia contra la base (IC 95 %) | Decisión |
+|---|---|---|---|
+| Base | 116 de 118 (98,3 %) | — | — |
+| Reglas | 102 de 102 (100 %) | +1,7 pp (−2,1 a +6,0) | **sin evidencia** |
+| Doctrina | 101 de 103 (98,1 %) | −0,2 pp (−5,3 a +4,3) | **sin evidencia** |
+
+**Lectura honesta:**
+1. **No hay evidencia de que ni las reglas ni la doctrina cambien la aprobación del juez.** Tampoco la hay de que no sirvan: los intervalos son estrechos (≈ ±5 pp) pero la métrica está en el **techo**.
+2. **Efecto techo, ahora comprobado.** Incluso en los módulos donde el generador histórico fallaba más, el generador **actual** pasa el ~98 % ante el juez. La baja aprobación histórica (25 % en agosto) la causaron generadores y criterios viejos, ya superados. **Un juez que aprueba 98 % no puede mostrar mejora**, y además el propio juez es indulgente: en la calibración contra el profesor aprobó 2 preguntas que el profesor rechazó (de 14 comparables).
+3. **Conclusión operativa:** la doctrina **permanece APAGADA** (`DOCTRINE` sin definir). Medir «¿pasa el juez?» ya no discrimina; hace falta una métrica **más exigente e independiente** (ver siguiente).
+4. **Reserva metodológica:** en este experimento el orden de juicio era fijo (base, reglas, doctrina) y las exclusiones por infraestructura (segunda opinión no disponible) cayeron casi todas en los últimos brazos (base 0, reglas 11, doctrina 13). Se **corrigió** rotando el orden en cada grupo; este resultado debe leerse con esa reserva.
+
+**Qué medir ahora** (en orden de costo): (a) un **auditor estricto** (otro modelo, rúbrica más dura, distinta del juez) sobre una muestra de ambos brazos; (b) una **muestra revisada por el profesor** (p. ej. 40 preguntas ciegas al brazo) — es la verdad de referencia; (c) **rendimiento de estudiantes** (aciertos y discriminación) cuando haya volumen real.
+
 ## 10. Flechas cerradas (2026-11-10)
 Cuatro conexiones entre memorias, todas **con una persona o una medición en medio**: ninguna cambia por sí sola lo que la IA genera ni publica sin que el profesor lo decida (salvo el interruptor de seguridad del juez, que solo quita un poder). Sin migración.
 
