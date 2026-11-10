@@ -9,6 +9,8 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminSupabase, hasServiceRoleKey } from '@/lib/supabase/admin';
 import { buildRetrospective, buildSnapshot, type CycleInput, type SuggestionStatus } from '@/lib/aiLearning/retrospective';
 import type { FeedbackEvent } from '@/lib/aiLearning/judgeCalibration';
+import { createMergedDraft } from '@/lib/aiLearning/playbookDraft';
+import { ruleFromSuggestion } from '@/lib/aiLearning/ruleProposals';
 
 export interface CycleActionResult {
   ok: boolean;
@@ -113,5 +115,23 @@ export async function setSuggestionStatus(classroomId: string, retrospectiveId: 
   const { error } = await (supabase as any).from('cycle_retrospectives').update({ suggestions: next }).eq('id', retrospectiveId);
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/teacher/classrooms/${classroomId}/cycles`);
+  return { ok: true };
+}
+
+/**
+ * Flecha «retrospectiva aceptada -> regla»: una sugerencia que el profesor ya ACEPTO y que tiene una traduccion segura (hoy, reforzar un concepto) se agrega al cuaderno como BORRADOR (origen «ai»,
+ * con su evidencia). Nunca activa nada ni acepta por el profesor: exige que el estado sea «accepted».
+ */
+export async function addSuggestionToPlaybook(classroomId: string, retrospectiveId: string, suggestionId: string): Promise<CycleActionResult> {
+  const { supabase, own } = await requireOwner(classroomId);
+  if (!own) return { ok: false, error: 'Clase no encontrada.' };
+  const { data: row } = await (supabase as any).from('cycle_retrospectives').select('suggestions').eq('id', retrospectiveId).eq('classroom_id', classroomId).maybeSingle();
+  const s = ((row?.suggestions ?? []) as any[]).find((x) => x.id === suggestionId);
+  if (!s) return { ok: false, error: 'Sugerencia no encontrada.' };
+  const rule = ruleFromSuggestion(s);
+  if (!rule) return { ok: false, error: 'Solo se pueden agregar al cuaderno las sugerencias ACEPTADAS de reforzar un concepto.' };
+  const draft = await createMergedDraft(supabase, classroomId, [rule], 'Desde una sugerencia aceptada de la retrospectiva. Pendiente de tu revisión; no está activa.', 'ai');
+  if (!draft.ok) return { ok: false, error: draft.error };
+  revalidatePath(`/teacher/classrooms/${classroomId}/playbook`);
   return { ok: true };
 }

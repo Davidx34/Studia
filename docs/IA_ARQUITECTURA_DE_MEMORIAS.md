@@ -85,3 +85,15 @@ Tres brazos corriendo juntos (base, reglas `item_writing_v1`, doctrina `2026-11-
 4. **Reserva metodológica:** en este experimento el orden de juicio era fijo (base, reglas, doctrina) y las exclusiones por infraestructura (segunda opinión no disponible) cayeron casi todas en los últimos brazos (base 0, reglas 11, doctrina 13). Se **corrigió** rotando el orden en cada grupo; este resultado debe leerse con esa reserva.
 
 **Qué medir ahora** (en orden de costo): (a) un **auditor estricto** (otro modelo, rúbrica más dura, distinta del juez) sobre una muestra de ambos brazos; (b) una **muestra revisada por el profesor** (p. ej. 40 preguntas ciegas al brazo) — es la verdad de referencia; (c) **rendimiento de estudiantes** (aciertos y discriminación) cuando haya volumen real.
+
+## 10. Flechas cerradas (2026-11-10)
+Cuatro conexiones entre memorias, todas **con una persona o una medición en medio**: ninguna cambia por sí sola lo que la IA genera ni publica sin que el profesor lo decida (salvo el interruptor de seguridad del juez, que solo quita un poder). Sin migración.
+
+| # | Flecha | Qué hace | Quién decide | Hoy |
+|---|---|---|---|---|
+| 1 | Rechazos → reglas propuestas | En «Estilo de la IA»: analiza los motivos de rechazo o revisión de la clase; si una categoría de error **del generador** se repite (≥ 8 casos y ≥ 8 %, sobre ≥ 30 motivos) agrega al cuaderno, como **borrador** de origen «ai», la **plantilla curada** correspondiente con su evidencia («86 de 254 rechazos, 34 %…») | El profesor activa o descarta | Con datos reales propondría 2 reglas (error conceptual/cálculo 34 %, anclaje al material 16 %) |
+| 2 | Calibración del juez → pipeline | Si el juez sale **degradado** (≥ 20 comparaciones decisivas y cota inferior del acuerdo < 80 %), lo que **aprueba** pasa a **revisión humana** en vez de publicarse solo. Nunca aprueba ni rechaza de más | Automático, solo para quitar poder al juez | Estado «sin datos suficientes»: **no actúa** |
+| 3 | Estadísticas → banderas | En «Revisión»: preguntas con ≥ 10 respuestas y acierto < 20 % o > 95 %; botón «Retirar» | El profesor retira | 0 banderas: ninguna pregunta llega aún a 10 respuestas |
+| 4 | Retrospectiva aceptada → regla | Una sugerencia **aceptada** de «reforzar un concepto» se puede agregar al cuaderno como borrador | El profesor acepta y luego agrega | Sin retrospectivas reales todavía |
+
+**Por qué plantillas y no reglas libres:** una IA que redacte reglas puede introducir instrucciones erróneas dentro de los prompts de todos; una plantilla curada y revisada de antemano no. **Honestidad:** que una regla esté bien fundamentada **no prueba** que reduzca errores en este generador (los experimentos A/B no mostraron efecto medible; ver §9). Por eso son propuestas visibles con su evidencia, nunca activas por sí solas. Retirar una pregunta desde una bandera queda registrado como decisión del profesor y alimenta la calibración del juez.

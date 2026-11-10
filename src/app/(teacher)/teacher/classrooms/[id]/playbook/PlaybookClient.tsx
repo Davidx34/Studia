@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { BookMarked } from 'lucide-react';
-import { savePlaybookDraft, activatePlaybook, deactivatePlaybook, importPlaybook } from '@/lib/actions/playbook';
+import { savePlaybookDraft, activatePlaybook, deactivatePlaybook, importPlaybook, proposeRulesFromRejections } from '@/lib/actions/playbook';
 
 interface Version {
   id: string;
@@ -131,6 +131,27 @@ export default function PlaybookClient({ classroomId, versions, sources = [] }: 
         </div>
       )}
 
+      <div className="rounded-2xl border border-line bg-surface p-5 space-y-3" data-testid="propose-rules">
+        <h3 className="text-sm font-semibold text-fg">Proponer reglas a partir de los rechazos del juez</h3>
+        <p className="text-sm text-fg-muted">
+          La IA revisa por qué se rechazaron las preguntas de esta clase y, si un error del generador se repite lo bastante, agrega al cuaderno una regla ya escrita y revisada de antemano, con su evidencia, como borrador. No inventa reglas
+          y no activa nada. Ojo: que una regla esté bien fundamentada no prueba que reduzca los errores; tú decides si la activas.
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            start(async () => {
+              const r = await proposeRulesFromRejections(classroomId);
+              setMsg(r.ok ? { ok: true, text: `Se propusieron ${r.added} regla(s) a partir de ${r.analyzed} rechazos. Revisa el borrador abajo.` } : { ok: false, text: r.error ?? 'No se pudo proponer.' });
+            })
+          }
+          className="px-4 py-2 rounded-xl border border-line text-sm text-fg disabled:opacity-50"
+        >
+          {busy ? 'Analizando…' : 'Proponer reglas'}
+        </button>
+      </div>
+
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-fg">Versiones</h3>
         {versions.length === 0 && <p className="text-sm text-fg-muted">Aún no hay versiones. Sin estilo activo, la IA genera como siempre.</p>}
@@ -152,9 +173,13 @@ export default function PlaybookClient({ classroomId, versions, sources = [] }: 
                 </button>
               )}
             </div>
+            {v.note && <p className="mt-1 text-xs text-fg-muted">{v.note}</p>}
             <ul className="mt-2 list-disc pl-5 text-sm text-fg-muted space-y-0.5">
               {v.rules.map((r, i) => (
-                <li key={i}>{r.text}</li>
+                <li key={i}>
+                  {r.text}
+                  {r.evidence && <span className="block text-xs">Evidencia: {r.evidence}</span>}
+                </li>
               ))}
             </ul>
           </div>
