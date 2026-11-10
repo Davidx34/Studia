@@ -190,7 +190,10 @@ async function main() {
         continue;
       }
       seguidos = 0;
-      for (const a of arms) add(stats[a], await evaluar(a, mm, rep, gens.get(a)!));
+      // El ORDEN de juicio rota en cada grupo: el segundo juez (proveedores gratuitos con limite por minuto) se agota hacia el final de cada tanda, y con un orden fijo esa degradacion
+      // (preguntas excluidas por infraestructura) caeria siempre en los mismos brazos y sesgaria la comparacion (visto en el experimento del 2026-11-10: base 0, reglas 11, doctrina 13).
+      const giro = (gruposCompletos + gruposDescartados) % arms.length;
+      for (const a of [...arms.slice(giro), ...arms.slice(0, giro)]) add(stats[a], await evaluar(a, mm, rep, gens.get(a)!));
       gruposCompletos++;
       console.log(`  rep ${rep + 1} ${mm.title.slice(0, 34).padEnd(34)} grupo ok | ${arms.map((a) => `${a}: pass ${stats[a].pass} fail ${stats[a].fail} rev ${stats[a].reviewGenerador} infra ${stats[a].excluidasInfra}`).join(' | ')}`);
       if (pausa > 0) await new Promise((r) => setTimeout(r, pausa * 1000));
