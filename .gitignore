@@ -63,3 +63,7 @@ evals/golden/local/
 # Prueba de carga (k6): cuentas de prueba y resultados, solo en tu maquina
 loadtest/users.json
 loadtest/results/
+
+# Muestra ciega y su clave: contenido real de las clases y la clave rompe la ciega; no se publican
+memoria-calidad/auditorias/*-clave.json
+memoria-calidad/auditorias/*-muestra-ciega.md

@@ -1,0 +1,326 @@
+{
+  "id": "2026-11-10-base+item_writing_v1+doctrina",
+  "fecha": "2026-11-10T17:03:55.396Z",
+  "brazos": [
+    {
+      "id": "A",
+      "nombre": "base"
+    },
+    {
+      "id": "R",
+      "nombre": "reglas:item_writing_v1"
+    },
+    {
+      "id": "D",
+      "nombre": "doctrina:2026-11-v1"
+    }
+  ],
+  "reglas": "item_writing_v1",
+  "bloqueReglas": "REGLAS DE ESTILO APRENDIDAS EN ESTA CLASE (revisadas por el profesor; no contradicen el material ni las instrucciones de arriba):\n1. Antes de fijar la respuesta correcta, verifícala contra el material; si hay un cálculo, resuélvelo paso a paso y escribe el resultado exacto.\n2. Cada pregunta debe poder responderse solo con lo que dice el material; no introduzcas conceptos, fórmulas ni datos que el material no explique.\n3. Deja una sola respuesta correcta; las demás opciones deben ser claramente incorrectas y no verdades parciales.\n4. Incluye en el enunciado todos los datos, símbolos y condiciones necesarios; la pregunta debe entenderse sin ver el material.\n5. En respuesta corta y completar, la respuesta esperada debe ser breve (1 a 3 palabras) y verificable; si la respuesta natural es una explicación o una fórmula, usa opción múltiple.",
+  "doctrina": true,
+  "doctrinaVersion": "2026-11-v1",
+  "generador": "gemini:gemini-3.5-flash-lite",
+  "modulos": 5,
+  "repeticiones": 3,
+  "preguntasPorLlamada": 8,
+  "estadisticas": {
+    "A": {
+      "pedidas": 120,
+      "generadas": 120,
+      "validasForma": 117,
+      "pass": 93,
+      "fail": 1,
+      "reviewGenerador": 1,
+      "excluidasInfra": 22,
+      "auditadas": 87,
+      "sospechosas": 4,
+      "ciegasEvaluables": 42,
+      "ciegasDiscrepan": 0,
+      "porCategoria": {
+        "ambiguedad_respuesta_unica": 1,
+        "otro": 1
+      }
+    },
+    "R": {
+      "pedidas": 120,
+      "generadas": 120,
+      "validasForma": 117,
+      "pass": 100,
+      "fail": 2,
+      "reviewGenerador": 1,
+      "excluidasInfra": 14,
+      "auditadas": 87,
+      "sospechosas": 11,
+      "ciegasEvaluables": 42,
+      "ciegasDiscrepan": 1,
+      "porCategoria": {
+        "error_conceptual_o_calculo": 1,
+        "no_autocontenida": 1,
+        "respuesta_no_evaluable": 1
+      }
+    },
+    "D": {
+      "pedidas": 120,
+      "generadas": 120,
+      "validasForma": 115,
+      "pass": 101,
+      "fail": 0,
+      "reviewGenerador": 3,
+      "excluidasInfra": 11,
+      "auditadas": 85,
+      "sospechosas": 7,
+      "ciegasEvaluables": 42,
+      "ciegasDiscrepan": 0,
+      "porCategoria": {
+        "otro": 3
+      }
+    }
+  },
+  "fiabilidadGeneracion": {
+    "A": {
+      "llamadas": 15,
+      "ok": 15
+    },
+    "R": {
+      "llamadas": 15,
+      "ok": 15
+    },
+    "D": {
+      "llamadas": 15,
+      "ok": 15
+    }
+  },
+  "comparaciones": {
+    "R": {
+      "pasanJuez": {
+        "a": {
+          "successes": 93,
+          "n": 95,
+          "rate": 0.9789473684210527,
+          "ci": {
+            "low": 0.9264573686165072,
+            "high": 0.9942076145484761
+          }
+        },
+        "b": {
+          "successes": 100,
+          "n": 103,
+          "rate": 0.970873786407767,
+          "ci": {
+            "low": 0.9178402543112528,
+            "high": 0.9900458125391128
+          }
+        },
+        "diff": -0.008073582013285674,
+        "diffCi": {
+          "low": -0.06325900253810854,
+          "high": 0.04780813830259395
+        },
+        "decision": "sin_evidencia",
+        "minPerArm": 30
+      },
+      "formaValida": {
+        "a": {
+          "successes": 117,
+          "n": 120,
+          "rate": 0.975,
+          "ci": {
+            "low": 0.9290687625956525,
+            "high": 0.9914619799012147
+          }
+        },
+        "b": {
+          "successes": 117,
+          "n": 120,
+          "rate": 0.975,
+          "ci": {
+            "low": 0.9290687625956525,
+            "high": 0.9914619799012147
+          }
+        },
+        "diff": 0,
+        "diffCi": {
+          "low": -0.048792164860380224,
+          "high": 0.048792164860380224
+        },
+        "decision": "sin_evidencia",
+        "minPerArm": 30
+      },
+      "generacionLegible": {
+        "a": {
+          "successes": 15,
+          "n": 15,
+          "rate": 1,
+          "ci": {
+            "low": 0.7961107336956521,
+            "high": 1
+          }
+        },
+        "b": {
+          "successes": 15,
+          "n": 15,
+          "rate": 1,
+          "ci": {
+            "low": 0.7961107336956521,
+            "high": 1
+          }
+        },
+        "diff": 0,
+        "diffCi": {
+          "low": -0.2038892663043479,
+          "high": 0.2038892663043479
+        },
+        "decision": "muestra_insuficiente",
+        "minPerArm": 30
+      },
+      "limpiasAuditor": {
+        "a": {
+          "successes": 83,
+          "n": 87,
+          "rate": 0.9540229885057471,
+          "ci": {
+            "low": 0.8876680217351717,
+            "high": 0.9819776031767627
+          }
+        },
+        "b": {
+          "successes": 76,
+          "n": 87,
+          "rate": 0.8735632183908046,
+          "ci": {
+            "low": 0.7876199981340795,
+            "high": 0.9279112122364997
+          }
+        },
+        "diff": -0.08045977011494243,
+        "diffCi": {
+          "low": -0.17083508527069136,
+          "high": 0.005311355855140754
+        },
+        "decision": "sin_evidencia",
+        "minPerArm": 30
+      }
+    },
+    "D": {
+      "pasanJuez": {
+        "a": {
+          "successes": 93,
+          "n": 95,
+          "rate": 0.9789473684210527,
+          "ci": {
+            "low": 0.9264573686165072,
+            "high": 0.9942076145484761
+          }
+        },
+        "b": {
+          "successes": 101,
+          "n": 104,
+          "rate": 0.9711538461538461,
+          "ci": {
+            "low": 0.9185982306978785,
+            "high": 0.9901419957082577
+          }
+        },
+        "diff": -0.007793522267206532,
+        "diffCi": {
+          "low": -0.06251982150098523,
+          "high": 0.048025380471757126
+        },
+        "decision": "sin_evidencia",
+        "minPerArm": 30
+      },
+      "formaValida": {
+        "a": {
+          "successes": 117,
+          "n": 120,
+          "rate": 0.975,
+          "ci": {
+            "low": 0.9290687625956525,
+            "high": 0.9914619799012147
+          }
+        },
+        "b": {
+          "successes": 115,
+          "n": 120,
+          "rate": 0.9583333333333334,
+          "ci": {
+            "low": 0.9061578707045692,
+            "high": 0.9820735474941623
+          }
+        },
+        "diff": -0.016666666666666607,
+        "diffCi": {
+          "low": -0.07137750364430351,
+          "high": 0.03503706954162447
+        },
+        "decision": "sin_evidencia",
+        "minPerArm": 30
+      },
+      "generacionLegible": {
+        "a": {
+          "successes": 15,
+          "n": 15,
+          "rate": 1,
+          "ci": {
+            "low": 0.7961107336956521,
+            "high": 1
+          }
+        },
+        "b": {
+          "successes": 15,
+          "n": 15,
+          "rate": 1,
+          "ci": {
+            "low": 0.7961107336956521,
+            "high": 1
+          }
+        },
+        "diff": 0,
+        "diffCi": {
+          "low": -0.2038892663043479,
+          "high": 0.2038892663043479
+        },
+        "decision": "muestra_insuficiente",
+        "minPerArm": 30
+      },
+      "limpiasAuditor": {
+        "a": {
+          "successes": 83,
+          "n": 87,
+          "rate": 0.9540229885057471,
+          "ci": {
+            "low": 0.8876680217351717,
+            "high": 0.9819776031767627
+          }
+        },
+        "b": {
+          "successes": 78,
+          "n": 85,
+          "rate": 0.9176470588235294,
+          "ci": {
+            "low": 0.8396383700842811,
+            "high": 0.9595367911014697
+          }
+        },
+        "diff": -0.0363759296822177,
+        "diffCi": {
+          "low": -0.11924218336984306,
+          "high": 0.042095283418139576
+        },
+        "decision": "sin_evidencia",
+        "minPerArm": 30
+      }
+    }
+  },
+  "gruposCompletos": 15,
+  "gruposDescartados": 0,
+  "gruposPrevistos": 15,
+  "incompleto": false,
+  "motivoIncompleto": null,
+  "lectura": "Con el AUDITOR ESTRICTO (metrica que si discrimina) no hay evidencia de mejora: sospechosas base 4/87 (4,6%), reglas 11/87 (12,6%), doctrina 7/85 (8,2%). Las estimaciones puntuales van en CONTRA de los tratamientos (reglas -8,0 pp limpias, IC95 -17,1 a +0,5; doctrina -3,6 pp, IC -11,9 a +4,2), sin llegar a ser significativas; los conteos de sospechosas son muy pequenos (4, 11, 7). Es una senal del auditor, no la verdad: falta contrastarla con la revision ciega del profesor.",
+  "advertencias": [
+    "El auditor es otro LLM: sus sospechas pueden ser falsas alarmas; se calibra con la muestra ciega del profesor",
+    "Conteos pequenos: una diferencia de 7 preguntas mueve el resultado",
+    "Orden de juicio rotado por grupo (corrige el sesgo del experimento anterior)"
+  ]
+}

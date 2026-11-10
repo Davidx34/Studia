@@ -28,5 +28,6 @@ export default async function PlaybookPage({ params }: { params: { id: string } 
     if (!prev || (o.status === 'active' && prev.status !== 'active')) byClass.set(o.classroom_id, o);
   }
   const sources = Array.from(byClass.values()).map((o) => ({ id: o.id, className: o.classrooms?.name ?? 'Otra clase', version: o.version, status: o.status, rules: o.rules }));
-  return <PlaybookClient classroomId={params.id} versions={data ?? []} sources={sources} />;
+  const { data: notes } = await (supabase as any).from('ai_class_notes').select('id, text, created_at').eq('classroom_id', params.id).eq('status', 'active').order('created_at', { ascending: true }).limit(15);
+  return <PlaybookClient classroomId={params.id} versions={data ?? []} sources={sources} notes={notes ?? []} />;
 }

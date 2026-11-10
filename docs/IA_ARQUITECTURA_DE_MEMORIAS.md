@@ -97,3 +97,37 @@ Cuatro conexiones entre memorias, todas **con una persona o una medición en med
 | 4 | Retrospectiva aceptada → regla | Una sugerencia **aceptada** de «reforzar un concepto» se puede agregar al cuaderno como borrador | El profesor acepta y luego agrega | Sin retrospectivas reales todavía |
 
 **Por qué plantillas y no reglas libres:** una IA que redacte reglas puede introducir instrucciones erróneas dentro de los prompts de todos; una plantilla curada y revisada de antemano no. **Honestidad:** que una regla esté bien fundamentada **no prueba** que reduzca errores en este generador (los experimentos A/B no mostraron efecto medible; ver §9). Por eso son propuestas visibles con su evidencia, nunca activas por sí solas. Retirar una pregunta desde una bandera queda registrado como decisión del profesor y alimenta la calibración del juez.
+
+## 11. Auditor estricto y memorias nuevas (2026-11-10)
+
+### 11.1 Por qué un auditor
+El juez de producción aprueba ~98 % de lo que genera el generador actual (§9): no discrimina, así que no puede decir si una regla o la doctrina sirven. El **auditor estricto** (`src/lib/questions/auditor.ts`) mide otra cosa con dos protocolos que **no dependen del veredicto del juez**:
+1. **Resolución ciega:** el modelo resuelve la pregunta **sin** ver la respuesta marcada ni la explicación. Si su respuesta difiere de la marcada, la pregunta es sospechosa. Solo opción múltiple y verdadero/falso (comparación exacta).
+2. **Defectos con cita:** lista cerrada de 12 defectos (respuesta incorrecta, más de una correcta, dato faltante, pista accidental, cálculo erróneo…), cada uno con severidad y una **cita textual** que el código **verifica que exista** en la pregunta; defectos sin cita real se descartan (frena que el modelo invente defectos para parecer estricto).
+
+Una pregunta es **sospechosa** si la resolución ciega discrepa o tiene un defecto crítico o mayor con cita. Es una **medición, no una decisión**: no cambia ninguna pregunta. Y es una señal más dura que el juez, **no la verdad**: la referencia sigue siendo el profesor. Si el auditor no responde (infraestructura), la pregunta **no cuenta** ni a favor ni en contra.
+
+### 11.2 Auditoría del banco real (60 preguntas aprobadas, clases reales, semilla 7)
+**10 de 60 sospechosas (16,7 %; IC95 % 9,3–28,0 %)** frente al ~98 % de aprobación del juez: el auditor sí discrimina. Resolución ciega discrepa en 1 de 34. Entre las marcadas hay casos que parecen reales (una pregunta de «curvas de Engel» duplicada y con la frase «el material indica textualmente» dentro del enunciado; un posible error de cálculo en una tasa marginal de sustitución) y otros discutibles (ambigüedad). **Falta saber cuántas son falsas alarmas del auditor:** para eso se generó una **muestra ciega de 40 preguntas** (`memoria-calidad/auditorias/2026-11-10-muestra-ciega.md`) que el profesor decide A/R/X sin ver lo que opinaron el juez ni el auditor; la **clave** (`…-clave.json`) no se le comparte hasta que termine. Con esas decisiones se calcula cuánto acierta el auditor **y** cuánto el juez, contra la misma referencia.
+
+### 11.3 Memorias nuevas
+| Memoria | Dónde vive | Quién la escribe | Entra al prompt |
+|---|---|---|---|
+| **Notas del profesor** (contexto que solo él conoce) | tabla `ai_class_notes` (migración 102, RLS: solo el profesor dueño) | el profesor, en «Estilo de la IA» | sí, cuando existen (es decisión explícita del profesor) |
+| **Errores comunes por concepto** | derivada al leer de `lesson_questions` (`review_reason` + `concept_tag`); solo errores del generador, ≥ 3 casos del mismo error en el mismo concepto | automática | **apagada** (`CLASS_MEMORY=on`) |
+| **Ejemplos aprobados** | derivada al leer: preguntas aprobadas por el profesor (`reviewed_by='teacher'`), hasta 3, solo como referencia («no las copies») | automática | **apagada** (`CLASS_MEMORY=on`) |
+
+Las dos derivadas **no tienen tabla a propósito**: la fuente de verdad ya es `lesson_questions`; guardarlas aparte las dejaría desincronizadas. Su efecto **no está medido** (el juez estaba en el techo), por eso nacen apagadas y se encienden solo si el auditor estricto muestra mejora. Todo texto que entra al prompt se limpia de saltos de línea y marcadores y se acota por presupuesto.
+
+### 11.4 Tercer experimento: reglas y doctrina medidas con el auditor
+Tres brazos juntos, 15 grupos completos de 15 (5 módulos de peor aprobación histórica × 3 repeticiones), orden de juicio rotado, auditor en todas las preguntas válidas de forma. Archivo: `memoria-calidad/experimentos/2026-11-10-base+item_writing_v1+doctrina+auditor.json`.
+
+| Brazo | Pasan el juez | Sospechosas para el auditor | Limpias contra la base (IC 95 %) | Decisión |
+|---|---|---|---|---|
+| Base | 93 de 95 (97,9 %) | 4 de 87 (4,6 %) | — | — |
+| Reglas | 100 de 103 (97,1 %) | 11 de 87 (12,6 %) | −8,0 pp (−17,1 a +0,5) | **sin evidencia** |
+| Doctrina | 101 de 104 (97,1 %) | 7 de 85 (8,2 %) | −3,6 pp (−11,9 a +4,2) | **sin evidencia** |
+
+**Lectura honesta:** (1) **No hay evidencia de mejora** de reglas ni doctrina, tampoco con la métrica que sí discrimina. (2) Las estimaciones puntuales van **en contra** de los tratamientos (las reglas llegan casi a ser peores, límite superior del intervalo +0,5 pp), pero con 4, 11 y 7 sospechosas el ruido es grande: **no se puede afirmar que empeoren**. (3) El auditor es otro modelo y puede equivocarse; sus sospechas se calibran con la muestra ciega del profesor. (4) **Decisión operativa:** la doctrina sigue APAGADA, las reglas `item_writing_v1` no se recomiendan como activas por defecto, y las memorias derivadas (§11.3) nacen apagadas por la misma razón. Para repetirlo con más poder hace falta más muestra (≈ 60 preguntas sospechosas por brazo) o una métrica con más señal (la revisión del profesor).
+
+**Defecto de método corregido en este PR:** el archivo de resultados llevaba el mismo nombre que el del experimento anterior y lo habría sobrescrito; ahora incluye `+auditor`.
