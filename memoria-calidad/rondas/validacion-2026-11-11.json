@@ -1,0 +1,17 @@
+{
+  "fecha": "2026-11-11",
+  "descripcion": "Validacion prospectiva del revisor externo contra las decisiones del profesor sobre la cola de revision (39 preguntas clasicas revisadas ANTES de que el profesor decidiera). Solo numeros.",
+  "decididasPorAmbos": 30,
+  "pendientes": 9,
+  "matriz": {
+    "externoBueno": { "profesorAprobo": 9, "profesorRechazo": 9 },
+    "externoCorregir": { "profesorAprobo": 6, "profesorRechazo": 6 }
+  },
+  "acuerdo": { "k": 15, "n": 30, "tasa": 0.5, "ic95": [0.332, 0.668], "cotaInferior": 0.332 },
+  "estado": "no_validado",
+  "tasaRechazoProfesor": { "k": 15, "n": 30, "tasa": 0.5 },
+  "hipotesisProbadas": {
+    "duplicados": "no se sostiene: 4 de 15 rechazadas y 3 de 15 aprobadas tienen un gemelo aprobado y mas antiguo",
+    "anclajeAlMaterial": "no concluyente: cuando el juez no pudo dar segunda opinion el profesor aprobo 11 y rechazo 11"
+  }
+}
