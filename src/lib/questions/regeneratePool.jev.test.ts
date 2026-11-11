@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const gen = vi.hoisted(() => ({ make: null as null | ((count: number, callNo: number) => any[]), calls: 0 }));
 vi.mock('@/lib/questions/cohereGeneration', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/questions/cohereGeneration')>()),
-  getRagContext: vi.fn(async () => 'contexto del material'),
+  getRagContext: vi.fn(async () => 'contexto del material '.repeat(60)), // >= MIN_MATERIAL_CHARS: sin material suficiente no se genera
   normalizeGeneratedQuestion: (q: any) => q,
   callCohere: vi.fn(async (_prompt: string, count: number) => {
     gen.calls++;

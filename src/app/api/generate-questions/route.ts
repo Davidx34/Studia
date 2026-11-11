@@ -12,6 +12,7 @@ import {
   hasGenerationProvider,
   RAG_CONTEXT_CHAR_LIMIT,
   ANTI_HALLUCINATION_BLOCK,
+  hasEnoughMaterial,
 } from '@/lib/questions/cohereGeneration';
 import {
   resolveConfig,
@@ -199,6 +200,8 @@ export async function POST(req: NextRequest) {
     if (moduleId && supabase) {
       const ragContext = await getRagContext(supabase, moduleId);
       if (ragContext) context = ragContext;
+      // Sin material suficiente no se genera (criterio del profesor: todo debe salir explicitamente del material).
+      if (!hasEnoughMaterial(context)) return NextResponse.json({ error: 'Este módulo no tiene material suficiente para generar preguntas.', code: 'no_material' }, { status: 422 });
     }
 
     // Fase 1.2: taxonomia cerrada de conceptos (Protocolo 7.6). Se genera

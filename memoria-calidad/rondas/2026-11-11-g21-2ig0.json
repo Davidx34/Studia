@@ -1,0 +1,64 @@
+{
+  "lote": "2026-11-11-g21-2ig0",
+  "fecha": "2026-11-11T15:12:54.337Z",
+  "arm": "base",
+  "kind": "generated",
+  "revisor": "claude-externo (sesion de Claude Code; criterio del profesor: explicito en el material, con cita literal verificable)",
+  "resumen": {
+    "n": 29,
+    "cruda": {
+      "k": 15,
+      "n": 29,
+      "rate": 0.5172413793103449,
+      "ci": {
+        "low": 0.34430737970569164,
+        "high": 0.6861418066920479
+      }
+    },
+    "entregable": {
+      "k": 15,
+      "n": 29,
+      "rate": 0.5172413793103449,
+      "ci": {
+        "low": 0.34430737970569164,
+        "high": 0.6861418066920479
+      }
+    },
+    "veredictos": {
+      "bueno": 15,
+      "corregir": 0,
+      "malo": 14
+    },
+    "defectosPorCodigo": {
+      "no_explicito": 14
+    },
+    "defectosSeriosPorCodigo": {
+      "no_explicito": 14
+    },
+    "metaCruda": {
+      "target": 0.9,
+      "status": "no_alcanzada",
+      "neededN": null
+    },
+    "metaEntregable": {
+      "target": 0.9,
+      "status": "no_alcanzada",
+      "neededN": null
+    }
+  },
+  "juezVsExterno": {
+    "pairs": 29,
+    "falsePass": 14,
+    "judgePass": 28,
+    "passPrecision": {
+      "k": 14,
+      "n": 28,
+      "rate": 0.5,
+      "ci": {
+        "low": 0.32632846832446344,
+        "high": 0.6736715316755366
+      }
+    },
+    "falseAlarm": 1
+  }
+}

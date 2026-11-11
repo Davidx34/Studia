@@ -9,7 +9,7 @@
 // antes cada camino tenia su propia copia del prompt y ya habian divergido.
 
 import { isValidQuestion } from '@/lib/lesson/validateQuestion';
-import { getRagContext, normalizeGeneratedQuestion, callCohere, hasGenerationProvider } from '@/lib/questions/cohereGeneration';
+import { getRagContext, normalizeGeneratedQuestion, callCohere, hasGenerationProvider, hasEnoughMaterial } from '@/lib/questions/cohereGeneration';
 import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/questions/conceptTaxonomy';
 import { resolveQuestionCount, countServable, planFill } from '@/lib/questions/poolPlan';
 import { resolveConfig, resolveMinigames, enforceAllowedTypes, buildGenerationPrompt } from '@/lib/questions/generationConfig';
@@ -88,6 +88,8 @@ export async function regenerateModulePool(
   }
 
   const context = await getRagContext(supabase, moduleId);
+  // Sin material suficiente no se genera: las preguntas saldrian del conocimiento del modelo y no del material (criterio del profesor).
+  if (!hasEnoughMaterial(context)) return { ok: false, error: 'Este módulo no tiene material suficiente para generar preguntas: sube o vincula material antes.' };
 
   // Fase 1.2: taxonomia cerrada de conceptos (Protocolo 7.6) -- ver
   // src/lib/questions/conceptTaxonomy.ts. regeneratePool es el flujo del

@@ -76,6 +76,14 @@ export function shuffle<T>(arr: T[]): T[] {
 // Busca el contexto mas relevante para el modulo. Primero la recuperacion HIBRIDA (vectores + texto completo en español,
 // varias consultas fusionadas; ver src/lib/rag/retrieve.ts). Si no esta disponible (funcion de la base ausente, sin
 // resultados), el camino de siempre: embedding + match_material_chunks con respaldo a los primeros chunks.
+// Criterio del profesor (2026-11-11): las preguntas deben salir EXPLICITAMENTE del material. Sin material suficiente el generador contesta con lo que «sabe» el modelo (medido: en modulos sin material
+// produjo preguntas completas con un contexto de 32 a 45 caracteres). Por debajo de este umbral NO se genera. Cuenta el texto del contexto sin las etiquetas «[Seccion: ...]».
+export const MIN_MATERIAL_CHARS = 600;
+export function hasEnoughMaterial(context: unknown): boolean {
+  if (typeof context !== 'string') return false;
+  return context.replace(/\[Secci[oó]n:[^\]]*\]/g, '').trim().length >= MIN_MATERIAL_CHARS;
+}
+
 export async function getRagContext(supabase: any, moduleId: string): Promise<string> {
   try {
     const hybrid = await retrieveContext(supabase, moduleId, { charLimit: RAG_CONTEXT_CHAR_LIMIT });

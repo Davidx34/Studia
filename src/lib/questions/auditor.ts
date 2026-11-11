@@ -48,6 +48,8 @@ export const DEFECT_CODES: Record<string, string> = {
   nivel_inadecuado: 'Pide algo muy por encima o por debajo del nivel declarado.',
   explicacion_contradice: 'La explicacion contradice la respuesta marcada o el enunciado.',
   calculo_erroneo: 'Un calculo del enunciado, de las opciones o de la explicacion esta mal.',
+  // Criterio del profesor (2026-11-11): todo debe estar EXPLICITAMENTE en el material.
+  no_explicito: 'La respuesta no esta dicha explicitamente en el material: se calcula, se deduce, es un ejemplo nuevo o viene del conocimiento del modelo (aunque sea correcta en la materia).',
 };
 
 // «match» se audita por defectos (no tiene resolucion ciega): antes quedaba fuera y era invisible para el auditor.
