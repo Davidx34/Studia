@@ -1,0 +1,71 @@
+{
+  "lote": "2026-11-11-b3-g84s",
+  "fecha": "2026-11-11T14:21:07.387Z",
+  "arm": "banco",
+  "kind": "bank",
+  "revisor": "claude-externo (sesion de Claude Code; revision manual lectura+razonamiento; ANTES de la decision del profesor)",
+  "resumen": {
+    "n": 39,
+    "cruda": {
+      "k": 26,
+      "n": 39,
+      "rate": 0.6666666666666666,
+      "ci": {
+        "low": 0.5097710432024052,
+        "high": 0.7936723389308484
+      }
+    },
+    "entregable": {
+      "k": 39,
+      "n": 39,
+      "rate": 1,
+      "ci": {
+        "low": 0.910330146399761,
+        "high": 1
+      }
+    },
+    "veredictos": {
+      "bueno": 26,
+      "corregir": 13,
+      "malo": 0
+    },
+    "defectosPorCodigo": {
+      "ambigua": 9,
+      "respuesta_incorrecta": 2,
+      "distractor_absurdo": 1,
+      "pista_accidental": 3,
+      "explicacion_contradice": 1,
+      "trivial": 1,
+      "dato_faltante": 1
+    },
+    "defectosSeriosPorCodigo": {
+      "ambigua": 8,
+      "respuesta_incorrecta": 2,
+      "pista_accidental": 1,
+      "explicacion_contradice": 1,
+      "dato_faltante": 1
+    },
+    "metaCruda": {
+      "target": 0.9,
+      "status": "no_alcanzada",
+      "neededN": null
+    },
+    "metaEntregable": {
+      "target": 0.9,
+      "status": "cumple",
+      "neededN": 39
+    }
+  },
+  "juezVsExterno": {
+    "pairs": 39,
+    "falsePass": 0,
+    "judgePass": 0,
+    "passPrecision": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci": null
+    },
+    "falseAlarm": 26
+  }
+}
