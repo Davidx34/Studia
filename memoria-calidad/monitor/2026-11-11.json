@@ -1,0 +1,23 @@
+{
+  "fecha": "2026-11-11T13:17:15.667Z",
+  "clases": [
+    {
+      "clase": "clase-1",
+      "cuaderno": null,
+      "alertas": []
+    },
+    {
+      "clase": "clase-2",
+      "cuaderno": null,
+      "alertas": [
+        "juez_degradado",
+        "cola_larga"
+      ]
+    },
+    {
+      "clase": "clase-3",
+      "cuaderno": null,
+      "alertas": []
+    }
+  ]
+}

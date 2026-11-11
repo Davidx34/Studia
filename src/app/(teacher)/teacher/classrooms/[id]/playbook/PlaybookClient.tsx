@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { BookMarked } from 'lucide-react';
+import QualityWatch from './QualityWatch';
+import type { MonitorReport } from '@/lib/aiLearning/regressionMonitor';
 import { savePlaybookDraft, activatePlaybook, deactivatePlaybook, importPlaybook, proposeRulesFromRejections, addClassNote, retireClassNote } from '@/lib/actions/playbook';
 
 interface Version {
@@ -24,7 +26,7 @@ interface Source {
   rules: { text: string }[];
 }
 
-export default function PlaybookClient({ classroomId, versions, sources = [], notes = [] }: { classroomId: string; versions: Version[]; sources?: Source[]; notes?: { id: string; text: string }[] }) {
+export default function PlaybookClient({ classroomId, versions, sources = [], notes = [], report = null }: { classroomId: string; versions: Version[]; sources?: Source[]; notes?: { id: string; text: string }[]; report?: MonitorReport | null }) {
   const [noteText, setNoteText] = useState('');
   const active = versions.find((v) => v.status === 'active');
   const [text, setText] = useState((active ?? versions[0])?.rules.map((r) => r.text).join('\n') ?? '');
@@ -51,6 +53,8 @@ export default function PlaybookClient({ classroomId, versions, sources = [], no
           </p>
         </div>
       </div>
+
+      {report && <QualityWatch classroomId={classroomId} report={report} />}
 
       <div className="rounded-2xl border border-line bg-surface p-5 space-y-3">
         <label htmlFor="playbook-rules" className="text-sm font-medium text-fg">
