@@ -131,3 +131,33 @@ Tres brazos juntos, 15 grupos completos de 15 (5 módulos de peor aprobación hi
 **Lectura honesta:** (1) **No hay evidencia de mejora** de reglas ni doctrina, tampoco con la métrica que sí discrimina. (2) Las estimaciones puntuales van **en contra** de los tratamientos (las reglas llegan casi a ser peores, límite superior del intervalo +0,5 pp), pero con 4, 11 y 7 sospechosas el ruido es grande: **no se puede afirmar que empeoren**. (3) El auditor es otro modelo y puede equivocarse; sus sospechas se calibran con la muestra ciega del profesor. (4) **Decisión operativa:** la doctrina sigue APAGADA, las reglas `item_writing_v1` no se recomiendan como activas por defecto, y las memorias derivadas (§11.3) nacen apagadas por la misma razón. Para repetirlo con más poder hace falta más muestra (≈ 60 preguntas sospechosas por brazo) o una métrica con más señal (la revisión del profesor).
 
 **Defecto de método corregido en este PR:** el archivo de resultados llevaba el mismo nombre que el del experimento anterior y lo habría sobrescrito; ahora incluye `+auditor`.
+
+## 12. Monitor de regresión con reversión (2026-11-11)
+
+### 12.1 Qué hace
+Vigila que lo que la IA lee (hoy: el **cuaderno de estilo activo**) no **empeore** la calidad de lo que genera, y avisa con evidencia cuando eso parece ocurrir. Vive en «Estilo de la IA» como la tarjeta **Vigilancia de calidad** (`QualityWatch.tsx`), alimentada por `regressionMonitor.ts` (núcleo puro) y `monitorLoader.ts` (lectura; nunca lanza). El script `scripts/quality-monitor.ts` lo corre sobre todas las clases reales y, con `--guardar`, deja una foto **solo con números** en `memoria-calidad/monitor/`.
+
+### 12.2 Qué mide y con qué rigor
+Entre las preguntas generadas **antes** y **después** de activar el cuaderno actual (el «antes» es el periodo de la versión previa, o todo lo anterior si no había), la proporción de **buenas**: *buena* = aprobada; *mala* = rechazada por el profesor, o rechazada/en revisión con un motivo atribuible al **generador**; se **excluyen** pendientes, infraestructura, pipeline y validador de forma (misma taxonomía que la línea base). Se compara con la estadística de los experimentos (Wilson/Newcombe, mínimo 30 por periodo):
+
+| Nivel | Condición | Alerta |
+|---|---|---|
+| `sin_datos` | < 30 en algún periodo | ninguna |
+| `estable` / `mejora` | sin cambio claro / intervalo entero del lado bueno | ninguna |
+| **`vigilar`** | cae ≥ 10 puntos pero el intervalo aún cruza 0 | atención (propone revertir) |
+| **`regresion`** | intervalo de la diferencia entero del lado malo | urgente (propone revertir) |
+
+Además avisa cuando el **juez está degradado** (§10) y cuando la **cola de revisión** tiene ≥ 20 preguntas.
+
+### 12.3 La reversión la decide el profesor
+La alerta trae un botón: **«Volver a la versión N»** (activa la versión previa) o **«Desactivar el cuaderno»** (si no había previa), que usan las acciones existentes del cuaderno (reversibles: la versión revertida queda en el historial). El monitor **no escribe nada ni revierte solo**: está cubierto por pruebas (el núcleo y el cargador no contienen insert/update/delete ni activate/deactivate). Decisión de diseño: igual que el resto de la memoria de la clase, ningún cambio de comportamiento ocurre sin una persona; una reversión automática se podría habilitar después con un umbral más exigente (p. ej. solo `regresion` con ≥ 100 preguntas por periodo), pero no hay datos que la justifiquen hoy.
+
+### 12.4 Límites honestos
+1. **Observacional, no un experimento:** el antes y el después son periodos distintos (otros módulos, otro material). Una alerta es una pista, no una prueba de causalidad.
+2. **Poca potencia:** con aprobación alta (~98 %) y poca muestra, `regresion` casi nunca saltará; por eso existe `vigilar`. **«Estable» no prueba que el cuaderno sirva.**
+3. **El juez es ciego a parte de los errores** (§11.5: el profesor halló defecto en 12,5 % de lo aprobado): la señal más confiable son las decisiones del profesor, que el monitor cuenta como verdad cuando existen. Las muestras ciegas periódicas (~40 preguntas) siguen siendo la referencia.
+4. Un tramo sin cuaderno entre dos versiones cuenta como «antes».
+5. Solo vigila el **cuaderno**. Notas del profesor, doctrina y memorias derivadas no están activas o no se pueden separar por periodo todavía.
+
+### 12.5 Sobre datos reales (2026-11-11)
+Ninguna clase tiene hoy un cuaderno activo, así que **la comparación antes/después no se ejerció con datos reales** (solo con pruebas y datos de ejemplo). Sí se ejerció lo demás: **Microeconomía I → `juez_degradado` + `cola_larga`** (46 comparaciones, cota inferior 76,5 %; ≥ 20 preguntas en revisión), las otras dos clases sin alertas.
