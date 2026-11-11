@@ -9,6 +9,7 @@ import { sanitizeRules, MAX_RULES } from '@/lib/aiLearning/playbook';
 import { mergeRules } from '@/lib/aiLearning/carryOver';
 import { createMergedDraft } from '@/lib/aiLearning/playbookDraft';
 import { MIN_TOTAL_REASONS, proposeRules } from '@/lib/aiLearning/ruleProposals';
+import { MAX_NOTES, sanitizeNote } from '@/lib/aiLearning/classMemory';
 
 export interface PlaybookActionResult {
   ok: boolean;
@@ -116,4 +117,26 @@ export async function proposeRulesFromRejections(classroomId: string): Promise<P
   if (!draft.ok) return { ok: false, error: draft.error };
   revalidatePath(`/teacher/classrooms/${classroomId}/playbook`);
   return { ok: true, added: draft.added, analyzed: result.total };
+}
+
+/** Agrega una nota de contexto de la clase (memoria del profesor). Pasa por la RLS de ai_class_notes: solo el profesor dueno. */
+export async function addClassNote(classroomId: string, text: string): Promise<PlaybookActionResult> {
+  const { supabase } = await requireUser();
+  const clean = sanitizeNote(text);
+  if (!clean) return { ok: false, error: 'Escribe una nota de al menos 8 caracteres (máximo 300).' };
+  const { count } = await (supabase as any).from('ai_class_notes').select('id', { count: 'exact', head: true }).eq('classroom_id', classroomId).eq('status', 'active');
+  if ((count ?? 0) >= MAX_NOTES) return { ok: false, error: `Máximo ${MAX_NOTES} notas activas: retira alguna antes de agregar otra.` };
+  const { error } = await (supabase as any).from('ai_class_notes').insert({ classroom_id: classroomId, text: clean });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/teacher/classrooms/${classroomId}/playbook`);
+  return { ok: true };
+}
+
+/** Retira una nota: deja de entrar al prompt (el registro queda). */
+export async function retireClassNote(classroomId: string, noteId: string): Promise<PlaybookActionResult> {
+  const { supabase } = await requireUser();
+  const { error } = await (supabase as any).from('ai_class_notes').update({ status: 'retired', retired_at: new Date().toISOString() }).eq('id', noteId).eq('classroom_id', classroomId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/teacher/classrooms/${classroomId}/playbook`);
+  return { ok: true };
 }

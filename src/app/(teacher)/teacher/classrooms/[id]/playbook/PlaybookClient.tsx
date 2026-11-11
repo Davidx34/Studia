@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { BookMarked } from 'lucide-react';
-import { savePlaybookDraft, activatePlaybook, deactivatePlaybook, importPlaybook, proposeRulesFromRejections } from '@/lib/actions/playbook';
+import { savePlaybookDraft, activatePlaybook, deactivatePlaybook, importPlaybook, proposeRulesFromRejections, addClassNote, retireClassNote } from '@/lib/actions/playbook';
 
 interface Version {
   id: string;
@@ -24,7 +24,8 @@ interface Source {
   rules: { text: string }[];
 }
 
-export default function PlaybookClient({ classroomId, versions, sources = [] }: { classroomId: string; versions: Version[]; sources?: Source[] }) {
+export default function PlaybookClient({ classroomId, versions, sources = [], notes = [] }: { classroomId: string; versions: Version[]; sources?: Source[]; notes?: { id: string; text: string }[] }) {
+  const [noteText, setNoteText] = useState('');
   const active = versions.find((v) => v.status === 'active');
   const [text, setText] = useState((active ?? versions[0])?.rules.map((r) => r.text).join('\n') ?? '');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -88,6 +89,43 @@ export default function PlaybookClient({ classroomId, versions, sources = [] }: 
             {msg.text}
           </p>
         )}
+      </div>
+
+      <div className="rounded-2xl border border-line bg-surface p-5 space-y-3" data-testid="class-notes">
+        <h3 className="text-sm font-semibold text-fg">Notas sobre tu clase</h3>
+        <p className="text-sm text-fg-muted">
+          Datos que solo tú conoces y la IA no puede deducir del material: «mis estudiantes no han visto cálculo diferencial», «usamos pesos colombianos en los ejemplos». Se agregan al contexto con que la IA genera preguntas nuevas (máximo 15, 300
+          caracteres cada una). Retírala cuando ya no valga.
+        </p>
+        <ul className="space-y-1.5">
+          {notes.length === 0 && <li className="text-sm text-fg-muted">Aún no hay notas.</li>}
+          {notes.map((n) => (
+            <li key={n.id} className="flex items-start justify-between gap-3 rounded-xl border border-line p-3">
+              <span className="text-sm text-fg">{n.text}</span>
+              <button type="button" disabled={busy} onClick={() => run(() => retireClassNote(classroomId, n.id), 'Nota retirada.')} className="px-2.5 py-1 rounded-lg border border-line text-xs text-fg disabled:opacity-50 flex-shrink-0">
+                Retirar
+              </button>
+            </li>
+          ))}
+        </ul>
+        <label htmlFor="class-note" className="sr-only">
+          Nueva nota
+        </label>
+        <textarea id="class-note" value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={2} maxLength={300} placeholder="Una nota sobre tu clase" className="w-full rounded-xl border border-line bg-bg p-3 text-sm text-fg" />
+        <button
+          type="button"
+          disabled={busy || noteText.trim().length < 8}
+          onClick={() =>
+            start(async () => {
+              const r = await addClassNote(classroomId, noteText);
+              setMsg(r.ok ? { ok: true, text: 'Nota agregada.' } : { ok: false, text: r.error ?? 'No se pudo agregar.' });
+              if (r.ok) setNoteText('');
+            })
+          }
+          className="px-4 py-2 rounded-xl border border-line text-sm text-fg disabled:opacity-50"
+        >
+          Agregar nota
+        </button>
       </div>
 
       {sources.length > 0 && (

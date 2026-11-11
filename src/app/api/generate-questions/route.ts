@@ -1,4 +1,4 @@
-import { loadActivePlaybookBlock } from '@/lib/aiLearning/playbook';
+import { loadStyleAndMemoryBlock } from '@/lib/aiLearning/classMemory';
 import { doctrineEnabled } from '@/lib/aiLearning/doctrine';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
           supabase.from('classroom_ai_config').select('*').eq('classroom_id', classroomId).maybeSingle(),
           gatePromise,
           // Reglas de estilo activas de la clase (fase 3 de «IA que aprende»); si no hay llave de servicio o falla, '' y todo sigue igual.
-          loadActivePlaybookBlock(hasServiceRoleKey() ? createAdminSupabase() : null, classroomId),
+          loadStyleAndMemoryBlock(hasServiceRoleKey() ? createAdminSupabase() : null, classroomId),
         ]);
         playbookBlock = pb;
         // Un fallo aqui NO debe pasar callado: la clase generaria con valores por defecto.

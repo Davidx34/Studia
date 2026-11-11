@@ -26,6 +26,7 @@ import { RULE_SETS, ruleSetNames, toPlaybookRules } from '../src/lib/aiLearning/
 import { CATEGORIES, classifyReason } from '../src/lib/aiLearning/errorTaxonomy';
 import { compareProportions } from '../src/lib/aiLearning/proportion';
 import { DOCTRINE_VERSION } from '../src/lib/aiLearning/doctrine';
+import { auditQuestions } from '../src/lib/questions/auditor';
 
 const args = process.argv.slice(2);
 const val = (f: string) => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined);
@@ -37,6 +38,8 @@ const count = Number(val('--count') ?? 8);
 const pausa = Number(val('--pausa') ?? 6);
 const gen = val('--gen') ?? 'gemini:gemini-3.5-flash-lite';
 const guardar = args.includes('--guardar');
+// --auditar: ademas del juez, pasa TODAS las preguntas validas por el AUDITOR ESTRICTO (resolucion ciega + defectos con cita). Es la metrica que discrimina cuando el juez esta en el techo.
+const auditar = args.includes('--auditar');
 // --peores N: usa los N modulos con MENOR aprobacion historica del juez (con al menos 15 preguntas juzgadas): donde hay margen para mejorar, para evitar el efecto techo.
 const peores = Number(val('--peores') ?? 0);
 const MAX_GRUPOS_FALLIDOS_SEGUIDOS = 3;
@@ -60,13 +63,17 @@ interface ArmStats {
   fail: number;
   reviewGenerador: number;
   excluidasInfra: number;
+  auditadas: number;
+  sospechosas: number;
+  ciegasEvaluables: number;
+  ciegasDiscrepan: number;
   porCategoria: Record<string, number>;
 }
 interface Reliability {
   llamadas: number;
   ok: number;
 }
-const newStats = (): ArmStats => ({ pedidas: 0, generadas: 0, validasForma: 0, pass: 0, fail: 0, reviewGenerador: 0, excluidasInfra: 0, porCategoria: {} });
+const newStats = (): ArmStats => ({ pedidas: 0, generadas: 0, validasForma: 0, pass: 0, fail: 0, reviewGenerador: 0, excluidasInfra: 0, auditadas: 0, sospechosas: 0, ciegasEvaluables: 0, ciegasDiscrepan: 0, porCategoria: {} });
 
 const NAME: Record<ArmId, string> = { A: 'base', R: `reglas:${reglas}`, D: `doctrina:${DOCTRINE_VERSION}` };
 
@@ -167,10 +174,23 @@ async function main() {
         else s.reviewGenerador++;
       }
     }
+    if (auditar && validas.length) {
+      const aud = await auditQuestions(validas, mm.context);
+      for (const q of validas) {
+        const a = aud.get(q.id);
+        if (!a?.audited) continue;
+        s.auditadas++;
+        if (a.suspicious) s.sospechosas++;
+        if (a.blindApplicable && a.blindMatches !== null) {
+          s.ciegasEvaluables++;
+          if (a.blindMatches === false) s.ciegasDiscrepan++;
+        }
+      }
+    }
     return s;
   };
   const add = (t: ArmStats, d: ArmStats) => {
-    for (const k of ['pedidas', 'generadas', 'validasForma', 'pass', 'fail', 'reviewGenerador', 'excluidasInfra'] as const) t[k] += d[k];
+    for (const k of ['pedidas', 'generadas', 'validasForma', 'pass', 'fail', 'reviewGenerador', 'excluidasInfra', 'auditadas', 'sospechosas', 'ciegasEvaluables', 'ciegasDiscrepan'] as const) t[k] += d[k];
     for (const [c, nn] of Object.entries(d.porCategoria)) t.porCategoria[c] = (t.porCategoria[c] ?? 0) + nn;
   };
 
@@ -208,15 +228,19 @@ async function main() {
     const s = stats[a];
     console.log(`Brazo ${a} (${NAME[a]}): generadas ${s.generadas} | validas de forma ${s.validasForma} | con veredicto ${n(s)} | pasan ${s.pass} (${pct(n(s) ? s.pass / n(s) : null)}) | excluidas por infraestructura ${s.excluidasInfra} | generacion legible ${rel[a].ok}/${rel[a].llamadas} llamadas`);
     console.log(`   errores: ${JSON.stringify(s.porCategoria)}`);
+    if (auditar) console.log(`   AUDITOR ESTRICTO: auditadas ${s.auditadas} | sospechosas ${s.sospechosas} (${pct(s.auditadas ? s.sospechosas / s.auditadas : null)}) | resolucion ciega discrepa ${s.ciegasDiscrepan} de ${s.ciegasEvaluables}`);
   }
   for (const t of arms.filter((x) => x !== 'A')) {
     const cp = compareProportions({ successes: stats.A.pass, n: n(stats.A) }, { successes: stats[t].pass, n: n(stats[t]) });
     const cf = compareProportions({ successes: stats.A.validasForma, n: stats.A.generadas }, { successes: stats[t].validasForma, n: stats[t].generadas });
     const cr = compareProportions({ successes: rel.A.ok, n: rel.A.llamadas }, { successes: rel[t].ok, n: rel[t].llamadas });
-    comparaciones[t] = { pasanJuez: cp, formaValida: cf, generacionLegible: cr };
+    // En el auditor, MENOS sospechosas es mejor: se compara la proporcion LIMPIA (auditadas - sospechosas) para que «mejora» signifique lo mismo que en el juez.
+    const ca = auditar ? compareProportions({ successes: stats.A.auditadas - stats.A.sospechosas, n: stats.A.auditadas }, { successes: stats[t].auditadas - stats[t].sospechosas, n: stats[t].auditadas }) : null;
+    comparaciones[t] = { pasanJuez: cp, formaValida: cf, generacionLegible: cr, ...(ca ? { limpiasAuditor: ca } : {}) };
     console.log(`\n${t} (${NAME[t]}) contra la base:`);
     console.log(`  Pasan el juez:       diferencia ${cp.diff === null ? '-' : (cp.diff * 100).toFixed(1) + ' pp'}  IC95% [${pct(cp.diffCi?.low ?? null)}, ${pct(cp.diffCi?.high ?? null)}]  => ${cp.decision.toUpperCase()}`);
     console.log(`  Validas de forma:    diferencia ${cf.diff === null ? '-' : (cf.diff * 100).toFixed(1) + ' pp'}  => ${cf.decision.toUpperCase()}`);
+    if (ca) console.log(`  Limpias para el auditor: diferencia ${ca.diff === null ? '-' : (ca.diff * 100).toFixed(1) + ' pp'}  IC95% [${pct(ca.diffCi?.low ?? null)}, ${pct(ca.diffCi?.high ?? null)}]  => ${ca.decision.toUpperCase()}`);
     console.log(`  Generacion legible:  diferencia ${cr.diff === null ? '-' : (cr.diff * 100).toFixed(1) + ' pp'}  => ${cr.decision.toUpperCase()}`);
   }
   console.log(`\nGrupos completos: ${gruposCompletos} | descartados: ${gruposDescartados} | previstos: ${reps * mods.length}`);
@@ -224,7 +248,7 @@ async function main() {
   if (guardar) {
     const dir = path.join(process.cwd(), 'memoria-calidad', 'experimentos');
     fs.mkdirSync(dir, { recursive: true });
-    const nombre = ['base', reglas, doctrina ? 'doctrina' : null].filter(Boolean).join('+');
+    const nombre = ['base', reglas, doctrina ? 'doctrina' : null, auditar ? 'auditor' : null].filter(Boolean).join('+');
     const id = `${new Date().toISOString().slice(0, 10)}-${nombre}`;
     const incompleto = !!abortado || gruposCompletos < reps * mods.length;
     fs.writeFileSync(

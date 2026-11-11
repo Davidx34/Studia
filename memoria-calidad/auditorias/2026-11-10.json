@@ -1,0 +1,781 @@
+{
+  "fecha": "2026-11-10T16:36:38.845Z",
+  "semilla": 7,
+  "poolAuditable": 122,
+  "auditadas": 60,
+  "sospechosas": 10,
+  "ic95": {
+    "low": 0.09313077201321034,
+    "high": 0.28031851497207827
+  },
+  "resolucionCiega": {
+    "evaluables": 34,
+    "discrepan": 1
+  },
+  "detalle": [
+    {
+      "id": "3297bfcf-67e3-4fdf-b937-2ba30556adce",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "a45cb60e-1b42-48a2-9421-2593c78765c2",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": false,
+      "defects": [],
+      "suspicious": true,
+      "reasons": [
+        "resolucion ciega discrepa (auditor: 2, marcada: 3)"
+      ]
+    },
+    {
+      "id": "07862d7d-57b6-444d-9f1f-8f0f7e2f56e7",
+      "tipo": "multiple_choice",
+      "revisadaPor": null,
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "6420c3f0-04aa-4b86-9e82-443055469f9f",
+      "tipo": "true_false",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "778066f6-8d17-4de6-817a-692ae0e51eeb",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "4adf342a-b522-4d5e-98d8-2eea15f0747e",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "7d093ac9-c49b-469b-a08e-e1bc54e57e3b",
+      "tipo": "short_answer",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "8b96e5f1-4736-4122-9e55-454db32ae1e1",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "eeb27bca-0998-4d49-b59c-a390e2967a63",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "514de29f-e73f-4d64-b3ba-345218bcf4f4",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "80d725f5-4110-4760-b246-0b7dc32568d5",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "9a103a7a-a080-4070-93e2-4a7c9114cdb7",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "d11342f0-9da1-4cab-a82b-eec4f3396d4c",
+      "tipo": "short_answer",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "05b4063b-5897-43e1-a7b6-7f36fbee9c29",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [
+        {
+          "code": "trivial",
+          "severity": "menor",
+          "quote": "recta o ___ presupuestal",
+          "why": "Pide recordar de memoria una palabra exacta para completar una frase en lugar de evaluar la comprensión del concepto."
+        }
+      ],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "a011654a-7493-4055-8ba5-5f6184f7f13a",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [
+        {
+          "code": "dato_inventado",
+          "severity": "mayor",
+          "quote": "El material indica textualmente que las curvas de Engel son líneas rectas",
+          "why": "El material de referencia no contiene esa afirmación ni menciona el término homotéticas."
+        }
+      ],
+      "suspicious": true,
+      "reasons": [
+        "mayor: dato_inventado — «El material indica textualmente que las curvas de Engel son líneas rectas»"
+      ]
+    },
+    {
+      "id": "e5139832-cf1c-466c-9814-61eb957bbc46",
+      "tipo": "multiple_choice",
+      "revisadaPor": null,
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [
+        {
+          "code": "calculo_erroneo",
+          "severity": "critico",
+          "quote": "0.7x / 0.3y",
+          "why": "La simplificación algebraica en la explicación es errónea, ya que (0.3/0.7)*(y/x) equivale a 3y/7x y no a 0.7x/0.3y."
+        },
+        {
+          "code": "explicacion_contradice",
+          "severity": "mayor",
+          "quote": "0.7x / 0.3y",
+          "why": "El resultado final escrito en la explicación da 0.7x / 0.3y (opción B), lo cual contradice la opción marcada como correcta (C: 3y / 7x)."
+        }
+      ],
+      "suspicious": true,
+      "reasons": [
+        "critico: calculo_erroneo — «0.7x / 0.3y»",
+        "mayor: explicacion_contradice — «0.7x / 0.3y»"
+      ]
+    },
+    {
+      "id": "a24b4269-2b7a-44ff-a0a4-02e46745e1df",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "b6f40e14-21d7-464d-88f9-52b162f37945",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [
+        {
+          "code": "explicacion_contradice",
+          "severity": "mayor",
+          "quote": "a menor elasticidad (|ε| mayor)",
+          "why": "La explicación afirma que una menor elasticidad implica un valor absoluto mayor, lo cual es contradictorio."
+        }
+      ],
+      "suspicious": true,
+      "reasons": [
+        "mayor: explicacion_contradice — «a menor elasticidad (|ε| mayor)»"
+      ]
+    },
+    {
+      "id": "a3db148c-8603-4b5b-bfd8-d3989b9fb8ef",
+      "tipo": "fill_blank",
+      "revisadaPor": null,
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "d9945b09-9ff4-474b-8305-7b07dbac7d14",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "c3b00a00-1426-4df7-8cbb-68c691c3a811",
+      "tipo": "short_answer",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "d7e232fd-eda7-4e1c-982b-29470b30e2c2",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "1cb6e899-57e6-4fb9-acc5-2bb1d5b61019",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "9073c92c-ba23-489f-beff-a1922d6b8761",
+      "tipo": "short_answer",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "fcd98e61-4fbf-4f7c-880e-1e9adb97488e",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "f76a9c42-dcde-4e9b-b9d1-97ac35146d03",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "a447b039-83af-44e6-a24e-5a57da0ae9a7",
+      "tipo": "short_answer",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "86ae12a8-e7f2-42de-b06c-54d60d084199",
+      "tipo": "multiple_choice",
+      "revisadaPor": null,
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [
+        {
+          "code": "dato_faltante",
+          "severity": "critico",
+          "quote": "mientras $y=10$, ¿qué sucede con la cantidad óptima de $x$?",
+          "why": "Falta especificar el ingreso W del consumidor para determinar la cantidad óptima en el problema de optimización."
+        }
+      ],
+      "suspicious": true,
+      "reasons": [
+        "critico: dato_faltante — «mientras $y=10$, ¿qué sucede con la cantidad óptima de $x$?»"
+      ]
+    },
+    {
+      "id": "95f8b773-9e70-45a0-9251-2793c137f24a",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "fc2c8bcc-0fc3-4dd4-ad1f-e3933060010c",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "64472942-85c6-43f1-9413-449d608cc366",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "31d3ab4c-2c2a-40d3-85e1-c80384fd4568",
+      "tipo": "fill_blank",
+      "revisadaPor": null,
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "3a3c8c3f-14e7-44b4-8fcd-d3d3530ade45",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "c8b718f9-db25-437b-84e1-a6f1555a16c2",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [
+        {
+          "code": "dato_inventado",
+          "severity": "mayor",
+          "quote": "El texto del material indica explícitamente",
+          "why": "La explicación afirma que el texto del material incluye explícitamente esa cita, lo cual no es cierto en el contexto dado."
+        }
+      ],
+      "suspicious": true,
+      "reasons": [
+        "mayor: dato_inventado — «El texto del material indica explícitamente»"
+      ]
+    },
+    {
+      "id": "2fb6cee5-f1e2-4d4c-a2a4-6b1bc597b9d3",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "bda118af-0390-4ee9-8ef5-b6cdc6bbb59c",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "d264a24f-1e8f-4bb6-b2cb-e51de74a3376",
+      "tipo": "short_answer",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "07e8edab-4c4a-48c3-8e16-c22c144c8689",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "1344047d-14ea-423f-8b9e-3985aed4137e",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "e321903c-9c8a-4ee5-9c24-ceb56ad6c5bc",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "30e8072f-0f19-4f10-bd4d-6f7065547ccf",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "f7d13aa5-e6f1-4ada-99b4-96a14ebd7e20",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "ee092ab5-d768-4018-8972-018580b009ec",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "5dfd24fe-75fe-45a4-bc85-73e77e2ea267",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "2ecdd295-36fd-4823-9794-cdf5af546339",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "10810fa8-a81f-4a73-9588-027ce94e485e",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "8fe83175-20fc-4109-a9b4-4a10cf15ba8f",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [
+        {
+          "code": "pista_accidental",
+          "severity": "mayor",
+          "quote": "Los mayas desarrollaron un sistema de escritura avanzado",
+          "why": "El enunciado menciona a los mayas y la única opción de respuesta que incluye ese término es «Glifos mayas»."
+        }
+      ],
+      "suspicious": true,
+      "reasons": [
+        "mayor: pista_accidental — «Los mayas desarrollaron un sistema de escritura avanzado»"
+      ]
+    },
+    {
+      "id": "addddd0c-339e-49f9-81a8-89ebf4746c6b",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "fd693d53-357e-4555-9b21-7b7ceafb6df9",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "2d0f31d8-367b-4b58-8da0-19d1ba0472a5",
+      "tipo": "fill_blank",
+      "revisadaPor": null,
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "a5a3419c-ef32-4673-92ea-2cb65985c13a",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "bb83e25c-7c79-409d-bc6c-c8ce197d73ab",
+      "tipo": "short_answer",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "15b9b61e-d8ae-4694-b2be-b2fd4cecc3b3",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "7c459b08-2117-4af4-a931-2df87995a63a",
+      "tipo": "true_false",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "25743514-47ee-4d48-8ac8-d60ac0f59c02",
+      "tipo": "short_answer",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "14ac4d8f-ab8c-4687-8b0a-1ad6d02896e3",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "4170304b-20a6-4eef-a191-615fc71a1fd2",
+      "tipo": "fill_blank",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [
+        {
+          "code": "trivial",
+          "severity": "menor",
+          "quote": "La ___ es la sensibilidad de una variable a cambios porcentuales en otra variable (ceteris paribus).",
+          "why": "Se responde por simple memorización de una palabra de la definición textual sin requerir comprensión."
+        }
+      ],
+      "suspicious": false,
+      "reasons": []
+    },
+    {
+      "id": "ef1b44cb-8ca9-4a28-b44a-57ea8177c464",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": true,
+      "defects": [
+        {
+          "code": "pista_accidental",
+          "severity": "mayor",
+          "quote": "establecía castigos diferentes para personas de distintas clases sociales",
+          "why": "El enunciado descarta directamente la opción D al afirmar que las leyes variaban según la clase social."
+        }
+      ],
+      "suspicious": true,
+      "reasons": [
+        "mayor: pista_accidental — «establecía castigos diferentes para personas de distintas clases sociales»"
+      ]
+    },
+    {
+      "id": "47ca10d9-2ac0-4c94-85c5-61447c506ee9",
+      "tipo": "fill_blank",
+      "revisadaPor": null,
+      "audited": true,
+      "blindApplicable": false,
+      "blindMatches": null,
+      "defects": [
+        {
+          "code": "ambigua",
+          "severity": "mayor",
+          "quote": "si su elasticidad precio es mayor que uno",
+          "why": "Es ambigua al omitir 'en valor absoluto', teniendo en cuenta que la elasticidad precio se define como negativa."
+        }
+      ],
+      "suspicious": true,
+      "reasons": [
+        "mayor: ambigua — «si su elasticidad precio es mayor que uno»"
+      ]
+    },
+    {
+      "id": "75632b6f-031b-48e0-9f43-33895037ab45",
+      "tipo": "multiple_choice",
+      "revisadaPor": "ai_judge",
+      "audited": true,
+      "blindApplicable": true,
+      "blindMatches": null,
+      "defects": [
+        {
+          "code": "ambigua",
+          "severity": "mayor",
+          "quote": "¿cómo se verá afectada la pendiente de la recta presupuestaria?",
+          "why": "Depende de si la pendiente se evalúa en valor algebraico (que disminuye al hacerse más negativa) o como magnitud/inclinación (que aumenta)."
+        }
+      ],
+      "suspicious": true,
+      "reasons": [
+        "mayor: ambigua — «¿cómo se verá afectada la pendiente de la recta presupuestaria?»"
+      ]
+    }
+  ]
+}
