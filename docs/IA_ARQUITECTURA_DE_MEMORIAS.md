@@ -232,6 +232,20 @@ Defectos más frecuentes (28 registrados en ambas rondas): ambigüedad en respue
 
 **Cómo se interpreta la discrepancia:** «el externo dijo corregir y el profesor aprobó» no siempre es un error del externo (el profesor puede aceptar algo que un revisor estricto mejoraría); por eso se reportan por separado falsos aprobados (peligrosos) y falsos rechazos (solo exigencia de más).
 
+### 13.8 Primer intento de validación: **no validado** (2026-11-11)
+El profesor decidió 30 de las 39 preguntas clásicas de la cola que el revisor externo había revisado antes (sin cambiar ninguna). Resultado (`memoria-calidad/rondas/validacion-2026-11-11.json`):
+
+| | Profesor aprobó | Profesor rechazó |
+|---|---|---|
+| Revisor externo: **bueno** (18) | 9 | 9 |
+| Revisor externo: **corregir** (12) | 6 | 6 |
+
+- **Acuerdo 15 de 30 (50 %; IC 95 % 33–67 %; cota inferior 33 %) → NO validado.** El revisor externo **no puede aprobar** y sigue sin poder.
+- **Hallazgo duro:** el veredicto del revisor externo **no predice** la decisión del profesor en esta cola: la tasa de rechazo del profesor es 50 % tanto entre lo que el revisor llamó «bueno» como entre lo que llamó «corregir». Con 30 pares es una muestra pequeña, pero el resultado no apunta en la dirección esperada.
+- **La cola está mucho peor que el banco aprobado:** el profesor rechazó el 50 % (15 de 30), frente al 12,5 % de rechazo en la muestra ciega de preguntas ya aprobadas por el juez (§11.5).
+- **Hipótesis probadas y descartadas con los datos:** (1) *duplicados*: rechazadas y aprobadas tienen la misma frecuencia de gemelo aprobado y más antiguo (4/15 y 3/15); (2) *anclaje al material*: cuando el juez no pudo dar segunda opinión, el profesor aprobó 11 y rechazó 11 (sin patrón). **No se puede deducir el criterio del profesor con los datos que hay: hace falta preguntarle el motivo de las discrepancias.**
+- **Dos ejes distintos:** parte de las discrepancias (6 de «corregir» que el profesor aprobó) son defectos **funcionales** del calificador (palabras clave de más, variantes de respuesta) que no se ven leyendo el contenido y que ahora detecta el validador determinista; no son errores del revisor. El eje que importa para validar es el **de contenido**.
+- **Consecuencia:** no se aplican las 13 correcciones ni se insertan preguntas nuevas con este revisor. Las preguntas rechazadas por el profesor quedan retiradas; las 9 pendientes siguen en su cola.
 ## 14. El criterio explícito del profesor: «todo debe estar en el material» (2026-11-11)
 
 ### 14.1 El criterio
