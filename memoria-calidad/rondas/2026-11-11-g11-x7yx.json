@@ -1,0 +1,70 @@
+{
+  "lote": "2026-11-11-g11-x7yx",
+  "fecha": "2026-11-11T13:42:07.978Z",
+  "arm": "base",
+  "kind": "generated",
+  "revisor": "claude-externo (sesion de Claude Code; revision manual lectura+razonamiento)",
+  "resumen": {
+    "n": 39,
+    "cruda": {
+      "k": 28,
+      "n": 39,
+      "rate": 0.717948717948718,
+      "ci": {
+        "low": 0.5622438267752261,
+        "high": 0.8345667498605671
+      }
+    },
+    "entregable": {
+      "k": 39,
+      "n": 39,
+      "rate": 1,
+      "ci": {
+        "low": 0.910330146399761,
+        "high": 1
+      }
+    },
+    "veredictos": {
+      "bueno": 28,
+      "corregir": 11,
+      "malo": 0
+    },
+    "defectosPorCodigo": {
+      "ambigua": 9,
+      "pista_accidental": 1,
+      "dato_faltante": 3,
+      "mas_de_una_correcta": 2
+    },
+    "defectosSeriosPorCodigo": {
+      "ambigua": 6,
+      "pista_accidental": 1,
+      "dato_faltante": 2,
+      "mas_de_una_correcta": 2
+    },
+    "metaCruda": {
+      "target": 0.9,
+      "status": "no_alcanzada",
+      "neededN": null
+    },
+    "metaEntregable": {
+      "target": 0.9,
+      "status": "cumple",
+      "neededN": 39
+    }
+  },
+  "juezVsExterno": {
+    "pairs": 39,
+    "falsePass": 10,
+    "judgePass": 38,
+    "passPrecision": {
+      "k": 28,
+      "n": 38,
+      "rate": 0.7368421052631579,
+      "ci": {
+        "low": 0.5799084979362467,
+        "high": 0.8502853761029869
+      }
+    },
+    "falseAlarm": 0
+  }
+}

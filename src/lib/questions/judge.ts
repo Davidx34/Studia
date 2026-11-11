@@ -84,7 +84,24 @@ export type JudgeCriterion = 'subject' | 'material';
 // Por defecto 'subject'. JUDGE_CRITERION=material vuelve al criterio de anclaje al material subido.
 export const judgeCriterion = (env: Record<string, string | undefined> = process.env): JudgeCriterion =>
   env.JUDGE_CRITERION?.trim().toLowerCase() === 'material' ? 'material' : 'subject';
-export const rubricFor = (c: JudgeCriterion = judgeCriterion()): string => (c === 'material' ? RUBRIC : RUBRIC_SUBJECT);
+// RUBRICA v2 (APAGADA por defecto; se enciende con JUDGE_RUBRIC=v2 solo si la medicion lo respalda). Nace de la revision EXTERNA de 79 preguntas (docs/IA_ARQUITECTURA_DE_MEMORIAS.md §13): el juez de la app
+// dejo pasar defectos en ~27 % de lo que aprobo, casi todos de calificacion o de enunciado. Estas comprobaciones se AGREGAN a la rubrica; no quitan ninguna. Se mide en una ronda nueva (no en las preguntas que
+// la inspiraron).
+export const RUBRIC_V2_EXTRA = `
+
+COMPROBACIONES ADICIONALES (revisa cada una antes de dar "pass"):
+a. CALIFICACION: en completar (fill_blank) el estudiante debe escribir TODAS las respuestas aceptadas; si la lista son sinonimos o alternativas, o la respuesta esperada es una frase larga con otras formas igual de correctas (otro nombre valido del mismo concepto, «0» frente a «cero»), da "review" o "fail". En respuesta corta, el numero de cosas que pide el enunciado debe coincidir con el numero de palabras clave.
+b. FIGURAS: si el enunciado, las opciones o los pares usan etiquetas de una grafica o figura que no se dan («cesta A», «punto B», «la figura»), da "fail" (criterio 3).
+c. COPIA LITERAL: si una opcion o el enunciado copia una frase del material que no se entiende o parece un error de extraccion (p. ej. «(excepto negativos)»), da "review" (criterio 6).
+d. EMPAREJAR: si dos definiciones son equivalentes entre si (dos nombres del mismo concepto), da "review" (criterio 2).
+e. SUPUESTOS Y SIGNOS: si la conclusion solo vale con un supuesto que el enunciado no da (p. ej. preferencias monotonas), o depende del signo de una pendiente o elasticidad sin precisar «en valor absoluto», da "review".
+f. EXPLICACION: si la explicacion contradice la respuesta marcada o trae una formula o un calculo incorrecto, da "fail" (criterio 1).
+g. VERDADERO/FALSO: si un absoluto («ninguna», «siempre», «nunca») delata la respuesta sin saber el tema, da "review" (criterio 5).`;
+
+export const rubricFor = (c: JudgeCriterion = judgeCriterion(), env: Record<string, string | undefined> = process.env): string => {
+  const base = c === 'material' ? RUBRIC : RUBRIC_SUBJECT;
+  return env.JUDGE_RUBRIC?.trim().toLowerCase() === 'v2' ? base + RUBRIC_V2_EXTRA : base;
+};
 export const sourceHeader = (c: JudgeCriterion = judgeCriterion()): string =>
   c === 'material' ? 'MATERIAL FUENTE:' : 'MATERIAL DE REFERENCIA DEL CURSO (puede no contener todo lo que la pregunta evalua):';
 

@@ -177,3 +177,48 @@ La alerta trae un botón: **«Volver a la versión N»** (activa la versión pre
 
 ### 12.5 Sobre datos reales (2026-11-11)
 Ninguna clase tiene hoy un cuaderno activo, así que **la comparación antes/después no se ejerció con datos reales** (solo con pruebas y datos de ejemplo). Sí se ejerció lo demás: **Microeconomía I → `juez_degradado` + `cola_larga`** (46 comparaciones, cota inferior 76,5 %; ≥ 20 preguntas en revisión), las otras dos clases sin alertas.
+
+## 13. Bucle iterativo con juez externo (2026-11-11)
+
+### 13.1 Qué es y por qué
+La calibración de la IA de la app dependía de decisiones del profesor, que cuestan conseguir. El bucle agrega un **segundo canal** que no depende de él: un **revisor externo** (un modelo fuerte operado por una persona desde una sesión de Claude Code; **la app nunca lo llama en producción**) revisa y **corrige** preguntas en lote, y las correcciones se integran al banco con trazabilidad. Los dos canales se tratan distinto a propósito:
+
+| Canal | Qué es | Peso |
+|---|---|---|
+| **Decisiones del profesor** | La verdad de referencia (§10, §11.5, §12) | Calibra al juez y activa el interruptor de seguridad |
+| **Juez externo** | Revisor fuerte, rápido y barato, **no validado todavía** | Puede **retirar** preguntas malas de inmediato; solo puede **aprobar** cuando esté **validado** frente al profesor (compuerta 13.3) |
+
+### 13.2 Flujo (`scripts/lote.ts`)
+1. `generar` — la IA de la app genera **en local** (sin tocar la base), pasa el validador de forma y el juez de la app, y deja el lote en `memoria-calidad/lotes/<id>/` (`lote.md` para leer).  `exportar-banco` hace lo mismo con preguntas **ya servidas** (solo lectura).
+2. El revisor externo escribe `revision.json`: por pregunta, veredicto `bueno | corregir | malo`, defectos del **catálogo del auditor** (12 códigos, severidad y una **cita textual**) y, si corrige, la versión corregida.
+3. `resumen <id> [--guardar]` — valida la revisión de forma **estricta** (cada pregunta una vez; citas que existan en la pregunta; «bueno» sin defectos serios; correcciones que pasen el validador de forma, conserven el tipo y sean distintas) y calcula la calidad **cruda** (`bueno/n`: el generador tal como sale) y la **entregable** (`bueno+corregir`) con intervalo de Wilson al 95 %. `comparar <A> <B>` compara dos lotes con la estadística de los experimentos.
+4. `aplicar <id> [--db]` — ensayo en seco por defecto; con `--db` inserta/corrige en el banco, deja **una fila por pregunta revisada** en `ai_question_revisions` (antes/después, veredicto, defectos: permite revertir y validar al revisor) y la ronda en `ai_quality_rounds` (solo números). Requiere la **migración 103**.
+
+### 13.3 Regla asimétrica y compuerta de validación
+- **Retirar es siempre posible** (quitar una pregunta es la dirección segura y reversible). **Aprobar** exige que el revisor externo esté **validado**: acuerdo con el profesor, sobre preguntas que ambos decidieron, con cota inferior de Wilson ≥ 80 % y ≥ 20 comparaciones (`validateExternal`).
+- Mientras no esté validado: sus «bueno» **no cambian el estado**, y lo nuevo o corregido entra como `human_review`, nunca como `approved`.
+- **Aviso sobre el estado actual:** hoy el banco **sirve** a estudiantes toda pregunta no rechazada, incluidas las `pending` y `human_review` (`servableQuestions` solo excluye `rejected`). `human_review` no protege a los estudiantes; por eso retirar sí importa.
+
+### 13.4 Ronda 1 (2026-11-11): 79 preguntas revisadas
+| Lote | n | Buenas tal como salen (cruda) | IC 95 % | Pasan el juez de la app y tenían defecto |
+|---|---|---|---|---|
+| Generado en local (base) | 39 | 28 (71,8 %) | 56,2 – 83,5 % | 10 de 38 (precisión del «pass» 73,7 %) |
+| Banco servido | 40 | 31 (77,5 %) | 62,5 – 87,7 % | 5 de 17 con juez (70,6 %) |
+| **Combinado** | **79** | **59 (74,7 %)** | **64,1 – 83,0 %** | |
+
+La calidad **entregable** (buenas + corregidas) fue 100 % y 97,5 %, pero **no es una medida independiente**: las correcciones las hizo el mismo revisor y el profesor aún no las valida. **Ni la meta del 90 % ni su IC se cumplen hoy.** Para confirmar el 90 % con IC 95 % hace falta, según la tasa real: ≈ 375 preguntas si es 93 %, ≈ 130 si es 95 %, ≈ 70 si es 97 %.
+
+Defectos más frecuentes (28 registrados en ambas rondas): ambigüedad en respuestas aceptadas o en el enunciado (18; p. ej. respuestas aceptadas que dejan mal a quien contesta bien o piden cosas que el calificador no admite), enunciados que dependen de una gráfica que no se da (3), frases del material copiadas sin entenderse, como «(excepto negativos)» (2), definiciones equivalentes en emparejar, explicaciones que contradicen la clave.
+
+### 13.5 Lo aprendido, integrado a la IA de la app
+1. **Hallazgo del calificador (activo):** en la app, `fill_blank` y `short_answer` exigen que aparezcan **todas** las respuestas / palabras clave de la lista (cliente y servidor). Una lista de sinónimos, o más respuestas que huecos, o «dos» pedidos con tres palabras clave, hace la pregunta imposible de acertar de forma natural. Tres **reglas deterministas** nuevas en el validador de forma (`typability.ts`, sin costo de IA, activas): una respuesta por hueco; la cantidad pedida («dos», «tres»…) debe coincidir con las palabras clave; en emparejar, términos no repetidos. Impacto medido sobre el banco real: **6 de 575** preguntas no rechazadas dejarían de servirse, todas defectos genuinos (1 completar, 4 respuesta corta, 1 emparejar). *Una regla que propuse al inicio —rechazar definiciones idénticas— se descartó al medirla: ocultaba 3 preguntas legítimas, porque el calificador compara el texto de la definición.*
+2. **Reglas de redacción `item_writing_v2`** (8 reglas, cada una con su evidencia): **apagadas**; se miden en la ronda 2 con preguntas nuevas.
+3. **Rúbrica v2 del juez** (`JUDGE_RUBRIC=v2`, 7 comprobaciones adicionales): **apagada**; mismo criterio.
+4. **El auditor ya ve las preguntas «match»** (antes sus pares eran invisibles para él).
+5. **Método anti-sobreajuste:** reglas y rúbrica v2 nacieron de las 79 preguntas de la ronda 1; **no** se miden con ellas, sino con una ronda nueva (`generar --reglas item_writing_v2` contra `generar` base, misma semilla; `comparar`).
+
+### 13.6 Límites honestos
+1. El revisor externo **no está validado**: es un modelo, estricto por diseño, y su estándar puede ser más duro que el del profesor (en la muestra ciega el profesor aceptó preguntas que el auditor marcó). Sus cifras son una **estimación a validar**, no la verdad.
+2. Se desvió un patrón del propio proceso: **no usé** como validación las 40 preguntas de la muestra ciega, porque ya conocía las decisiones del profesor (no serían ciegas). La validación correcta es **prospectiva**: el revisor externo registra sus veredictos sobre la cola de revisión **antes** de que el profesor decida, y luego se calcula el acuerdo.
+3. Muestras pequeñas (≈ 40 por lote): los intervalos son amplios. Un lote nuevo con reglas v2 necesita ≥ 50 por brazo para detectar mejoras de ≈ 20 puntos.
+4. La calidad medida es de redacción y corrección; **no** mide aprendizaje de estudiantes.
