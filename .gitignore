@@ -67,3 +67,6 @@ loadtest/results/
 # Muestra ciega y su clave: contenido real de las clases y la clave rompe la ciega; no se publican
 memoria-calidad/auditorias/*-clave.json
 memoria-calidad/auditorias/*-muestra-ciega.md
+
+# Bucle con juez externo: lotes (preguntas y revisiones con contenido real de las clases) NO se publican; solo las rondas (numeros) si
+memoria-calidad/lotes/

@@ -5,7 +5,7 @@
 // y dejar saltar a la siguiente en vez de una pantalla rota o vacia.
 
 import { isGradedGameType } from '@/lib/grading/gameGrading';
-import { fillBlankQuality, hasDroppedSymbols, shortAnswerQuality } from './typability';
+import { fillBlankQuality, hasDroppedSymbols, matchQuality, shortAnswerQuality } from './typability';
 
 export interface ValidationResult {
   valid: boolean;
@@ -109,6 +109,10 @@ export function isValidQuestion(q: any): ValidationResult {
     case 'match':
       if (!q.q || !Array.isArray(q.pairs) || q.pairs.length === 0) {
         return { valid: false, error: 'Faltan los pares para conectar.' };
+      }
+      {
+        const quality = matchQuality(q.pairs);
+        if (!quality.ok) return { valid: false, error: quality.error };
       }
       return { valid: true };
 

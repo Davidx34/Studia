@@ -50,7 +50,8 @@ export const DEFECT_CODES: Record<string, string> = {
   calculo_erroneo: 'Un calculo del enunciado, de las opciones o de la explicacion esta mal.',
 };
 
-const CLASSIC = new Set(['multiple_choice', 'true_false', 'fill_blank', 'short_answer']);
+// «match» se audita por defectos (no tiene resolucion ciega): antes quedaba fuera y era invisible para el auditor.
+const CLASSIC = new Set(['multiple_choice', 'true_false', 'fill_blank', 'short_answer', 'match']);
 export const isAuditable = (q: any): boolean => CLASSIC.has(q?.type);
 export const supportsBlindSolve = (q: any): boolean => (q?.type === 'multiple_choice' && Array.isArray(q.opts) && q.opts.length >= 2) || q?.type === 'true_false';
 
@@ -68,6 +69,7 @@ export function fullText(q: any): string {
   if (q.ok !== null && q.ok !== undefined) parts.push(`Respuesta marcada como correcta: ${JSON.stringify(q.ok)}`);
   if (q.answers) parts.push(`Respuestas aceptadas: ${JSON.stringify(q.answers)}`);
   if (q.keywords) parts.push(`Palabras clave esperadas: ${JSON.stringify(q.keywords)}`);
+  if (q.pairs) parts.push(`Pares: ${JSON.stringify(q.pairs)}`);
   if (q.exp) parts.push(`Explicacion: ${q.exp}`);
   return parts.join('\n');
 }

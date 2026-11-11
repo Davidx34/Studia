@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_ANSWER_CHARS, MAX_ANSWER_WORDS, fillBlankQuality, hasDroppedSymbols, isTypable, shortAnswerQuality, unfairKeywords } from './typability';
+import { MAX_ANSWER_CHARS, MAX_ANSWER_WORDS, askedCount, fillBlankQuality, hasDroppedSymbols, isTypable, matchQuality, shortAnswerQuality, unfairKeywords } from './typability';
 import { isValidQuestion } from './validateQuestion';
 import { validateExamQuestion, chunkKey, type ChunkIndex } from '@/lib/blueprint/examQuestion';
 import type { Blueprint } from '@/lib/blueprint/types';
@@ -120,5 +120,31 @@ describe('preguntas de EXAMEN: las mismas reglas', () => {
   });
   it('huecos de formula en el enunciado', () => {
     expect(errs(validateExamQuestion({ ...base, type: 'fill_blank', q: 'La pendiente de la recta, donde  y  son precios, es ____.', answers: ['costo'] }, { plan: plan(), chunks: chunks() }))).toContain('huecos');
+  });
+});
+
+// Reglas nacidas de la revision externa (docs/IA_ARQUITECTURA_DE_MEMORIAS.md §13).
+describe('reglas de la revision externa', () => {
+  it('completar: debe haber una respuesta por hueco (el calificador exige TODAS)', () => {
+    expect(fillBlankQuality('El Índice de Lerner en competencia perfecta vale ___.', ['cero', '0']).ok).toBe(false);
+    expect(fillBlankQuality('El poder adquisitivo depende de ___ y ___.', ['precios', 'ingreso']).ok).toBe(true);
+    expect(fillBlankQuality('La demanda es ___ si su elasticidad es mayor que uno.', ['elástica']).ok).toBe(true);
+    expect(fillBlankQuality('Dos huecos ___ y ___ pero una sola respuesta.', ['una']).ok).toBe(false);
+  });
+  it('completar sin hueco marcado no se rechaza por esta regla', () => {
+    expect(fillBlankQuality('Escribe el nombre de la curva', ['oferta']).ok).toBe(true);
+  });
+  it('respuesta corta: pedir «dos» o «tres» exige esa cantidad de palabras clave', () => {
+    expect(askedCount('Indica dos de las características de la competencia perfecta.')).toBe(2);
+    expect(askedCount('Menciona los tres conjuntos de cestas que se definen.')).toBe(3);
+    expect(askedCount('Explica el significado de la condición de primer orden.')).toBeNull();
+    expect(askedCount('Menciona una de las dos razones del colapso.')).toBeNull();
+    expect(askedCount('Indica al menos dos características.')).toBeNull();
+    expect(shortAnswerQuality('Menciona dos supuestos fundamentales sobre la conducta del consumidor.', ['tomador', 'racional', 'bienestar']).ok).toBe(false);
+    expect(shortAnswerQuality('Menciona dos supuestos fundamentales sobre la conducta del consumidor.', ['tomador', 'racional']).ok).toBe(true);
+  });
+  it('emparejar: un termino repetido se rechaza, pero definiciones identicas NO (el calificador compara el texto)', () => {
+    expect(matchQuality([{ term: 'Alfa', def: 'Uno' }, { term: 'alfa', def: 'Dos' }]).ok).toBe(false);
+    expect(matchQuality([{ term: 'Maíz', def: 'América' }, { term: 'Papa', def: 'América' }, { term: 'Arroz', def: 'Asia' }]).ok).toBe(true);
   });
 });
