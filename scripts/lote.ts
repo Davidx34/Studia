@@ -9,8 +9,11 @@
 //        Valida la revision de forma ESTRICTA (citas verificables, correcciones validas) y calcula calidad cruda y entregable con IC 95 %. --guardar escribe solo numeros en memoria-calidad/rondas/.
 //   3b. comparar        npx tsx --env-file=.env.local scripts/lote.ts comparar <idBase> <idTratamiento>
 //        Compara la calidad CRUDA de dos lotes revisados (p. ej. base contra --reglas item_writing_v2, mismos modulos por la misma --semilla) con la estadistica de los experimentos (Wilson/Newcombe).
+//   3c. validacion      npx tsx --env-file=.env.local scripts/lote.ts validacion
+//        Muestra el acuerdo del revisor externo con el profesor (preguntas que ambos decidieron) y si la compuerta de validacion se cumple. Solo lectura.
 //   4. aplicar          npx tsx --env-file=.env.local scripts/lote.ts aplicar <id> [--db]
-//        Sin --db es un ensayo en seco. Con --db: inserta/corrige en el banco con trazabilidad (ai_question_revisions) y registra la ronda (ai_quality_rounds). Las aprobaciones del revisor externo solo
+//        --solo-registrar (con --db) guarda SOLO los veredictos del revisor (ai_question_revisions) sin tocar ninguna pregunta: sirve para la validacion PROSPECTIVA (el revisor opina ANTES de que el
+//        profesor decida; despues se aplican las correcciones con otra corrida sin esa bandera). Sin --db es un ensayo en seco. Con --db: inserta/corrige en el banco con trazabilidad (ai_question_revisions) y registra la ronda (ai_quality_rounds). Las aprobaciones del revisor externo solo
 //        entran como «approved» si el revisor esta VALIDADO frente al profesor; si no, entran como «human_review» (nunca se publica sin validacion). Las preguntas del lote y la revision son PRIVADAS (gitignore).
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
@@ -198,12 +201,26 @@ async function paresExternoProfesor(d: any) {
   });
 }
 
+async function validacion() {
+  const d = db();
+  const pares = await paresExternoProfesor(d);
+  const v = validateExternal(pares);
+  const { data: revs } = await d.from('ai_question_revisions').select('question_id, verdict').eq('source', 'external_ai').not('question_id', 'is', null).limit(20000);
+  const total = new Set((revs ?? []).map((r: any) => r.question_id)).size;
+  console.log(`Preguntas con veredicto del revisor externo: ${total} | ya decididas tambien por el profesor: ${v.pairs} | por decidir: ${total - v.pairs}`);
+  if (v.pairs === 0) return console.log('Aun no hay comparaciones.');
+  console.log(`Acuerdo: ${v.agree}/${v.pairs} = ${pct(v.agreement.rate)}  IC95% [${pct(v.agreement.ci?.low ?? null)}, ${pct(v.agreement.ci?.high ?? null)}]  cota inferior ${pct(v.lowerBound)}`);
+  console.log(`El externo dijo «bueno» y el profesor rechazo: ${v.falsePass} | el externo dijo corregir/malo y el profesor aprobo: ${v.falseReject}`);
+  console.log(`ESTADO: ${v.status.toUpperCase()}${v.status === 'sin_datos' ? ' (faltan comparaciones: minimo 20)' : v.status === 'validado' ? ' -> puede aprobar' : ' -> NO puede aprobar'}`);
+}
+
 // REGLA ASIMETRICA: el revisor externo SIEMPRE puede retirar una pregunta mala (quitar una pregunta es la direccion segura y reversible), pero APROBAR exige que este validado frente al profesor.
 async function aplicar(id: string) {
   const { lot, rev } = load(id);
   const errores = validateRevision(lot, rev);
   if (errores.length) throw new Error(`La revision es invalida (${errores.length} problemas); corrige y vuelve a correr «resumen».`);
   const enDb = process.argv.includes('--db');
+  const soloRegistrar = process.argv.includes('--solo-registrar');
   const d = db();
   const validacion = validateExternal(await paresExternoProfesor(d));
   const estado = bankStatusFor(validacion.status);
@@ -222,6 +239,7 @@ async function aplicar(id: string) {
   }
   console.log('Plan:', JSON.stringify(plan));
   if (!enDb) return console.log('(ensayo en seco: no se escribio nada. Usa --db para aplicar.)');
+  if (soloRegistrar) console.log('Modo --solo-registrar: se guardan los veredictos, NO se modifica ninguna pregunta.');
 
   const s = summarizeRound(rev);
   const ahora = new Date().toISOString();
@@ -232,7 +250,9 @@ async function aplicar(id: string) {
     const final = r.veredicto === 'corregir' ? r.corregida : it.question;
     const { data: modRow } = await d.from('content_modules').select('classroom_id').eq('id', it.module_id).single();
     let questionId: string | null = it.bankId ?? null;
-    if (it.bankId) {
+    if (soloRegistrar) {
+      // Solo se registra el veredicto: la pregunta queda como esta.
+    } else if (it.bankId) {
       if (r.veredicto === 'malo') {
         const { error } = await d.from('lesson_questions').update({ review_status: 'rejected', is_backup: true, reviewed_by: 'external_ai', reviewed_at: ahora, review_reason: `[revisor externo] ${r.defectos.map((x) => x.code).join(', ')}`.slice(0, 500) }).eq('id', it.bankId);
         if (error) throw error;
@@ -255,7 +275,7 @@ async function aplicar(id: string) {
     if (er) throw er;
     hecho++;
   }
-  const { error: er } = await d.from('ai_quality_rounds').insert({ batch_id: id, source: 'external_ai', kind: lot.arm === 'banco' ? 'bank' : 'generated', n: s.n, good: s.veredictos.bueno, ci_low: s.cruda.ci?.low ?? null, ci_high: s.cruda.ci?.high ?? null, defects: s.defectosPorCodigo, notes: `entregable ${s.entregable.k}/${s.entregable.n}; revisor ${rev.revisor}; estado ${validacion.status}` });
+  const { error: er } = await d.from('ai_quality_rounds').upsert({ batch_id: id, source: 'external_ai', kind: lot.arm === 'banco' ? 'bank' : 'generated', n: s.n, good: s.veredictos.bueno, ci_low: s.cruda.ci?.low ?? null, ci_high: s.cruda.ci?.high ?? null, defects: s.defectosPorCodigo, notes: `entregable ${s.entregable.k}/${s.entregable.n}; revisor ${rev.revisor}; estado ${validacion.status}` }, { onConflict: 'batch_id' });
   if (er) throw er;
   console.log(`Aplicadas ${hecho} preguntas y registrada la ronda ${id}.`);
 }
@@ -265,6 +285,7 @@ async function aplicar(id: string) {
   else if (cmd === 'exportar-banco') await exportarBanco();
   else if (cmd === 'resumen') resumen(arg1);
   else if (cmd === 'comparar') comparar(arg1, args[2]);
+  else if (cmd === 'validacion') await validacion();
   else if (cmd === 'aplicar') await aplicar(arg1);
   else console.log('Uso: lote.ts generar | exportar-banco | resumen <id> | aplicar <id> [--db]');
 })().catch((e) => {
