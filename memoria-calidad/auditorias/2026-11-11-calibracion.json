@@ -1,0 +1,55 @@
+{
+  "fecha": "2026-11-11",
+  "muestra": 40,
+  "decisiones": {
+    "A": 35,
+    "R": 4,
+    "X": 1
+  },
+  "profesor": {
+    "defectuosas": 5,
+    "tasa": 12.5,
+    "ic95": [
+      5.5,
+      26.1
+    ]
+  },
+  "juez": {
+    "aprobo": 40,
+    "detecto": 0,
+    "recall": 0,
+    "nota": "las 40 estaban aprobadas por el juez; el profesor encontro defecto en 5"
+  },
+  "auditor": {
+    "marco": 6,
+    "verdaderosPositivos": 3,
+    "falsosPositivos": 3,
+    "falsosNegativos": 2,
+    "precision": 50,
+    "precisionIc95": [
+      18.8,
+      81.2
+    ],
+    "recall": 60,
+    "recallIc95": [
+      23.1,
+      88.2
+    ]
+  },
+  "ids": {
+    "verdaderosPositivos": [
+      2,
+      16,
+      34
+    ],
+    "falsosPositivos": [
+      15,
+      18,
+      28
+    ],
+    "falsosNegativos": [
+      32,
+      40
+    ]
+  }
+}
