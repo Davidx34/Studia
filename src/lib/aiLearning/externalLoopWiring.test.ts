@@ -28,7 +28,15 @@ describe('script del bucle con juez externo (scripts/lote.ts)', () => {
   });
   it('toda pregunta revisada deja una fila en ai_question_revisions (permite revertir y validar al revisor)', () => {
     expect(s).toContain("from('ai_question_revisions').insert");
-    expect(s).toContain("from('ai_quality_rounds').insert");
+    expect(s).toContain("from('ai_quality_rounds').upsert");
+  });
+  it('--solo-registrar no modifica ninguna pregunta: la rama de escritura del banco queda detras de «else» (validacion prospectiva)', () => {
+    const aplicar = s.slice(s.indexOf('async function aplicar'), s.indexOf('(async () => {'));
+    const iSolo = aplicar.indexOf('if (soloRegistrar) {');
+    expect(iSolo).toBeGreaterThan(-1);
+    // Toda escritura a lesson_questions ocurre despues de la rama soloRegistrar y dentro de su cadena else.
+    for (const m of aplicar.matchAll(/from('lesson_questions').(update|insert)/g)) expect(m.index!).toBeGreaterThan(iSolo);
+    expect(aplicar.slice(iSolo, iSolo + 200)).toContain('} else if (it.bankId)');
   });
   it('la generacion local y la exportacion del banco son de solo lectura', () => {
     const gen = s.slice(s.indexOf('async function generar'), s.indexOf('function load('));
