@@ -131,3 +131,20 @@ Tres brazos juntos, 15 grupos completos de 15 (5 módulos de peor aprobación hi
 **Lectura honesta:** (1) **No hay evidencia de mejora** de reglas ni doctrina, tampoco con la métrica que sí discrimina. (2) Las estimaciones puntuales van **en contra** de los tratamientos (las reglas llegan casi a ser peores, límite superior del intervalo +0,5 pp), pero con 4, 11 y 7 sospechosas el ruido es grande: **no se puede afirmar que empeoren**. (3) El auditor es otro modelo y puede equivocarse; sus sospechas se calibran con la muestra ciega del profesor. (4) **Decisión operativa:** la doctrina sigue APAGADA, las reglas `item_writing_v1` no se recomiendan como activas por defecto, y las memorias derivadas (§11.3) nacen apagadas por la misma razón. Para repetirlo con más poder hace falta más muestra (≈ 60 preguntas sospechosas por brazo) o una métrica con más señal (la revisión del profesor).
 
 **Defecto de método corregido en este PR:** el archivo de resultados llevaba el mismo nombre que el del experimento anterior y lo habría sobrescrito; ahora incluye `+auditor`.
+
+### 11.5 Calibración contra el profesor (2026-11-11)
+El profesor revisó a ciegas la muestra de 40 preguntas **aprobadas por el juez** (A = usable tal cual, R = corregir, X = descartar): **35 A, 4 R, 1 X**. Datos y aciertos en `memoria-calidad/auditorias/2026-11-11-calibracion.json` (solo números e índices; el contenido de las preguntas no se publica).
+
+| Medida | Resultado | IC 95 % |
+|---|---|---|
+| Preguntas **aprobadas por el juez** que el profesor encontró defectuosas | **5 de 40 (12,5 %)** | 5,5 – 26,1 % |
+| Defectos que el **juez** detectó | 0 de 5 (las 40 estaban aprobadas) | — |
+| **Auditor**: precisión (de lo que marca, cuánto es defecto real) | 3 de 6 (50 %) | 18,8 – 81,2 % |
+| **Auditor**: sensibilidad (de los defectos reales, cuántos marca) | 3 de 5 (60 %) | 23,1 – 88,2 % |
+
+**Lectura honesta:**
+1. **El hallazgo importante no es el auditor, es el juez:** el juez aprueba ~98 % de lo que genera, pero el profesor rechaza o corrige ~1 de cada 8 de lo que el juez aprobó (12,5 %, con incertidumbre de 5 a 26 %). La calidad real del banco aprobado es menor que la que reporta el juez.
+2. **El auditor no es una referencia confiable por sí solo:** acierta la mitad de lo que marca y deja pasar 2 de 5 defectos reales, incluido un error de fondo (una demanda «derivada de la utilidad indirecta» que se deriva del problema primal). Pero **sirve para priorizar la revisión del profesor**: entre lo que marca, la tasa de defecto real es 50 % frente al 12,5 % base (unas 4 veces más), y el juez no detectó ninguno.
+3. **Consecuencia para los experimentos A/B (§9, §11.4):** una métrica con 50 % de precisión y 60 % de sensibilidad añade mucho ruido; «sin evidencia» sigue siendo la lectura correcta y **no** se puede concluir que reglas o doctrina empeoren. La referencia útil es la revisión del profesor.
+4. **Límite de la muestra:** n = 40, intervalos amplios; las cifras orientan, no prueban. Falsos positivos del auditor: #15 (cita en la explicación), #18 y #28 (la explicación sí tenía un defecto menor que Gemini corrigió, pero el profesor lo consideró usable).
+5. **Efecto sobre la calibración del juez:** si estas 40 decisiones se registraran como decisiones del profesor, el acuerdo del juez con el profesor sería 35 de 40 (87,5 %) con cota inferior de Wilson ≈ 74 % < 80 %: el estado pasaría a «degradado» y el interruptor de §10 enviaría lo que el juez aprueba a revisión humana. Es el sistema funcionando como se diseñó; registrar las decisiones requiere autorización del profesor.
