@@ -13,6 +13,7 @@ import { DEFECT_CODES, fullText, type AuditDefect, type Severity } from '@/lib/q
 import { wilsonInterval, type Interval } from './proportion';
 import { wilsonLower, MIN_DECISIVE, TRUST_THRESHOLD } from './judgeCalibration';
 import type { ErrorCategory } from './errorTaxonomy';
+import { quoteInMaterial, quoteTokens, MIN_QUOTE_TOKENS } from './evidence';
 
 export type ExternalVerdict = 'bueno' | 'corregir' | 'malo';
 export const VERDICTS: ExternalVerdict[] = ['bueno', 'corregir', 'malo'];
@@ -39,6 +40,8 @@ export interface ReviewItem {
   defectos: AuditDefect[];
   corregida?: any;
   nota?: string;
+  /** Cita LITERAL (≥ 8 palabras) del material que respalda EXPLICITAMENTE la respuesta correcta (de la version corregida, si se corrige). Obligatoria en «bueno» y «corregir» cuando se valida contra el material. */
+  evidencia?: string;
 }
 export interface Revision {
   revisor: string;
@@ -50,7 +53,12 @@ export interface Revision {
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 
 /** Una revision es valida solo si es estricta: cada pregunta revisada una vez, defectos con codigo y CITA verificable, y las correcciones pasan el validador de forma. Devuelve la lista de problemas (vacia = valida). */
-export function validateRevision(lot: Lot, rev: Revision): string[] {
+export interface ValidateOptions {
+  /** Material normalizado (ver evidence.indexForQuotes) de cada modulo. Si se da, «bueno» y «corregir» EXIGEN una cita literal que exista en el material de su modulo (criterio del profesor: todo explicito). */
+  material?: (moduleId: string) => string | undefined;
+}
+
+export function validateRevision(lot: Lot, rev: Revision, opts: ValidateOptions = {}): string[] {
   const errors: string[] = [];
   if (rev.lote !== lot.id) errors.push(`la revision es del lote «${rev.lote}», no de «${lot.id}»`);
   if (!rev.revisor || !rev.fecha) errors.push('faltan revisor o fecha');
@@ -77,6 +85,12 @@ export function validateRevision(lot: Lot, rev: Revision): string[] {
     const serios = (r.defectos ?? []).filter((d) => d.severity !== 'menor');
     if (r.veredicto === 'bueno' && serios.length > 0) errors.push(`${r.id}: marcada «bueno» pero tiene defectos criticos o mayores`);
     if ((r.veredicto === 'corregir' || r.veredicto === 'malo') && (r.defectos ?? []).length === 0) errors.push(`${r.id}: «${r.veredicto}» exige al menos un defecto con cita`);
+    if (opts.material && (r.veredicto === 'bueno' || r.veredicto === 'corregir')) {
+      const mat = opts.material(it.module_id);
+      if (mat === undefined) errors.push(`${r.id}: no se pudo cargar el material del modulo para verificar la evidencia`);
+      else if (!r.evidencia || quoteTokens(r.evidencia) < MIN_QUOTE_TOKENS) errors.push(`${r.id}: «${r.veredicto}» exige una cita literal del material de al menos ${MIN_QUOTE_TOKENS} palabras (campo evidencia)`);
+      else if (!quoteInMaterial(r.evidencia, mat)) errors.push(`${r.id}: la cita de evidencia NO aparece literalmente en el material`);
+    }
     if (r.veredicto === 'corregir') {
       if (!r.corregida) errors.push(`${r.id}: «corregir» exige la version corregida`);
       else {
@@ -163,6 +177,7 @@ export const DEFECT_TO_CATEGORY: Record<string, ErrorCategory> = {
   ambigua: 'redaccion_confusa',
   dato_faltante: 'no_autocontenida',
   dato_inventado: 'anclaje_material',
+  no_explicito: 'anclaje_material',
   pista_accidental: 'otro',
   distractor_absurdo: 'otro',
   trivial: 'otro',

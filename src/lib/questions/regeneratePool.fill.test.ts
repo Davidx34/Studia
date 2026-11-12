@@ -6,7 +6,7 @@ import path from 'path';
 const cohereCalls: number[] = [];
 vi.mock('@/lib/questions/cohereGeneration', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/questions/cohereGeneration')>()),
-  getRagContext: vi.fn(async () => 'contexto del material'),
+  getRagContext: vi.fn(async () => 'contexto del material '.repeat(60)), // >= MIN_MATERIAL_CHARS: sin material suficiente no se genera
   normalizeGeneratedQuestion: (q: any) => q,
   callCohere: vi.fn(async (_prompt: string, count: number) => {
     cohereCalls.push(count);
@@ -160,5 +160,28 @@ describe('cableado en la interfaz del profesor', () => {
   it('un modulo que falla no detiene a los demas y se informa al final', () => {
     expect(client).toMatch(/catch \(e\)[\s\S]*failures\.push/);
     expect(client).toContain('setFailed(failures)');
+  });
+});
+
+// Criterio del profesor (2026-11-11): sin material suficiente NO se genera.
+import { hasEnoughMaterial, MIN_MATERIAL_CHARS } from '@/lib/questions/cohereGeneration';
+describe('guarda de material suficiente', () => {
+  it('rechaza un contexto vacio, de unas pocas letras o solo con etiquetas de seccion', () => {
+    expect(hasEnoughMaterial('')).toBe(false);
+    expect(hasEnoughMaterial('Verbos y Tiempos')).toBe(false);
+    expect(hasEnoughMaterial('[Sección: 1]\n'.repeat(100))).toBe(false);
+    expect(hasEnoughMaterial(undefined)).toBe(false);
+  });
+  it('acepta un material de al menos MIN_MATERIAL_CHARS letras de contenido', () => {
+    expect(hasEnoughMaterial('a'.repeat(MIN_MATERIAL_CHARS))).toBe(true);
+    expect(hasEnoughMaterial('a'.repeat(MIN_MATERIAL_CHARS - 1))).toBe(false);
+  });
+  it('los dos puntos de generacion aplican la guarda ANTES de pedir preguntas', () => {
+    const route = fs.readFileSync(path.join(process.cwd(), 'src/app/api/generate-questions/route.ts'), 'utf8');
+    const regen = fs.readFileSync(path.join(process.cwd(), 'src/lib/questions/regeneratePool.ts'), 'utf8');
+    expect(route.indexOf('hasEnoughMaterial(context)')).toBeGreaterThan(-1);
+    expect(route.indexOf('hasEnoughMaterial(context)')).toBeLessThan(route.indexOf('Fase 1.2: taxonomia cerrada'));
+    expect(regen.indexOf('hasEnoughMaterial(context)')).toBeGreaterThan(-1);
+    expect(regen.indexOf('hasEnoughMaterial(context)')).toBeLessThan(regen.indexOf('await getOrCreateModuleConcepts('));
   });
 });

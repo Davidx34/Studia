@@ -271,3 +271,33 @@ Por qué el profesor rechaza ≈ 50 % de la cola cuando muchas de las rechazadas
 - El revisor externo sigue **no validado**: no aprueba ni inserta preguntas.
 - **No** se cambia el criterio por defecto del juez en este PR: el criterio `material` ya existe, pero con la evidencia disponible no se puede asegurar que reduzca el rechazo del profesor (hay que medirlo contra sus decisiones antes de activarlo en producción).
 - Código de investigación (cobertura léxica y verificador semántico) **no** se incorpora al sistema: no predice la decisión del profesor.
+
+### 14.6 El criterio pasa a ser el estándar del bucle (2026-11-11)
+El profesor pidió **no ponderar tanto sus aprobaciones y rechazos individuales** (§13.8: ruidosas y difíciles de explicar) y evaluar **conforme a los criterios que declaró**: (1) todo explícito en el material, (2) sin resultados, procedimientos o ideas incorrectos o no sustentados por el material. En consecuencia:
+- La validación del revisor externo deja de depender del acuerdo con cada decisión y pasa a ser **objetiva y auditable**: todo «bueno» o «corregir» **exige una cita literal** (≥ 8 palabras) del material, y el código **comprueba que existe** (`evidence.ts`, `validateRevision`). Una cita inventada o parafraseada invalida la revisión. `resumen` lo exige por defecto (`--sin-cita` solo para lotes anteriores). Verificar que la frase existe **no prueba que respalde la respuesta**: eso lo sigue juzgando el revisor.
+- Nuevo defecto del catálogo: `no_explicito` (la respuesta no está dicha en el material: se calcula, se deduce o viene del conocimiento del modelo, aunque sea correcta). Una pregunta así **se retira**, no se «corrige».
+- La IA de la app puede **entregar su propia evidencia**: `generar --evidencia` agrega al prompt una regla que exige el campo `evidence` (frase literal del material) y descarta las preguntas cuya evidencia no sea literal.
+
+### 14.7 Ronda 2 (2026-11-11): 39 preguntas, todas las citas verificadas
+Mismos 5 módulos y la misma semilla en los dos lotes; 30 preguntas pedidas por lote.
+
+| Lote | Generadas útiles | Buenas (criterio del profesor) | IC 95 % |
+|---|---|---|---|
+| **Base** (la IA tal como es) | 29 | **15 de 29 (51,7 %)** | 34,4 – 68,6 % |
+| ... solo módulos **con material** | 17 | 15 de 17 (88,2 %) | 65,7 – 96,7 % |
+| ... módulos **sin material** | 12 | 0 de 12 | — |
+| **Con evidencia obligatoria** | 10 de 30 pedidas | 10 de 10 (100 %) | 72,2 – 100 % |
+
+**Hallazgos:**
+1. **Los dos módulos sin material («Verbos y Tiempos», «Lógica Proposicional») generaron preguntas completas** con un contexto de 32 a 45 caracteres: salen del conocimiento del modelo, justo lo que el profesor rechaza. Explican **12 de las 14 preguntas malas** del lote base. No existía ninguna guarda.
+2. **El juez de la app aprobó las 12** (con su criterio `subject`), y **cambiar al criterio `material` tampoco las atrapa**: sobre estas 39 preguntas el criterio `subject` atrapa 0 de 14 malas y el criterio `material` también 0 de 14, pero este último duda de 9 de las 25 buenas. **Cambiar el criterio por defecto del juez no resuelve nada** y empeoraría a las buenas.
+3. **La evidencia obligatoria sube la calidad de lo que sobrevive, pero a un costo**: se descartaron 20 de 30 (8 de 18 en los módulos con material: 44 %) por evidencia no literal. En los módulos con material, 15/17 (base) frente a 10/10 (evidencia) **no es una diferencia concluyente** (IC 66–97 % frente a 72–100 %; n pequeño); la ganancia fiable es estructural: **toda pregunta sobreviviente lleva una cita verificable**, que además se puede mostrar al profesor.
+4. **El validador determinista de forma ya filtra** parte de los defectos funcionales; los de **contenido** (anclaje) se resuelven con la guarda y la evidencia.
+
+### 14.8 Freno de material (activo): sin material suficiente no se genera
+`hasEnoughMaterial` (`MIN_MATERIAL_CHARS = 600`, sin contar las etiquetas «[Sección: …]») se aplica en los **dos** puntos de generación (`/api/generate-questions` responde 422 `no_material`; `regeneratePool` devuelve un error claro), **antes** de pedir preguntas al modelo. Es determinista, sin costo de IA, y habría evitado 12 de las 14 preguntas malas de la ronda 2. Si el recorte de material que recupera el RAG es menor que el umbral, tampoco se genera (se prefiere no generar a generar de memoria).
+
+### 14.9 Límites y pendientes
+- n pequeño (39): las cifras orientan, no prueban.
+- Sigue pendiente verificar con evidencia las **85 preguntas servidas en los 3 módulos de Microeconomía con muy poco material** (2, 7 y 8 fragmentos) y una muestra de las demás, y decidir su destino.
+- La regla `--evidencia` **no** está activa en producción (solo en el bucle): primero hay que decidir si el costo de descartar ~44 % de lo generado compensa, y si se guarda la cita en la base (requeriría una migración).

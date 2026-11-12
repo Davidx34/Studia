@@ -15,8 +15,8 @@ describe('script del bucle con juez externo (scripts/lote.ts)', () => {
   });
   it('exige una revision VALIDA antes de aplicar', () => {
     const aplicar = s.slice(s.indexOf('async function aplicar'), s.indexOf('(async () => {'));
-    expect(aplicar).toContain('validateRevision(lot, rev)');
-    expect(aplicar.indexOf('validateRevision(lot, rev)')).toBeLessThan(aplicar.indexOf('.insert('));
+    expect(aplicar).toContain('validateRevision(lot, rev');
+    expect(aplicar.indexOf('validateRevision(lot, rev')).toBeLessThan(aplicar.indexOf('.insert('));
   });
   it('regla asimetrica: retirar una mala es siempre posible; aprobar exige que el revisor este VALIDADO', () => {
     const aplicar = s.slice(s.indexOf('async function aplicar'), s.indexOf('(async () => {'));

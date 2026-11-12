@@ -1,0 +1,62 @@
+{
+  "lote": "2026-11-11-g21-68rb",
+  "fecha": "2026-11-11T15:13:01.166Z",
+  "arm": "base",
+  "kind": "generated",
+  "revisor": "claude-externo (sesion de Claude Code; criterio del profesor: explicito en el material, con cita literal verificable)",
+  "resumen": {
+    "n": 10,
+    "cruda": {
+      "k": 10,
+      "n": 10,
+      "rate": 1,
+      "ci": {
+        "low": 0.7224598312333834,
+        "high": 1
+      }
+    },
+    "entregable": {
+      "k": 10,
+      "n": 10,
+      "rate": 1,
+      "ci": {
+        "low": 0.7224598312333834,
+        "high": 1
+      }
+    },
+    "veredictos": {
+      "bueno": 10,
+      "corregir": 0,
+      "malo": 0
+    },
+    "defectosPorCodigo": {
+      "dato_faltante": 1
+    },
+    "defectosSeriosPorCodigo": {},
+    "metaCruda": {
+      "target": 0.9,
+      "status": "probable",
+      "neededN": 35
+    },
+    "metaEntregable": {
+      "target": 0.9,
+      "status": "probable",
+      "neededN": 35
+    }
+  },
+  "juezVsExterno": {
+    "pairs": 10,
+    "falsePass": 0,
+    "judgePass": 9,
+    "passPrecision": {
+      "k": 9,
+      "n": 9,
+      "rate": 1,
+      "ci": {
+        "low": 0.7008472464490406,
+        "high": 1
+      }
+    },
+    "falseAlarm": 1
+  }
+}
