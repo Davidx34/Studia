@@ -246,3 +246,28 @@ El profesor decidió 30 de las 39 preguntas clásicas de la cola que el revisor 
 - **Hipótesis probadas y descartadas con los datos:** (1) *duplicados*: rechazadas y aprobadas tienen la misma frecuencia de gemelo aprobado y más antiguo (4/15 y 3/15); (2) *anclaje al material*: cuando el juez no pudo dar segunda opinión, el profesor aprobó 11 y rechazó 11 (sin patrón). **No se puede deducir el criterio del profesor con los datos que hay: hace falta preguntarle el motivo de las discrepancias.**
 - **Dos ejes distintos:** parte de las discrepancias (6 de «corregir» que el profesor aprobó) son defectos **funcionales** del calificador (palabras clave de más, variantes de respuesta) que no se ven leyendo el contenido y que ahora detecta el validador determinista; no son errores del revisor. El eje que importa para validar es el **de contenido**.
 - **Consecuencia:** no se aplican las 13 correcciones ni se insertan preguntas nuevas con este revisor. Las preguntas rechazadas por el profesor quedan retiradas; las 9 pendientes siguen en su cola.
+## 14. El criterio explícito del profesor: «todo debe estar en el material» (2026-11-11)
+
+### 14.1 El criterio
+Al revisar las 9 preguntas que el profesor rechazó y el revisor externo había dado por buenas, el profesor explicó su criterio: **no quiere preguntas cuyo contenido no esté explícitamente en los materiales**, por dos razones: (1) si no está explícito, el modelo está fallando en leer, extraer y generar; (2) los estudiantes estudian con los materiales y lo que no está allí no les sirve. También rechaza preguntas con **resultados incorrectos** de procedimientos, conceptos o ideas **no sustentadas por los materiales**. Esto **revierte** la decisión del 2026-10-27 de juzgar por «correcto en la materia» (criterio `subject` del juez): el criterio que coincide con el profesor es `material` (`JUDGE_CRITERION=material`).
+
+### 14.2 Se probó si ese criterio se puede medir de forma automática (70 preguntas con decisión del profesor: 30 de la cola + 40 de la muestra ciega; 20 malas)
+| Medida | Resultado |
+|---|---|
+| **Cobertura léxica** del enunciado + respuesta dentro de una ventana del material (determinista, sin IA) | AUC 0,36 (< 0,5: **invertida**); las malas tienen *más* cobertura (0,74) que las buenas (0,64) |
+| Presencia de la **respuesta** en el material | AUC 0,47 (≈ azar) |
+| **Verificador semántico** (IA obligada a citar la frase literal; el código comprueba que la cita existe) | En la cola: marca «mala» con precisión 50 % = la tasa base (sensibilidad 40 %); entre las que da por «explícita» el profesor rechazó 9 de 18. En la muestra ciega: precisión 21 % (tasa base 13 %), sensibilidad 60 % |
+
+**Conclusión:** ni el anclaje léxico ni el semántico predicen las decisiones del profesor sobre la cola. Para las 9 rechazadas que el revisor externo había dado por buenas, el verificador encontró una **cita literal válida** en el material (p. ej. las dos de Leontief citan la misma frase exacta, y el «$320» del excedente del consumidor aparece en el material), así que **el anclaje no explica esos rechazos**.
+
+### 14.3 Lo que sí se puede explicar (poco)
+- **Casi-duplicados dentro de la cola:** el trío del excedente del consumidor (1 aprobada, 2 rechazadas) y el par de oferta-precio (1 y 1) son compatibles con «un representante por concepto»; el par de Leontief se rechazó entero y los 30 casos sin gemelo se decidieron ≈ 50/50 (11 aprobadas, 10 rechazadas). Los casi-duplicados explican a lo sumo 3–4 de 15 rechazos.
+- **Defectos funcionales del calificador** (respuestas aceptadas o palabras clave que dejan mal a quien contesta bien): reales y ya filtrados por el validador determinista (§13.5), pero invisibles al leer el contenido.
+
+### 14.4 Lo que NO se sabe
+Por qué el profesor rechaza ≈ 50 % de la cola cuando muchas de las rechazadas están literalmente en el material y son correctas. Candidatos aún sin probar: preguntas **triviales por copia literal** (la frase del material con una palabra quitada), **redundancia por concepto** más amplia que el casi-duplicado léxico, o criterios que dependen de cada pregunta. **Se pregunta al profesor** por el motivo de un conjunto pequeño de rechazos concretos antes de construir cualquier compuerta nueva; construir una sin entender el criterio reproduciría el error de §13.8.
+
+### 14.5 Decisiones operativas
+- El revisor externo sigue **no validado**: no aprueba ni inserta preguntas.
+- **No** se cambia el criterio por defecto del juez en este PR: el criterio `material` ya existe, pero con la evidencia disponible no se puede asegurar que reduzca el rechazo del profesor (hay que medirlo contra sus decisiones antes de activarlo en producción).
+- Código de investigación (cobertura léxica y verificador semántico) **no** se incorpora al sistema: no predice la decisión del profesor.
