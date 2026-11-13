@@ -1,0 +1,50 @@
+{
+  "lote": "2026-11-13-b1-jasb",
+  "fecha": "2026-11-13T13:58:07.404Z",
+  "arm": "banco",
+  "kind": "bank",
+  "revisor": "claude-externo (sesion de Claude Code; criterio del profesor: explicito en el material, con cita literal verificable)",
+  "resumen": {
+    "n": 15,
+    "cruda": {
+      "k": 15,
+      "n": 15,
+      "rate": 1,
+      "ci": {
+        "low": 0.7961107336956521,
+        "high": 1
+      }
+    },
+    "entregable": {
+      "k": 15,
+      "n": 15,
+      "rate": 1,
+      "ci": {
+        "low": 0.7961107336956521,
+        "high": 1
+      }
+    },
+    "veredictos": {
+      "bueno": 15,
+      "corregir": 0,
+      "malo": 0
+    },
+    "defectosPorCodigo": {
+      "trivial": 1,
+      "ambigua": 1,
+      "no_explicito": 1
+    },
+    "defectosSeriosPorCodigo": {},
+    "metaCruda": {
+      "target": 0.9,
+      "status": "probable",
+      "neededN": 35
+    },
+    "metaEntregable": {
+      "target": 0.9,
+      "status": "probable",
+      "neededN": 35
+    }
+  },
+  "juezVsExterno": null
+}

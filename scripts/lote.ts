@@ -2,7 +2,7 @@
 //
 //   1. generar          npx tsx --env-file=.env.local scripts/lote.ts generar --modulos 5 --por-modulo 8 [--semilla 1] [--reglas item_writing_v1] [--doctrina]
 //        La IA de la app genera EN LOCAL (sin tocar la base), pasa el validador de forma y el juez de la app, y deja el lote en memoria-calidad/lotes/<id>/ (lote.json + lote.md).
-//   1b. exportar-banco  npx tsx --env-file=.env.local scripts/lote.ts exportar-banco --n 40 [--estado approved|pending|human_review|todas] [--semilla 1]
+//   1b. exportar-banco  npx tsx --env-file=.env.local scripts/lote.ts exportar-banco --n 40 [--estado approved|pending|human_review|todas] [--modulo <id>] [--semilla 1]
 //        Lo mismo, pero con preguntas que YA se sirven a los estudiantes (solo lectura): para medir y corregir la calidad del banco real.
 //   2. (revision)       El revisor externo lee lote.md, y escribe memoria-calidad/lotes/<id>/revision.json (ver docs §13.2 para el formato).
 //   3. resumen          npx tsx --env-file=.env.local scripts/lote.ts resumen <id> [--guardar]
@@ -186,18 +186,18 @@ async function exportarBanco() {
   const reales = new Map((mods ?? []).filter((m: any) => !String(m.classrooms?.name ?? '').startsWith('[CARGA]')).map((m: any) => [m.id as string, m.title as string]));
   const rows: any[] = [];
   for (let from = 0; ; from += 1000) {
-    const { data } = await d.from('lesson_questions').select('id, module_id, type, q, opts, ok, exp, answers, keywords, concept_tag, review_status, reviewed_by, review_reason').neq('review_status', 'rejected').range(from, from + 999);
+    const { data } = await d.from('lesson_questions').select('id, module_id, type, q, opts, ok, exp, answers, keywords, pairs, concept_tag, review_status, reviewed_by, review_reason').neq('review_status', 'rejected').range(from, from + 999);
     rows.push(...(data ?? []));
     if (!data || data.length < 1000) break;
   }
-  const pool = rows.filter((r) => reales.has(r.module_id) && ['multiple_choice', 'true_false', 'fill_blank', 'short_answer'].includes(r.type) && r.reviewed_by !== 'teacher' && r.reviewed_by !== 'external_ai' && (estado === 'todas' || r.review_status === estado));
+  const pool = rows.filter((r) => reales.has(r.module_id) && ['multiple_choice', 'true_false', 'fill_blank', 'short_answer', 'match'].includes(r.type) && r.reviewed_by !== 'teacher' && r.reviewed_by !== 'external_ai' && (estado === 'todas' || r.review_status === estado) && (!val('--modulo') || r.module_id === val('--modulo')));
   const sel = shuffle(pool, rng(semilla)).slice(0, n);
   const id = `${new Date().toISOString().slice(0, 10)}-b${semilla}-${Date.now().toString(36).slice(-4)}`;
   const contextos: Record<string, string> = {};
   for (const mid of new Set(sel.map((r) => r.module_id))) contextos[mid] = await getRagContext(d, mid).catch(() => '');
   const items: LotItem[] = sel.map((r, i) => {
     const question: any = { type: r.type, q: r.q, exp: r.exp, concept_tag: r.concept_tag };
-    for (const k of ['opts', 'ok', 'answers', 'keywords']) if (r[k] !== null && r[k] !== undefined) question[k] = r[k];
+    for (const k of ['opts', 'ok', 'answers', 'keywords', 'pairs']) if (r[k] !== null && r[k] !== undefined) question[k] = r[k];
     return { id: `${id}-${i + 1}`, module_id: r.module_id, module_title: reales.get(r.module_id)!, question, judge: r.reviewed_by === 'ai_judge' ? { verdict: r.review_status === 'approved' ? 'pass' : r.review_status === 'rejected' ? 'fail' : 'review', reason: r.review_reason ?? '' } : null, bankId: r.id } as LotItem & { bankId: string };
   });
   console.log(`Pool elegible: ${pool.length} | estado: ${estado}`);
