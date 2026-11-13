@@ -2,7 +2,7 @@
 //
 //   1. generar          npx tsx --env-file=.env.local scripts/lote.ts generar --modulos 5 --por-modulo 8 [--semilla 1] [--reglas item_writing_v1] [--doctrina]
 //        La IA de la app genera EN LOCAL (sin tocar la base), pasa el validador de forma y el juez de la app, y deja el lote en memoria-calidad/lotes/<id>/ (lote.json + lote.md).
-//   1b. exportar-banco  npx tsx --env-file=.env.local scripts/lote.ts exportar-banco --n 40 [--estado approved|pending|human_review|todas] [--modulo <id>] [--semilla 1]
+//   1b. exportar-banco  npx tsx --env-file=.env.local scripts/lote.ts exportar-banco --n 40 [--estado approved|pending|human_review|todas] [--modulo <id>[,<id>...]] [--semilla 1]
 //        Lo mismo, pero con preguntas que YA se sirven a los estudiantes (solo lectura): para medir y corregir la calidad del banco real.
 //   2. (revision)       El revisor externo lee lote.md, y escribe memoria-calidad/lotes/<id>/revision.json (ver docs §13.2 para el formato).
 //   3. resumen          npx tsx --env-file=.env.local scripts/lote.ts resumen <id> [--guardar]
@@ -190,7 +190,7 @@ async function exportarBanco() {
     rows.push(...(data ?? []));
     if (!data || data.length < 1000) break;
   }
-  const pool = rows.filter((r) => reales.has(r.module_id) && ['multiple_choice', 'true_false', 'fill_blank', 'short_answer', 'match'].includes(r.type) && r.reviewed_by !== 'teacher' && r.reviewed_by !== 'external_ai' && (estado === 'todas' || r.review_status === estado) && (!val('--modulo') || r.module_id === val('--modulo')));
+  const pool = rows.filter((r) => reales.has(r.module_id) && ['multiple_choice', 'true_false', 'fill_blank', 'short_answer', 'match'].includes(r.type) && r.reviewed_by !== 'teacher' && r.reviewed_by !== 'external_ai' && (estado === 'todas' || r.review_status === estado) && (!val('--modulo') || val('--modulo')!.split(',').includes(r.module_id)));
   const sel = shuffle(pool, rng(semilla)).slice(0, n);
   const id = `${new Date().toISOString().slice(0, 10)}-b${semilla}-${Date.now().toString(36).slice(-4)}`;
   const contextos: Record<string, string> = {};
