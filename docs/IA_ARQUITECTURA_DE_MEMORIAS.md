@@ -301,3 +301,26 @@ Mismos 5 módulos y la misma semilla en los dos lotes; 30 preguntas pedidas por 
 - n pequeño (39): las cifras orientan, no prueban.
 - Sigue pendiente verificar con evidencia las **85 preguntas servidas en los 3 módulos de Microeconomía con muy poco material** (2, 7 y 8 fragmentos) y una muestra de las demás, y decidir su destino.
 - La regla `--evidencia` **no** está activa en producción (solo en el bucle): primero hay que decidir si el costo de descartar ~44 % de lo generado compensa, y si se guarda la cita en la base (requeriría una migración).
+
+## 15. Evidencia obligatoria en la generación (2026-11-13)
+
+### 15.1 Por qué
+Dos mediciones apuntan al mismo lugar. (1) Mejorar la extracción del PDF a Markdown (§14, reproceso de 7 presentaciones: más fórmulas en LaTeX, 48 → 58 fragmentos) subió el respaldo explícito de las preguntas ya servidas de 52 a 55 de 80 (65 % → 69 %, diferencia no concluyente). (2) **17 de esas 80 (21 %) no tienen respaldo explícito con ninguna de las dos versiones del material**: el generador las produjo sin que el material las diga. La extracción ayuda poco; lo que falta es **restringir la generación a una cita del material**.
+
+### 15.2 Qué hace (interruptor `EVIDENCE_REQUIRED=on`, APAGADO por defecto)
+1. **Prompt:** agrega la regla de evidencia (el campo `evidence` debe ser una frase copiada textualmente del material; si no hay una, no se genera la pregunta).
+2. **Compuerta** (`evidenceGate.ts`), en `/api/generate-questions` y en `regeneratePool`, **antes** de la compuerta de calificación (JEV): solo se conservan las preguntas clásicas cuya cita existe **literalmente** en el contexto que recibió el generador. Se descarta lo que no trae evidencia o trae una cita no literal. Los **minijuegos** quedan fuera (su contenido vive en `game_data`).
+3. **Guardado:** la cita verificada se guarda en `lesson_questions.evidence` / `evidence_status` (**migración 104**, aditiva y nullable) y se muestra en la pantalla de Revisión («Evidencia en el material (cita literal verificada)»).
+4. **Seguridad:** la cita contiene la respuesta, así que **nunca se sirve al estudiante** (`stripEvidence`).
+
+### 15.3 Verificación tolerante a LaTeX
+El material convertido trae LaTeX (`$p_x$`, `\frac{\alpha K}{p_x}`, `\succeq`) y el modelo puede citar con símbolos o sin formato. `plainMath` convierte el formato y los símbolos griegos a su nombre antes de comparar; si la comparación normal falla, se compara sin espacios (solo citas de ≥ 30 caracteres, para evitar coincidencias casuales). Una cita parafraseada o inventada sigue rechazándose.
+
+### 15.4 Cómo activarlo y qué cuesta
+Orden: (1) aplicar la migración 104; (2) definir `EVIDENCE_REQUIRED=on` en Vercel (Production). Con el interruptor apagado **no cambia nada**: ni el prompt, ni lo que se descarta, ni las columnas que se escriben (la base funciona sin la 104). **Costo medido en el bucle local:** se descarta ≈ 44 % de lo generado en módulos con material, y el modelo debe copiar la frase literal, así que cada reposición del banco necesita más llamadas a la IA. Si la compuerta descarta un lote entero, el flujo existente responde «no se generó ninguna pregunta válida» sin borrar el banco.
+
+### 15.5 Límites
+- Verificar que la frase **existe** no prueba que **respalde** la respuesta: eso lo sigue juzgando el profesor (que ahora ve la cita) o el revisor externo.
+- La cita se verifica contra el **contexto que recibió el generador** (hasta 16 000 caracteres de los fragmentos recuperados), no contra todo el material.
+- Las preguntas ya existentes no tienen cita; auditarlas es una tarea aparte (§14.9).
+- No medido todavía: cuánto sube el respaldo con la verificación tolerante a LaTeX (en la medición del §15.1, 3 preguntas pasaron de «explícita» a «cita no literal» por el formato) ni cuántas preguntas por llamada sobreviven en producción.

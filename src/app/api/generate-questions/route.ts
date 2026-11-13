@@ -1,4 +1,5 @@
 import { loadStyleAndMemoryBlock } from '@/lib/aiLearning/classMemory';
+import { evidenceColumns, gateEvidence, stripEvidence, withEvidenceBlock } from '@/lib/aiLearning/evidenceGate';
 import { doctrineEnabled } from '@/lib/aiLearning/doctrine';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -224,7 +225,7 @@ export async function POST(req: NextRequest) {
       classicCount: TOTAL_QUESTIONS,
       minigames: minigameTypes,
       conceptBlock: conceptTaxonomyPromptBlock(closedConcepts),
-      playbookBlock,
+      playbookBlock: withEvidenceBlock(playbookBlock),
       useDoctrine: doctrineEnabled(),
     });
 
@@ -255,13 +256,17 @@ export async function POST(req: NextRequest) {
 
     // JEV-2: ademas de la forma, el ejercicio tiene que poder CALIFICARSE: se simula la jugada perfecta con los calificadores del servidor (src/lib/jev). Si no sale 100 %,
     // o hay otra opcion que tambien puntua, se descarta aqui y nunca llega a la base ni a un estudiante.
-    const gate = gateGenerated(structurallyValid);
+    // Evidencia obligatoria (EVIDENCE_REQUIRED=on; apagada por defecto): solo pasan las clasicas con cita literal del material que recibio el generador.
+    const evGate = gateEvidence(structurallyValid, context);
+    if (evGate.dropped > 0) console.warn('[EVIDENCE_GATE]', { moduleId, sinEvidencia: evGate.droppedNoEvidence, citaNoLiteral: evGate.droppedNotLiteral });
+    const gate = gateGenerated(evGate.kept);
     logGateResult('GENERATE', { moduleId }, gate);
     const validGenerated = gate.kept;
 
     // 3. Guardar lo generado en el cache para las proximas aperturas (best-effort),
     // y recuperar los ids asignados por la base para poder trackear intentos.
-    let generatedWithIds = validGenerated;
+    // La evidencia contiene la respuesta: se guarda en la base pero NUNCA se sirve al estudiante.
+    let generatedWithIds: any[] = validGenerated.map(stripEvidence);
     if (moduleId && supabase && validGenerated.length > 0) {
       const targetModuleId: string = moduleId;
       const rows = validGenerated.map((q) => ({
@@ -277,11 +282,12 @@ export async function POST(req: NextRequest) {
         concept_tag: q.concept_tag ?? null,
         game_type: q.game_type ?? null,
         game_data: q.game_data ?? null,
+        ...evidenceColumns(q),
       }));
       const writer = moduleVisible ? questionBank(supabase) : supabase;
       const { data: inserted } = await writer.from('lesson_questions').insert(rows).select('id');
       if (inserted && inserted.length === validGenerated.length) {
-        generatedWithIds = validGenerated.map((q, i) => ({ ...q, id: inserted[i].id }));
+        generatedWithIds = validGenerated.map((q, i) => ({ ...stripEvidence(q), id: inserted[i].id }));
       }
     }
 

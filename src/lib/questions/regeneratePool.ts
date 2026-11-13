@@ -14,6 +14,7 @@ import { getOrCreateModuleConcepts, conceptTaxonomyPromptBlock } from '@/lib/que
 import { resolveQuestionCount, countServable, planFill } from '@/lib/questions/poolPlan';
 import { resolveConfig, resolveMinigames, enforceAllowedTypes, buildGenerationPrompt } from '@/lib/questions/generationConfig';
 import { loadStyleAndMemoryBlock } from '@/lib/aiLearning/classMemory';
+import { evidenceColumns, gateEvidence, withEvidenceBlock } from '@/lib/aiLearning/evidenceGate';
 import { doctrineEnabled } from '@/lib/aiLearning/doctrine';
 import { gateGenerated, logGateResult } from '@/lib/jev/runtimeGate';
 
@@ -131,7 +132,7 @@ export async function regenerateModulePool(
       classicCount: count,
       minigames,
       conceptBlock,
-      playbookBlock,
+      playbookBlock: withEvidenceBlock(playbookBlock),
       useDoctrine: doctrineEnabled(),
     });
     return { raw: await callCohere(built.prompt, built.total), requested: new Set(built.requestedTypes) };
@@ -163,7 +164,10 @@ export async function regenerateModulePool(
     });
     // JEV-2: ademas de la forma, el ejercicio tiene que poder CALIFICARSE (se simula la jugada perfecta con los calificadores del servidor). Lo que no, se descarta antes de guardar;
     // y como el borrado del pool viejo ('replace') va DESPUES de comprobar que algo sirve, un lote entero imposible no destruye el pool que ya habia.
-    const gate = gateGenerated(structurallyValid);
+    // Evidencia obligatoria (EVIDENCE_REQUIRED=on; apagada por defecto): solo pasan las clasicas con cita literal del material que recibio el generador.
+    const evGate = gateEvidence(structurallyValid, context);
+    if (evGate.dropped > 0) console.warn('[REGENERATE_EVIDENCE_GATE]', { moduleId, sinEvidencia: evGate.droppedNoEvidence, citaNoLiteral: evGate.droppedNotLiteral });
+    const gate = gateGenerated(evGate.kept);
     logGateResult('REGENERATE', { moduleId }, gate);
     return gate.kept;
   };
@@ -195,6 +199,7 @@ export async function regenerateModulePool(
     concept_tag: q.concept_tag ?? null,
     game_type: q.game_type ?? null,
     game_data: q.game_data ?? null,
+    ...evidenceColumns(q),
     is_backup: i >= activeQuestions.length,
     backup_pool_size: existingBackup + backupQuestions.length,
   }));

@@ -139,12 +139,12 @@ describe('cableado: la compuerta va ANTES de guardar, en los dos caminos de gene
   it('la ruta del estudiante filtra con la compuerta y solo guarda y sirve lo que paso', () => {
     const src = read('src/app/api/generate-questions/route.ts');
     expect(src).toContain("import { gateGenerated, logGateResult } from '@/lib/jev/runtimeGate';");
-    expect(src).toContain('const gate = gateGenerated(structurallyValid);');
+    expect(src).toContain('const gate = gateGenerated(evGate.kept);');
     expect(src).toContain('const validGenerated = gate.kept;');
     // y lo descartado se registra (sin esto nadie sabria cuantas preguntas imposibles genera la IA)
     expect(src).toContain("logGateResult('GENERATE', { moduleId }, gate);");
-    expect(src.indexOf("logGateResult('GENERATE'")).toBeGreaterThan(src.indexOf('gateGenerated(structurallyValid)'));
-    expect(src.indexOf('gateGenerated(structurallyValid)')).toBeLessThan(src.indexOf(".from('lesson_questions').insert(rows)"));
+    expect(src.indexOf("logGateResult('GENERATE'")).toBeGreaterThan(src.indexOf('gateGenerated(evGate.kept)'));
+    expect(src.indexOf('gateGenerated(evGate.kept)')).toBeLessThan(src.indexOf(".from('lesson_questions').insert(rows)"));
     // despues de la compuerta ya no se usa nada sin filtrar
     const after = src.slice(src.indexOf('const validGenerated = gate.kept;'));
     expect(after).not.toContain('structurallyValid');
@@ -152,9 +152,9 @@ describe('cableado: la compuerta va ANTES de guardar, en los dos caminos de gene
   });
   it('regeneratePool filtra cada lote con la compuerta antes de armar las filas y de borrar el pool', () => {
     const src = read('src/lib/questions/regeneratePool.ts');
-    expect(src).toContain('const gate = gateGenerated(structurallyValid);');
+    expect(src).toContain('const gate = gateGenerated(evGate.kept);');
     expect(src).toContain('return gate.kept;');
-    expect(src.indexOf('gateGenerated(structurallyValid)')).toBeLessThan(src.indexOf("No se genero ninguna pregunta valida"));
+    expect(src.indexOf('gateGenerated(evGate.kept)')).toBeLessThan(src.indexOf("No se genero ninguna pregunta valida"));
     expect(src.indexOf("No se genero ninguna pregunta valida")).toBeLessThan(src.indexOf(".delete().eq('module_id', moduleId)"));
   });
 });
