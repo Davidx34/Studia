@@ -25,6 +25,9 @@ interface ReviewQuestion {
   game_type: string | null;
   game_data: unknown;
   review_reason: string | null;
+  /** Cita literal del material que respalda la respuesta (la guarda la generacion con evidencia obligatoria). */
+  evidence?: string | null;
+  evidence_status?: string | null;
 }
 
 // Fase 1.3: vista funcional, no decorativa, a proposito -- el plan explicita
@@ -129,6 +132,11 @@ export default function ReviewClient({ classroomId, questions, calibration, flag
                       {/* La razon del juez (migracion 044) -- antes se
                           calculaba y se tiraba, dejando al profesor una cola
                           sin ninguna pista de por que cada pregunta esta ahi. */}
+                      {q.evidence && q.evidence_status === 'verified' && (
+                        <p className="text-xs mt-2 p-2 rounded-lg bg-surface border border-line text-fg-muted" data-testid="question-evidence">
+                          <span className="font-medium text-fg">Evidencia en el material (cita literal verificada):</span> «{q.evidence}»
+                        </p>
+                      )}
                       {q.review_reason && (
                         <p className="text-xs mt-2 p-2 rounded-lg bg-accent/10 border border-accent/20 text-accent-text/90">
                           <span className="font-medium">Por qué la marcó la IA:</span> {q.review_reason}
