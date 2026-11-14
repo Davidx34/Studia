@@ -1,0 +1,57 @@
+{
+  "lote": "2026-11-13-b1-hzns",
+  "fecha": "2026-11-13T14:26:14.726Z",
+  "arm": "banco",
+  "kind": "bank",
+  "revisor": "claude-externo (sesion de Claude Code; criterio del profesor: explicito en el material, con cita literal verificable; tanda 2 ciega)",
+  "resumen": {
+    "n": 23,
+    "cruda": {
+      "k": 17,
+      "n": 23,
+      "rate": 0.7391304347826086,
+      "ci": {
+        "low": 0.5352960945624944,
+        "high": 0.8745155411075103
+      }
+    },
+    "entregable": {
+      "k": 20,
+      "n": 23,
+      "rate": 0.8695652173913043,
+      "ci": {
+        "low": 0.678721020269818,
+        "high": 0.9546242348565529
+      }
+    },
+    "veredictos": {
+      "bueno": 17,
+      "corregir": 3,
+      "malo": 3
+    },
+    "defectosPorCodigo": {
+      "no_explicito": 1,
+      "respuesta_incorrecta": 1,
+      "ambigua": 5,
+      "trivial": 1,
+      "dato_faltante": 1
+    },
+    "defectosSeriosPorCodigo": {
+      "no_explicito": 1,
+      "respuesta_incorrecta": 1,
+      "ambigua": 3,
+      "dato_faltante": 1
+    },
+    "metaCruda": {
+      "target": 0.9,
+      "status": "no_alcanzada",
+      "neededN": null
+    },
+    "metaEntregable": {
+      "target": 0.9,
+      "status": "no_alcanzada",
+      "neededN": null
+    }
+  },
+  "juezVsExterno": null
+}
