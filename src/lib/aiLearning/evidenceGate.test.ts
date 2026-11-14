@@ -81,3 +81,19 @@ describe('cableado', () => {
     expect(ui).toContain("q.evidence && q.evidence_status === 'verified'");
   });
 });
+
+describe('reglas de redaccion aprendidas del profesor', () => {
+  const buena = (ev: string, q = '¿Cuál?') => ({ type: 'multiple_choice', q, opts: ['a', 'b'], ok: 0, evidence: ev });
+  const ctx = 'La condición de primer orden exige que el valor del producto marginal sea igual al precio del insumo. Los costos fijos son los generados por factores fijos de producción en el corto plazo.';
+  it('descarta fragmentos cortados en dos puntos y citas repetidas del lote', () => {
+    const a = buena('La condición de primer orden exige que el valor del producto marginal sea igual al precio del insumo');
+    const rep = buena('condición de primer orden exige que el valor del producto marginal sea igual al precio del insumo.');
+    const frag = buena('Los costos fijos son los generados por factores fijos de producción en el corto plazo', '¿Qué indica la frase:');
+    const r = gateEvidence([a, rep, frag], ctx, ON);
+    expect(r.kept).toEqual([a]);
+    expect(r).toMatchObject({ droppedDuplicate: 1, droppedFragment: 1 });
+  });
+  it('el prompt incluye las reglas de redaccion', () => {
+    expect(EVIDENCE_PROMPT_BLOCK).toContain('REGLAS DE REDACCION');
+  });
+});
