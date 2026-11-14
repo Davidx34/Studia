@@ -22,6 +22,23 @@ export interface EvidenceGateResult {
   dropped: number;
   droppedNoEvidence: number;
   droppedNotLiteral: number;
+  droppedFragment?: number;
+  droppedDuplicate?: number;
+}
+
+const toks = (s: string) => new Set(s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((t) => t.length >= 4));
+/** Solapamiento de contenido entre dos citas (Jaccard sobre palabras de 4+ letras). */
+export function citasSolapadas(a: string, b: string, umbral = 0.6): boolean {
+  const A = toks(a), B = toks(b);
+  if (!A.size || !B.size) return false;
+  let i = 0;
+  for (const t of A) if (B.has(t)) i++;
+  return i / (A.size + B.size - i) >= umbral;
+}
+/** Enunciado o definicion que termina en dos puntos: fragmento de diapositiva cortado. */
+export function esFragmentoCortado(q: any): boolean {
+  const fin = (s: unknown) => typeof s === 'string' && /:\s*["»”)?]*\s*$/.test(s.trim());
+  return fin(q?.q) || (Array.isArray(q?.pairs) && q.pairs.some((p: any) => fin(p?.def)));
 }
 
 /** Con el interruptor apagado devuelve todo sin tocar. Encendido: conserva minijuegos y clasicas con cita literal verificada en `context`; el resto se descarta. */
@@ -32,17 +49,26 @@ export function gateEvidence(questions: any[], context: string, env: Record<stri
   const kept: any[] = [];
   let droppedNoEvidence = 0;
   let droppedNotLiteral = 0;
+  let droppedFragment = 0;
+  let droppedDuplicate = 0;
+  const citas: string[] = [];
   for (const q of questions) {
     if (!CLASSIC_TYPES.has(q?.type)) {
       kept.push(q);
       continue;
     }
     const st = evidenceStatus(q, norm, compact);
-    if (st === 'verificada') kept.push(q);
-    else if (st === 'sin_evidencia') droppedNoEvidence++;
+    if (st === 'verificada') {
+      if (esFragmentoCortado(q)) droppedFragment++;
+      else if (citas.some((c) => citasSolapadas(c, q.evidence))) droppedDuplicate++;
+      else {
+        citas.push(q.evidence);
+        kept.push(q);
+      }
+    } else if (st === 'sin_evidencia') droppedNoEvidence++;
     else droppedNotLiteral++;
   }
-  return { kept, dropped: droppedNoEvidence + droppedNotLiteral, droppedNoEvidence, droppedNotLiteral };
+  return { kept, dropped: droppedNoEvidence + droppedNotLiteral + droppedFragment + droppedDuplicate, droppedNoEvidence, droppedNotLiteral, droppedFragment, droppedDuplicate };
 }
 
 /** Campos de evidencia para guardar en la base: SOLO con el interruptor encendido (si esta apagado no se escribe nada, asi la base sigue funcionando sin la migracion 104). */
