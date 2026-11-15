@@ -1,0 +1,56 @@
+{
+  "lote": "2026-11-14-b1-nn8d",
+  "fecha": "2026-11-14T14:45:46.634Z",
+  "arm": "banco",
+  "kind": "bank",
+  "revisor": "claude-externo (sesion de Claude Code; criterio del profesor: explicito en el material, con cita literal verificable; tanda 3 ciega)",
+  "resumen": {
+    "n": 38,
+    "cruda": {
+      "k": 35,
+      "n": 38,
+      "rate": 0.9210526315789473,
+      "ci": {
+        "low": 0.792003210797347,
+        "high": 0.9727858986057349
+      }
+    },
+    "entregable": {
+      "k": 36,
+      "n": 38,
+      "rate": 0.9473684210526315,
+      "ci": {
+        "low": 0.8271423311893115,
+        "high": 0.9854460975514632
+      }
+    },
+    "veredictos": {
+      "bueno": 35,
+      "corregir": 1,
+      "malo": 2
+    },
+    "defectosPorCodigo": {
+      "trivial": 1,
+      "ambigua": 1,
+      "pista_accidental": 2,
+      "respuesta_incorrecta": 1,
+      "no_explicito": 1
+    },
+    "defectosSeriosPorCodigo": {
+      "ambigua": 1,
+      "respuesta_incorrecta": 1,
+      "no_explicito": 1
+    },
+    "metaCruda": {
+      "target": 0.9,
+      "status": "probable",
+      "neededN": 777
+    },
+    "metaEntregable": {
+      "target": 0.9,
+      "status": "probable",
+      "neededN": 140
+    }
+  },
+  "juezVsExterno": null
+}
